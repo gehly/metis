@@ -628,7 +628,7 @@ if __name__ == '__main__':
     dt = 10  # sec    
     UTC_now = ts.now().utc
     sec_array = list(range(0,86400*ndays,dt))
-    UTC_array = ts.utc(UTC_now[0], UTC_now[1], UTC_now[2], UTC_now[3],
+    UTC_array = ts.utc(UTC_now[0], UTC_now[1], UTC_now[2]+2, UTC_now[3]+16,
                        UTC_now[4], sec_array)
     
     # Generate visible pass dictionary
