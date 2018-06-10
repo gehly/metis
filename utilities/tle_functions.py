@@ -1,26 +1,17 @@
 import numpy as np
-from math import pi, cos, sin, acos, asin, log10
+from math import pi
 import requests
-import os
-import sys
 import getpass
-import csv
+from datetime import datetime, timedelta
+import time
 
-cwd = os.getcwd()
-metis_dir = cwd[0:-10]
-sys.path.append(metis_dir)
+from conversions import utcdt2utcmjd, utcdt2ttjd
 
-from skyfield.positionlib import ICRF
-from skyfield.constants import ERAD
-from skyfield.api import Star, Topos, EarthSatellite, Loader
-
-import sensors.sensors as sensors
+from sgp4.io import twoline2rv
+from sgp4.earth_gravity import wgs84
 
 
-
-
-
-def get_spacetrack_tle_data(obj_id_list):
+def get_spacetrack_tle_data(obj_id_list, username='', password=''):
     '''
     This function retrieves the latest two-line element (TLE) data for objects
     in the input list from space-track.org.
@@ -29,15 +20,21 @@ def get_spacetrack_tle_data(obj_id_list):
     ------
     obj_id_list : list
         object NORAD IDs (int)
+    username : string, optional
+        space-track.org username (code will prompt for input if not supplied)
+    password : string, optional
+        space-track.org password (code will prompt for input in not supplied)
     
     Returns
     ------
     r : str
         string returned from requests containing TLE data
     '''
-        
-    username = input('space-track username: ')
-    password = getpass.getpass('space-track password: ')    
+    
+    if len(username) == 0:    
+        username = input('space-track username: ')
+    if len(password) == 0:
+        password = getpass.getpass('space-track password: ')    
     
     myString = ",".join(map(str, obj_id_list))
     
@@ -51,43 +48,12 @@ def get_spacetrack_tle_data(obj_id_list):
         r = s.get('https:' + pageData)
         if r.status_code != requests.codes.ok:
             print("Error: Page data request failed.")
-    
-    return r
-
-
-def define_RSOs(obj_id_list):
-    '''
-    This function generates the resident space object (RSO) dictionary by 
-    retrieving data about RSOs including recent position/velocity states
-    and phyical parameters relating to size and shape from websites
-    or databases as available.
-    
-    Parameters
-    ------
-    obj_id_list : list
-        object NORAD IDs (int)
-    
-    Returns
-    ------
-    rso_dict : dictionary
-        RSO state and parameters indexed by object NORAD ID
-    '''
-    
-    
-    # Initialize output
-    rso_dict = {}    
-    
-    # Load TLE Data
-    # Include options here to import from space-track, celestrak, text file,
-    # other URL, graph database, ...
-    
-    # Download from space-track.org
-    r = get_spacetrack_tle_data(obj_id_list)    
-
-    # Parse space-track.org TLE data
+            
+    # Parse response and form output
+    tle_dict = {}
     nchar = 69
     nskip = 2
-    ii = 0    
+    ii = 0  
     for obj_id in obj_id_list:
         line1_start = ii*2*(nchar+nskip)
         line1_stop = ii*2*(nchar+nskip) + nchar
@@ -95,550 +61,282 @@ def define_RSOs(obj_id_list):
         line2_stop = ii*2*(nchar+nskip) + 2*nchar + nskip
         line1 = r.text[line1_start:line1_stop]
         line2 = r.text[line2_start:line2_stop]
+
+        tle_dict[obj_id] = {}
+        tle_dict[obj_id]['line1'] = line1
+        tle_dict[obj_id]['line2'] = line2
         
-        # Instantiate skyfield object
-        satellite = EarthSatellite(line1, line2, name=str(obj_id))
-        rso_dict[obj_id] = {}
-        rso_dict[obj_id]['satellite'] = satellite
+        ii += 1
+    
+    return tle_dict
+
+
+def get_celestrak_eop_alldata():
+    
+    start = time.time()
+    
+    pageData = 'https://celestrak.com/SpaceData/eop19620101.txt'
+
+    r = requests.get(pageData)
+    if r.status_code != requests.codes.ok:
+        print("Error: Page data request failed.")
+            
+    print(r.text[0:200])
+    
+    print('Time: ', time.time()-start)
+    
+    ind_NUM_OBSERVED_POINTS = r.text.find('NUM_OBSERVED_POINTS')
+    ind_BEGIN_OBSERVED = r.text.find('BEGIN OBSERVED')
+    ind_END_OBSERVED = r.text.find('END OBSERVED')
+    ind_NUM_PREDICTED_POINTS = r.text.find('NUM_PREDICTED_POINTS')
+    ind_BEGIN_PREDICTED = r.text.find('BEGIN PREDICTED')
+    ind_END_PREDICTED = r.text.find('END PREDICTED')
+    
+    print(ind_NUM_OBSERVED_POINTS)
+    print(ind_BEGIN_OBSERVED)
+    print(ind_END_OBSERVED)
+    print(ind_NUM_PREDICTED_POINTS)
+    print(ind_BEGIN_PREDICTED)
+    print(ind_END_PREDICTED)
+    
+    
+    test = r.text[ind_NUM_OBSERVED_POINTS:ind_BEGIN_OBSERVED]
+    print(test)
+    print(len(test))
+    
+    # Reduce to data
+    data_text = r.text[ind_BEGIN_OBSERVED+16:ind_END_OBSERVED] \
+        + r.text[ind_BEGIN_PREDICTED+17:ind_END_PREDICTED]
+    
+    
+    print(data_text[-19200:-18000])
+    
+
+    
+    return data_text
+
+
+def get_eop_data(data_text, UTC):
+    
         
+    # Compute MJD for desired time
+    MJD = utcdt2utcmjd(UTC)
+    MJD_int = int(MJD)
+    
+    print('\n\n Parse Lines')
+    
+    # Find EOP data lines around time of interest
+    nchar = 102
+    nskip = 1
+    nlines = 0
+    for ii in range(len(data_text)):
+        start = ii + nlines*(nchar+nskip)
+        stop = ii + nlines*(nchar+nskip) + nchar
+        line = data_text[start:stop]
+        nlines += 1
         
-    # Initialize object size
-    # Include options here for RCS from SATCAT, graph database, ...    
+        MJD_line = int(line[11:16])
+        
+        if MJD_line == MJD_int:
+            line0 = line
+        if MJD_line == MJD_int+1:
+            line1 = line
+            break
+        
+
+    print(line0)
+    print(line1)
+    
+    # Compute EOP data at desired time by interpolating
+    EOP_data = eop_linear_interpolate(line0, line1, MJD)
+    
+    
+    return EOP_data
+
+
+def eop_linear_interpolate(line0, line1, MJD):
+    
+    
+    # Initialize output
+    EOP_data = {}
+    
+    # Leap seconds do not interpolate
+    EOP_data['TAI_UTC'] = int(line0[99:102])
+    
+    # Retrieve values
+    line0_array = eop_read_line(line0)
+    line1_array = eop_read_line(line1)
+    
+    # Adjust UT1-UTC column in case leap second occurs between lines
+    line0_array[3] -= line0_array[9]
+    line1_array[3] -= line1_array[9]
+    
+    # Linear interpolation
+    dt = MJD - line0_array[0]
+    interp = (line1_array[1:] - line0_array[1:])/ \
+        (line1_array[0] - line0_array[0]) * dt + line0_array[1:]
+    
+    print(MJD)
+    print(dt)
+    print(line0_array)
+    print(line1_array)
+    print(interp)
+    
+    # Convert final output
+    arcsec2rad = (1./3600.) * pi/180.
+    EOP_data['xp'] = interp[0]*arcsec2rad
+    EOP_data['yp'] = interp[1]*arcsec2rad
+    EOP_data['UT1_UTC'] = interp[2] + EOP_data['TAI_UTC']
+    EOP_data['LOD'] = interp[3]
+    EOP_data['ddPsi'] = interp[4]*arcsec2rad
+    EOP_data['ddEps'] = interp[5]*arcsec2rad
+    EOP_data['dX'] = interp[6]*arcsec2rad
+    EOP_data['dY'] = interp[7]*arcsec2rad
+    
+    print(EOP_data)
+
+    
+    
+    
+    
+    return EOP_data
+
+
+def eop_read_line(line):
+    '''
+    http://celestrak.com/SpaceData/EOP-format.asp
+    
+    012-016	Modified Julian Date (Julian Date at 0h UT minus 2400000.5)
+    018-026	x (arc seconds)
+    028-036	y (arc seconds)
+    038-047	UT1-UTC (seconds)
+    049-058	Length of Day (seconds)
+    060-068	δΔψ (arc seconds)
+    070-078	δΔε (arc seconds)
+    080-088	δX (arc seconds)
+    090-098	δY (arc seconds)
+    100-102	Delta Atomic Time, TAI-UTC (seconds)
+    '''
+    
+    MJD = int(line[11:16])
+    xp = float(line[17:26])
+    yp = float(line[27:36])
+    UT1_UTC = float(line[37:47])
+    LOD = float(line[48:58])
+    ddPsi = float(line[59:68])
+    ddEps = float(line[69:78])
+    dX = float(line[79:88])
+    dY = float(line[89:98])
+    TAI_UTC = float(line[99:102])
+    
+    line_array = np.array([MJD, xp, yp, UT1_UTC, LOD, ddPsi, ddEps, dX, dY,
+                           TAI_UTC])
+    
+    return line_array
+
+        
+
+
+def propagate_TLE(obj_id_list, UTC_list, username='', password=''):
+    
+    
+    
+    # Retrieve latest TLE data from space-track.org
+    tle_dict = get_spacetrack_tle_data(obj_id_list, username, password)
+    
+    # Retrieve latest EOP data from celestrak.com
+    eop_alldata = get_celestrak_eop_alldata()
+    
+    # Loop over objects
     for obj_id in obj_id_list:
         
-        # Dummy value for all satellites
-        rso_dict[obj_id]['rcs_m2'] = 1.
-    
-    return rso_dict
-
-
-def compute_visible_passes(UTC_array, obj_id_list, sensor_id_list, ephemeris):
-    '''
-    This function computes the visible passes for a given list of 
-    resident space objects (RSOs) from one or more sensors. Output includes
-    the start and stop times of each pass, as well as the time of closest
-    approach (TCA) and time of maximum elevation (TME).  
-    
-    Parameters
-    ------
-    UTC_array : 1D numpy array
-        times to compute visibility conditions
-        stored as skyfield time objects that can be extracted in multiple
-        time systems or representations
-    obj_id_list : list
-        object NORAD IDs (int)
-    sensor_id_list : list
-        sensor IDs (str)
-    ephemeris : skyfield object
-        contains data about sun, moon, and planets loaded from skyfield
-    
-    Returns
-    ------
-    vis_dict : dictionary
-        contains sorted lists of pass start and stop times for each object
-        and sensor, as well as TCA and TME times, and maximum elevation angle
-        and minimum range to the RSO during the pass
-
-    '''
-    
-    # Constants
-    Re = ERAD/1000.   # km
-    
-    # Generate resident space object dictionary
-    rso_dict = define_RSOs(obj_id_list)
-    
-    # Load sensor data
-    # Include options here to load from file, URL, graph database, ...
-    
-    # Load from script
-    sensor_dict = sensors.define_sensors()
-    
-    # Remove sensors not in list
-    sensor_remove_list = list(set(sensor_dict.keys()) - set(sensor_id_list))
-    for sensor_id in sensor_remove_list:
-        sensor_dict.pop(sensor_id, None)
-    
-    # Instantiate a skyfield object for each sensor in list
-    for sensor_id in sensor_dict.keys():
-        geodetic_latlonht = sensor_dict[sensor_id]['geodetic_latlonht']
-        lat = geodetic_latlonht[0]
-        lon = geodetic_latlonht[1]
-        elevation_m = geodetic_latlonht[2]*1000.
-        statTopos = Topos(latitude_degrees=lat, longitude_degrees=lon,
-                          elevation_m=elevation_m)
-        sensor_dict[sensor_id]['statTopos'] = statTopos
-
-    # Retrieve sun and moon positions for full timespan
-    earth = ephemeris['earth']
-    sun = ephemeris['sun']
-    moon = ephemeris['moon']
-    moon_icrf_array = earth.at(UTC_array).observe(moon).position.km
-    sun_icrf_array = earth.at(UTC_array).observe(sun).position.km
-
-    # Initialize output
-    start_list_all = []
-    stop_list_all = []
-    TCA_list_all = []
-    TME_list_all = []
-    rg_min_list_all = []
-    el_max_list_all = []
-    obj_id_list_all = []
-    sensor_id_list_all = []
-    
-    # Loop over RSOs
-    for obj_id in rso_dict:
-        rso = rso_dict[obj_id]
-        rso_icrf_array = rso['satellite'].at(UTC_array).position.km
+        line1 = tle_dict[obj_id]['line1']
+        line2 = tle_dict[obj_id]['line2']
         
-        # Retrieve object size and albedo if available/needed
-        radius_km = rcs2radius_meters(rso['rcs_m2'])/1000.
-
-        # Loop over sensors        
-        for sensor_id in sensor_dict:
-            sensor = sensor_dict[sensor_id]
-            sensor_icrf_array = sensor['statTopos'].at(UTC_array).position.km
+        # Loop over times
+        for UTC in UTC_list:
             
-            # Constraint parameters
-            el_lim = sensor['el_lim']
-            az_lim = sensor['az_lim']
-            rg_lim = sensor['rg_lim']
-            sun_elmask = sensor['sun_elmask']
-            mapp_lim = sensor['mapp_lim']
-            moon_angle_lim = sensor['moon_angle_lim']
+            # Propagate TLE using SGP4
+            satellite = twoline2rv(line1, line2, wgs84)
+            tleTime = satellite.epoch
+            r_TEME, v_TEME = satellite.propagate(UTC.year, UTC.month, UTC.day,
+                                                 UTC.hour, UTC.minute,
+                                                 UTC.second + UTC.microsecond)
             
-            # Compute topocentric RSO position
-            # For earth satellites, calling observe and apparent is costly
-            # and unnecessary except for meter level accuracy
-            difference = rso['satellite'] - sensor['statTopos']
-            rso_topo = difference.at(UTC_array)
-            el_array, az_array, rg_array = rso_topo.altaz()
+            print(obj_id)
+            print(tleTime)
+            print(UTC)
+            print(r_TEME)
+            print(v_TEME)
             
-            # Compute topocentric sun position
-            # Need both sun and sensor positions referenced from solar
-            # system barycenter
-            sensor_ssb = earth + sensor['statTopos']
-            sun_topo = sensor_ssb.at(UTC_array).observe(sun).apparent()
-            sun_el_array, sun_az_array, sun_rg_array = sun_topo.altaz()
+            # Get EOP data for this time
+            EOP_data = get_eop_data(eop_alldata, UTC)            
             
-            # Find indices where az/el/range constraints are met
-            el_inds0 = np.where(el_array.radians > el_lim[0])[0]
-            el_inds1 = np.where(el_array.radians < el_lim[1])[0]
-            az_inds0 = np.where(az_array.radians > az_lim[0])[0]
-            az_inds1 = np.where(az_array.radians < az_lim[1])[0]
-            rg_inds0 = np.where(rg_array.km > rg_lim[0])[0]
-            rg_inds1 = np.where(rg_array.km < rg_lim[1])[0]
+            # Compute TT in JD format
+            TT_JD = utcdt2ttjd(UTC, EOP_data['TAI_UTC'])
             
-            # Check sun constraint (ensures station is dark if needed)
-            sun_el_inds = np.where(sun_el_array.radians < sun_elmask)[0]
             
-            # Find all common elements to create candidate visible index list
-            common_el = set(el_inds0).intersection(set(el_inds1))
-            common_az = set(az_inds0).intersection(set(az_inds1))
-            common_rg = set(rg_inds0).intersection(set(rg_inds1))
-            common1 = common_el.intersection(common_az)
-            common2 = common1.intersection(common_rg)
-            common_inds = list(common2.intersection(set(sun_el_inds)))
-            
-            # Initialze visibility array for this sensor and object
-            vis_array = np.zeros(rso_icrf_array.shape[1],)
-            vis_array[common_inds] = True
-            
-            # For remaining indices compute angles and visibility conditions
-            for ii in common_inds:
-                rso_icrf = rso_icrf_array[:,ii]
-                sensor_icrf = sensor_icrf_array[:,ii]
-                sun_icrf = sun_icrf_array[:,ii]
-                moon_icrf = moon_icrf_array[:,ii]
-                rg_km = rg_array.km[ii]
+            # Convert from TEME to GCRF (ECI)
                 
-                # Compute angles
-                phase_angle, sun_angle, moon_angle = \
-                    compute_angles(rso_icrf, sun_icrf, moon_icrf, sensor_icrf)
             
-                # Check for eclipse - if sun angle is less than half cone angle
-                # the sun is behind the earth
-                # First check valid orbit - radius greater than Earth radius
-                r = np.linalg.norm(rso_icrf)
-                if r < Re:
-                    vis_array[ii] = False
-                else:
-                    half_cone = asin(Re/r)
-                    if sun_angle < half_cone:
-                        vis_array[ii] = False                
-                
-                # Check too close to moon
-                if moon_angle < moon_angle_lim:
-                    vis_array[ii] = False
-                                
-                # Check apparent magnitude
-                # Optional input for albedo could be retrieved for each object
-                # from catalog                
-                mapp = compute_mapp(phase_angle, rg_km, radius_km)
-                if mapp > mapp_lim:
-                    vis_array[ii] = False
+            # 
             
-            vis_inds = np.where(vis_array)[0]
-            UTC_vis = UTC_array[vis_inds]
-            rg_vis = rg_array.km[vis_inds]
-            el_vis = el_array.radians[vis_inds]
+            # Compute MAI Time (UTC seconds since _____ epoch)
             
-            # Compute pass start and stop times
-            start_list, stop_list, TCA_list, TME_list, rg_min_list, el_max_list = \
-                compute_pass(UTC_vis, rg_vis, el_vis, sensor)
-
-            # Store output
-            npass = len(start_list)
-            start_list_all.extend(start_list)
-            stop_list_all.extend(stop_list)
-            TCA_list_all.extend(TCA_list)
-            TME_list_all.extend(TME_list)
-            rg_min_list_all.extend(rg_min_list)
-            el_max_list_all.extend(el_max_list)
-            obj_id_list_all.extend([obj_id]*npass)
-            sensor_id_list_all.extend([sensor_id]*npass)
-
-    # Sort results
-    start_list_JD = [ti.tdb for ti in start_list_all]
-    sort_ind = np.argsort(start_list_JD)
-    sorted_start = [start_list_all[ii] for ii in sort_ind]
-    sorted_stop = [stop_list_all[ii] for ii in sort_ind]
-    sorted_TCA = [TCA_list_all[ii] for ii in sort_ind]
-    sorted_TME = [TME_list_all[ii] for ii in sort_ind]
-    sorted_rg_min = [rg_min_list_all[ii] for ii in sort_ind]
-    sorted_el_max = [el_max_list_all[ii] for ii in sort_ind]
-    sorted_obj_id = [obj_id_list_all[ii] for ii in sort_ind]
-    sorted_sensor_id = [sensor_id_list_all[ii] for ii in sort_ind]
-
-    # Final output
-    vis_dict = {}
-    vis_dict['start_list'] = sorted_start
-    vis_dict['stop_list'] = sorted_stop
-    vis_dict['TCA_list'] = sorted_TCA
-    vis_dict['TME_list'] = sorted_TME
-    vis_dict['rg_min_list'] = sorted_rg_min
-    vis_dict['el_max_list'] = sorted_el_max
-    vis_dict['obj_id_list'] = sorted_obj_id
-    vis_dict['sensor_id_list'] = sorted_sensor_id
-
-    return vis_dict
-
-
-def compute_pass(UTC_vis, rg_vis, el_vis, sensor):
-    '''
-    This function computes times of importance during the pass, such as start,
-    stop, TCA, and TME.  Also computes the minimum range and maximum elevation
-    angle achieved during the pass. Computes pass times for one object and one
-    sensor at a time.
-    
-    Parameters
-    ------
-    UTC_vis : 1D numpy array
-        times when object is visible to this sensor
-        stored as skyfield time objects that can be extracted in multiple
-        time systems or representations
-    rg_vis : 1D numpy array
-        range values when object is visible to this sensor [km]
-    el_vis : 1D numpy array
-        elevation angle values when object is visible to this sensor [rad]
-    sensor : dict
-        sensor parameters including maximum gap between visible times for
-        continous pass
-    
-    Returns
-    ------
-    start_list : list
-        pass start times
-    stop_list : list
-        pass stop times
-    TCA_list : list
-        pass times of closest apporach
-    TME_list : list
-        pass times of maximum elevation
-    rg_min_list : list
-        pass minimum range values [km]
-    el_max_list : list
-        pass maximum elevation angle values [rad]
-
-    '''
-    
-    # Retrieve pass length and gap parameters
-    max_gap = sensor['max_gap']
-    
-    # Initialze output
-    start_list = []
-    stop_list = []
-    TCA_list = []
-    TME_list = []
-    rg_min_list = []
-    el_max_list = []
-    
-    # Loop over times
-    rg_min = 1e12
-    el_max = -1.
-    ti_prior = UTC_vis[0]
-    start = UTC_vis[0]
-    stop = UTC_vis[0]
-    TCA = UTC_vis[0]
-    TME = UTC_vis[0]
-    for ii in range(len(UTC_vis)):
-        
-        ti = UTC_vis[ii]
-        rg_km = rg_vis[ii]
-        el_rad = el_vis[ii]
-        
-        # If current time is close to previous, pass continues
-        if (ti.tdb - ti_prior.tdb)*86400. < (max_gap+1.):
-
-            # Update pass stop time and JD_prior for next iteration
-            stop = ti
-            ti_prior = ti
             
-            # Check if this is pass time of closest approach (TCA)
-            if rg_km < rg_min:
-                TCA = ti
-                rg_min = float(rg_km)
             
-            # Check if this is pass time of maximum elevation (TME)
-            if el_rad > el_max:
-                TME = ti
-                el_max = float(el_rad)
-
-        # If current time is far from previous or if we reached
-        # the end of UTC list, pass has ended
-        if ((ti.tdb - ti_prior.tdb)*86400. >= (max_gap+1.) or ii == (len(UTC_vis)-1)):
-            
-            # Store output
-            start_list.append(start)
-            stop_list.append(stop)
-            TCA_list.append(TCA)
-            TME_list.append(TME)
-            rg_min_list.append(rg_min)
-            el_max_list.append(el_max)
-            
-            # Reset for new pass next round
-            start = ti
-            TCA = ti
-            TME = ti
-            stop = ti
-            ti_prior = ti
-            rg_min = float(rg_km)
-            el_max = float(el_rad)
-                        
-    return start_list, stop_list, TCA_list, TME_list, rg_min_list, el_max_list
-
-
-def compute_mapp(phase_angle, sat_rg, sat_radius, albedo=0.1):
-    '''
-    This function computes the apparent magnitude of a space object
-    due to reflected sunlight. Assumes object is diffuse sphere.
-
-    Reference
-    ------
-    Cognion, "Observations and Modeling of GEO Satellites at Large
-    Phase Angles," 2013.
-
-    Parameters
-    ------
-    phase_angle : float
-        angle at satellite between sun vector and observer vector [rad]
-    sat_rg : float
-        range from observer to satellite [km]
-    sat_radius : float
-        radius of spherical satellite [km]
-    albedo : float, optional
-        unitless reflectivity parameter of object (default = 0.1)
-
-    Returns
-    ------
-    mapp : float
-        apparent magnitude
-    '''
-
-    # Fraction of incident solar flux reflected by diffuse sphere satellite
-    F_diff = (2./3.) * (albedo/pi) * (sat_radius/sat_rg)**2. * \
-        (sin(phase_angle) + (pi - phase_angle)*cos(phase_angle))
-
-    if sat_radius == 0.:
-        mapp = 100.
-    else:
-        mapp = -26.74 - 2.5*log10(F_diff)
-
-    return mapp
-
-
-def rcs2radius_meters(rcs_m2):
-    '''
-    This function computes a satellite radius in meters from a given
-    RCS obtained from SATCAT. Assumes object is diffuse sphere.
-
-    Reference
-    ------
-    Cognion, "Observations and Modeling of GEO Satellites at Large
-    Phase Angles," 2013.
-
-    Parameters
-    ------
-    rcs_m2 : float
-        radar cross section [m^2]
-
-    Returns
-    ------
-    r_m : float
-        satellite radius [m]
-    '''
-
-    # Cognion formula works for RCS > 0.0268 m^2
-    # Otherwise, the RCS drops off rapidly as function of true size
-    if rcs_m2 < 0.:
-        r_m = 0.
-
-    elif rcs_m2 > 0.0268:
-        r_m = 2. * np.sqrt(rcs_m2/pi)   # m
-
-    else:
-        lam = 1.23  # m
-        r_m = (4.*rcs_m2*lam**4. / (9.*pi**5.))**(1./6.)   # m
-
-    return r_m
-
-
-def compute_angles(rso_icrf, sun_icrf, moon_icrf, sensor_icrf):
-    '''
-    This function computes a set of 3 angles for visibility checks:
-    1. phase_angle between the sun-satellite-station (satellite at vertex)
-    2. sun_angle between sun-satellite-Earth CM (satellite at vertex)
-    3. moon_angle between moon-station-satellite (station at vertex)
-
-    Parameters
-    ------
-    rso_icrf : 3x1 numpy array
-        satellite position in ICRF [km]
-    sun_icrf : 3x1 numpy array
-        sun position in ICRF [km]
-    moon_icrf : 3x1 numpy array
-        moon position in ICRF [km]
-    sensor_icrf : 3x1 numpy array
-        sensor position in ICRF [km]
-
-    Returns
-    ------
-    phase_angle : float
-        sun-satellite-station angle [rad]
-    sun_angle : float
-        sun-satellite-earth angle [rad]
-    moon_angle : float
-        moon-station-satellite angle [rad]
-    '''
-    
-    # Compute relative position vectors
-    sat2sun = sun_icrf - rso_icrf
-    sat2sensor = sensor_icrf - rso_icrf
-    moon2sensor = sensor_icrf - moon_icrf
-
-    # Unit vectors and angles
-    u_sun = sat2sun.flatten()/np.linalg.norm(sat2sun)
-    u_sensor = sat2sensor.flatten()/np.linalg.norm(sat2sensor)
-    u_sat = rso_icrf.flatten()/np.linalg.norm(rso_icrf)
-    u_moon = moon2sensor.flatten()/np.linalg.norm(moon2sensor)
-
-    phase_angle = acos(np.dot(u_sun, u_sensor))
-    sun_angle = acos(np.dot(u_sun, -u_sat))
-    moon_angle = acos(np.dot(u_moon, u_sensor))
-
-    return phase_angle, sun_angle, moon_angle
-
-
-def generate_visibility_file(vis_dict, vis_file, vis_file_min_el):
-    '''
-    This function produces the visibility .CSV file with output passes
-    sorted by start times.
-    
-    Parameters
-    ------
-    vis_dict : dictionary
-        sorted lists of pass start/stop/TCA/TME times and minimum range
-        and maximum elevation angle
-    vis_file : string
-        path and filename for output .CSV file
-    vis_file_min_el : float
-        minimum elevation angle desired for passes in output file
-        can be different from sensor minimum elevation constraints used to 
-        determine the pass start and stop times
-        
-    '''
     
     
-    # Retrieve sorted lists
-    start_list = vis_dict['start_list']
-    stop_list = vis_dict['stop_list']
-    TCA_list = vis_dict['TCA_list']
-    TME_list = vis_dict['TME_list']
-    rg_min_list = vis_dict['rg_min_list']
-    el_max_list = vis_dict['el_max_list']
-    obj_id_list = vis_dict['obj_id_list']
-    sensor_id_list = vis_dict['sensor_id_list']
     
-    with open(vis_file, 'w', newline='') as csvfile:
-        writer = csv.writer(csvfile, delimiter=',')
-        writer.writerow(['Sensor ID','Object NORAD ID', 'UTC Start', 
-                         'UTC Stop', 'UTC Time Closest Approach',
-                         'UTC Time Max Elevation', 'Min Range [km]',
-                         'Max Elevation [deg]'])
-    
-        for ii in range(len(start_list)):
-            UTC_start = start_list[ii].utc_iso()
-            UTC_stop = stop_list[ii].utc_iso()
-            UTC_TCA = TCA_list[ii].utc_iso()
-            UTC_TME = TME_list[ii].utc_iso()
-            rg_min = str(int(round(rg_min_list[ii])))
-            el_max = str(int(round(el_max_list[ii]*180./pi)))
-            obj_id = str(obj_id_list[ii])
-            sensor_id = sensor_id_list[ii]
-            
-            if float(el_max) < vis_file_min_el:
-                continue
-    
-            writer.writerow([sensor_id, obj_id, UTC_start, UTC_stop,
-                             UTC_TCA, UTC_TME, rg_min, el_max])
-    
-    csvfile.close()
     
     return
+
+
+def teme2gcrf(r_TEME, v_TEME, UTC):
+    
+    
+    return r_GCRF, v_GCRF
+
 
 
 ###############################################################################
 # Stand-alone execution
 ###############################################################################
 
-
-if __name__ == '__main__':    
+if __name__ == '__main__' :
     
-    load = Loader(os.path.join(metis_dir, 'skyfield_data'))
-    ts = load.timescale()
-    ephemeris = load('de430t.bsp')  
-
+    
+    username = 'steve.gehly@gmail.com'
+    password = 'SpaceTrackPword!'
+    
+    
     obj_id_list = [43014]
-    sensor_id_list = ['PSU Falcon', 'NJC Falcon', 'FLC Falcon']
+    UTC_list = [datetime(2018, 6, 10, 12, 0, 0)]
     
-    # Minimum elevation pass for output file
-    vis_file_min_el = 20.  # deg
     
-    # Create an array of times
-    ndays = 5
-    dt = 10  # sec    
-    UTC_now = ts.now().utc
-    sec_array = list(range(0,86400*ndays,dt))
-    UTC_array = ts.utc(UTC_now[0], UTC_now[1], UTC_now[2]+2, UTC_now[3]+16,
-                       UTC_now[4], sec_array)
+    propagate_TLE(obj_id_list, UTC_list, username, password)
     
-    # Generate visible pass dictionary
-    vis_dict = compute_visible_passes(UTC_array, obj_id_list, sensor_id_list,
-                                      ephemeris)
-
-    # Generate output file
-    outdir = os.path.join(metis_dir, 'output_data')
-    vis_file = os.path.join(outdir, 'visible_passes.csv')
-    generate_visibility_file(vis_dict, vis_file, vis_file_min_el)
-
-
-
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
