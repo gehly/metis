@@ -239,17 +239,13 @@ def propagate_TLE(obj_id_list, UTC_list, username='', password=''):
 ###############################################################################
 
 if __name__ == '__main__' :
-    
-    
-    username = 'steve.gehly@gmail.com'
-    password = 'SpaceTrackPword!'
-    
+
     
     obj_id_list = [43014]
     UTC_list = [datetime(2018, 6, 11, 12, 0, 0)]
     
     
-    output_state = propagate_TLE(obj_id_list, UTC_list, username, password)
+    output_state = propagate_TLE(obj_id_list, UTC_list)
     
     
     

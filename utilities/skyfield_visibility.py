@@ -126,8 +126,8 @@ def compute_visible_passes(UTC_array, obj_id_list, sensor_id_list, ephemeris):
     earth = ephemeris['earth']
     sun = ephemeris['sun']
     moon = ephemeris['moon']
-    moon_icrf_array = earth.at(UTC_array).observe(moon).position.km
-    sun_icrf_array = earth.at(UTC_array).observe(sun).position.km
+    moon_gcrf_array = earth.at(UTC_array).observe(moon).position.km
+    sun_gcrf_array = earth.at(UTC_array).observe(sun).position.km
 
     # Initialize output
     start_list_all = []
@@ -142,7 +142,7 @@ def compute_visible_passes(UTC_array, obj_id_list, sensor_id_list, ephemeris):
     # Loop over RSOs
     for obj_id in rso_dict:
         rso = rso_dict[obj_id]
-        rso_icrf_array = rso['satellite'].at(UTC_array).position.km
+        rso_gcrf_array = rso['satellite'].at(UTC_array).position.km
         
         # Retrieve object size and albedo if available/needed
         radius_km = rcs2radius_meters(rso['rcs_m2'])/1000.
@@ -150,7 +150,7 @@ def compute_visible_passes(UTC_array, obj_id_list, sensor_id_list, ephemeris):
         # Loop over sensors        
         for sensor_id in sensor_dict:
             sensor = sensor_dict[sensor_id]
-            sensor_icrf_array = sensor['statTopos'].at(UTC_array).position.km
+            sensor_gcrf_array = sensor['statTopos'].at(UTC_array).position.km
             
             # Constraint parameters
             el_lim = sensor['el_lim']
@@ -194,25 +194,25 @@ def compute_visible_passes(UTC_array, obj_id_list, sensor_id_list, ephemeris):
             common_inds = list(common2.intersection(set(sun_el_inds)))
             
             # Initialze visibility array for this sensor and object
-            vis_array = np.zeros(rso_icrf_array.shape[1],)
+            vis_array = np.zeros(rso_gcrf_array.shape[1],)
             vis_array[common_inds] = True
             
             # For remaining indices compute angles and visibility conditions
             for ii in common_inds:
-                rso_icrf = rso_icrf_array[:,ii]
-                sensor_icrf = sensor_icrf_array[:,ii]
-                sun_icrf = sun_icrf_array[:,ii]
-                moon_icrf = moon_icrf_array[:,ii]
+                rso_gcrf = rso_gcrf_array[:,ii]
+                sensor_gcrf = sensor_gcrf_array[:,ii]
+                sun_gcrf = sun_gcrf_array[:,ii]
+                moon_gcrf = moon_gcrf_array[:,ii]
                 rg_km = rg_array.km[ii]
                 
                 # Compute angles
                 phase_angle, sun_angle, moon_angle = \
-                    compute_angles(rso_icrf, sun_icrf, moon_icrf, sensor_icrf)
+                    compute_angles(rso_gcrf, sun_gcrf, moon_gcrf, sensor_gcrf)
             
                 # Check for eclipse - if sun angle is less than half cone angle
                 # the sun is behind the earth
                 # First check valid orbit - radius greater than Earth radius
-                r = np.linalg.norm(rso_icrf)
+                r = np.linalg.norm(rso_gcrf)
                 if r < Re:
                     vis_array[ii] = False
                 else:
@@ -456,7 +456,7 @@ def rcs2radius_meters(rcs_m2):
     return r_m
 
 
-def compute_angles(rso_icrf, sun_icrf, moon_icrf, sensor_icrf):
+def compute_angles(rso_gcrf, sun_gcrf, moon_gcrf, sensor_gcrf):
     '''
     This function computes a set of 3 angles for visibility checks:
     1. phase_angle between the sun-satellite-station (satellite at vertex)
@@ -465,14 +465,14 @@ def compute_angles(rso_icrf, sun_icrf, moon_icrf, sensor_icrf):
 
     Parameters
     ------
-    rso_icrf : 3x1 numpy array
-        satellite position in ICRF [km]
-    sun_icrf : 3x1 numpy array
-        sun position in ICRF [km]
-    moon_icrf : 3x1 numpy array
-        moon position in ICRF [km]
-    sensor_icrf : 3x1 numpy array
-        sensor position in ICRF [km]
+    rso_gcrf : 3x1 numpy array
+        satellite position in GCRF [km]
+    sun_gcrf : 3x1 numpy array
+        sun position in GCRF [km]
+    moon_gcrf : 3x1 numpy array
+        moon position in GCRF [km]
+    sensor_gcrf : 3x1 numpy array
+        sensor position in GCRF [km]
 
     Returns
     ------
@@ -485,14 +485,14 @@ def compute_angles(rso_icrf, sun_icrf, moon_icrf, sensor_icrf):
     '''
     
     # Compute relative position vectors
-    sat2sun = sun_icrf - rso_icrf
-    sat2sensor = sensor_icrf - rso_icrf
-    moon2sensor = sensor_icrf - moon_icrf
+    sat2sun = sun_gcrf - rso_gcrf
+    sat2sensor = sensor_gcrf - rso_gcrf
+    moon2sensor = sensor_gcrf - moon_gcrf
 
     # Unit vectors and angles
     u_sun = sat2sun.flatten()/np.linalg.norm(sat2sun)
     u_sensor = sat2sensor.flatten()/np.linalg.norm(sat2sensor)
-    u_sat = rso_icrf.flatten()/np.linalg.norm(rso_icrf)
+    u_sat = rso_gcrf.flatten()/np.linalg.norm(rso_gcrf)
     u_moon = moon2sensor.flatten()/np.linalg.norm(moon2sensor)
 
     phase_angle = acos(np.dot(u_sun, u_sensor))
@@ -569,7 +569,7 @@ if __name__ == '__main__':
     
     load = Loader(os.path.join(metis_dir, 'skyfield_data'))
     ts = load.timescale()
-    ephemeris = load('de430t.bsp')  
+    ephemeris = load('de430t.bsp')
 
     obj_id_list = [43014]
     sensor_id_list = ['PSU Falcon', 'NJC Falcon', 'FLC Falcon']
@@ -590,7 +590,7 @@ if __name__ == '__main__':
                                       ephemeris)
 
     # Generate output file
-    outdir = os.path.join(metis_dir, 'output_data')
+    outdir = os.path.join(metis_dir, 'skyfield_data')
     vis_file = os.path.join(outdir, 'visible_passes.csv')
     generate_visibility_file(vis_dict, vis_file, vis_file_min_el)
 
