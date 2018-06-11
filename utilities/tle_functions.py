@@ -1,14 +1,26 @@
 import numpy as np
-from math import pi
 import requests
 import getpass
-from datetime import datetime, timedelta
-import time
+from datetime import datetime
 
-from conversions import utcdt2utcmjd, utcdt2ttjd
+from time_systems import utcdt2ttjd
+from eop_functions import get_celestrak_eop_alldata
+from eop_functions import get_nutation_data
+from eop_functions import get_eop_data
+from eop_functions import compute_precession_IAU1976
+from eop_functions import compute_nutation_IAU1980
+from eop_functions import eqnequinox_IAU1982_simple
 
 from sgp4.io import twoline2rv
 from sgp4.earth_gravity import wgs84
+
+
+###############################################################################
+#
+# This file contains functions to retrieve and propagate TLEs and convert
+# position coordinates to the intertial GCRF frame.
+#
+###############################################################################
 
 
 def get_spacetrack_tle_data(obj_id_list, username='', password=''):
@@ -27,8 +39,8 @@ def get_spacetrack_tle_data(obj_id_list, username='', password=''):
     
     Returns
     ------
-    r : str
-        string returned from requests containing TLE data
+    tle_dict : dictionary
+        indexed by object ID, each item has two strings, one for each line
     '''
     
     if len(username) == 0:    
@@ -71,175 +83,88 @@ def get_spacetrack_tle_data(obj_id_list, username='', password=''):
     return tle_dict
 
 
-def get_celestrak_eop_alldata():
-    
-    start = time.time()
-    
-    pageData = 'https://celestrak.com/SpaceData/eop19620101.txt'
-
-    r = requests.get(pageData)
-    if r.status_code != requests.codes.ok:
-        print("Error: Page data request failed.")
-            
-    print(r.text[0:200])
-    
-    print('Time: ', time.time()-start)
-    
-    ind_NUM_OBSERVED_POINTS = r.text.find('NUM_OBSERVED_POINTS')
-    ind_BEGIN_OBSERVED = r.text.find('BEGIN OBSERVED')
-    ind_END_OBSERVED = r.text.find('END OBSERVED')
-    ind_NUM_PREDICTED_POINTS = r.text.find('NUM_PREDICTED_POINTS')
-    ind_BEGIN_PREDICTED = r.text.find('BEGIN PREDICTED')
-    ind_END_PREDICTED = r.text.find('END PREDICTED')
-    
-    print(ind_NUM_OBSERVED_POINTS)
-    print(ind_BEGIN_OBSERVED)
-    print(ind_END_OBSERVED)
-    print(ind_NUM_PREDICTED_POINTS)
-    print(ind_BEGIN_PREDICTED)
-    print(ind_END_PREDICTED)
-    
-    
-    test = r.text[ind_NUM_OBSERVED_POINTS:ind_BEGIN_OBSERVED]
-    print(test)
-    print(len(test))
-    
-    # Reduce to data
-    data_text = r.text[ind_BEGIN_OBSERVED+16:ind_END_OBSERVED] \
-        + r.text[ind_BEGIN_PREDICTED+17:ind_END_PREDICTED]
-    
-    
-    print(data_text[-19200:-18000])
-    
-
-    
-    return data_text
-
-
-def get_eop_data(data_text, UTC):
-    
-        
-    # Compute MJD for desired time
-    MJD = utcdt2utcmjd(UTC)
-    MJD_int = int(MJD)
-    
-    print('\n\n Parse Lines')
-    
-    # Find EOP data lines around time of interest
-    nchar = 102
-    nskip = 1
-    nlines = 0
-    for ii in range(len(data_text)):
-        start = ii + nlines*(nchar+nskip)
-        stop = ii + nlines*(nchar+nskip) + nchar
-        line = data_text[start:stop]
-        nlines += 1
-        
-        MJD_line = int(line[11:16])
-        
-        if MJD_line == MJD_int:
-            line0 = line
-        if MJD_line == MJD_int+1:
-            line1 = line
-            break
-        
-
-    print(line0)
-    print(line1)
-    
-    # Compute EOP data at desired time by interpolating
-    EOP_data = eop_linear_interpolate(line0, line1, MJD)
-    
-    
-    return EOP_data
-
-
-def eop_linear_interpolate(line0, line1, MJD):
-    
-    
-    # Initialize output
-    EOP_data = {}
-    
-    # Leap seconds do not interpolate
-    EOP_data['TAI_UTC'] = int(line0[99:102])
-    
-    # Retrieve values
-    line0_array = eop_read_line(line0)
-    line1_array = eop_read_line(line1)
-    
-    # Adjust UT1-UTC column in case leap second occurs between lines
-    line0_array[3] -= line0_array[9]
-    line1_array[3] -= line1_array[9]
-    
-    # Linear interpolation
-    dt = MJD - line0_array[0]
-    interp = (line1_array[1:] - line0_array[1:])/ \
-        (line1_array[0] - line0_array[0]) * dt + line0_array[1:]
-    
-    print(MJD)
-    print(dt)
-    print(line0_array)
-    print(line1_array)
-    print(interp)
-    
-    # Convert final output
-    arcsec2rad = (1./3600.) * pi/180.
-    EOP_data['xp'] = interp[0]*arcsec2rad
-    EOP_data['yp'] = interp[1]*arcsec2rad
-    EOP_data['UT1_UTC'] = interp[2] + EOP_data['TAI_UTC']
-    EOP_data['LOD'] = interp[3]
-    EOP_data['ddPsi'] = interp[4]*arcsec2rad
-    EOP_data['ddEps'] = interp[5]*arcsec2rad
-    EOP_data['dX'] = interp[6]*arcsec2rad
-    EOP_data['dY'] = interp[7]*arcsec2rad
-    
-    print(EOP_data)
-
-    
-    
-    
-    
-    return EOP_data
-
-
-def eop_read_line(line):
+def teme2gcrf(r_TEME, v_TEME, UTC, IAU1980nut, EOP_data):
     '''
-    http://celestrak.com/SpaceData/EOP-format.asp
+    This function converts position and velocity vectors from the True
+    Equator Mean Equinox (TEME) frame used for TLEs to the GCRF inertial
+    frame.
     
-    012-016	Modified Julian Date (Julian Date at 0h UT minus 2400000.5)
-    018-026	x (arc seconds)
-    028-036	y (arc seconds)
-    038-047	UT1-UTC (seconds)
-    049-058	Length of Day (seconds)
-    060-068	δΔψ (arc seconds)
-    070-078	δΔε (arc seconds)
-    080-088	δX (arc seconds)
-    090-098	δY (arc seconds)
-    100-102	Delta Atomic Time, TAI-UTC (seconds)
+    Parameters
+    ------
+    r_TEME : 3x1 numpy array
+        position vector in TEME frame
+    v_TEME : 3x1 numpy array
+        velocity vector in TEME frame
+    UTC : datetime object
+        time in UTC
+    IAU1980nut : 2D numpy array
+        nutation coefficients
+    EOP_data : dictionary
+        EOP data for the given time including pole coordinates and offsets,
+        time offsets, and length of day  
+    
+    Returns
+    ------
+    r_GCRF : 3x1 numpy array
+        position vector in GCRF frame
+    v_GCRF : 3x1 numpy array
+        velocity vector in GCRF frame    
     '''
     
-    MJD = int(line[11:16])
-    xp = float(line[17:26])
-    yp = float(line[27:36])
-    UT1_UTC = float(line[37:47])
-    LOD = float(line[48:58])
-    ddPsi = float(line[59:68])
-    ddEps = float(line[69:78])
-    dX = float(line[79:88])
-    dY = float(line[89:98])
-    TAI_UTC = float(line[99:102])
+    # Compute TT in JD format
+    TT_JD = utcdt2ttjd(UTC, EOP_data['TAI_UTC'])
     
-    line_array = np.array([MJD, xp, yp, UT1_UTC, LOD, ddPsi, ddEps, dX, dY,
-                           TAI_UTC])
+    # Compute TT in centuries since J2000 epoch
+    TT_cent = (TT_JD - 2451545.)/36525.
     
-    return line_array
+    print(TT_JD)
+    print(TT_cent)
+    
+    # IAU 1976 Precession
+    P = compute_precession_IAU1976(TT_cent)
+    
+    # IAU 1980 Nutation
+    N, FA, Eps_A, Eps_true, dPsi, dEps = \
+        compute_nutation_IAU1980(IAU1980nut, TT_cent, EOP_data['ddPsi'],
+                                 EOP_data['ddEps'])
 
-        
+    # Equation of the Equinonx 1982
+    R = eqnequinox_IAU1982_simple(dPsi, Eps_A)
+    
+    # Compute transformation matrix and output
+    GCRF_TEME = np.dot(P, np.dot(N, R))
+    
+    r_GCRF = np.dot(GCRF_TEME, r_TEME)
+    v_GCRF = np.dot(GCRF_TEME, v_TEME)
+    
+    return r_GCRF, v_GCRF
 
 
 def propagate_TLE(obj_id_list, UTC_list, username='', password=''):
+    '''
+    This function retrieves TLE data for the objects in the input list from
+    space-track.org and propagates them to the times given in UTC_list.  The
+    output positions and velocities are provided in both the TLE True Equator
+    Mean Equinox (TEME) frame and the intertial GCRF frame.
     
-    
+    Parameters
+    ------
+    obj_id_list : list
+        object NORAD IDs
+    UTC_list : list
+        datetime objects in UTC
+    username : string, optional
+        space-track.org username (code will prompt for input if not supplied)
+    password : string, optional
+        space-track.org password (code will prompt for input in not supplied)
+        
+    Returns
+    ------
+    output_state : dictionary
+        indexed by object ID, contains lists for UTC times, and object 
+        position/velocity in TEME and GCRF
+        
+    '''
     
     # Retrieve latest TLE data from space-track.org
     tle_dict = get_spacetrack_tle_data(obj_id_list, username, password)
@@ -247,11 +172,23 @@ def propagate_TLE(obj_id_list, UTC_list, username='', password=''):
     # Retrieve latest EOP data from celestrak.com
     eop_alldata = get_celestrak_eop_alldata()
     
+    # Retrieve IAU Nutation data from file
+    IAU1980_nutation = get_nutation_data()
+    print(IAU1980_nutation)
+    
     # Loop over objects
+    output_state = {}
     for obj_id in obj_id_list:
         
         line1 = tle_dict[obj_id]['line1']
         line2 = tle_dict[obj_id]['line2']
+        
+        output_state[obj_id] = {}
+        output_state[obj_id]['UTC'] = []
+        output_state[obj_id]['r_GCRF'] = []
+        output_state[obj_id]['v_GCRF'] = []
+        output_state[obj_id]['r_TEME'] = []
+        output_state[obj_id]['v_TEME'] = []
         
         # Loop over times
         for UTC in UTC_list:
@@ -263,6 +200,9 @@ def propagate_TLE(obj_id_list, UTC_list, username='', password=''):
                                                  UTC.hour, UTC.minute,
                                                  UTC.second + UTC.microsecond)
             
+            r_TEME = np.reshape(r_TEME, (3,1))
+            v_TEME = np.reshape(v_TEME, (3,1))
+            
             print(obj_id)
             print(tleTime)
             print(UTC)
@@ -270,32 +210,27 @@ def propagate_TLE(obj_id_list, UTC_list, username='', password=''):
             print(v_TEME)
             
             # Get EOP data for this time
-            EOP_data = get_eop_data(eop_alldata, UTC)            
-            
-            # Compute TT in JD format
-            TT_JD = utcdt2ttjd(UTC, EOP_data['TAI_UTC'])
-            
+            EOP_data = get_eop_data(eop_alldata, UTC)  
             
             # Convert from TEME to GCRF (ECI)
-                
-            
-            # 
-            
-            # Compute MAI Time (UTC seconds since _____ epoch)
+            r_GCRF, v_GCRF = teme2gcrf(r_TEME, v_TEME, UTC, IAU1980_nutation,
+                                       EOP_data)
             
             
+            print(r_GCRF)
+            print(v_GCRF)
             
+            # Store output
+            output_state[obj_id]['UTC'].append(UTC)
+            output_state[obj_id]['r_GCRF'].append(r_GCRF)
+            output_state[obj_id]['v_GCRF'].append(v_GCRF)
+            output_state[obj_id]['r_TEME'].append(r_TEME)
+            output_state[obj_id]['v_TEME'].append(v_TEME)
+
     
-    
-    
-    
-    return
+    return output_state
 
 
-def teme2gcrf(r_TEME, v_TEME, UTC):
-    
-    
-    return r_GCRF, v_GCRF
 
 
 
@@ -311,10 +246,10 @@ if __name__ == '__main__' :
     
     
     obj_id_list = [43014]
-    UTC_list = [datetime(2018, 6, 10, 12, 0, 0)]
+    UTC_list = [datetime(2018, 6, 11, 12, 0, 0)]
     
     
-    propagate_TLE(obj_id_list, UTC_list, username, password)
+    output_state = propagate_TLE(obj_id_list, UTC_list, username, password)
     
     
     
