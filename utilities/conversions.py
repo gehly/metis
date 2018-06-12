@@ -1,7 +1,7 @@
 import numpy as np
 from math import *
 import copy
-import datetime
+from datetime import datetime, timedelta
 import os
 
 #
@@ -45,6 +45,11 @@ import os
 ###############################################################################
 # Time Systems
 ###############################################################################
+
+
+
+
+
 def UTC_G_2_JED_JD(UTC):
 
     JD = TPT.TimeFrame([UTC], 'UTC_G', 'JED_JD')[0]
