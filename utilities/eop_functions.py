@@ -25,7 +25,8 @@ from time_systems import utcdt2utcmjd
 #        Observatory, IERS Technical Note No. 21, July 1996.
 #
 #  [4] Bradley, B.K., Sibois, A., and Axelrad, P., "Influence of ITRS/GCRS
-#        implementation for astrodynamics: Coordinate transformations
+#        implementation for astrodynamics: Coordinate transformations,"
+#        Advances in Space Research, Vol 57, 2016, pp 850-866.
 #
 ###############################################################################
 
