@@ -117,9 +117,6 @@ def teme2gcrf(r_TEME, v_TEME, UTC, IAU1980nut, EOP_data):
     # Compute TT in centuries since J2000 epoch
     TT_cent = (TT_JD - 2451545.)/36525.
     
-    print(TT_JD)
-    print(TT_cent)
-    
     # IAU 1976 Precession
     P = compute_precession_IAU1976(TT_cent)
     
@@ -174,7 +171,6 @@ def propagate_TLE(obj_id_list, UTC_list, username='', password=''):
     
     # Retrieve IAU Nutation data from file
     IAU1980_nutation = get_nutation_data()
-    print(IAU1980_nutation)
     
     # Loop over objects
     output_state = {}
@@ -195,7 +191,6 @@ def propagate_TLE(obj_id_list, UTC_list, username='', password=''):
             
             # Propagate TLE using SGP4
             satellite = twoline2rv(line1, line2, wgs84)
-            tleTime = satellite.epoch
             r_TEME, v_TEME = satellite.propagate(UTC.year, UTC.month, UTC.day,
                                                  UTC.hour, UTC.minute,
                                                  UTC.second + UTC.microsecond)
@@ -203,22 +198,13 @@ def propagate_TLE(obj_id_list, UTC_list, username='', password=''):
             r_TEME = np.reshape(r_TEME, (3,1))
             v_TEME = np.reshape(v_TEME, (3,1))
             
-            print(obj_id)
-            print(tleTime)
-            print(UTC)
-            print(r_TEME)
-            print(v_TEME)
-            
             # Get EOP data for this time
             EOP_data = get_eop_data(eop_alldata, UTC)  
             
             # Convert from TEME to GCRF (ECI)
             r_GCRF, v_GCRF = teme2gcrf(r_TEME, v_TEME, UTC, IAU1980_nutation,
                                        EOP_data)
-            
-            
-            print(r_GCRF)
-            print(v_GCRF)
+
             
             # Store output
             output_state[obj_id]['UTC'].append(UTC)

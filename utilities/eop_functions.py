@@ -24,6 +24,9 @@ from time_systems import utcdt2utcmjd
 #        Rotation and Reference Systems Service (IERS), U.S. Naval 
 #        Observatory, IERS Technical Note No. 21, July 1996.
 #
+#  [4] Bradley, B.K., Sibois, A., and Axelrad, P., "Influence of ITRS/GCRS
+#        implementation for astrodynamics: Coordinate transformations
+#
 ###############################################################################
 
 
