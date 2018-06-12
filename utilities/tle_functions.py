@@ -35,7 +35,7 @@ def get_spacetrack_tle_data(obj_id_list, username='', password=''):
     username : string, optional
         space-track.org username (code will prompt for input if not supplied)
     password : string, optional
-        space-track.org password (code will prompt for input in not supplied)
+        space-track.org password (code will prompt for input if not supplied)
     
     Returns
     ------
@@ -142,7 +142,7 @@ def propagate_TLE(obj_id_list, UTC_list, username='', password=''):
     This function retrieves TLE data for the objects in the input list from
     space-track.org and propagates them to the times given in UTC_list.  The
     output positions and velocities are provided in both the TLE True Equator
-    Mean Equinox (TEME) frame and the intertial GCRF frame.
+    Mean Equinox (TEME) frame and the inertial GCRF frame.
     
     Parameters
     ------
@@ -153,7 +153,7 @@ def propagate_TLE(obj_id_list, UTC_list, username='', password=''):
     username : string, optional
         space-track.org username (code will prompt for input if not supplied)
     password : string, optional
-        space-track.org password (code will prompt for input in not supplied)
+        space-track.org password (code will prompt for input if not supplied)
         
     Returns
     ------
@@ -193,7 +193,8 @@ def propagate_TLE(obj_id_list, UTC_list, username='', password=''):
             satellite = twoline2rv(line1, line2, wgs84)
             r_TEME, v_TEME = satellite.propagate(UTC.year, UTC.month, UTC.day,
                                                  UTC.hour, UTC.minute,
-                                                 UTC.second + UTC.microsecond)
+                                                 UTC.second + 
+                                                 (UTC.microsecond/1e6))
             
             r_TEME = np.reshape(r_TEME, (3,1))
             v_TEME = np.reshape(v_TEME, (3,1))
@@ -228,11 +229,12 @@ if __name__ == '__main__' :
 
     
     obj_id_list = [43014]
-    UTC_list = [datetime(2018, 6, 11, 12, 0, 0)]
+    UTC_list = [datetime(2018, 6, 12, 4, 57, 0)]
     
     
     output_state = propagate_TLE(obj_id_list, UTC_list)
     
+    print(output_state)
     
     
     
