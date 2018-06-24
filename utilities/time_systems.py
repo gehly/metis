@@ -105,6 +105,63 @@ def utcdt2ttjd(UTC, TAI_UTC):
     return TT_JD
 
 
+def utcdt2taijd(UTC, TAI_UTC):
+    '''
+    This function converts a UTC time to Terrestrial Time (TT) in Julian Date
+    (JD) format.
+    
+    UTC = TAI - TAI_UTC
+    
+    Parameters
+    ------
+    UTC : datetime object
+        time in UTC
+    TAI_UTC : float
+        EOP parameter, time offset between atomic time (TAI) and UTC 
+        (10 + leap seconds)        
+    
+    Returns
+    ------
+    TAI_JD : float
+        fractional days since 12:00:00 Jan 1 4713 BC TAI
+    
+    '''
+    
+    UTC_JD = dt2jd(UTC)
+    TAI_JD = UTC_JD + TAI_UTC/86400.
+    
+    return TAI_JD
+
+
+def utcdt2gpsjd(UTC, TAI_UTC):
+    '''
+    This function converts a UTC time to Terrestrial Time (TT) in Julian Date
+    (JD) format.
+    
+    UTC = TAI - TAI_UTC
+    GPS = TAI - 19 sec
+    
+    Parameters
+    ------
+    UTC : datetime object
+        time in UTC
+    TAI_UTC : float
+        EOP parameter, time offset between atomic time (TAI) and UTC 
+        (10 + leap seconds)        
+    
+    Returns
+    ------
+    GPS_JD : float
+        fractional days since 12:00:00 Jan 1 4713 BC GPS
+    
+    '''
+    
+    UTC_JD = dt2jd(UTC)
+    GPS_JD = UTC_JD + (TAI_UTC - 19.)/86400.
+    
+    return GPS_JD
+
+
 def utcdt2jedjd(UTC, TAI_UTC):
     '''
     This function converts a UTC time to Julian Ephemeris Date (JED) in Julian
@@ -205,6 +262,7 @@ def jedjd2ttjd(JED_JD):
     
     return TT_JD
 
+
 ###############################################################################
 # Unit Test
 ###############################################################################
@@ -228,6 +286,8 @@ if __name__ == '__main__':
     TT_JD = utcdt2ttjd(UTC, EOP_data['TAI_UTC'])
     JED_JD = utcdt2jedjd(UTC, EOP_data['TAI_UTC'])
     TT_check = jedjd2ttjd(JED_JD)
+    TAI_JD = utcdt2taijd(UTC, EOP_data['TAI_UTC'])
+    GPS_JD = utcdt2gpsjd(UTC, EOP_data['TAI_UTC'])
     
     print('UTC', UTC)
     print('MJD', MJD)
@@ -236,6 +296,8 @@ if __name__ == '__main__':
     print('TT_JD', TT_JD)
     print('TT_check', TT_check)
     print('JED_JD', JED_JD)
+    print('TAI_JD', TAI_JD)
+    print('GPS_JD', GPS_JD)
     
 
 

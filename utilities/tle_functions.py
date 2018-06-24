@@ -7,6 +7,7 @@ from eop_functions import get_celestrak_eop_alldata
 from eop_functions import get_nutation_data
 from eop_functions import get_eop_data
 from coordinate_systems import teme2gcrf
+from coordinate_systems import gcrf2itrf
 
 from sgp4.io import twoline2rv
 from sgp4.earth_gravity import wgs84
@@ -143,7 +144,7 @@ def propagate_TLE(obj_id_list, UTC_list, username='', password=''):
             v_TEME = np.reshape(v_TEME, (3,1))
             
             # Get EOP data for this time
-            EOP_data = get_eop_data(eop_alldata, UTC)  
+            EOP_data = get_eop_data(eop_alldata, UTC)
             
             # Convert from TEME to GCRF (ECI)
             r_GCRF, v_GCRF = teme2gcrf(r_TEME, v_TEME, UTC, IAU1980_nutation,
@@ -172,14 +173,12 @@ if __name__ == '__main__' :
 
     
     obj_id_list = [43014]
-    UTC_list = [datetime(2018, 6, 12, 4, 57, 0)]
+    UTC_list = [datetime(2018, 6, 23, 0, 0, 0)]
     
     
     output_state = propagate_TLE(obj_id_list, UTC_list)
     
     print(output_state)
-    
-    
     
     
     

@@ -1,15 +1,16 @@
 import numpy as np
-from math import pi, sin, cos
+from math import pi, sin, cos, modf
 import requests
 import pandas as pd
 import os
 
 from time_systems import dt2mjd
+from numerical_methods import interp_lagrange
 
 ###############################################################################
 #
 # This file contains functions to retrieve Earth Orientation Parameters (EOPs)
-# and compute frame rotations.
+# and compute rotation matrices.
 #
 # References:
 # 
@@ -27,6 +28,23 @@ from time_systems import dt2mjd
 #  [4] Bradley, B.K., Sibois, A., and Axelrad, P., "Influence of ITRS/GCRS
 #        implementation for astrodynamics: Coordinate transformations,"
 #        Advances in Space Research, Vol 57, 2016, pp 850-866.
+#
+#  [5] Petit, Gerard and Brian Luzum, "IERS Conventions (2010)," 
+#        International Earth Rotation and Reference Systems Service (IERS),
+#        IERS Conventions Center, IERS Technical Note No. 36, December
+#        2010.
+#
+#  [6] International Astronomical Union, "Standards of Fundamental 
+#        Astronomy: SOFA Tools for Earth Attitude," September 5, 2010.
+#
+#  [7] Coppola, V., J.H. Seago, and D.A. Vallado, "The IAU 2000A and IAU
+#         2006 Precession-Nutation Theories and their Implementation," 
+#         AAS 09-159, 2009.
+#
+#  [8] Wallace, P.T. and N. Capitaine, "Precession-Nutation Precedures
+#         Consistent with IAU 2006 Resolutions," Astronomy & Astrophysics,
+#         Volume 459, pages 981-985, December 2006.
+#
 #
 ###############################################################################
 
@@ -247,6 +265,122 @@ def get_nutation_data(TEME_flag=True):
     return IAU1980_nutation
 
 
+def init_XYs2006(TT1, TT2):
+    '''
+    This loads the data file containing CIP coordinates, X and Y, as well as 
+    the CIO locator, s. The data file is named IAU2006_XYs.csv.
+    X, Y, and s are tabulated from 1980 to 2050 every day at 0h 
+    Terrestrial Time (TT). 
+
+    The data is loaded into a single matrix and then trimmed. The resulting 
+    XYsdata matrix contains data from 8 days before TT1 to 8 days after TT2 
+    for interpolation purposes.
+
+    NOTE: although TT is used for input, UTC can also be used without any
+        issues.  The difference between TT and UTC is about 60 seconds. 
+        Since data is trimmed for +/- 8 days on either side of the input
+        times, UTC is fine.  The resulting data matrix will still contain
+        X,Y,s data for 0h of TT though.
+        
+    Parameters
+    ------
+    TT1 : datetime object
+        start time in TT
+    TT2 : datetime object
+        final time in TT
+        
+    Returns
+    ------
+    XYs_data : nx7 numpy array
+        each row contains data for 0h TT for consecutive days
+        [yr, mo, day, MJD, X, Y, s]
+    
+    '''
+    
+    # Load data
+    df = pd.read_csv(os.path.join('../input_data', 'IAU2006_XYs.csv'))
+    XYs_data = df.values
+    
+    # Compute MJD and round to nearest whole day
+    MJD1 = int(round(dt2mjd(TT1)))
+    MJD2 = int(round(dt2mjd(TT2)))
+    
+    # Number of additional data points to include on either side
+    num = 10
+    
+    # Find rows
+    MJD_data = df['MJD (0h TT)'].tolist()
+    
+    if MJD1 < MJD_data[0]:
+        print('Error: init_XYs2006 start date before first XYs time')
+    elif MJD1 <= MJD_data[0] + num:
+        row1 = 0
+    elif MJD1 > MJD_data[-1]:
+        print('Error: init_XYs2006 start date after last XYs time')
+    else:
+        row1 = MJD_data.index(MJD1) - num
+    
+    if MJD2 < MJD_data[0]:
+        print('Error: init_XYs2006 final date before first XYs time')
+    elif MJD2 >= MJD_data[0] - num:
+        row2 = -1
+    elif MJD2 > MJD_data[-1]:
+        print('Error: init_XYs2006 final date after last XYs time')
+    else:
+        row2 = MJD_data.index(MJD2) + num
+        
+    if row2 == -1:
+        XYs_data = XYs_data[row1:, :]
+    else:
+        XYs_data = XYs_data[row1:row2, :]
+    
+    return XYs_data
+
+
+def get_XYs(XYs_data, TT_JD):
+    '''
+    Interpolates X,Y, and s loaded by init_XYs2006.m using an 11th-order 
+    Lagrange interpolation method. The init_XYsdata function must be 
+    called before get_XYs is used.  This function uses the XYs data set that 
+    has been loaded as a matrix. Each of the three values listed below are 
+    tabulated at 0h TT of each day.
+    
+    Parameters
+    ------
+    XYs_data : nx7 numpy array
+        each row contains data for 0h TT for consecutive days
+        [yr, mo, day, MJD, X, Y, s]
+    TT_JD : float
+        fractional days since 12:00:00 Jan 1 4713 BC TT
+ 
+    
+    Returns
+    ------
+    X : float
+        x-coordinate of the Celestial Intermediate Pole (CIP) [rad]
+    Y : float
+        y-coordinate of the Celestial Intermediate Pole (CIP) [rad]
+    s : float
+        Celestial Intermediate Origin (CIO) locator [rad]
+    
+    '''
+    
+    # Conversion
+    arcsec2rad  = (1./3600.) * (pi/180.)
+    
+    # Compute MJD
+    TT_MJD = TT_JD - 2400000.5
+    
+    # Compute interpolation
+    XYs = interp_lagrange(XYs_data[:,3], XYs_data[:,4:], TT_MJD, 11)
+    
+    X = float(XYs[0,0])*arcsec2rad
+    Y = float(XYs[0,1])*arcsec2rad
+    s = float(XYs[0,2])*arcsec2rad
+    
+    return X, Y, s
+
+
 def compute_precession_IAU1976(TT_cent):
     '''    
     This function computes the IAU1976 precession matrix required for the 
@@ -457,3 +591,139 @@ def eqnequinox_IAU1982_simple(dPsi, Eps_A):
     
 
     return R
+
+
+def compute_polarmotion(xp, yp, TT_cent):
+    '''
+    This function computes the polar motion transformation matrix required
+    for the frame transformation between TIRS and ITRF.    
+    
+    r_TIRS = W * r_ITRF
+    
+    Parameters
+    ------
+    xp : float
+        x-coordinate of the CIP unit vector [rad]
+    yp : float
+        y-coordinate of the CIP unit vector [rad]
+    TT_cent : float
+        Julian centuries since J2000 TT
+    
+    Returns
+    ------
+    W : 3x3 numpy array
+        matrix to compute frame rotation    
+    '''
+    
+    # Conversion
+    arcsec2rad  = (1./3600.) * (pi/180.)
+    
+    # Calcuate the Terrestrial Intermediate Origin (TIO) locator 
+    # Eq 5.13 in [5]
+    sp = -0.000047 * TT_cent * arcsec2rad
+    
+    # Construct rotation matrix
+    # W = ROT3(-sp)*ROT2(xp)*ROT1(yp) (Eq. 5.3 in [5])
+    cx = cos(xp)
+    sx = sin(xp)
+    cy = cos(yp)
+    sy = sin(yp)
+    cs = cos(sp)
+    ss = sin(sp)
+    
+    W = np.array([[cx*cs,  -cy*ss + sy*sx*cs,  -sy*ss - cy*sx*cs],
+                  [cx*ss,   cy*cs + sy*sx*ss,   sy*cs - cy*sx*ss],
+                  [   sx,             -sy*cx,              cy*cx]])
+    
+    
+    return W
+
+
+def compute_ERA(UT1_JD):
+    '''
+    This function computes the Earth Rotation Angle (ERA) and the ERA rotation
+    matrix based on UT1 time. The ERA is modulated to lie within [0,2*pi] and 
+    is computed using the precise equation given by Eq. 5.15 in [5].
+
+    The ERA is the angle between the Celestial Intermediate Origin, CIO, and 
+    Terrestrial Intermediate Origin, TIO (a reference meridian 100m offset 
+    from Greenwich meridian).
+    
+    r_CIRS = R * r_TIRS
+   
+    Parameters
+    ------
+    UT1_JD : float
+        fractional days since 12:00:00 Jan 1 4713 BC UT1
+        
+    Returns
+    ------
+    R : 3x3 numpy array
+        matrix to compute frame rotation
+    
+    '''
+    
+    # Compute ERA based on Eq. 5.15 of [5]
+    d,i = modf(UT1_JD)
+    ERA = 2.*pi*(d + 0.7790572732640 + 0.00273781191135448*(UT1_JD - 2451545.))
+    
+    # Compute ERA between [0, 2*pi]
+    ERA = ERA % (2.*pi)
+    if ERA < 0.:
+        ERA += 2*pi
+    
+    # Construct rotation matrix
+    # R = ROT3(-ERA)
+    ct = cos(ERA)
+    st = sin(ERA)
+    R = np.array([[ct, -st, 0.],
+                  [st,  ct, 0.],
+                  [0.,  0., 1.]])
+
+    return R
+
+
+def compute_BPN(X, Y, s):
+    '''
+    This function computes the Bias-Precession-Nutation matrix required for the 
+    CIO-based transformation between the GCRF/ITRF frames.
+    
+    r_GCRS = BPN * r_CIRS
+    
+    Parameters
+    ------
+    X : float
+        x-coordinate of the Celestial Intermediate Pole (CIP) [rad]
+    Y : float
+        y-coordinate of the Celestial Intermediate Pole (CIP) [rad]
+    s : float
+        Celestial Intermediate Origin (CIO) locator [rad]
+    
+    Returns
+    ------
+    BPN : 3x3 numpy array
+        matrix to compute frame rotation
+    
+    '''
+    
+    # Compute z-coordinate of CIP
+    Z  = np.sqrt(1 - X*X - Y*Y)
+    aa = 1./(1. + Z)
+    
+    # Construct BPN (Bias-Precession-Nutation Matrix) 
+    # Eq. 5.1 in [5]:  BPN = [f(X,Y)]*ROT3(s)
+    cs = cos(s)
+    ss = sin(s)
+    
+    f = np.array([[1-aa*X*X,    -aa*X*Y,                X],
+                  [ -aa*X*Y,   1-aa*Y*Y,                Y], 
+                  [      -X,         -Y,   1-aa*(X*X+Y*Y)]])
+    
+    R3 = np.array([[ cs,  ss,  0.],
+                   [-ss,  cs,  0.],
+                   [ 0.,  0.,  1.]])
+    
+    BPN = np.dot(f, R3)
+    
+    return BPN
+
