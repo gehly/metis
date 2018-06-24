@@ -578,7 +578,7 @@ if __name__ == '__main__':
     vis_file_min_el = 20.  # deg
     
     # Create an array of times
-    ndays = 5
+    ndays = 6
     dt = 10  # sec    
     UTC_now = ts.now().utc
     sec_array = list(range(0,86400*ndays,dt))

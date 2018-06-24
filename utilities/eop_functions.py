@@ -4,7 +4,7 @@ import requests
 import pandas as pd
 import os
 
-from time_systems import utcdt2utcmjd
+from time_systems import dt2mjd
 
 ###############################################################################
 #
@@ -85,7 +85,7 @@ def get_eop_data(data_text, UTC):
     '''    
         
     # Compute MJD for desired time
-    MJD = utcdt2utcmjd(UTC)
+    MJD = dt2mjd(UTC)
     MJD_int = int(MJD)
     
     # Find EOP data lines around time of interest
