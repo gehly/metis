@@ -50,6 +50,31 @@ def dt2jd(dt):
     return JD
 
 
+def utcdt2maisec(UTC):
+    '''
+    This function converts a UTC time to MAI seconds since 1980-01-06 00:00:00,
+    the initial epoch of GPS time.  No conversion between time systems is made,
+    the output is seconds in UTC since the initial GPS epoch, including leap
+    seconds.
+    
+    Parameters
+    ------
+    UTC : datetime object
+        time in UTC
+    
+    Returns
+    MAI : float
+        seconds in UTC since GPS epoch 1980-01-06 00:00:00
+        
+    '''
+    
+    MAI_datetime = datetime(1980, 1, 6, 0, 0, 0)
+    delta = UTC - MAI_datetime
+    MAI = delta.total_seconds()
+    
+    return MAI
+
+
 def utcdt2ut1jd(UTC, UT1_UTC):
     '''
     This function converts a UTC time to UT1 in Julian Date (JD) format.
