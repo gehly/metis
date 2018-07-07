@@ -1,5 +1,5 @@
-from math import *
-
+from math import pi
+import pickle
 
 def define_sensors():
     
@@ -29,10 +29,17 @@ def define_sensors():
     sun_el_mask = -10.*pi/180.  # rad
     
     # Measurement types and noise
-    meas_types = ['ra', 'dec']
+    meas_types = ['ra', 'dec', 'mapp']
     sigma_dict = {}
     sigma_dict['ra'] = 5./206265.   # rad
     sigma_dict['dec'] = 5./206265.  # rad
+    sigma_dict['mapp'] = 0.1
+    
+    # Pass parameters
+    max_pass = 6000.
+    min_pass = 60.
+    max_gap = 60.
+    obs_gap = 1.
 
     # Set up sensors
     print('UNSW Falcon')
@@ -58,7 +65,10 @@ def define_sensors():
     sensor_dict['UNSW Falcon']['sigma_dict'] = sigma_dict
     
     # Pass parameters
-    sensor_dict['UNSW Falcon']['max_gap'] = 60.
+    sensor_dict['UNSW Falcon']['max_gap'] = max_gap
+    sensor_dict['UNSW Falcon']['obs_gap'] = obs_gap
+    sensor_dict['UNSW Falcon']['min_pass'] = min_pass
+    sensor_dict['UNSW Falcon']['max_pass'] = max_pass
     
     	
     print('FLC Falcon')
@@ -84,7 +94,10 @@ def define_sensors():
     sensor_dict['FLC Falcon']['sigma_dict'] = sigma_dict
     
     # Pass parameters
-    sensor_dict['FLC Falcon']['max_gap'] = 60.
+    sensor_dict['FLC Falcon']['max_gap'] = max_gap
+    sensor_dict['FLC Falcon']['obs_gap'] = obs_gap
+    sensor_dict['FLC Falcon']['min_pass'] = min_pass
+    sensor_dict['FLC Falcon']['max_pass'] = max_pass
 	
     print('NJC Falcon')
     lat_gs = 40.65
@@ -109,7 +122,10 @@ def define_sensors():
     sensor_dict['NJC Falcon']['sigma_dict'] = sigma_dict
     
     # Pass parameters
-    sensor_dict['NJC Falcon']['max_gap'] = 60.
+    sensor_dict['NJC Falcon']['max_gap'] = max_gap
+    sensor_dict['NJC Falcon']['obs_gap'] = obs_gap
+    sensor_dict['NJC Falcon']['min_pass'] = min_pass
+    sensor_dict['NJC Falcon']['max_pass'] = max_pass
 	
     print('OJC Falcon')
     lat_gs = 37.97
@@ -134,7 +150,10 @@ def define_sensors():
     sensor_dict['OJC Falcon']['sigma_dict'] = sigma_dict
     
     # Pass parameters
-    sensor_dict['OJC Falcon']['max_gap'] = 60.
+    sensor_dict['OJC Falcon']['max_gap'] = max_gap
+    sensor_dict['OJC Falcon']['obs_gap'] = obs_gap
+    sensor_dict['OJC Falcon']['min_pass'] = min_pass
+    sensor_dict['OJC Falcon']['max_pass'] = max_pass
 	
     print('PSU Falcon')
     lat_gs = 40.86
@@ -159,7 +178,10 @@ def define_sensors():
     sensor_dict['PSU Falcon']['sigma_dict'] = sigma_dict
     
     # Pass parameters
-    sensor_dict['PSU Falcon']['max_gap'] = 60.
+    sensor_dict['PSU Falcon']['max_gap'] = max_gap
+    sensor_dict['PSU Falcon']['obs_gap'] = obs_gap
+    sensor_dict['PSU Falcon']['min_pass'] = min_pass
+    sensor_dict['PSU Falcon']['max_pass'] = max_pass
 	
     print('Mamalluca Falcon')
     lat_gs = -29.99
@@ -184,7 +206,10 @@ def define_sensors():
     sensor_dict['Mamalluca Falcon']['sigma_dict'] = sigma_dict
     
     # Pass parameters
-    sensor_dict['Mamalluca Falcon']['max_gap'] = 60.
+    sensor_dict['Mamalluca Falcon']['max_gap'] = max_gap
+    sensor_dict['Mamalluca Falcon']['obs_gap'] = obs_gap
+    sensor_dict['Mamalluca Falcon']['min_pass'] = min_pass
+    sensor_dict['Mamalluca Falcon']['max_pass'] = max_pass
     
     
     print('Perth Falcon')
@@ -210,13 +235,22 @@ def define_sensors():
     sensor_dict['Perth Falcon']['sigma_dict'] = sigma_dict
     
     # Pass parameters
-    sensor_dict['Perth Falcon']['max_gap'] = 60.
-	
-	
-    
+    sensor_dict['Perth Falcon']['max_gap'] = max_gap
+    sensor_dict['Perth Falcon']['obs_gap'] = obs_gap
+    sensor_dict['Perth Falcon']['min_pass'] = min_pass
+    sensor_dict['Perth Falcon']['max_pass'] = max_pass
+
     
     return sensor_dict
 
 
-
-
+def generate_sensor_file(sensor_file):
+    
+    sensor_dict = define_sensors()
+    
+    # Save data    
+    pklFile = open( sensor_file, 'wb' )
+    pickle.dump( [sensor_dict], pklFile, -1 )
+    pklFile.close()
+    
+    return
