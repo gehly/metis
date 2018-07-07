@@ -4,18 +4,18 @@ import pickle
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
+import sys
 
-from integration_functions import int_twobody
+sys.path.append('../')
 
-def propagate_orbit(params_file, intfcn, ndays, dt):
+from propagation.integration_functions import int_twobody
+
+
+
+
+def propagate_orbit(intfcn, spacecraftConfig, forcesCoeff, brdfCoeff, ndays, dt):
     
-     # Load parameters
-    pklFile = open(params_file, 'rb')
-    data = pickle.load(pklFile)
-    spacecraftConfig = data[0]
-    forcesCoeff = data[1]
-    brdfCoeff = data[2]
-    pklFile.close() 
+    
     
     # Integrator tolerance
     int_tol = 1e-12
@@ -65,6 +65,14 @@ if __name__ == '__main__':
     fname = 'leo_' + object_type + '_2018_07_05_true_params.pkl'
     true_params_file = datadir / fname
     
+    # Load parameters
+    pklFile = open(true_params_file, 'rb')
+    data = pickle.load(pklFile)
+    spacecraftConfig = data[0]
+    forcesCoeff = data[1]
+    brdfCoeff = data[2]
+    pklFile.close() 
+    
     
     # Generate truth trajectory and measurements file
     ndays = 3.
@@ -72,7 +80,7 @@ if __name__ == '__main__':
     
     intfcn = int_twobody
     
-    UTC_times, state = propagate_orbit(true_params_file, intfcn, ndays, dt)
+    UTC_times, state = propagate_orbit(intfcn, spacecraftConfig, forcesCoeff, brdfCoeff, ndays, dt)
     
     
     

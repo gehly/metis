@@ -1,20 +1,27 @@
 import numpy as np
+from math import pi, sin, cos, tan, asin, acos, atan, atan2
 from datetime import datetime
+import sys
+import copy
 
-from time_systems import utcdt2ttjd
-from time_systems import utcdt2ut1jd
-from time_systems import jd2cent
+sys.path.append('../')
 
-from eop_functions import get_celestrak_eop_alldata
-from eop_functions import get_eop_data
-from eop_functions import compute_precession_IAU1976
-from eop_functions import compute_nutation_IAU1980
-from eop_functions import eqnequinox_IAU1982_simple
-from eop_functions import compute_polarmotion
-from eop_functions import compute_ERA
-from eop_functions import init_XYs2006
-from eop_functions import get_XYs
-from eop_functions import compute_BPN
+from utilities.time_systems import utcdt2ttjd
+from utilities.time_systems import utcdt2ut1jd
+from utilities.time_systems import jd2cent
+
+from utilities.eop_functions import get_celestrak_eop_alldata
+from utilities.eop_functions import get_eop_data
+from utilities.eop_functions import compute_precession_IAU1976
+from utilities.eop_functions import compute_nutation_IAU1980
+from utilities.eop_functions import eqnequinox_IAU1982_simple
+from utilities.eop_functions import compute_polarmotion
+from utilities.eop_functions import compute_ERA
+from utilities.eop_functions import init_XYs2006
+from utilities.eop_functions import get_XYs
+from utilities.eop_functions import compute_BPN
+
+from utilities.constants import Re, rec_f
 
 
 
@@ -254,6 +261,262 @@ def itrf2gcrf(r_ITRF, v_ITRF, UTC, EOP_data):
                     np.cross(np.array([[0.],[0.],[wE]]), r_TIRS, axis=0))))  
     
     return r_GCRF, v_GCRF
+
+
+def eci2ric(rc_vect, vc_vect, Qin):
+    '''
+    This function computes the rotation from ECI to RIC and rotates input
+    Qin (vector or matrix) to RIC.
+
+    Parameters
+    ------
+    rc_vect : 3x1 numpy array
+      position vector of chief (or truth) orbit in ECI
+    vc_vect : 3x1 numpy array
+      velocity vector of chief (or truth) orbit in ECI
+    Qin : 3x1 or 3x3 numpy array
+      vector or matrix in ECI
+
+    Returns
+    ------
+    Qout : 3x1 or 3x3 numpy array
+      vector or matrix in RIC
+    '''
+
+    # Compute transformation matrix to Hill (RIC) frame
+    rc = np.linalg.norm(rc_vect)
+    OR = rc_vect/rc
+    h_vect = np.cross(rc_vect, vc_vect, axis=0)
+    h = np.linalg.norm(h_vect)
+    OH = h_vect/h
+    OT = np.cross(OH, OR, axis=0)
+
+    ON = np.concatenate((OR.T, OT.T, OH.T))
+
+    # Rotate Qin as appropriate for vector or matrix
+    if Qin.shape[1] == 1:
+        Qout = np.dot(ON, Qin)
+    else:
+        Qout = np.dot(np.dot(ON, Qin), ON.T)
+
+    return Qout
+
+
+def ric2eci(rc_vect, vc_vect, Qin):
+    '''
+    This function computes the rotation from RIC to ECI and rotates input
+    Qin (vector or matrix) to ECI.
+
+    Parameters
+    ------
+    rc_vect : 3x1 numpy array
+      position vector of chief (or truth) orbit in ECI
+    vc_vect : 3x1 numpy array
+      velocity vector of chief (or truth) orbit in ECI
+    Qin : 3x1 or 3x3 numpy array
+      vector or matrix in RIC
+
+    Returns
+    ------
+    Qout : 3x1 or 3x3 numpy array
+      vector or matrix in ECI
+    '''
+
+    # Compute transformation matrix to Hill (RIC) frame
+    rc = np.linalg.norm(rc_vect)
+    OR = rc_vect/rc
+    h_vect = np.cross(rc_vect, vc_vect, axis=0)
+    h = np.linalg.norm(h_vect)
+    OH = h_vect/h
+    OT = np.cross(OH, OR, axis=0)
+
+    ON = np.concatenate((OR.T, OT.T, OH.T))
+    NO = ON.T
+
+    # Rotate Qin as appropriate for vector or matrix
+    if Qin.shape[1] == 1:
+        Qout = np.dot(NO, Qin)
+    else:
+        Qout = np.dot(np.dot(NO, Qin), NO.T)
+
+    return Qout
+
+
+def ecef2enu(r_ecef, r_site):
+    '''
+    This function converts the coordinates of a position vector from
+    the ECEF to ENU frame.
+
+    Parameters
+    ------
+    r_ecef : 3x1 numpy array
+      position vector in ECEF [km]
+    r_site : 3x1 numpy array
+      station position vector in ECEF [km]
+
+    Returns
+    ------
+    r_enu : 3x1 numpy array
+      position vector in ENU [km]
+    '''
+
+    # Compute lat,lon,ht of ground station
+    lat, lon, ht = ecef2latlonht(r_site)
+    lat = lat*pi/180  # rad
+    lon = lon*pi/180  # rad
+
+    # Compute rotation matrix
+    lat1 = pi/2 - lat
+    lon1 = pi/2 + lon
+
+    R1 = np.array([[1.,   0.,               0.],
+                   [0.,   cos(lat1), sin(lat1)],
+                   [0.,  -sin(lat1), cos(lat1)]])
+
+    R3 = np.array([[cos(lon1),  sin(lon1), 0.],
+                   [-sin(lon1), cos(lon1), 0.],
+                   [0.,          0.,       1.]])
+
+    R = np.dot(R1, R3)
+
+    r_enu = np.dot(R, r_ecef)
+
+    return r_enu
+
+
+def enu2ecef(r_enu, r_site):
+    '''
+    This function converts the coordinates of a position vector from
+    the ENU to ECEF frame.
+
+    Parameters
+    ------
+    r_enu : 3x1 numpy array
+      position vector in ENU [km]
+    r_site : 3x1 numpy array
+      station position vector in ECEF [km]
+
+    Returns
+    ------
+    r_ecef : 3x1 numpy array
+      position vector in ECEF
+    '''
+
+    # Compute lat,lon,ht of ground station
+    lat, lon, ht = ecef2latlonht(r_site)
+    lat = lat*pi/180  # rad
+    lon = lon*pi/180  # rad
+
+    # Compute rotation matrix
+    lat1 = pi/2 - lat
+    lon1 = pi/2 + lon
+
+    R1 = np.array([[1.,   0.,               0.],
+                   [0.,   cos(lat1), sin(lat1)],
+                   [0.,  -sin(lat1), cos(lat1)]])
+
+    R3 = np.array([[cos(lon1),  sin(lon1), 0.],
+                   [-sin(lon1), cos(lon1), 0.],
+                   [0.,          0.,       1.]])
+
+    R = np.dot(R1, R3)
+
+    R2 = R.T
+
+    r_ecef = np.dot(R2, r_enu)
+
+    return r_ecef
+
+
+def ecef2latlonht(r_ecef):
+    '''
+    This function converts the coordinates of a position vector from
+    the ECEF frame to geodetic latitude, longitude, and height.
+
+    Parameters
+    ------
+    r_ecef : 3x1 numpy array
+      position vector in ECEF [km]
+
+    Returns
+    ------
+    lat : float
+      latitude [deg] [-90,90]
+    lon : float
+      longitude [deg] [-180,180]
+    ht : float
+      height [km]
+    '''
+
+    a = Re   # km
+
+    # Get components from position vector
+    x = float(r_ecef[0])
+    y = float(r_ecef[1])
+    z = float(r_ecef[2])
+
+    # Compute longitude
+    f = 1/rec_f
+    e = np.sqrt(2*f - f**2)
+    lon = atan2(y, x) * 180/pi  # deg
+
+    # Iterate to find height and latitude
+    p = np.sqrt(x**2 + y**2)  # km
+    lat = 0.*pi/180.
+    lat_diff = 1.
+    tol = 1e-12
+
+    while abs(lat_diff) > tol:
+        lat0 = copy.copy(lat)  # rad
+        N = a/np.sqrt(1 - e**2*(sin(lat0)**2))  # km
+        ht = p/cos(lat0) - N
+        lat = atan((z/p)/(1 - e**2*(N/(N + ht))))
+        lat_diff = lat - lat0
+
+    lat = lat*180/pi  # deg
+
+    return lat, lon, ht
+
+
+def latlonht2ecef(lat, lon, ht):
+    '''
+    This function converts geodetic latitude, longitude and height
+    to a position vector in ECEF.
+
+    Parameters
+    ------
+    lat : float
+      geodetic latitude [deg]
+    lon : float
+      geodetic longitude [deg]
+    ht : float
+      geodetic height [km]
+
+    Returns
+    ------
+    r_ecef = 3x1 numpy array
+      position vector in ECEF [km]
+    '''
+
+    # Convert to radians
+    lat = lat*pi/180    # rad
+    lon = lon*pi/180    # rad
+
+    # Compute flattening and eccentricity
+    f = 1/rec_f
+    e = np.sqrt(2*f - f**2)
+
+    # Compute ecliptic plane and out of plane components
+    C = Re/np.sqrt(1 - e**2*sin(lat)**2)
+    S = Re*(1 - e**2)/np.sqrt(1 - e**2*sin(lat)**2)
+
+    rd = (C + ht)*cos(lat)
+    rk = (S + ht)*sin(lat)
+
+    # Compute ECEF position vector
+    r_ecef = np.array([[rd*cos(lon)], [rd*sin(lon)], [rk]])
+
+    return r_ecef
 
 
 ###############################################################################

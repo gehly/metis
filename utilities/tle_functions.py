@@ -2,12 +2,15 @@ import numpy as np
 import requests
 import getpass
 from datetime import datetime
+import sys
 
-from eop_functions import get_celestrak_eop_alldata
-from eop_functions import get_nutation_data
-from eop_functions import get_eop_data
-from coordinate_systems import teme2gcrf
-from coordinate_systems import gcrf2itrf
+sys.path.append('../')
+
+from utilities.eop_functions import get_celestrak_eop_alldata
+from utilities.eop_functions import get_nutation_data
+from utilities.eop_functions import get_eop_data
+from utilities.coordinate_systems import teme2gcrf
+from utilities.coordinate_systems import gcrf2itrf
 
 from sgp4.io import twoline2rv
 from sgp4.earth_gravity import wgs84

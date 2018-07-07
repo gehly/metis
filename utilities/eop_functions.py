@@ -3,9 +3,12 @@ from math import pi, sin, cos, modf
 import requests
 import pandas as pd
 import os
+import sys
 
-from time_systems import dt2mjd
-from numerical_methods import interp_lagrange
+sys.path.append('../')
+
+from utilities.time_systems import dt2mjd
+from utilities.numerical_methods import interp_lagrange
 
 ###############################################################################
 #

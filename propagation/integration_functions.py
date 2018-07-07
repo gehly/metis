@@ -4,12 +4,11 @@ import os
 import sys
 from pathlib import Path
 
-cwd = os.getcwd()
-metis_dir = Path(cwd).parent
-sys.path.append(metis_dir)
+sys.path.append('../')
 
 import utilities.conversions as conv
 from utilities.constants import GM, Re, wE
+
 ###############################################################################
 # This file contains functions to perform numerical integration using odeint
 # Functions:
