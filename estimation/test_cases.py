@@ -15,9 +15,13 @@ sys.path.append('../')
 from utilities.tle_functions import propagate_TLE
 from utilities.eop_functions import get_celestrak_eop_alldata
 from utilities.eop_functions import get_eop_data
+from utilities.coordinate_systems import latlonht2ecef
+from utilities.coordinate_systems import gcrf2itrf
 from sensors.sensors import generate_sensor_file
 from sensors.brdf_models import lambertian_sphere
 from sensors.measurements import compute_measurement
+from sensors.measurements import ecef2azelrange_rad
+from sensors.visibility import check_visibility
 from propagation.integration_functions import int_twobody
 from propagation.orbit_propagation import propagate_orbit
 
@@ -272,27 +276,26 @@ def generate_noisy_meas(true_params_file, truth_file, sensor_file, meas_file,
     # Retrieve sensor parameters
     sensor_id = list(sensor_dict.keys())[0]
     sensor = sensor_dict[sensor_id]
-    mapp_lim = sensor['mapp_lim']
-    az_lim = sensor['az_lim']
-    el_lim = sensor['el_lim']
-    sig_ra = sensor['sigma_dict']['ra']
-    sig_dec = sensor['sigma_dict']['dec']
-    sig_mapp = sensor['sigma_dict']['mapp']
-    geodetic_latlonht = sensor['geodetic_latlonht']
     meas_types = sensor['meas_types']
-    meas_types.append('rg')
-    meas_types.append('az')
-    meas_types.append('el')
+    sigs = []
+    for mtype in meas_types:
+        sigs.append(sensor['sigma_dict'][mtype])
+    
     
     # Retrieve sun and moon positions for full timespan
     earth = ephemeris['earth']
     sun = ephemeris['sun']
-    moon = ephemeris['moon']
-    moon_gcrf_array = earth.at(UTC_times).observe(moon).position.km
     sun_gcrf_array = earth.at(UTC_times).observe(sun).position.km
     
-    # Loop over times and check visiblity conditions
-    for ii in range(len(UTC_times)):
+    # Compute visible indicies    
+    vis_inds = check_visibility(state, UTC_times, sensor, spacecraftConfig,
+                                surfaces, eop_alldata, ephemeris)
+
+
+    # Compute measurements
+    meas = np.zeros(len(vis_inds), len(meas_types))
+    meas_times = []
+    for ii in vis_inds:
         
         # Retrieve time and current sun and object locations in ECI
         UTC = UTC_times[ii]
@@ -303,70 +306,33 @@ def generate_noisy_meas(true_params_file, truth_file, sensor_file, meas_file,
         EOP_data = get_eop_data(eop_alldata, UTC)
         Yi = compute_measurement(Xi, sun_gcrf, sensor, spacecraftConfig,
                                  surfaces, UTC, EOP_data, meas_types)
-
-    
-        # Compare against constraints
         
+        for jj in range(len(meas_types)):
+            sig = sigs[jj]
+            sig = 0    # TODO Reset to real noise value
+            meas[ii,jj] = float(Yi[jj]) + sig*np.random.randn()
         
+        meas_times.append(UTC)
         
-        #TODO Moon Limits based on phase of moon (Meeus algorithm?)
-    
-    
-    # Find all times when visible
-    visState = visibility[:,2]
-    mapp = visibility[:,0]
-    az = visibility[:,3]
-    el = visibility[:,4]
-    vis_inds = set(np.where([ti < (truth_time[0]+timedelta(days=ndays)) for ti in truth_time])[0])
-    vis_inds.intersection_update(set(np.where(visState > 0.)[0]))
-    vis_inds.intersection_update(set(np.where(az < az_lim[1]*180./pi)[0]))
-    vis_inds.intersection_update(set(np.where(az > az_lim[0]*180./pi)[0]))
-    vis_inds.intersection_update(set(np.where(el < el_lim[1]*180./pi)[0]))
-    vis_inds.intersection_update(set(np.where(el > el_lim[0]*180./pi)[0]))
-    vis_inds.intersection_update(set(np.where(mapp < mapp_lim)[0]))
-    vis_inds = sorted(list(vis_inds))
-    
-    vis_time = [truth_time[ii] for ii in vis_inds]
-    vis_az = az[vis_inds]
-    vis_el = el[vis_inds]
-    vis_mapp = mapp[vis_inds]
-
-#    print(vis_time)
-
-    # Compute passes
-    start, stop, pass_length, meas_inds = compute_passes(vis_time, sensor)
-    
-    print(start)
-    print(stop)
-    print(pass_length)
-    print(meas_inds)
-    print('Total Number Meas: ', len(meas_inds))
-    
-    # Add noise
-    meas_time = [vis_time[ii] for ii in meas_inds]
-    az_noise = vis_az[meas_inds] + sig_az*np.random.randn(len(meas_inds),)
-    el_noise = vis_el[meas_inds] + sig_el*np.random.randn(len(meas_inds),)
-    mapp_noise = vis_mapp[meas_inds] + sig_mapp*np.random.randn(len(meas_inds),)
-    
     # Save measurement file
     pklFile = open( meas_file, 'wb' )
-    pickle.dump( [meas_time, az_noise, el_noise, mapp_noise], pklFile, -1 )
+    pickle.dump( [meas_times, meas], pklFile, -1 )
     pklFile.close()
     
     # Plot noise
-    t_hrs = [(ti - truth_time[0]).total_seconds()/3600. for ti in meas_time]
+    t_hrs = [(ti - UTC_times[0]).total_seconds()/3600. for ti in meas_times]
     
     plt.figure()
     plt.subplot(3,1,1)
-    plt.plot(t_hrs, mapp_noise - vis_mapp[meas_inds], 'k.')
+    plt.plot(t_hrs, meas[:,2], 'k.')
     plt.ylabel('Apparent Mag')    
     plt.title('Measurements')
     plt.subplot(3,1,2)
-    plt.plot(t_hrs, az_noise - vis_az[meas_inds], 'k.')
-    plt.ylabel('Az [deg]')
+    plt.plot(t_hrs, meas[:,0], 'k.')
+    plt.ylabel('RA [rad]')
     plt.subplot(3,1,3)
-    plt.plot(t_hrs, el_noise - vis_el[meas_inds], 'k.')
-    plt.ylabel('El [deg]')
+    plt.plot(t_hrs, meas[:,1], 'k.')
+    plt.ylabel('DEC [rad]')
     plt.xlabel('Time [hours]')
     
     

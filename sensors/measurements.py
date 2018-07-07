@@ -40,7 +40,7 @@ def compute_measurement(X, sun_gcrf, sensor, spacecraftConfig, surface, UTC,
     for mtype in meas_types:
         
         if mtype == 'rg':
-            Y[ii] = rg
+            Y[ii] = rg  # km
             
         elif mtype == 'ra':
             Y[ii] = atan2(rho_hat_gcrf[1], rho_hat_gcrf[0]) #rad
