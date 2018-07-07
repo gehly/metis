@@ -3,17 +3,25 @@ from math import pi
 from scipy.integrate import odeint
 from datetime import datetime
 import pickle
+import os
 import sys
 from pathlib import Path
 import matplotlib.pyplot as plt
 
+from skyfield.api import Loader
+
 sys.path.append('../')
 
 from utilities.tle_functions import propagate_TLE
+from utilities.eop_functions import get_celestrak_eop_alldata
+from utilities.eop_functions import get_eop_data
 from sensors.sensors import generate_sensor_file
+from sensors.brdf_models import lambertian_sphere
+from sensors.measurements import compute_measurement
 from propagation.integration_functions import int_twobody
 from propagation.orbit_propagation import propagate_orbit
-from utilities.eop_functions import get_celestrak_eop_alldata
+
+
 
 
 def generate_init_orbit_file(obj_id, UTC, orbit_file):
@@ -50,8 +58,10 @@ def parameter_setup_sphere(orbit_file, obj_id, mass, radius):
     spacecraftConfig = {}
     spacecraftConfig['type'] = '3DoF' # 6DoF or 3DoF
     spacecraftConfig['mass'] = mass  # kg
-    spacecraftConfig['radius'] = radius # m
+    spacecraftConfig['radius'] = radius * 0.001 # km
     spacecraftConfig['time'] = UTC  # UTC in datetime
+    spacecraftConfig['brdf_function'] = lambertian_sphere
+    spacecraftConfig['intfcn'] = int_twobody
     spacecraftConfig['X'] = \
         np.array([pos[0], pos[1], pos[2], vel[0] ,vel[1] ,vel[2]])  # km, GCRF
     
@@ -80,14 +90,16 @@ def parameter_setup_sphere(orbit_file, obj_id, mass, radius):
     brdfCoeff['rho'] = 0.75
     brdfCoeff['s'] = 1 - brdfCoeff['d']
     brdfCoeff['Fo'] = 0.5
+    surfaces = {}
+    surfaces[0] = {}
+    surfaces[0]['brdf_params'] = brdfCoeff
     
-    return spacecraftConfig, forcesCoeff, brdfCoeff
+    return spacecraftConfig, forcesCoeff, surfaces
 
 
 def generate_true_params_file(orbit_file, obj_id, object_type, param_file):    
     
     eop_alldata = get_celestrak_eop_alldata()
-    
     
     if object_type == 'sphere_lamr':
         
@@ -95,83 +107,22 @@ def generate_true_params_file(orbit_file, obj_id, object_type, param_file):
         mass = 100.     # kg
         radius = 1./pi     # m,  gives area = 1 m^2
         
-        spacecraftConfig, forcesCoeff, brdfCoeff = \
+        spacecraftConfig, forcesCoeff, surfaces = \
             parameter_setup_sphere(orbit_file, obj_id, mass, radius)
             
-    if object_type == 'sphere_hamr':
-        
-        # Parameter setup
-        mass = 1.     # kg
-        radius = 1./pi     # m,  gives area = 1 m^2
-        
-        spacecraftConfig, forcesCoeff, brdfCoeff = \
-            parameter_setup_sphere(orbit_file, obj_id, mass, radius)
-            
-    if object_type == 'cubesat_nadir':
-        
-        mass = 5.  # kg
-        wE = 7.29211514670639e-5 * 180./pi
-        attitude = np.array([0.0,0.0,0.0,0.0,-wE,0.0]) #roll-pitch-yaw and omega w.r.t orbit frame
-        
-        spacecraftConfig, forcesCoeff, brdfCoeff = \
-            parameter_setup_cubesat(orbit_file, obj_id, mass, attitude)
-            
-    if object_type == 'cubesat_spin':
-        
-        mass = 5.  # kg
-        #wE = 7.29211514670639e-5 * 180./pi
-        attitude = np.array([0.0,0.0,0.0,0.0,5.,0.0]) #roll-pitch-yaw and omega w.r.t orbit frame
-        
-        spacecraftConfig, forcesCoeff, brdfCoeff = \
-            parameter_setup_cubesat(orbit_file, obj_id, mass, attitude)
-            
-    if object_type == 'cubesat_tumble':
-        
-        mass = 5.  # kg
-        wE = 7.29211514670639e-5 * 180./pi
-        attitude = np.array([0.0,0.0,0.0,0.0,5.,5.]) #roll-pitch-yaw and omega w.r.t orbit frame
-        
-        spacecraftConfig, forcesCoeff, brdfCoeff = \
-            parameter_setup_cubesat(orbit_file, obj_id, mass, attitude)
-            
-    if object_type == 'boxwing_nadir':
-        
-        mass = 500.  # kg
-        wE = 7.29211514670639e-5 * 180./pi
-        attitude = np.array([0.0,0.0,0.0,0.0,-wE,0.0]) #roll-pitch-yaw and omega w.r.t orbit frame
-        
-        spacecraftConfig, forcesCoeff, brdfCoeff = \
-            parameter_setup_boxwing(orbit_file, obj_id, mass, attitude)
-            
-    if object_type == 'boxwing_spin':
-        
-        mass = 500.  # kg
-        wE = 7.29211514670639e-5 * 180./pi
-        attitude = np.array([0.0,0.0,0.0,0.0,5.,0.0]) #roll-pitch-yaw and omega w.r.t orbit frame
-        
-        spacecraftConfig, forcesCoeff, brdfCoeff = \
-            parameter_setup_boxwing(orbit_file, obj_id, mass, attitude)
-            
-    if object_type == 'boxwing_tumble':
-        
-        mass = 500.  # kg
-        wE = 7.29211514670639e-5 * 180./pi
-        attitude = np.array([0.0,0.0,0.0,0.0,5.,5.]) #roll-pitch-yaw and omega w.r.t orbit frame
-        
-        spacecraftConfig, forcesCoeff, brdfCoeff = \
-            parameter_setup_boxwing(orbit_file, obj_id, mass, attitude)
+    
         
         
     # Save data    
     pklFile = open( param_file, 'wb' )
-    pickle.dump( [spacecraftConfig, forcesCoeff, brdfCoeff, eop_alldata], pklFile, -1 )
+    pickle.dump( [spacecraftConfig, forcesCoeff, surfaces, eop_alldata], pklFile, -1 )
     pklFile.close()
     
     
     return
 
 
-def generate_truth_file(true_params_file, truth_file, ndays, dt):
+def generate_truth_file(true_params_file, truth_file, ephemeris, ndays, dt):
 
 
     # Load parameters
@@ -179,13 +130,13 @@ def generate_truth_file(true_params_file, truth_file, ndays, dt):
     data = pickle.load(pklFile)
     spacecraftConfig = data[0]
     forcesCoeff = data[1]
-    brdfCoeff = data[2]
+    surfaces = data[2]
     pklFile.close()
     
     intfcn = int_twobody
    
     UTC_times, state = propagate_orbit(intfcn, spacecraftConfig, forcesCoeff,
-                                       brdfCoeff, ndays, dt)
+                                       surfaces, ephemeris, ndays, dt)
     
     
     
@@ -288,7 +239,17 @@ def generate_truth_file(true_params_file, truth_file, ndays, dt):
     return
 
 
-def generate_noisy_meas(truth_file, sensor_file, meas_file, ndays=7.):
+def generate_noisy_meas(true_params_file, truth_file, sensor_file, meas_file,
+                        ephemeris, ndays=1.):
+    
+    # Load parameters
+    pklFile = open(true_params_file, 'rb')
+    data = pickle.load(pklFile)
+    spacecraftConfig = data[0]
+    forcesCoeff = data[1]
+    surfaces = data[2]
+    eop_alldata = data[3]
+    pklFile.close()
     
     # Load truth data
     pklFile = open(truth_file, 'rb')
@@ -318,18 +279,37 @@ def generate_noisy_meas(truth_file, sensor_file, meas_file, ndays=7.):
     sig_dec = sensor['sigma_dict']['dec']
     sig_mapp = sensor['sigma_dict']['mapp']
     geodetic_latlonht = sensor['geodetic_latlonht']
+    meas_types = sensor['meas_types']
+    meas_types.append('rg')
+    meas_types.append('az')
+    meas_types.append('el')
+    
+    # Retrieve sun and moon positions for full timespan
+    earth = ephemeris['earth']
+    sun = ephemeris['sun']
+    moon = ephemeris['moon']
+    moon_gcrf_array = earth.at(UTC_times).observe(moon).position.km
+    sun_gcrf_array = earth.at(UTC_times).observe(sun).position.km
     
     # Loop over times and check visiblity conditions
     for ii in range(len(UTC_times)):
         
-        # Retrieve time and object location in ECI
+        # Retrieve time and current sun and object locations in ECI
         UTC = UTC_times[ii]
         Xi = state[ii,:]
+        sun_gcrf = sun_gcrf_array[:,ii].reshape(3,1)
         
         # Compute measurements
-        meas = compute_measurement(Xi, sensor, UTC)
+        EOP_data = get_eop_data(eop_alldata, UTC)
+        Yi = compute_measurement(Xi, sun_gcrf, sensor, spacecraftConfig,
+                                 surfaces, UTC, EOP_data, meas_types)
+
     
-    
+        # Compare against constraints
+        
+        
+        
+        #TODO Moon Limits based on phase of moon (Meeus algorithm?)
     
     
     # Find all times when visible
@@ -437,6 +417,13 @@ if __name__ == '__main__':
     error_file = datadir / fname
     
     
+    cwd = os.getcwd()
+    metis_dir = cwd[0:-10]
+    load = Loader(os.path.join(metis_dir, 'skyfield_data'))
+    ephemeris = load('de430t.bsp')
+    
+    
+    
     # Generate initial orbit file       
 #    generate_init_orbit_file(obj_id, UTC, init_orbit_file)
     
@@ -444,7 +431,7 @@ if __name__ == '__main__':
 #    generate_sensor_file(sensor_file)
 
     # Generate true params file
-    generate_true_params_file(init_orbit_file, obj_id, object_type, true_params_file)
+#    generate_true_params_file(init_orbit_file, obj_id, object_type, true_params_file)
     
     
     # Generate truth trajectory and measurements file

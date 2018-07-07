@@ -24,7 +24,7 @@ from utilities.constants import GM, Re, wE
 # Orbit Propagation Routines
 ###############################################################################
 
-def int_twobody(X, t, spacecraftConfig, forcesCoeff, brdfCoeff):
+def int_twobody(X, t, spacecraftConfig, forcesCoeff, surfaces):
     '''
     This function works with odeint to propagate object assuming
     simple two-body dynamics.  No perturbations included.

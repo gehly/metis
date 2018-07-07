@@ -12,13 +12,12 @@ from propagation.integration_functions import int_twobody
 
 
 
+def propagate_orbit(spacecraftConfig, forcesCoeff, surfaces, ephemeris,
+                    ndays, dt):
 
-def propagate_orbit(intfcn, spacecraftConfig, forcesCoeff, brdfCoeff, ndays, dt):
-    
-    
-    
-    # Integrator tolerance
+    # Integrator 
     int_tol = 1e-12
+    intfcn = spacecraftConfig['intfcn']
     
     if spacecraftConfig['type'] == '3DoF':
     
@@ -26,7 +25,7 @@ def propagate_orbit(intfcn, spacecraftConfig, forcesCoeff, brdfCoeff, ndays, dt)
         
         # Setup propagator
         tvec = np.arange(0., 86400.*ndays+(0.1*dt), dt)
-        args = (spacecraftConfig, forcesCoeff, brdfCoeff)
+        args = (spacecraftConfig, forcesCoeff, surfaces)
         int0 = spacecraftConfig['X'].flatten()
         
         state = odeint(intfcn,int0,tvec,args,rtol=int_tol,atol=int_tol)
@@ -54,35 +53,3 @@ def propagate_orbit(intfcn, spacecraftConfig, forcesCoeff, brdfCoeff, ndays, dt)
     return UTC_times, state
 
 
-if __name__ == '__main__':
-    
-    # Data directory
-    datadir = Path('C:/Users/Steve/Documents/data/multiple_model/'
-                   '2018_07_07_leo')
-    
-    object_type = 'sphere_lamr'
-    
-    fname = 'leo_' + object_type + '_2018_07_05_true_params.pkl'
-    true_params_file = datadir / fname
-    
-    # Load parameters
-    pklFile = open(true_params_file, 'rb')
-    data = pickle.load(pklFile)
-    spacecraftConfig = data[0]
-    forcesCoeff = data[1]
-    brdfCoeff = data[2]
-    pklFile.close() 
-    
-    
-    # Generate truth trajectory and measurements file
-    ndays = 3.
-    dt = 10.
-    
-    intfcn = int_twobody
-    
-    UTC_times, state = propagate_orbit(intfcn, spacecraftConfig, forcesCoeff, brdfCoeff, ndays, dt)
-    
-    
-    
-    
-    

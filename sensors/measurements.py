@@ -1,23 +1,75 @@
+import numpy as np
+from math import asin, atan2
 
 
 from utilities.coordinate_systems import latlonht2ecef
 from utilities.coordinate_systems import itrf2gcrf
+from utilities.coordinate_systems import gcrf2itrf
+from utilities.coordinate_systems import ecef2enu
 
-def compute_measurement(X, sensor, UTC, EOP_data):
+
+def compute_measurement(X, sun_gcrf, sensor, spacecraftConfig, surface, UTC,
+                        EOP_data, meas_types=[]):
     
     # Retrieve sensor parameters
-    meas_types = sensor['meas_types']
+    if len(meas_types) == 0:
+        meas_types = sensor['meas_types']
     geodetic_latlonht = sensor['geodetic_latlonht']
     
-    # Comptue station location in GCRF
+    # Compute station location in GCRF
     lat = geodetic_latlonht[0]
     lon = geodetic_latlonht[1]
     ht = geodetic_latlonht[2]
     stat_itrf = latlonht2ecef(lat, lon, ht)
     stat_gcrf, dum = itrf2gcrf(stat_itrf, np.zeros(3,1), UTC, EOP_data)
     
+    # Object location in GCRF
+    r_gcrf = X[0:3].reshape(3,1)
     
+    # Compute range and line of sight vector
+    rg = np.linalg.norm(r_gcrf - stat_gcrf)
+    rho_hat_gcrf = r_gcrf/rg
     
+    # Rotate to ENU frame
+    rho_hat_itrf = gcrf2itrf(rho_hat_gcrf, np.zeros(3,1), UTC, EOP_data)
+    rho_hat_enu = ecef2enu(rho_hat_itrf, stat_itrf)
+    
+    # Loop over measurement types
+    Y = np.zeros(len(meas_types),1)
+    ii = 0
+    for mtype in meas_types:
+        
+        if mtype == 'rg':
+            Y[ii] = rg
+            
+        elif mtype == 'ra':
+            Y[ii] = atan2(rho_hat_gcrf[1], rho_hat_gcrf[0]) #rad
+            
+        elif mtype == 'dec':
+            Y[ii] = asin(rho_hat_gcrf[2])  #rad
+    
+        elif mtype == 'az':
+            Y[ii] = atan2(rho_hat_enu[0], rho_hat_enu[1])  # rad  
+            
+        elif mtype == 'el':
+            Y[ii] = asin(rho_hat_enu[2])  # rad
+            
+        elif mtype == 'mapp':
+            
+            sat2sun = sun_gcrf - r_gcrf
+            sat2obs = stat_gcrf - r_gcrf
+            if spacecraftConfig['type'] == '3DoF':
+                Y[ii] = compute_mapp(sat2sun, sat2obs, spacecraftConfig, surfaces)
+            
+        else:
+            print('Invalid Measurement Type! Entered: ', mtype)
+            
+        ii += 1
+    
+    return Y
+
+
+def compute_mapp():
     
     
     return
