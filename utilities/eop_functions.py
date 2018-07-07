@@ -125,7 +125,7 @@ def get_eop_data(data_text, UTC):
             break
     
     # Compute EOP data at desired time by interpolating
-    EOP_data = eop_linear_interpolate(line0, line1, MJD)    
+    EOP_data = eop_linear_interpolate(line0, line1, MJD)
     
     return EOP_data
 

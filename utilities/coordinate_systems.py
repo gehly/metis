@@ -316,3 +316,22 @@ if __name__ == '__main__':
     
     print(r_check2 - r_GCRF)
     print(v_check2 - v_GCRF)
+    
+    
+    r_GCRF = np.array([[10000.], [5000.], [3000.]])
+    v_GCRF = np.array([[-2.], [-3.], [4.]])
+    
+    UTC = datetime(2018, 6, 25, 6, 30, 10)
+    EOP_data = get_eop_data(eop_alldata, UTC)
+    print(EOP_data)
+    
+    r_ITRF, v_ITRF = gcrf2itrf(r_GCRF, v_GCRF, UTC, EOP_data)
+    r_check, v_check = itrf2gcrf(r_ITRF, v_ITRF, UTC, EOP_data)
+    
+    print(r_ITRF)
+    print(v_ITRF)
+    print(r_GCRF - r_check)
+    print(v_GCRF - v_check)
+    
+    
+    
