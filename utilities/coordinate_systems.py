@@ -3,6 +3,7 @@ from math import pi, sin, cos, tan, asin, acos, atan, atan2
 from datetime import datetime
 import sys
 import copy
+import time
 
 sys.path.append('../')
 
@@ -111,7 +112,7 @@ def teme2gcrf(r_TEME, v_TEME, UTC, IAU1980nut, EOP_data):
     return r_GCRF, v_GCRF
 
 
-def gcrf2itrf(r_GCRF, v_GCRF, UTC, EOP_data):
+def gcrf2itrf(r_GCRF, v_GCRF, UTC, EOP_data, XYs_df=[]):
     '''
     This function converts a position and velocity vector in the GCRF(ECI)
     frame to the ITRF(ECEF) frame using the IAU 2006 precession and 
@@ -144,7 +145,7 @@ def gcrf2itrf(r_GCRF, v_GCRF, UTC, EOP_data):
         velocity vector in ITRF
     
     '''
-    
+        
     # Compute UT1 in JD format
     UT1_JD = utcdt2ut1jd(UTC, EOP_data['UT1_UTC'])
     
@@ -161,7 +162,8 @@ def gcrf2itrf(r_GCRF, v_GCRF, UTC, EOP_data):
     R = compute_ERA(UT1_JD)
     
     # Construct Bias-Precessino-Nutation matrix (CIRS to GCRS/ICRS)
-    XYs_data = init_XYs2006(UTC, UTC)
+    XYs_data = init_XYs2006(UTC, UTC, XYs_df)
+    
     X, Y, s = get_XYs(XYs_data, TT_JD)
     
     # Add in Free Core Nutation (FCN) correction
@@ -188,7 +190,7 @@ def gcrf2itrf(r_GCRF, v_GCRF, UTC, EOP_data):
     return r_ITRF, v_ITRF
 
 
-def itrf2gcrf(r_ITRF, v_ITRF, UTC, EOP_data):
+def itrf2gcrf(r_ITRF, v_ITRF, UTC, EOP_data, XYs_df=[]):
     '''
     This function converts a position and velocity vector in the ITRF(ECEF)
     frame to the GCRF(ECI) frame using the IAU 2006 precession and 
@@ -238,7 +240,7 @@ def itrf2gcrf(r_ITRF, v_ITRF, UTC, EOP_data):
     R = compute_ERA(UT1_JD)
     
     # Construct Bias-Precessino-Nutation matrix (CIRS to GCRS/ICRS)
-    XYs_data = init_XYs2006(UTC, UTC)
+    XYs_data = init_XYs2006(UTC, UTC, XYs_df)
     X, Y, s = get_XYs(XYs_data, TT_JD)
     
     # Add in Free Core Nutation (FCN) correction

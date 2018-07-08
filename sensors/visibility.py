@@ -1,6 +1,7 @@
 import numpy as np
 from math import acos, asin
 import sys
+import time
 
 sys.path.append('../')
 
@@ -30,7 +31,7 @@ from sensors.measurements import ecef2azelrange_rad
 
     
 def check_visibility(state, UTC_times, sun_gcrf_array, moon_gcrf_array, sensor,
-                     spacecraftConfig, surfaces, eop_alldata):
+                     spacecraftConfig, surfaces, eop_alldata, XYs_df=[]):
     
     # Sensor parameters
     mapp_lim = sensor['mapp_lim']
@@ -40,7 +41,7 @@ def check_visibility(state, UTC_times, sun_gcrf_array, moon_gcrf_array, sensor,
     sun_elmask = sensor['sun_elmask']
     moon_angle_lim = sensor['moon_angle_lim']
     geodetic_latlonht = sensor['geodetic_latlonht']
-    meas_types = ['rg', 'az', 'el', 'mapp']
+    meas_types = ['rg', 'az', 'el']
     
     # Sensor coordinates
     lat = geodetic_latlonht[0]
@@ -48,27 +49,43 @@ def check_visibility(state, UTC_times, sun_gcrf_array, moon_gcrf_array, sensor,
     ht = geodetic_latlonht[2]
     sensor_itrf = latlonht2ecef(lat, lon, ht)
     
+    start = time.time()
+    
     # Loop over times and check visiblity conditions
     vis_inds = []
     for ii in range(len(UTC_times)):
+        
+        
+            
         
         # Retrieve time and current sun and object locations in ECI
         UTC = UTC_times[ii]
         Xi = state[ii,:]
         sun_gcrf = sun_gcrf_array[:,ii].reshape(3,1)
         
+#        print(UTC)
+        
+        if ii % 100 == 0:
+            print(ii)
+            print(UTC)
+            print('time elapsed:', time.time() - start)
+        
         # Compute measurements
         EOP_data = get_eop_data(eop_alldata, UTC)
         Yi = compute_measurement(Xi, sun_gcrf, sensor, spacecraftConfig,
-                                 surfaces, UTC, EOP_data, meas_types)
+                                 surfaces, UTC, EOP_data, meas_types,
+                                 XYs_df)
+        
+#        print(Yi)
     
         rg = float(Yi[0])
         az = float(Yi[1])
         el = float(Yi[2])
-        mapp = float(Yi[3])
         
-        # Compute sun elevation angle        
-        sun_itrf = gcrf2itrf(sun_gcrf, np.zeros(3,1), UTC, EOP_data)
+        # Compute sun elevation angle
+        sun_itrf, dum = gcrf2itrf(sun_gcrf, np.zeros((3,1)), UTC, EOP_data,
+                                  XYs_df)
+        
         sun_az, sun_el, sun_rg = ecef2azelrange_rad(sun_itrf, sensor_itrf)
         
         # Check against constraints
@@ -85,8 +102,7 @@ def check_visibility(state, UTC_times, sun_gcrf_array, moon_gcrf_array, sensor,
             vis_flag = False
         if rg > rg_lim[1]:
             vis_flag = False
-        if mapp > mapp_lim:
-            vis_flag = False
+        
             
         if sun_el > sun_elmask:
             vis_flag = False
@@ -97,7 +113,9 @@ def check_visibility(state, UTC_times, sun_gcrf_array, moon_gcrf_array, sensor,
             # Compute angles
             rso_gcrf = Xi[0:3].reshape(3,1)
             moon_gcrf = moon_gcrf_array[:,ii].reshape(3,1)
-            sensor_gcrf = itrf2gcrf(sensor_itrf, np.zeros(3,1), UTC, EOP_data)
+            sensor_gcrf, dum = \
+                itrf2gcrf(sensor_itrf, np.zeros((3,1)), UTC, EOP_data,
+                          XYs_df)
             phase_angle, sun_angle, moon_angle = \
                 compute_angles(rso_gcrf, sun_gcrf, moon_gcrf, sensor_gcrf)
         
@@ -115,10 +133,24 @@ def check_visibility(state, UTC_times, sun_gcrf_array, moon_gcrf_array, sensor,
             # Check too close to moon
             if moon_angle < moon_angle_lim:
                 vis_flag = False
+                
+
         
         
             #TODO Moon Limits based on phase of moon (Meeus algorithm?)
-    
+        
+        # If still good, compute apparent mag
+        if vis_flag:
+            
+            meas_types_mapp = ['mapp']
+            Yi = compute_measurement(Xi, sun_gcrf, sensor, spacecraftConfig,
+                                     surfaces, UTC, EOP_data, meas_types_mapp,
+                                     XYs_df)
+            
+            if float(Yi[0]) > mapp_lim:
+                vis_flag = False
+        
+        # If passed all checks, append to list
         if vis_flag:
             vis_inds.append(ii)
     

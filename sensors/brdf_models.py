@@ -15,9 +15,9 @@ def compute_mapp(sat2sun, sat2obs, spacecraftConfig, surfaces, q_IB=[]):
     Parameters
     ------
     sat2sun : 3x1 numpy array
-        position vector from space object to sun
+        position vector from space object to sun [GCRF]
     sat2obs : 3x1 numpy array
-        position vector from space object to observer
+        position vector from space object to observer [GCRF]
     brdf_function : function handle
         function handle for BRDF calculation
     surfaces : dict

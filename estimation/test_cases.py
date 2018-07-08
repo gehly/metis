@@ -14,6 +14,7 @@ sys.path.append('../')
 
 from utilities.tle_functions import propagate_TLE
 from utilities.eop_functions import get_celestrak_eop_alldata
+from utilities.eop_functions import get_XYs2006_alldata
 from utilities.eop_functions import get_eop_data
 from utilities.coordinate_systems import latlonht2ecef
 from utilities.coordinate_systems import gcrf2itrf
@@ -104,12 +105,13 @@ def parameter_setup_sphere(orbit_file, obj_id, mass, radius):
 def generate_true_params_file(orbit_file, obj_id, object_type, param_file):    
     
     eop_alldata = get_celestrak_eop_alldata()
+    XYs_df = get_XYs2006_alldata()
     
     if object_type == 'sphere_lamr':
         
         # Parameter setup
         mass = 100.     # kg
-        radius = 1./pi     # m,  gives area = 1 m^2
+        radius = 1./np.sqrt(pi)     # m,  gives area = 1 m^2
         
         spacecraftConfig, forcesCoeff, surfaces = \
             parameter_setup_sphere(orbit_file, obj_id, mass, radius)
@@ -119,7 +121,8 @@ def generate_true_params_file(orbit_file, obj_id, object_type, param_file):
         
     # Save data    
     pklFile = open( param_file, 'wb' )
-    pickle.dump( [spacecraftConfig, forcesCoeff, surfaces, eop_alldata], pklFile, -1 )
+    pickle.dump( [spacecraftConfig, forcesCoeff, surfaces, eop_alldata,
+                  XYs_df], pklFile, -1 )
     pklFile.close()
     
     
@@ -255,6 +258,7 @@ def generate_noisy_meas(true_params_file, truth_file, sensor_file, meas_file,
     forcesCoeff = data[1]
     surfaces = data[2]
     eop_alldata = data[3]
+    XYs_df = data[4]
     pklFile.close()
     
     # Load truth data
@@ -297,14 +301,16 @@ def generate_noisy_meas(true_params_file, truth_file, sensor_file, meas_file,
     # Compute visible indicies    
     vis_inds = check_visibility(state, UTC_times, sun_gcrf_array,
                                 moon_gcrf_array, sensor,
-                                spacecraftConfig, surfaces, eop_alldata)
+                                spacecraftConfig, surfaces, eop_alldata,
+                                XYs_df)
 
     print(vis_inds)
-    mistake
 
     # Compute measurements
-    meas = np.zeros(len(vis_inds), len(meas_types))
+    meas = np.zeros((len(vis_inds), len(meas_types)))
+    meas_true = np.zeros((len(vis_inds), len(meas_types)))
     meas_times = []
+    row = 0
     for ii in vis_inds:
         
         # Retrieve time and current sun and object locations in ECI
@@ -315,36 +321,49 @@ def generate_noisy_meas(true_params_file, truth_file, sensor_file, meas_file,
         # Compute measurements
         EOP_data = get_eop_data(eop_alldata, UTC)
         Yi = compute_measurement(Xi, sun_gcrf, sensor, spacecraftConfig,
-                                 surfaces, UTC, EOP_data, meas_types)
+                                 surfaces, UTC, EOP_data, meas_types, XYs_df)
         
         for jj in range(len(meas_types)):
             sig = sigs[jj]
-            sig = 0    # TODO Reset to real noise value
-            meas[ii,jj] = float(Yi[jj]) + sig*np.random.randn()
+            meas[row,jj] = float(Yi[jj]) + sig*np.random.randn()
+            meas_true[row,jj] = float(Yi[jj])
         
         meas_times.append(UTC)
+        row += 1
         
     # Save measurement file
     pklFile = open( meas_file, 'wb' )
     pickle.dump( [meas_times, meas], pklFile, -1 )
     pklFile.close()
     
-    # Plot noise
+    # Plot measurements
     t_hrs = [(ti - UTC_times[0]).total_seconds()/3600. for ti in meas_times]
     
     plt.figure()
     plt.subplot(3,1,1)
-    plt.plot(t_hrs, meas[:,2], 'k.')
+    plt.plot(t_hrs, meas_true[:,2], 'k.')
     plt.ylabel('Apparent Mag')    
     plt.title('Measurements')
     plt.subplot(3,1,2)
-    plt.plot(t_hrs, meas[:,0], 'k.')
-    plt.ylabel('RA [rad]')
+    plt.plot(t_hrs, meas_true[:,0]*180/pi, 'k.')
+    plt.ylabel('RA [deg]')
     plt.subplot(3,1,3)
-    plt.plot(t_hrs, meas[:,1], 'k.')
-    plt.ylabel('DEC [rad]')
+    plt.plot(t_hrs, meas_true[:,1]*180/pi, 'k.')
+    plt.ylabel('DEC [deg]')
     plt.xlabel('Time [hours]')
     
+    plt.figure()
+    plt.subplot(3,1,1)
+    plt.plot(t_hrs, meas[:,2] - meas_true[:,2], 'k.')
+    plt.ylabel('Apparent Mag')    
+    plt.title('Measurement Noise')
+    plt.subplot(3,1,2)
+    plt.plot(t_hrs, (meas[:,0] - meas_true[:,0])*206265, 'k.')
+    plt.ylabel('RA [arcsec]')
+    plt.subplot(3,1,3)
+    plt.plot(t_hrs, (meas[:,1] - meas_true[:,1])*206265, 'k.')
+    plt.ylabel('DEC [arcsec]')
+    plt.xlabel('Time [hours]')
     
     
     plt.show()
@@ -417,8 +436,8 @@ if __name__ == '__main__':
 #    generate_truth_file(true_params_file, truth_file, ephemeris, ts, ndays, dt)
     
     # Generate noisy measurements file
-    generate_noisy_meas(true_params_file, truth_file, sensor_file, meas_file,
-                        ephemeris, ndays=0.001)
+#    generate_noisy_meas(true_params_file, truth_file, sensor_file, meas_file,
+#                        ephemeris, ndays=3.)
     
     # Generate model parameters file
 #    generate_model_params(true_params_file, model_params_file)

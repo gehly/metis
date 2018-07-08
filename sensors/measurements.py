@@ -4,7 +4,7 @@ import sys
 
 sys.path.append('../')
 
-from brdf_models import compute_mapp
+from sensors.brdf_models import compute_mapp
 from utilities.coordinate_systems import latlonht2ecef
 from utilities.coordinate_systems import itrf2gcrf
 from utilities.coordinate_systems import gcrf2itrf
@@ -12,7 +12,7 @@ from utilities.coordinate_systems import ecef2enu
 
 
 def compute_measurement(X, sun_gcrf, sensor, spacecraftConfig, surfaces, UTC,
-                        EOP_data, meas_types=[]):
+                        EOP_data, meas_types=[], XYs_df=[]):
     
     # Retrieve sensor parameters
     if len(meas_types) == 0:
@@ -24,21 +24,23 @@ def compute_measurement(X, sun_gcrf, sensor, spacecraftConfig, surfaces, UTC,
     lon = geodetic_latlonht[1]
     ht = geodetic_latlonht[2]
     stat_itrf = latlonht2ecef(lat, lon, ht)
-    stat_gcrf, dum = itrf2gcrf(stat_itrf, np.zeros((3,1)), UTC, EOP_data)
+    stat_gcrf, dum = itrf2gcrf(stat_itrf, np.zeros((3,1)), UTC, EOP_data,
+                               XYs_df)
     
     # Object location in GCRF
     r_gcrf = X[0:3].reshape(3,1)
     
     # Compute range and line of sight vector
     rg = np.linalg.norm(r_gcrf - stat_gcrf)
-    rho_hat_gcrf = r_gcrf/rg
+    rho_hat_gcrf = (r_gcrf - stat_gcrf)/rg
     
     # Rotate to ENU frame
-    rho_hat_itrf, dum = gcrf2itrf(rho_hat_gcrf, np.zeros((3,1)), UTC, EOP_data)
+    rho_hat_itrf, dum = gcrf2itrf(rho_hat_gcrf, np.zeros((3,1)), UTC, EOP_data,
+                                  XYs_df)
     rho_hat_enu = ecef2enu(rho_hat_itrf, stat_itrf)
     
     # Loop over measurement types
-    Y = np.zeros(len(meas_types),1)
+    Y = np.zeros((len(meas_types),1))
     ii = 0
     for mtype in meas_types:
         
