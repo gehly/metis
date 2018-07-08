@@ -4,10 +4,12 @@ import matplotlib.pyplot as plt
 import pickle
 from datetime import datetime
 from pathlib import Path
+import sys
 
-from state import State
+sys.path.append('../')
 
-from attitude import quat2dcm, dcm2euler321
+from utilities.attitude import quat2dcm, dcm2euler321
+
 
 def compute_ukf_errors(filter_output_file, truth_file, error_file):
     
@@ -21,7 +23,8 @@ def compute_ukf_errors(filter_output_file, truth_file, error_file):
     pklFile = open(truth_file, 'rb')
     data = pickle.load(pklFile)
     truth_time = data[0]
-    state = data[1]
+    skyfield_time = data[1]
+    state = data[2]
     pklFile.close()
     
     # Times
@@ -80,20 +83,20 @@ def plot_ukf_errors(error_file):
     
     plt.figure()
     plt.subplot(3,1,1)
-    plt.plot(t_hrs, Xerr[0,:]*0.001, 'k.')
-    plt.plot(t_hrs, 3*sigs[0,:]*0.001, 'k--')
-    plt.plot(t_hrs, -3*sigs[0,:]*0.001, 'k--')
+    plt.plot(t_hrs, Xerr[0,:], 'k.')
+    plt.plot(t_hrs, 3*sigs[0,:], 'k--')
+    plt.plot(t_hrs, -3*sigs[0,:], 'k--')
     plt.ylabel('X Error [km]')    
     plt.title('Position Errors')
     plt.subplot(3,1,2)
-    plt.plot(t_hrs, Xerr[1,:]*0.001, 'k.')
-    plt.plot(t_hrs, 3*sigs[1,:]*0.001, 'k--')
-    plt.plot(t_hrs, -3*sigs[1,:]*0.001, 'k--')
+    plt.plot(t_hrs, Xerr[1,:], 'k.')
+    plt.plot(t_hrs, 3*sigs[1,:], 'k--')
+    plt.plot(t_hrs, -3*sigs[1,:], 'k--')
     plt.ylabel('Y Error [km]')
     plt.subplot(3,1,3)
-    plt.plot(t_hrs, Xerr[2,:]*0.001, 'k.')
-    plt.plot(t_hrs, 3*sigs[2,:]*0.001, 'k--')
-    plt.plot(t_hrs, -3*sigs[2,:]*0.001, 'k--')
+    plt.plot(t_hrs, Xerr[2,:], 'k.')
+    plt.plot(t_hrs, 3*sigs[2,:], 'k--')
+    plt.plot(t_hrs, -3*sigs[2,:], 'k--')
     plt.ylabel('Z Error [km]')
     plt.xlabel('Time [hours]')
     
@@ -119,11 +122,11 @@ def plot_ukf_errors(error_file):
     plt.figure()
     plt.subplot(3,1,1)
     plt.plot(t_hrs, resids[0,:]*3600., 'k.')
-    plt.ylabel('Azimuth [arcsec]')    
+    plt.ylabel('Right Asc [arcsec]')    
     plt.title('Post-fit Residuals')
     plt.subplot(3,1,2)
     plt.plot(t_hrs, resids[1,:]*3600., 'k.')
-    plt.ylabel('Elevation [arcsec]')
+    plt.ylabel('Declination [arcsec]')
     plt.subplot(3,1,3)
     plt.plot(t_hrs, resids[2,:], 'k.')
     plt.ylabel('Apparent Mag')
@@ -256,13 +259,6 @@ def plot_truth(truth_file, true_params_file):
     plt.xlabel('Time [hours]')
     
     return
-
-
-#def proptime2datetime(t):
-#    
-#    dt_object = datetime.strptime(t, "%Y-%m-%dT%H:%M:%S.%f")
-#        
-#    return dt_object
 
 
 ###############################################################################

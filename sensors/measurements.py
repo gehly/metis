@@ -39,6 +39,12 @@ def compute_measurement(X, sun_gcrf, sensor, spacecraftConfig, surfaces, UTC,
                                   XYs_df)
     rho_hat_enu = ecef2enu(rho_hat_itrf, stat_itrf)
     
+#    print('\n measurements')
+#    print(stat_gcrf)
+#    print(rho_hat_gcrf)
+#    print(rho_hat_enu)
+#    print('el', asin(rho_hat_enu[2])*180/pi)
+    
     # Loop over measurement types
     Y = np.zeros((len(meas_types),1))
     ii = 0

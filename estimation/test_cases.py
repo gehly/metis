@@ -24,9 +24,12 @@ from sensors.measurements import compute_measurement
 from sensors.measurements import ecef2azelrange_rad
 from sensors.visibility import check_visibility
 from propagation.integration_functions import int_twobody
+from propagation.integration_functions import int_twobody_ukf
 from propagation.orbit_propagation import propagate_orbit
+from data_processing.errors import compute_ukf_errors
+from data_processing.errors import plot_ukf_errors
 
-
+from estimation import unscented_kalman_filter
 
 
 def generate_init_orbit_file(obj_id, UTC, orbit_file):
@@ -372,6 +375,70 @@ def generate_noisy_meas(true_params_file, truth_file, sensor_file, meas_file,
 
 
 
+def generate_model_params(true_params_file, model_params_file):
+    
+    # Load parameters
+    pklFile = open(true_params_file, 'rb')
+    data = pickle.load(pklFile)
+    spacecraftConfig = data[0]
+    forcesCoeff = data[1]
+    surfaces = data[2]
+    eop_alldata = data[3]
+    XYs_df = data[4]
+    pklFile.close()
+        
+    
+    # Spherical case
+    if spacecraftConfig['type'] == '3DoF':
+        
+        # Integration function
+        spacecraftConfig['intfcn'] = int_twobody_ukf
+        
+        # Initial covariance
+        Po = np.diag([1., 1., 1., 1e-6, 1e-6, 1e-6])  # km^2 and km^2/s^2
+        spacecraftConfig['covar'] = Po
+        
+        # Perturb initial state
+        pert_vect = np.multiply(np.sqrt(np.diag(Po)), np.random.randn(6,))
+        print(pert_vect)
+        print(spacecraftConfig['X'])
+        spacecraftConfig['X'] += \
+            pert_vect.reshape(spacecraftConfig['X'].shape)
+        
+        # Alter additional parameters as needed        
+        forcesCoeff['Q'] = 1e-6*np.diag([1., 1., 1., 1e-6, 1e-6, 1e-6])
+        
+        
+    
+    else:
+        mistake
+        
+        
+    # Save data
+    pklFile = open( model_params_file, 'wb' )
+    pickle.dump( [spacecraftConfig, forcesCoeff, surfaces, eop_alldata,
+                  XYs_df], pklFile, -1 )
+    pklFile.close()
+    
+    
+    
+    return
+
+
+def run_filter(model_params_file, sensor_file, meas_file, filter_output_file,
+               ephemeris, ts, alpha=1e-4):
+    
+    filter_output = \
+        unscented_kalman_filter(model_params_file, sensor_file, meas_file,
+                                ephemeris, ts, alpha)
+        
+    
+    # Save data
+    pklFile = open( filter_output_file, 'wb' )
+    pickle.dump( [filter_output], pklFile, -1 )
+    pklFile.close()
+
+    return
 
 ###############################################################################
 # Stand-alone execution
@@ -440,11 +507,28 @@ if __name__ == '__main__':
 #                        ephemeris, ndays=3.)
     
     # Generate model parameters file
-#    generate_model_params(true_params_file, model_params_file)
+    generate_model_params(true_params_file, model_params_file)
     
     
     
     # Run filter
-#    run_filter(model_params_file, sensor_file, meas_file, filter_output_file,
-#               alpha=1e-4)
+    run_filter(model_params_file, sensor_file, meas_file, filter_output_file,
+               ephemeris, ts, alpha=1e-4)
+    
+    # Compute and plot errors
+    compute_ukf_errors(filter_output_file, truth_file, error_file)
+    plot_ukf_errors(error_file)
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+
     
