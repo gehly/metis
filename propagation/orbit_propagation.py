@@ -6,9 +6,9 @@ from datetime import datetime, timedelta
 from pathlib import Path
 import sys
 
-sys.path.append('../')
+#sys.path.append('../')
 
-from propagation.integration_functions import int_twobody
+#from propagation.integration_functions import int_twobody
 
 
 

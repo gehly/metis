@@ -1,14 +1,17 @@
 import numpy as np
-from math import asin, atan2
+from math import pi, asin, atan2
+import sys
 
+sys.path.append('../')
 
+from brdf_models import compute_mapp
 from utilities.coordinate_systems import latlonht2ecef
 from utilities.coordinate_systems import itrf2gcrf
 from utilities.coordinate_systems import gcrf2itrf
 from utilities.coordinate_systems import ecef2enu
 
 
-def compute_measurement(X, sun_gcrf, sensor, spacecraftConfig, surface, UTC,
+def compute_measurement(X, sun_gcrf, sensor, spacecraftConfig, surfaces, UTC,
                         EOP_data, meas_types=[]):
     
     # Retrieve sensor parameters
@@ -21,7 +24,7 @@ def compute_measurement(X, sun_gcrf, sensor, spacecraftConfig, surface, UTC,
     lon = geodetic_latlonht[1]
     ht = geodetic_latlonht[2]
     stat_itrf = latlonht2ecef(lat, lon, ht)
-    stat_gcrf, dum = itrf2gcrf(stat_itrf, np.zeros(3,1), UTC, EOP_data)
+    stat_gcrf, dum = itrf2gcrf(stat_itrf, np.zeros((3,1)), UTC, EOP_data)
     
     # Object location in GCRF
     r_gcrf = X[0:3].reshape(3,1)
@@ -31,7 +34,7 @@ def compute_measurement(X, sun_gcrf, sensor, spacecraftConfig, surface, UTC,
     rho_hat_gcrf = r_gcrf/rg
     
     # Rotate to ENU frame
-    rho_hat_itrf = gcrf2itrf(rho_hat_gcrf, np.zeros(3,1), UTC, EOP_data)
+    rho_hat_itrf, dum = gcrf2itrf(rho_hat_gcrf, np.zeros((3,1)), UTC, EOP_data)
     rho_hat_enu = ecef2enu(rho_hat_itrf, stat_itrf)
     
     # Loop over measurement types
@@ -69,11 +72,6 @@ def compute_measurement(X, sun_gcrf, sensor, spacecraftConfig, surface, UTC,
     return Y
 
 
-def compute_mapp():
-    
-    
-    return
-
 
 def ecef2azelrange(r_sat, r_site):
     '''
@@ -90,9 +88,9 @@ def ecef2azelrange(r_sat, r_site):
     Returns
     ------
     az : float
-      azimuth, degrees clockwise from north [deg]
+      azimuth, degrees clockwise from north [0 - 360 deg]
     el : float
-      elevation, degrees up from horizon [deg]
+      elevation, degrees up from horizon [-90 - 90 deg]
     rg : float
       scalar distance from site to sat [km]
     '''
@@ -138,9 +136,9 @@ def ecef2azelrange_rad(r_sat, r_site):
     Returns
     ------
     az : float
-      azimuth, clockwise from north [0-2pi] [rad]
+      azimuth, clockwise from north [0 - 2pi rad]
     el : float
-      elevation, up from horizon [0-pi/2] [rad]
+      elevation, up from horizon [-pi/2 - pi/2 rad]
     rg : float
       scalar distance from site to sat [km]
     '''

@@ -29,8 +29,8 @@ from sensors.measurements import ecef2azelrange_rad
 ###############################################################################
 
     
-def check_visibility(state, UTC_times, sensor, spacecraftConfig, surfaces, 
-                     eop_alldata, ephemeris):
+def check_visibility(state, UTC_times, sun_gcrf_array, moon_gcrf_array, sensor,
+                     spacecraftConfig, surfaces, eop_alldata):
     
     # Sensor parameters
     mapp_lim = sensor['mapp_lim']
@@ -47,13 +47,6 @@ def check_visibility(state, UTC_times, sensor, spacecraftConfig, surfaces,
     lon = geodetic_latlonht[1]
     ht = geodetic_latlonht[2]
     sensor_itrf = latlonht2ecef(lat, lon, ht)
-    
-    # Retrieve sun and moon positions for full timespan
-    earth = ephemeris['earth']
-    sun = ephemeris['sun']
-    moon = ephemeris['moon']
-    moon_gcrf_array = earth.at(UTC_times).observe(moon).position.km
-    sun_gcrf_array = earth.at(UTC_times).observe(sun).position.km
     
     # Loop over times and check visiblity conditions
     vis_inds = []

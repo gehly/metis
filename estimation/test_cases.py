@@ -1,14 +1,14 @@
 import numpy as np
 from math import pi
 from scipy.integrate import odeint
-from datetime import datetime
+from datetime import datetime, timedelta
 import pickle
 import os
 import sys
 from pathlib import Path
 import matplotlib.pyplot as plt
 
-from skyfield.api import Loader
+from skyfield.api import Loader, utc
 
 sys.path.append('../')
 
@@ -126,7 +126,7 @@ def generate_true_params_file(orbit_file, obj_id, object_type, param_file):
     return
 
 
-def generate_truth_file(true_params_file, truth_file, ephemeris, ndays, dt):
+def generate_truth_file(true_params_file, truth_file, ephemeris, ts, ndays, dt):
 
 
     # Load parameters
@@ -137,15 +137,17 @@ def generate_truth_file(true_params_file, truth_file, ephemeris, ndays, dt):
     surfaces = data[2]
     pklFile.close()
     
-    intfcn = int_twobody
-   
-    UTC_times, state = propagate_orbit(intfcn, spacecraftConfig, forcesCoeff,
+    UTC_times, state = propagate_orbit(spacecraftConfig, forcesCoeff,
                                        surfaces, ephemeris, ndays, dt)
     
+    sec_array = [(UTC - UTC_times[0]).total_seconds() for UTC in UTC_times]
     
+    UTC0 = ts.utc(UTC_times[0].replace(tzinfo=utc)).utc
+    skyfield_times = ts.utc(UTC0[0], UTC0[1], UTC0[2],
+                            UTC0[3], UTC0[4], sec_array)
     
     pklFile = open( truth_file, 'wb' )
-    pickle.dump( [UTC_times, state], pklFile, -1 )
+    pickle.dump( [UTC_times, skyfield_times, state], pklFile, -1 )
     pklFile.close()
 
 
@@ -259,13 +261,16 @@ def generate_noisy_meas(true_params_file, truth_file, sensor_file, meas_file,
     pklFile = open(truth_file, 'rb')
     data = pickle.load(pklFile)
     UTC_times = data[0]
-    state = data[1]
+    skyfield_times = data[1]
+    state = data[2]
     pklFile.close()
     
     # Reduce data set
-#    print(len(truth_time))
-#    truth_time = [ti for ti in truth_time if ti < (truth_time[0]+timedelta(days=ndays))]
-#    print(len(truth_time))
+    print(len(UTC_times))
+    UTC_times = [ti for ti in UTC_times if ti < (UTC_times[0]+timedelta(days=ndays))]
+#    skyfield_times = skyfield_times[0:len(UTC_times)]
+    print(len(UTC_times))
+    print(len(skyfield_times))
     
     # Load sensor data
     pklFile = open(sensor_file, 'rb')
@@ -285,12 +290,17 @@ def generate_noisy_meas(true_params_file, truth_file, sensor_file, meas_file,
     # Retrieve sun and moon positions for full timespan
     earth = ephemeris['earth']
     sun = ephemeris['sun']
-    sun_gcrf_array = earth.at(UTC_times).observe(sun).position.km
+    moon = ephemeris['moon']
+    moon_gcrf_array = earth.at(skyfield_times).observe(moon).position.km
+    sun_gcrf_array = earth.at(skyfield_times).observe(sun).position.km
     
     # Compute visible indicies    
-    vis_inds = check_visibility(state, UTC_times, sensor, spacecraftConfig,
-                                surfaces, eop_alldata, ephemeris)
+    vis_inds = check_visibility(state, UTC_times, sun_gcrf_array,
+                                moon_gcrf_array, sensor,
+                                spacecraftConfig, surfaces, eop_alldata)
 
+    print(vis_inds)
+    mistake
 
     # Compute measurements
     meas = np.zeros(len(vis_inds), len(meas_types))
@@ -353,33 +363,33 @@ if __name__ == '__main__':
     
     # General parameters
     obj_id = 25042
-    UTC = datetime(2018, 7, 5, 0, 0, 0) 
+    UTC = datetime(2018, 7, 8, 0, 0, 0) 
     object_type = 'sphere_lamr'
     
     # Data directory
     datadir = Path('C:/Users/Steve/Documents/data/multiple_model/'
-                   '2018_07_07_leo')
+                   '2018_07_08_leo')
     
     # Filenames
-    init_orbit_file = datadir / 'iridium39_orbit_2018_07_05.pkl'
+    init_orbit_file = datadir / 'iridium39_orbit_2018_07_08.pkl'
     sensor_file = datadir / 'sensors_falcon_params.pkl'
     
-    fname = 'leo_' + object_type + '_2018_07_05_true_params.pkl'
+    fname = 'leo_' + object_type + '_2018_07_08_true_params.pkl'
     true_params_file = datadir / fname
     
-    fname = 'leo_' + object_type + '_2018_07_05_truth.pkl'
+    fname = 'leo_' + object_type + '_2018_07_08_truth.pkl'
     truth_file = datadir / fname
     
-    fname = 'leo_' + object_type + '_2018_07_05_meas.pkl'
+    fname = 'leo_' + object_type + '_2018_07_08_meas.pkl'
     meas_file = datadir / fname
     
-    fname = 'leo_' + object_type + '_2018_07_05_model_params.pkl'
+    fname = 'leo_' + object_type + '_2018_07_08_model_params.pkl'
     model_params_file = datadir / fname
     
-    fname = 'leo_' + object_type + '_2018_07_05_filter_output.pkl'
+    fname = 'leo_' + object_type + '_2018_07_08_filter_output.pkl'
     filter_output_file = datadir / fname
     
-    fname = 'leo_' + object_type + '_2018_07_05_filter_error.pkl'
+    fname = 'leo_' + object_type + '_2018_07_08_filter_error.pkl'
     error_file = datadir / fname
     
     
@@ -387,7 +397,7 @@ if __name__ == '__main__':
     metis_dir = cwd[0:-10]
     load = Loader(os.path.join(metis_dir, 'skyfield_data'))
     ephemeris = load('de430t.bsp')
-    
+    ts = load.timescale()
     
     
     # Generate initial orbit file       
@@ -404,10 +414,11 @@ if __name__ == '__main__':
     ndays = 7.
     dt = 10.
     
-#    generate_truth_file(true_params_file, truth_file, ndays, dt)
+#    generate_truth_file(true_params_file, truth_file, ephemeris, ts, ndays, dt)
     
     # Generate noisy measurements file
-#    generate_noisy_meas(truth_file, sensor_file, meas_file, ndays=3.)
+    generate_noisy_meas(true_params_file, truth_file, sensor_file, meas_file,
+                        ephemeris, ndays=0.001)
     
     # Generate model parameters file
 #    generate_model_params(true_params_file, model_params_file)
