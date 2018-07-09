@@ -38,8 +38,7 @@ from propagation.integration_functions import int_euler_dynamics_notorque
 from propagation.integration_functions import int_twobody_6dof_notorque
 from propagation.integration_functions import ode_twobody
 from propagation.integration_functions import ode_twobody_ukf
-#from propagation.integration_functions import ode_euler_dynamics_notorque
-#from propagation.integration_functions import ode_twobody_6dof_notorque
+from propagation.integration_functions import ode_twobody_6dof_notorque
 from propagation.propagation_functions import propagate_orbit
 from data_processing.errors import compute_ukf_errors
 from data_processing.errors import plot_ukf_errors
@@ -178,7 +177,7 @@ def parameter_setup_cubesat(orbit_file, obj_id, mass, attitude, username='',
     spacecraftConfig['mass'] = mass  # kg
     spacecraftConfig['time'] = UTC  # UTC in datetime
     spacecraftConfig['brdf_function'] = ashikhmin_premoze
-#    spacecraftConfig['intfcn'] = ode_twobody_6dof_notorque
+    spacecraftConfig['intfcn'] = ode_twobody_6dof_notorque
     spacecraftConfig['integrator'] = 'dop853'
     spacecraftConfig['X'] = \
         np.concatenate((pos.flatten(), vel.flatten(), q_BN.flatten(),
@@ -644,7 +643,7 @@ if __name__ == '__main__':
     # General parameters
     obj_id = 25042
     UTC = datetime(2018, 7, 8, 0, 0, 0) 
-    object_type = 'sphere_lamr'
+    object_type = 'cubesat_nadir'
     
     # Data directory
     datadir = Path('C:/Users/Steve/Documents/data/multiple_model/'
@@ -691,10 +690,10 @@ if __name__ == '__main__':
     
     
     # Generate truth trajectory and measurements file
-    ndays = 7.
+    ndays = 0.001
     dt = 10.
     
-#    generate_truth_file(true_params_file, truth_file, ephemeris, ts, ndays, dt)
+    generate_truth_file(true_params_file, truth_file, ephemeris, ts, ndays, dt)
     
     # Generate noisy measurements file
 #    generate_noisy_meas(true_params_file, truth_file, sensor_file, meas_file,
@@ -710,8 +709,8 @@ if __name__ == '__main__':
 #               ephemeris, ts, alpha=1e-4)
     
     # Compute and plot errors
-    compute_ukf_errors(filter_output_file, truth_file, error_file)
-    plot_ukf_errors(error_file)
+#    compute_ukf_errors(filter_output_file, truth_file, error_file)
+#    plot_ukf_errors(error_file)
     
     
     

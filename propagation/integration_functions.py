@@ -308,7 +308,73 @@ def int_twobody_6dof_notorque(X, t, spacecraftConfig, forcesCoeff, surfaces):
     return dX
 
 
+def ode_twobody_6dof_notorque(t, X, params):
+    '''
+    This function works with ode to propagate object assuming
+    simple two-body dynamics and including attitude states assuming
+    no torques.  No perturbations included.
 
+    Parameters
+    ------
+    X : 6 element list
+      cartesian state vector (Inertial Frame)
+    t : m element list
+      vector of times when output is desired
+    args : tuple
+        additional arguments
+
+    Returns
+    ------
+    dX : 6 element list
+      state derivative vector
+    '''
+    
+    print(t, X)
+    
+    # Input parameters
+    spacecraftConfig = params[0]
+    
+    # Initialize
+    dX = [0.]*len(X)
+
+    # Position states
+    x = float(X[0])
+    y = float(X[1])
+    z = float(X[2])
+    dx = float(X[3])
+    dy = float(X[4])
+    dz = float(X[5])
+
+    # Compute radius
+    r = np.linalg.norm([x, y, z])
+    
+    # Attitude states
+    q_BN = np.reshape(X[0:4], (4,1))
+    w_BN = np.reshape(X[4:7], (3,1))
+    
+    # Moment of inertia
+    I = spacecraftConfig['moi']
+    
+    # Torque vector
+    L = np.zeros((3,1))
+    
+    # Compute derivative vector
+    q_BN_dot = quat_derivative(q_BN, w_BN)
+    w_BN_dot = euler_dynamics(w_BN, I, L)
+
+    # Derivative vector
+    dX[0] = dx
+    dX[1] = dy
+    dX[2] = dz
+
+    dX[3] = -GM*x/r**3
+    dX[4] = -GM*y/r**3
+    dX[5] = -GM*z/r**3
+    
+    dX[6:10] = q_BN_dot.flatten()
+    dX[10:13] = w_BN_dot.flatten() 
+
+    return dX
 
 
 #def int_twobody_diff_entropy(X, t, inputs):

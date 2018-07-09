@@ -28,9 +28,10 @@ def propagate_orbit(spacecraftConfig, forcesCoeff, surfaces, ephemeris,
         
         y0 = spacecraftConfig['X'].flatten()
         tvec = np.arange(0., 86400.*ndays+(0.1*dt), dt)
-        
+
         solver = ode(intfcn)
-        solver.set_integrator(integrator, atol=int_tol, rtol=int_tol)
+        solver.set_integrator(integrator)
+#        solver.set_integrator('vode', method='bdf', nsteps=1000000)
         solver.set_f_params([spacecraftConfig, forcesCoeff, surfaces])
         
         solver.set_initial_value(y0, tvec[0])
