@@ -1467,8 +1467,12 @@ def dcm2euler321(DCM):
     '''
     
     theta1 = atan2(DCM[0,1], DCM[0,0])
-    theta2 = -asin(DCM[0,2])
     theta3 = atan2(DCM[1,2], DCM[2,2])
+    
+    try:
+        theta2 = -asin(DCM[0,2])
+    except:
+        theta2 = -asin(round(DCM[0,2]))
     
     return theta1, theta2, theta3
 
@@ -1502,8 +1506,11 @@ def dcm2euler123(DCM):
     '''
     
     theta1 = -atan2(DCM[2,1], DCM[2,2])
-    theta2 = asin(DCM[2,0])
     theta3 = -atan2(DCM[1,0], DCM[0,0])
+    try:
+        theta2 = asin(DCM[2,0])
+    except:
+        theta2 = asin(round(DCM[2,0]))
     
     return theta1, theta2, theta3
 

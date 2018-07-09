@@ -265,7 +265,7 @@ def itrf2gcrf(r_ITRF, v_ITRF, UTC, EOP_data, XYs_df=[]):
     return r_GCRF, v_GCRF
 
 
-def eci2ric(rc_vect, vc_vect, Qin):
+def eci2ric(rc_vect, vc_vect, Qin=[]):
     '''
     This function computes the rotation from ECI to RIC and rotates input
     Qin (vector or matrix) to RIC.
@@ -296,7 +296,9 @@ def eci2ric(rc_vect, vc_vect, Qin):
     ON = np.concatenate((OR.T, OT.T, OH.T))
 
     # Rotate Qin as appropriate for vector or matrix
-    if Qin.shape[1] == 1:
+    if len(Qin) == 0:
+        Qout = ON
+    elif Qin.shape[1] == 1:
         Qout = np.dot(ON, Qin)
     else:
         Qout = np.dot(np.dot(ON, Qin), ON.T)
@@ -304,7 +306,7 @@ def eci2ric(rc_vect, vc_vect, Qin):
     return Qout
 
 
-def ric2eci(rc_vect, vc_vect, Qin):
+def ric2eci(rc_vect, vc_vect, Qin=[]):
     '''
     This function computes the rotation from RIC to ECI and rotates input
     Qin (vector or matrix) to ECI.
@@ -336,12 +338,34 @@ def ric2eci(rc_vect, vc_vect, Qin):
     NO = ON.T
 
     # Rotate Qin as appropriate for vector or matrix
-    if Qin.shape[1] == 1:
+    if len(Qin) == 0:
+        Qout = NO
+    elif Qin.shape[1] == 1:
         Qout = np.dot(NO, Qin)
     else:
         Qout = np.dot(np.dot(NO, Qin), NO.T)
 
     return Qout
+
+
+def lvlh2ric():
+
+    OL = np.array([[0.,  0., -1.],
+                   [1.,  0.,  0.],
+                   [0., -1.,  0.]])
+    
+    return OL
+
+
+def ric2lvlh():
+
+    OL = np.array([[0.,  0., -1.],
+                   [1.,  0.,  0.],
+                   [0., -1.,  0.]])
+    
+    LO = OL.T
+    
+    return LO
 
 
 def ecef2enu(r_ecef, r_site):

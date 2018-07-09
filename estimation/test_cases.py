@@ -18,13 +18,24 @@ from utilities.eop_functions import get_XYs2006_alldata
 from utilities.eop_functions import get_eop_data
 from utilities.coordinate_systems import latlonht2ecef
 from utilities.coordinate_systems import gcrf2itrf
+from utilities.coordinate_systems import ric2eci
+from utilities.coordinate_systems import eci2ric
+from utilities.coordinate_systems import lvlh2ric
+from utilities.coordinate_systems import ric2lvlh
+from utilities.attitude import euler_angles
+from utilities.attitude import quat2dcm
+from utilities.attitude import dcm2quat
+from utilities.attitude import dcm2euler123
 from sensors.sensors import generate_sensor_file
 from sensors.brdf_models import lambertian_sphere
+from sensors.brdf_models import ashikhmin_premoze
 from sensors.measurements import compute_measurement
 from sensors.measurements import ecef2azelrange_rad
 from sensors.visibility import check_visibility
 from propagation.integration_functions import int_twobody
 from propagation.integration_functions import int_twobody_ukf
+from propagation.integration_functions import int_euler_dynamics_notorque
+from propagation.integration_functions import int_twobody_6dof_notorque
 from propagation.orbit_propagation import propagate_orbit
 from data_processing.errors import compute_ukf_errors
 from data_processing.errors import plot_ukf_errors
@@ -61,8 +72,8 @@ def parameter_setup_sphere(orbit_file, obj_id, mass, radius):
 
     # Initialize spacecraft configuation
     UTC = output_state[obj_id]['UTC'][0]
-    pos = output_state[obj_id]['r_GCRF'][0]
-    vel = output_state[obj_id]['v_GCRF'][0]
+    pos = output_state[obj_id]['r_GCRF'][0].flatten()
+    vel = output_state[obj_id]['v_GCRF'][0].flatten()
     spacecraftConfig = {}
     spacecraftConfig['type'] = '3DoF' # 6DoF or 3DoF
     spacecraftConfig['mass'] = mass  # kg
@@ -70,8 +81,7 @@ def parameter_setup_sphere(orbit_file, obj_id, mass, radius):
     spacecraftConfig['time'] = UTC  # UTC in datetime
     spacecraftConfig['brdf_function'] = lambertian_sphere
     spacecraftConfig['intfcn'] = int_twobody
-    spacecraftConfig['X'] = \
-        np.array([pos[0], pos[1], pos[2], vel[0] ,vel[1] ,vel[2]])  # km, GCRF
+    spacecraftConfig['X'] = np.concatenate((pos, vel))  # km, GCRF
     
     
     # Drag parameters
@@ -105,6 +115,144 @@ def parameter_setup_sphere(orbit_file, obj_id, mass, radius):
     return spacecraftConfig, forcesCoeff, surfaces
 
 
+def parameter_setup_cubesat(orbit_file, obj_id, mass, attitude, username='',
+                            password=''):
+
+    
+    # Load parameters
+    pklFile = open(orbit_file, 'rb')
+    data = pickle.load(pklFile)
+    output_state = data[0]
+    pklFile.close()
+    
+    # Transform attitude to quaternion
+    attitude *= pi/180.  # rad
+    roll = float(attitude[0])
+    pitch = float(attitude[1])
+    yaw = float(attitude[2])
+    
+    sequence = [1,2,3]
+    DCM_BL = euler_angles(sequence, roll, pitch, yaw)
+    
+    print(DCM_BL)
+    
+    roll, pitch, yaw = dcm2euler123(DCM_BL)
+    
+    print(roll*180/pi)
+    print(pitch*180/pi)
+    print(yaw*180/pi)
+    
+    w_BL_B = attitude[3:6].reshape(3,1)
+    
+    # Initialize spacecraft configuation
+    UTC = output_state[obj_id]['UTC'][0]
+    pos = output_state[obj_id]['r_GCRF'][0]
+    vel = output_state[obj_id]['v_GCRF'][0]
+    
+    # Compute frame transforms
+    DCM_LO = ric2lvlh()
+    DCM_ON = eci2ric(pos, vel)
+    DCM_NO = DCM_ON.T
+    DCM_BN = np.dot(DCM_BL, np.dot(DCM_LO, DCM_ON))
+    q_BN = dcm2quat(DCM_BN)
+    
+    w_ON_O = np.array([[0.], [0.], [np.linalg.norm(vel)/np.linalg.norm(pos)]])  # rad/s
+    w_LO_O = np.zeros((3,1))
+    w_LN_O = w_LO_O + w_ON_O
+    w_LN_N = np.dot(DCM_NO, w_LN_O)
+    
+    w_BN_B = w_BL_B + np.dot(DCM_BN, w_LN_N)
+    
+    print(q_BN)
+    print(w_BN_B)
+    
+    
+    
+    spacecraftConfig = {}
+    spacecraftConfig['type'] = '6DoF' # 6DoF or 3DoF
+    spacecraftConfig['mass'] = mass  # kg
+    spacecraftConfig['time'] = UTC  # UTC in datetime
+    spacecraftConfig['brdf_function'] = ashikhmin_premoze
+    spacecraftConfig['intfcn'] = int_twobody_6dof_notorque
+    spacecraftConfig['X'] = \
+        np.concatenate((pos.flatten(), vel.flatten(), q_BN.flatten(),
+                        w_BN_B.flatten()))   # km, rad GCRF
+        
+    print(spacecraftConfig)
+    
+    # m^2 wrt body frame
+    spacecraftConfig['moi'] = np.array([[(0.1**2 + 0.1**2),   0.,      0.],
+                                        [ 0.,    (0.3**2 + 0.1**2),    0.],
+                                        [ 0.,      0.,  (0.3**2 + 0.1**2)]]) * (mass/12.)
+
+    # Location of center of mass wrt body frame, meters
+    spacecraftConfig['comOffset'] = np.array([0., 0., 0.])
+    
+    
+#    # location of facet center w.r.t body frame  - meters
+#    spacecraftConfig['centerOfPressure'] = np.array([[0.15, -0.15,    0,     0,    0,    0],
+#                                                     [   0,     0, 0.05, -0.05,    0,    0],
+#                                                     [   0,     0,    0,     0, 0.05, 0.05]])
+#    
+#    # area of each facet - meters^2
+#    spacecraftConfig['areaOfFacets'] = np.array([0.01,0.01,0.03,0.03,0.03,0.03])\
+#    
+#    # orientation of the facet w.r.t body frame - degrees (rotated from velocity vector)                                 
+#    spacecraftConfig['orientationOfFacets'] = np.array([[0 ,0   ,0  ,0   ,0   ,0  ],
+#                                                        [0 ,0   ,0  ,0   ,270 ,90 ],
+#                                                        [0 ,180 ,90 ,270 ,0   ,0  ]])\
+                                            
+
+    surfaces = {}
+    
+
+
+    # Drag parameters
+    dragCoeff = 3.0  # Mehta 2014 cylinder 3-1 ratio
+
+    # Gravity field parameters
+    order = 2
+    degree = 0
+
+    # SRP parameters
+    emissivity = 0.05
+
+    # Dynamic Model parameters
+    forcesCoeff = {}
+    forcesCoeff['order'] = order
+    forcesCoeff['degree'] = degree
+    forcesCoeff['dragCoeff'] = dragCoeff
+    forcesCoeff['emissivity'] = emissivity
+
+    # Measurement Model Parameters
+    brdfCoeff = {}
+    brdfCoeff['cSunVis'] = 455#W/m^2
+    brdfCoeff['d'] = 0.1
+    brdfCoeff['rho'] = 0.5
+    brdfCoeff['s'] = 0.9
+    brdfCoeff['Fo'] = 0.5
+    brdfCoeff['m'] = 0.6
+    brdfCoeff['nu'] = 0.5
+    brdfCoeff['nv'] = 0.5
+    
+    # Measurement Model Parameters
+    brdfCoeff = {}
+    brdfCoeff['cSunVis'] = 455  # W/m^2
+    brdfCoeff['d'] = 0.1
+    brdfCoeff['rho'] = 0.75
+    brdfCoeff['s'] = 1 - brdfCoeff['d']
+    brdfCoeff['Fo'] = 0.5
+    brdfCoeff['nu'] = 0.5
+    brdfCoeff['nv'] = 0.5
+    
+    surfaces = {}
+    surfaces[0] = {}
+    surfaces[0]['brdf_params'] = brdfCoeff
+
+
+    return spacecraftConfig, forcesCoeff, surfaces
+
+
 def generate_true_params_file(orbit_file, obj_id, object_type, param_file):    
     
     eop_alldata = get_celestrak_eop_alldata()
@@ -119,7 +267,13 @@ def generate_true_params_file(orbit_file, obj_id, object_type, param_file):
         spacecraftConfig, forcesCoeff, surfaces = \
             parameter_setup_sphere(orbit_file, obj_id, mass, radius)
             
-    
+    if object_type == 'cubesat_nadir':
+        
+        mass = 5.  # kg
+        attitude = np.array([0., 0., 0., 0., 0., 0.])
+        
+        spacecraftConfig, forcesCoeff, surfaces = \
+            parameter_setup_cubesat(orbit_file, obj_id, mass, attitude)
         
         
     # Save data    
@@ -191,6 +345,40 @@ def generate_truth_file(true_params_file, truth_file, ephemeris, ts, ndays, dt):
     
     
     if spacecraftConfig['type'] == '6DoF':
+        
+        roll = []
+        pitch = []
+        yaw = []
+        omega1 = []
+        omega2 = []
+        omega3 = []
+        DCM_OL = lvlh2ric()
+        for ii in range(len(t_hrs)):
+            
+            pos = state[ii,0:3].reshape(3,1)
+            vel = state[ii,3:6].reshape(3,1)
+            q_BN = state[ii,6:10].reshape(4,1)
+            DCM_BN= quat2dcm(q_BN)
+            DCM_NO = ric2eci(pos, vel)
+            DCM_BO = np.dot(DCM_BN, DCM_NO)
+            DCM_BL = np.dot(DCM_BO, DCM_OL)
+            
+            w_BN_B = state[ii,10:13].reshape(3,1)
+            w_ON_O = np.array([[0.], [0.], [np.linalg.norm(vel)/np.linalg.norm(pos)]])  # rad/s
+            w_LO_O = np.zeros((3,1))
+            w_LN_O = w_LO_O + w_ON_O
+            w_LN_B = np.dot(DCM_BO, w_LN_O)
+            w_BL_B = w_BN_B - w_LN_B
+            
+            r, p, y = dcm2euler123(DCM_BL)
+            
+            roll.append(r*180/pi)
+            pitch.append(p*180/pi)
+            yaw.append(y*180/pi)
+            
+            omega1.append(float(w_BL_B[0])*180/pi)
+            omega2.append(float(w_BL_B[1])*180/pi)
+            omega3.append(float(w_BL_B[2])*180/pi)
     
         plt.figure()
         plt.subplot(3,1,1)
@@ -227,21 +415,21 @@ def generate_truth_file(true_params_file, truth_file, ephemeris, ts, ndays, dt):
         plt.figure()
         plt.subplot(4,1,1)
         plt.plot(t_hrs, state[:,6], 'k.')
-        plt.ylim([-1, 1])
-        plt.ylabel('q0')    
+        plt.ylim([-2, 2])
+        plt.ylabel('q1')    
         plt.title('Quaternion')
         plt.subplot(4,1,2)
         plt.plot(t_hrs, state[:,7], 'k.')
-        plt.ylim([-1, 1])
-        plt.ylabel('q1')
+        plt.ylim([-2, 2])
+        plt.ylabel('q2')
         plt.subplot(4,1,3)
         plt.plot(t_hrs, state[:,8], 'k.')
-        plt.ylim([-1, 1])
-        plt.ylabel('q2')
+        plt.ylim([-2, 2])
+        plt.ylabel('q3')
         plt.subplot(4,1,4)
         plt.plot(t_hrs, state[:,9], 'k.')
-        plt.ylim([-1, 1])
-        plt.ylabel('q3')
+        plt.ylim([-2, 2])
+        plt.ylabel('q4')
         plt.xlabel('Time [hours]')
     
 
@@ -450,7 +638,7 @@ if __name__ == '__main__':
     # General parameters
     obj_id = 25042
     UTC = datetime(2018, 7, 8, 0, 0, 0) 
-    object_type = 'sphere_lamr'
+    object_type = 'cubesat_nadir'
     
     # Data directory
     datadir = Path('C:/Users/Steve/Documents/data/multiple_model/'
@@ -497,27 +685,27 @@ if __name__ == '__main__':
     
     
     # Generate truth trajectory and measurements file
-    ndays = 7.
+    ndays = 0.01
     dt = 10.
     
-#    generate_truth_file(true_params_file, truth_file, ephemeris, ts, ndays, dt)
+    generate_truth_file(true_params_file, truth_file, ephemeris, ts, ndays, dt)
     
     # Generate noisy measurements file
 #    generate_noisy_meas(true_params_file, truth_file, sensor_file, meas_file,
 #                        ephemeris, ndays=3.)
     
     # Generate model parameters file
-    generate_model_params(true_params_file, model_params_file)
+#    generate_model_params(true_params_file, model_params_file)
     
     
     
     # Run filter
-    run_filter(model_params_file, sensor_file, meas_file, filter_output_file,
-               ephemeris, ts, alpha=1e-4)
+#    run_filter(model_params_file, sensor_file, meas_file, filter_output_file,
+#               ephemeris, ts, alpha=1e-4)
     
     # Compute and plot errors
-    compute_ukf_errors(filter_output_file, truth_file, error_file)
-    plot_ukf_errors(error_file)
+#    compute_ukf_errors(filter_output_file, truth_file, error_file)
+#    plot_ukf_errors(error_file)
     
     
     

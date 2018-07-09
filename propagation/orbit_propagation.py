@@ -19,7 +19,7 @@ def propagate_orbit(spacecraftConfig, forcesCoeff, surfaces, ephemeris,
     int_tol = 1e-12
     intfcn = spacecraftConfig['intfcn']
     
-    if spacecraftConfig['type'] == '3DoF':
+    if 1: #spacecraftConfig['type'] == '3DoF':
     
         start = time.time()
         
@@ -28,15 +28,17 @@ def propagate_orbit(spacecraftConfig, forcesCoeff, surfaces, ephemeris,
         args = (spacecraftConfig, forcesCoeff, surfaces)
         int0 = spacecraftConfig['X'].flatten()
         
+        print(int0)
+
         state = odeint(intfcn,int0,tvec,args,rtol=int_tol,atol=int_tol)
  
         print('Propagation Time:', time.time() - start)                    
                                    
                                    
-    elif spacecraftConfig['type'] == '6DoF':
-        
-        # Setup propagator
-        tvec = np.arange(0., 86400.*ndays+0.1, dt)
+#    elif spacecraftConfig['type'] == '6DoF':
+#        
+#        # Setup propagator
+#        tvec = np.arange(0., 86400.*ndays+0.1, dt)
         
         
         
