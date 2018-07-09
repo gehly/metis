@@ -7,6 +7,7 @@ import copy
 import time
 import sys
 from scipy.integrate import odeint
+from scipy.integrate import ode
 
 from skyfield.api import utc
 
@@ -54,18 +55,14 @@ def unscented_kalman_filter(model_params_file, sensor_file, meas_file,
 #    emissivity = forcesCoeff['emissivity']
     
     # Integration parameters
-    intfcn = spacecraftConfig['intfcn']
     int_tol = 1e-12
     int_dt = 10.
+    intfcn = spacecraftConfig['intfcn']
+    integrator = spacecraftConfig['integrator']    
     
     # Sun and earth data
     earth = ephemeris['earth']
     sun = ephemeris['sun']
-    
-    # Initial state parameters
-    X = spacecraftConfig['X']
-    P = spacecraftConfig['covar']
-    Q = forcesCoeff['Q']
     
     # Sensor and measurement parameters
     sensor_id = list(sensor_dict.keys())[0]
@@ -74,9 +71,14 @@ def unscented_kalman_filter(model_params_file, sensor_file, meas_file,
     sigma_dict = sensor['sigma_dict']
     
     #Number of states and observations per epoch
-    n = len(X)
+    n = len(spacecraftConfig['X'])
     p = len(meas_types)
     
+    # Initial state parameters
+    X = spacecraftConfig['X'].reshape(n,1)
+    P = spacecraftConfig['covar']
+    Q = forcesCoeff['Q']
+       
     print(spacecraftConfig)
     print(X)
     
@@ -135,12 +137,21 @@ def unscented_kalman_filter(model_params_file, sensor_file, meas_file,
         if ti_prior == ti:
             intout = chi_v.T
         else:
-            int0 = chi_v.flatten()
-            tvec = np.arange(0., delta_t, int_dt)
-            tvec = np.append(tvec, delta_t)
-#            print(tvec[-1])
-            args = (spacecraftConfig, forcesCoeff, surfaces)
-            intout = odeint(intfcn,int0,tvec,args,rtol=int_tol,atol=int_tol)
+            y0 = chi_v.flatten()
+            tvec = np.arange(0., delta_t+(0.1*int_dt), int_dt)
+            solver = ode(intfcn)
+            solver.set_integrator(integrator, atol=int_tol, rtol=int_tol)
+            solver.set_f_params([spacecraftConfig, forcesCoeff, surfaces])
+            
+            solver.set_initial_value(y0, tvec[0])
+            intout = np.zeros((len(tvec), len(y0)))
+            intout[0] = y0
+            
+            k = 1
+            while solver.successful() and solver.t < tvec[-1]:
+                solver.integrate(tvec[k])
+                intout[k] = solver.y
+                k += 1
 
         # Extract values for later calculations
         chi_v = intout[-1,:]

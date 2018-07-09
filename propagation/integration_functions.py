@@ -66,7 +66,104 @@ def int_twobody(X, t, spacecraftConfig, forcesCoeff, surfaces):
     return dX
 
 
+def ode_twobody(t, X, params):
+    '''
+    This function works with ode to propagate object assuming
+    simple two-body dynamics.  No perturbations included.
+
+    Parameters
+    ------
+    X : 6 element list
+      cartesian state vector (Inertial Frame)
+    t : m element list
+      vector of times when output is desired
+    args : tuple
+        additional arguments
+
+    Returns
+    ------
+    dX : 6 element list
+      state derivative vector
+    '''
+    
+
+    # State Vector
+    x = float(X[0])
+    y = float(X[1])
+    z = float(X[2])
+    dx = float(X[3])
+    dy = float(X[4])
+    dz = float(X[5])
+
+    # Compute radius
+    r = np.linalg.norm([x, y, z])
+
+    # Derivative vector
+    dX = [0.]*6
+
+    dX[0] = dx
+    dX[1] = dy
+    dX[2] = dz
+
+    dX[3] = -GM*x/r**3
+    dX[4] = -GM*y/r**3
+    dX[5] = -GM*z/r**3
+    
+    
+    return dX
+
+
 def int_twobody_ukf(X, t, spacecraftConfig, forcesCoeff, surfaces):
+    '''
+    This function works with ode to propagate object assuming
+    simple two-body dynamics.  No perturbations included.
+
+    Parameters
+    ------
+    X : (n*(2n+1)) element list
+      initial condition vector of cartesian state and sigma points
+    t : m element list
+      vector of times when output is desired
+    inputs : dictionary
+     input parameters
+
+    Returns
+    ------
+    dX : (n*(2n+1)) element list
+      derivative vector
+
+    '''
+
+    # Initialize
+    dX = [0]*len(X)
+    n = int((-1 + np.sqrt(1. + 8.*len(X)))/4.)
+
+    for ind in range(0, 2*n+1):
+
+        # Pull out relevant values from X
+        x = float(X[ind*n])
+        y = float(X[ind*n + 1])
+        z = float(X[ind*n + 2])
+        dx = float(X[ind*n + 3])
+        dy = float(X[ind*n + 4])
+        dz = float(X[ind*n + 5])
+
+        # Compute radius
+        r = np.linalg.norm([x, y, z])
+
+        # Solve for components of dX
+        dX[ind*n] = dx
+        dX[ind*n + 1] = dy
+        dX[ind*n + 2] = dz
+
+        dX[ind*n + 3] = -GM*x/r**3
+        dX[ind*n + 4] = -GM*y/r**3
+        dX[ind*n + 5] = -GM*z/r**3
+
+    return dX
+
+
+def ode_twobody_ukf(t, X, params):
     '''
     This function works with odeint to propagate object assuming
     simple two-body dynamics.  No perturbations included.
@@ -86,7 +183,7 @@ def int_twobody_ukf(X, t, spacecraftConfig, forcesCoeff, surfaces):
       derivative vector
 
     '''
-
+    
     # Initialize
     dX = [0]*len(X)
     n = int((-1 + np.sqrt(1. + 8.*len(X)))/4.)
