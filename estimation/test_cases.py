@@ -690,7 +690,7 @@ if __name__ == '__main__':
     
     
     # Generate truth trajectory and measurements file
-    ndays = 0.001
+    ndays = 7.
     dt = 10.
     
     generate_truth_file(true_params_file, truth_file, ephemeris, ts, ndays, dt)

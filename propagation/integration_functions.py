@@ -280,8 +280,8 @@ def int_twobody_6dof_notorque(X, t, spacecraftConfig, forcesCoeff, surfaces):
     r = np.linalg.norm([x, y, z])
     
     # Attitude states
-    q_BN = np.reshape(X[0:4], (4,1))
-    w_BN = np.reshape(X[4:7], (3,1))
+    q_BN = np.reshape(X[6:10], (4,1))
+    w_BN = np.reshape(X[10:13], (3,1))
     
     # Moment of inertia
     I = spacecraftConfig['moi']
@@ -304,6 +304,8 @@ def int_twobody_6dof_notorque(X, t, spacecraftConfig, forcesCoeff, surfaces):
     
     dX[6:10] = q_BN_dot.flatten()
     dX[10:13] = w_BN_dot.flatten() 
+    
+
 
     return dX
 
@@ -329,8 +331,6 @@ def ode_twobody_6dof_notorque(t, X, params):
       state derivative vector
     '''
     
-    print(t, X)
-    
     # Input parameters
     spacecraftConfig = params[0]
     
@@ -349,8 +349,8 @@ def ode_twobody_6dof_notorque(t, X, params):
     r = np.linalg.norm([x, y, z])
     
     # Attitude states
-    q_BN = np.reshape(X[0:4], (4,1))
-    w_BN = np.reshape(X[4:7], (3,1))
+    q_BN = np.reshape(X[6:10], (4,1))
+    w_BN = np.reshape(X[10:13], (3,1))
     
     # Moment of inertia
     I = spacecraftConfig['moi']
