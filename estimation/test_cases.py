@@ -302,12 +302,253 @@ def parameter_setup_cubesat(orbit_file, obj_id, mass, attitude, dim):
     return spacecraftConfig, forcesCoeff, surfaces
 
 
+def parameter_setup_boxwing(orbit_file, obj_id, mass, attitude, dim, mpanel,
+                            paneldim):
+
+    
+    # Load parameters
+    pklFile = open(orbit_file, 'rb')
+    data = pickle.load(pklFile)
+    output_state = data[0]
+    pklFile.close()
+    
+    # Transform attitude to quaternion
+    attitude *= pi/180.  # rad
+    roll = float(attitude[0])
+    pitch = float(attitude[1])
+    yaw = float(attitude[2])
+    
+    sequence = [1,2,3]
+    DCM_BL = euler_angles(sequence, roll, pitch, yaw)
+    
+    print(DCM_BL)
+    
+    roll, pitch, yaw = dcm2euler123(DCM_BL)
+    
+    print(roll*180/pi)
+    print(pitch*180/pi)
+    print(yaw*180/pi)
+    
+    w_BL_B = attitude[3:6].reshape(3,1)
+    
+    # Initialize spacecraft configuation
+    UTC = output_state[obj_id]['UTC'][0]
+    pos = output_state[obj_id]['r_GCRF'][0]
+    vel = output_state[obj_id]['v_GCRF'][0]
+    
+    # Compute frame transforms
+    DCM_LO = ric2lvlh()
+    DCM_ON = eci2ric(pos, vel)
+    DCM_NO = DCM_ON.T
+    DCM_BN = np.dot(DCM_BL, np.dot(DCM_LO, DCM_ON))
+    q_BN = dcm2quat(DCM_BN)
+    
+    w_ON_O = np.array([[0.], [0.], [np.linalg.norm(vel)/np.linalg.norm(pos)]])  # rad/s
+    w_LO_O = np.zeros((3,1))
+    w_LN_O = w_LO_O + w_ON_O
+    w_LN_N = np.dot(DCM_NO, w_LN_O)
+    
+    w_BN_B = w_BL_B + np.dot(DCM_BN, w_LN_N)
+    
+    print(q_BN)
+    print(w_BN_B)
+    
+    
+    
+    spacecraftConfig = {}
+    spacecraftConfig['type'] = '6DoF' # 6DoF or 3DoF
+    spacecraftConfig['mass'] = mass  # kg
+    spacecraftConfig['time'] = UTC  # UTC in datetime
+    spacecraftConfig['brdf_function'] = ashikhmin_premoze
+    spacecraftConfig['intfcn'] = ode_twobody_6dof_notorque
+    spacecraftConfig['integrator'] = 'dop853'
+    spacecraftConfig['X'] = \
+        np.concatenate((pos.flatten(), vel.flatten(), q_BN.flatten(),
+                        w_BN_B.flatten()))   # km, rad GCRF
+        
+    print(spacecraftConfig)
+    
+    # Moment of Inertia matrix, m^2 wrt body frame
+    xdim = float(dim[0])
+    ydim = float(dim[1])
+    zdim = float(dim[2])
+    
+    xpanel = float(paneldim[0])
+    ypanel = float(paneldim[1])
+    zpanel = float(paneldim[2])
+    
+     # m^2 wrt body frame
+    mbody = mass - 2*mpanel
+    
+    moi_body = np.array([[(ydim**2 + zdim**2),   0.,      0.],
+                          [ 0.,    (xdim**2 + zdim**2),    0.],
+                          [ 0.,      0.,  (xdim**2 + ydim**2)]]) * (mbody/12.)
+    
+
+    # Parallel axis theorem for solar panel moi 
+    # (panels attach to +/- y body surfaces)
+    rx = 0.5*ydim + 0.5*ypanel
+    rz = 0.5*ydim + 0.5*ypanel
+    
+    moi_panel_x = (mpanel/12.) * (ypanel**2 + zpanel**2) + mpanel*(rx**2)
+    moi_panel_y = (mpanel/12.) * (xpanel**2 + zpanel**2)
+    moi_panel_z = (mpanel/12.) * (xpanel**2 + ypanel**2) + mpanel*(rz**2)
+    moi_panels = np.array([[2*moi_panel_x,   0.,      0.],
+                           [ 0.,    2*moi_panel_y,    0.],
+                           [ 0.,      0.,  2*moi_panel_z]])
+    
+    spacecraftConfig['moi'] = moi_body + moi_panels
+    
+    
+    
+    
+    # Convert to km^2
+    spacecraftConfig['moi'] *= 1e-6
+
+    # Location of center of mass wrt body frame, km
+    spacecraftConfig['comOffset'] = np.array([0., 0., 0.]) * 0.001
+
+    # Drag parameters
+    dragCoeff = 3.0  # Mehta 2014 cylinder 3-1 ratio
+
+    # Gravity field parameters
+    order = 2
+    degree = 0
+
+    # SRP parameters
+    emissivity = 0.05
+
+    # Dynamic Model parameters
+    forcesCoeff = {}
+    forcesCoeff['order'] = order
+    forcesCoeff['degree'] = degree
+    forcesCoeff['dragCoeff'] = dragCoeff
+    forcesCoeff['emissivity'] = emissivity
+    forcesCoeff['solar_flux'] = 1367. * 1e6  # w/km^2
+
+    # Measurement Model Parameters
+    brdfCoeff = {}
+    brdfCoeff['cSunVis'] = 455 * 1e6  #W/km^2
+    brdfCoeff['d'] = 0.5
+    brdfCoeff['rho'] = 0.75
+    brdfCoeff['s'] = 1. - brdfCoeff['d']
+    brdfCoeff['Fo'] = 0.75
+    brdfCoeff['nu'] = 0.5
+    brdfCoeff['nv'] = 0.5
+
+    
+    Rdiff = brdfCoeff['d']*brdfCoeff['rho']
+    Rspec = brdfCoeff['s']*brdfCoeff['Fo']
+    if Rdiff + Rspec > 1.:
+        mistake
+    
+    
+    surfaces = {}
+    
+    # Positive x-panel
+    surfaces[0] = {}
+    surfaces[0]['brdf_params'] = brdfCoeff
+    surfaces[0]['area'] = ydim * zdim * 1e-6    # km^2
+    surfaces[0]['center'] = np.array([[xdim/2.], [0.], [0.]]) * 0.001 # km
+    surfaces[0]['norm_body_hat'] = np.array([[1.], [0.], [0.]])
+    surfaces[0]['u_body_hat'] = np.array([[0.], [1.], [0.]])
+    surfaces[0]['v_body_hat'] = np.array([[0.], [0.], [1.]])
+    
+    # Negative x-panel
+    surfaces[1] = {}
+    surfaces[1]['brdf_params'] = brdfCoeff
+    surfaces[1]['area'] = ydim * zdim * 1e-6    # km^2
+    surfaces[1]['center'] = np.array([[-xdim/2.], [0.], [0.]]) * 0.001 # km
+    surfaces[1]['norm_body_hat'] = np.array([[-1.], [0.], [0.]])
+    surfaces[1]['u_body_hat'] = np.array([[0.], [1.], [0.]])
+    surfaces[1]['v_body_hat'] = np.array([[0.], [0.], [-1.]])
+    
+    # Positive y-panel
+    surfaces[2] = {}
+    surfaces[2]['brdf_params'] = brdfCoeff
+    surfaces[2]['area'] = xdim * zdim * 1e-6    # km^2
+    surfaces[2]['center'] = np.array([[0.], [ydim/2.], [0.]]) * 0.001 # km
+    surfaces[2]['norm_body_hat'] = np.array([[0.], [1.], [0.]])
+    surfaces[2]['u_body_hat'] = np.array([[-1.], [0.], [0.]])
+    surfaces[2]['v_body_hat'] = np.array([[0.], [0.], [1.]])
+    
+    # Negative y-panel
+    surfaces[3] = {}
+    surfaces[3]['brdf_params'] = brdfCoeff
+    surfaces[3]['area'] = xdim * zdim * 1e-6    # km^2
+    surfaces[3]['center'] = np.array([[0.], [-ydim/2.], [0.]]) * 0.001 # km
+    surfaces[3]['norm_body_hat'] = np.array([[0.], [-1.], [0.]])
+    surfaces[3]['u_body_hat'] = np.array([[1.], [0.], [0.]])
+    surfaces[3]['v_body_hat'] = np.array([[0.], [0.], [1.]])
+    
+    # Positive z-panel
+    surfaces[4] = {}
+    surfaces[4]['brdf_params'] = brdfCoeff
+    surfaces[4]['area'] = xdim * ydim * 1e-6    # km^2
+    surfaces[4]['center'] = np.array([[0.], [0.], [zdim/2.]]) * 0.001 # km
+    surfaces[4]['norm_body_hat'] = np.array([[0.], [0.], [1.]])
+    surfaces[4]['u_body_hat'] = np.array([[1.], [0.], [0.]])
+    surfaces[4]['v_body_hat'] = np.array([[0.], [1.], [0.]])
+    
+    # Negative z-panel
+    surfaces[5] = {}
+    surfaces[5]['brdf_params'] = brdfCoeff
+    surfaces[5]['area'] = xdim * ydim * 1e-6    # km^2
+    surfaces[5]['center'] = np.array([[0.], [0.], [-zdim/2.]]) * 0.001 # km
+    surfaces[5]['norm_body_hat'] = np.array([[0.], [0.], [-1.]])
+    surfaces[5]['u_body_hat'] = np.array([[1.], [0.], [0.]])
+    surfaces[5]['v_body_hat'] = np.array([[0.], [-1.], [0.]])
+    
+    # Solar Panels
+    # +Y +X panel
+    surfaces[6] = {}
+    surfaces[6]['brdf_params'] = brdfCoeff
+    surfaces[6]['area'] = ypanel * zpanel * 1e-6    # km^2
+    surfaces[6]['center'] = np.array([[xpanel/2.], [(ydim+ypanel)/2.], [0.]]) * 0.001 # km
+    surfaces[6]['norm_body_hat'] = np.array([[1.], [0.], [0.]])
+    surfaces[6]['u_body_hat'] = np.array([[0.], [1.], [0.]])
+    surfaces[6]['v_body_hat'] = np.array([[0.], [0.], [1.]])
+    
+    # +Y -X panel
+    surfaces[7] = {}
+    surfaces[7]['brdf_params'] = brdfCoeff
+    surfaces[7]['area'] = ypanel * zpanel * 1e-6    # km^2
+    surfaces[7]['center'] = np.array([[-xpanel/2.], [(ydim+ypanel)/2.], [0.]]) * 0.001 # km
+    surfaces[7]['norm_body_hat'] = np.array([[-1.], [0.], [0.]])
+    surfaces[7]['u_body_hat'] = np.array([[0.], [1.], [0.]])
+    surfaces[7]['v_body_hat'] = np.array([[0.], [0.], [-1.]])
+    
+    # -Y +X panel
+    surfaces[8] = {}
+    surfaces[8]['brdf_params'] = brdfCoeff
+    surfaces[8]['area'] = ypanel * zpanel * 1e-6    # km^2
+    surfaces[8]['center'] = np.array([[xpanel/2.], [-(ydim+ypanel)/2.], [0.]]) * 0.001 # km
+    surfaces[8]['norm_body_hat'] = np.array([[1.], [0.], [0.]])
+    surfaces[8]['u_body_hat'] = np.array([[0.], [1.], [0.]])
+    surfaces[8]['v_body_hat'] = np.array([[0.], [0.], [1.]])
+    
+    # -Y -X panel
+    surfaces[9] = {}
+    surfaces[9]['brdf_params'] = brdfCoeff
+    surfaces[9]['area'] = ypanel * zpanel * 1e-6    # km^2
+    surfaces[9]['center'] = np.array([[-xpanel/2.], [-(ydim+ypanel)/2.], [0.]]) * 0.001 # km
+    surfaces[9]['norm_body_hat'] = np.array([[-1.], [0.], [0.]])
+    surfaces[9]['u_body_hat'] = np.array([[0.], [1.], [0.]])
+    surfaces[9]['v_body_hat'] = np.array([[0.], [0.], [-1.]])
+    
+    
+
+    print(surfaces)
+
+    return spacecraftConfig, forcesCoeff, surfaces
+
+
 def generate_true_params_file(orbit_file, obj_id, object_type, param_file):    
     
     eop_alldata = get_celestrak_eop_alldata()
     XYs_df = get_XYs2006_alldata()
     
-    if object_type == 'sphere_lamr':
+    if object_type == 'sphere_lamr_big':
         
         # Parameter setup
         mass = 100.     # kg
@@ -316,9 +557,36 @@ def generate_true_params_file(orbit_file, obj_id, object_type, param_file):
         spacecraftConfig, forcesCoeff, surfaces = \
             parameter_setup_sphere(orbit_file, obj_id, mass, radius)
             
+    if object_type == 'sphere_lamr_small':
+        
+        # Parameter setup
+        mass = 1.     # kg
+        radius = 0.1/np.sqrt(pi)    # m,  gives area = 0.01 m^2
+        
+        spacecraftConfig, forcesCoeff, surfaces = \
+            parameter_setup_sphere(orbit_file, obj_id, mass, radius)
+            
+    if object_type == 'sphere_mamr_big':
+        
+        # Parameter setup
+        mass = 10.     # kg
+        radius = 1./np.sqrt(pi)    # m,  gives area = 1 m^2
+        
+        spacecraftConfig, forcesCoeff, surfaces = \
+            parameter_setup_sphere(orbit_file, obj_id, mass, radius)
+            
+    if object_type == 'sphere_mamr_small':
+        
+        # Parameter setup
+        mass = 0.1     # kg
+        radius = 0.1/np.sqrt(pi)    # m,  gives area = 0.01 m^2
+        
+        spacecraftConfig, forcesCoeff, surfaces = \
+            parameter_setup_sphere(orbit_file, obj_id, mass, radius)
+            
     if object_type == 'cubesat_nadir':
         
-        mass = 5.  # kg
+        mass = 1.  # kg
         attitude = np.array([0., 0., 0., 0., 0., 0.])  # deg, deg/s
         dim = np.array([0.3, 0.1, 0.1])  # m
         
@@ -327,7 +595,7 @@ def generate_true_params_file(orbit_file, obj_id, object_type, param_file):
             
     if object_type == 'cubesat_spin':
         
-        mass = 5.  # kg
+        mass = 1.  # kg
         attitude = np.array([0., 0., 0., 0., 1., 0.])  # deg, deg/s
         dim = np.array([0.3, 0.1, 0.1])  # m
         
@@ -336,7 +604,7 @@ def generate_true_params_file(orbit_file, obj_id, object_type, param_file):
     
     if object_type == 'cubesat_tumble':
         
-        mass = 5.  # kg
+        mass = 1.  # kg
         attitude = np.array([0., 0., 0., 1., 1., 1.])  # deg, deg/s
         dim = np.array([0.3, 0.1, 0.1])  # m
         
@@ -345,12 +613,42 @@ def generate_true_params_file(orbit_file, obj_id, object_type, param_file):
             
     if object_type == 'boxwing_nadir':
         
-        mass = 100.  # kg
-        attitude = np.array([0., 0., 0., 1., 1., 1.])  # deg, deg/s
-        dim = np.array([1., 1., 1.])  # m
+        mass = 200.  # kg
+        mpanel = 5.  # kg
+        attitude = np.array([0., 0., 0., 0., 0., 0.])  # deg, deg/s
+#        dim = np.array([2., 0.5, 1.0])  # m
+        dim = np.array([1.0, 1.0, 1.0])  # m
+        paneldim = np.array([0.02, 1.0, 0.5])
         
         spacecraftConfig, forcesCoeff, surfaces = \
-            parameter_setup_boxwing(orbit_file, obj_id, mass, attitude, dim)
+            parameter_setup_boxwing(orbit_file, obj_id, mass, attitude, dim,
+                                    mpanel, paneldim)
+            
+    if object_type == 'boxwing_spin':
+        
+        mass = 200.  # kg
+        mpanel = 5.  # kg
+        attitude = np.array([0., 0., 0., 0., 1., 0.])  # deg, deg/s
+#        dim = np.array([2., 0.5, 1.0])  # m
+        dim = np.array([1.0, 1.0, 1.0])  # m
+        paneldim = np.array([0.02, 1.0, 0.5])
+        
+        spacecraftConfig, forcesCoeff, surfaces = \
+            parameter_setup_boxwing(orbit_file, obj_id, mass, attitude, dim,
+                                    mpanel, paneldim)
+            
+    if object_type == 'boxwing_tumble':
+        
+        mass = 200.  # kg
+        mpanel = 5.  # kg
+        attitude = np.array([0., 0., 0., 1., 1., 1.])  # deg, deg/s
+#        dim = np.array([2., 0.5, 1.0])  # m
+        dim = np.array([1.0, 1.0, 1.0])  # m
+        paneldim = np.array([0.02, 1.0, 0.5])
+        
+        spacecraftConfig, forcesCoeff, surfaces = \
+            parameter_setup_boxwing(orbit_file, obj_id, mass, attitude, dim,
+                                    mpanel, paneldim)
         
         
         
@@ -602,7 +900,7 @@ def generate_noisy_meas(true_params_file, truth_file, sensor_file, meas_file,
         
     # Save measurement file
     pklFile = open( meas_file, 'wb' )
-    pickle.dump( [meas_times, meas], pklFile, -1 )
+    pickle.dump( [meas_times, meas, meas_true], pklFile, -1 )
     pklFile.close()
     
     # Plot measurements
@@ -672,9 +970,8 @@ def generate_model_params(true_params_file, model_params_file):
             pert_vect.reshape(spacecraftConfig['X'].shape)
         
         # Alter additional parameters as needed        
-        forcesCoeff['Q'] = 1e-6*np.diag([1., 1., 1., 1e-6, 1e-6, 1e-6])
-        
-        
+        forcesCoeff['Q'] = np.eye(3) * 1e-10
+
     
     else:
         mistake
@@ -716,7 +1013,7 @@ if __name__ == '__main__':
     # General parameters
     obj_id = 25042
     UTC = datetime(2018, 7, 8, 0, 0, 0) 
-    object_type = 'cubesat_spin'
+    object_type = 'sphere_lamr_big'
     
     # Data directory
     datadir = Path('C:/Users/Steve/Documents/data/multiple_model/'
@@ -769,22 +1066,22 @@ if __name__ == '__main__':
 #    generate_truth_file(true_params_file, truth_file, ephemeris, ts, ndays, dt)
     
 #    # Generate noisy measurements file
-    ndays = 0.5
-    generate_noisy_meas(true_params_file, truth_file, sensor_file, meas_file,
-                        ephemeris, ndays)
+    ndays = 3.
+#    generate_noisy_meas(true_params_file, truth_file, sensor_file, meas_file,
+#                        ephemeris, ndays)
     
     # Generate model parameters file
-#    generate_model_params(true_params_file, model_params_file)
+    generate_model_params(true_params_file, model_params_file)
     
     
     
     # Run filter
-#    run_filter(model_params_file, sensor_file, meas_file, filter_output_file,
-#               ephemeris, ts, alpha=1e-4)
+    run_filter(model_params_file, sensor_file, meas_file, filter_output_file,
+               ephemeris, ts, alpha=1e-4)
     
     # Compute and plot errors
-#    compute_ukf_errors(filter_output_file, truth_file, error_file)
-#    plot_ukf_errors(error_file)
+    compute_ukf_errors(filter_output_file, truth_file, error_file)
+    plot_ukf_errors(error_file)
     
     
     

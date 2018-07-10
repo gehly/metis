@@ -1652,42 +1652,61 @@ def ehatphi2dcm(ehat, phi):
 #    
 #
     
-def test_euler():
+#def test_euler():
+#    
+#    eulerB = [90., 0., -90.]
+#    sequence = [3,2,1]
+#    
+#
+#    
+#    DCM_BN = euler_angles(sequence, eulerB[0]*pi/180., eulerB[1]*pi/180.,
+#                          eulerB[2]*pi/180.)
+#    
+#    print(DCM_BN)
+#    
+#    yaw, pitch, roll = dcm2euler321(DCM_BN)
+#    
+#    print(roll*180/pi)
+#    print(pitch*180/pi)
+#    print(yaw*180/pi)
+#    
+#    
+#    eulerB = [-90., -90., 0.]
+#    sequence = [1,2,3]
+#    
+#    DCM_BN = euler_angles(sequence, eulerB[0]*pi/180., eulerB[1]*pi/180.,
+#                          eulerB[2]*pi/180.)
+#    
+#    print(DCM_BN)
+#    
+#    roll, pitch, yaw = dcm2euler123(DCM_BN)
+#    
+#    print(roll*180/pi)
+#    print(pitch*180/pi)
+#    print(yaw*180/pi)
+#    
+#    
+#    
+#    return
     
-    eulerB = [90., 0., -90.]
-    sequence = [3,2,1]
-    
-
-    
-    DCM_BN = euler_angles(sequence, eulerB[0]*pi/180., eulerB[1]*pi/180.,
-                          eulerB[2]*pi/180.)
-    
-    print(DCM_BN)
-    
-    yaw, pitch, roll = dcm2euler321(DCM_BN)
-    
-    print(roll*180/pi)
-    print(pitch*180/pi)
-    print(yaw*180/pi)
-    
-    
-    eulerB = [-90., -90., 0.]
-    sequence = [1,2,3]
-    
-    DCM_BN = euler_angles(sequence, eulerB[0]*pi/180., eulerB[1]*pi/180.,
-                          eulerB[2]*pi/180.)
-    
-    print(DCM_BN)
-    
-    roll, pitch, yaw = dcm2euler123(DCM_BN)
-    
-    print(roll*180/pi)
-    print(pitch*180/pi)
-    print(yaw*180/pi)
-    
-    
-    
-    return
+#def test_att_error():
+#    
+#    
+#    euler123 = [2., 3., 4.]
+#    sequence = [3, 2, 1]
+#    
+#    DCM_BN = euler_angles(sequence, euler123[0]*pi/180., euler123[1]*pi/180.,
+#                          euler123[2]*pi/180.)
+#    
+#    mrp_BN = dcm2mrp(DCM_BN)
+#    
+#    print(mrp_BN*4*180/pi)
+#    
+#    
+#    
+#    return
+#
+#test_att_error()
 
 #test_euler()
 
