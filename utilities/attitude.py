@@ -1004,7 +1004,92 @@ def mrp2quat(p):
                   [(1.-pp)/(1.+pp)]])    
     
     return q
+
+
+def quat2grp(q, a, f=None):
+    '''
+    This function returns a generalized Rodrigues parameter vector given an 
+    input quaternion.
     
+    Gibbs vector - (a = 0, f = 1)
+    MRP vector - (a = 1, f = 1)
+    Angle of rotation (small angles) - (f = 2(a+1))
+    
+    This last choice can be used with error GRP to get error roll-pitch-yaw.
+       
+    Parameters
+    ------
+    q : 4x1 numpy array, float
+        quaternion for frame rotation (vector part on top, q4 is scalar)
+    a : float
+        scaling parameter between 0 and 1
+    f : float (optional)
+        scaling parameter, default = None will cause f = 2(a+1)
+        
+    
+    Returns
+    ------
+    p : 3x1 numpy array, float
+        GRP vector for frame rotation
+    
+    Reference
+    ------
+    Crassidis and Markley, "Unscented Filtering for Spacecraft Attitude 
+        Estimation," 2003.
+    '''
+    
+    if not f:
+        f = 2.*(a + 1.)
+    
+    qvec = q[0:3].reshape(3,1)
+    
+    p = (f / (a + float(q[3]))) * qvec
+    
+    return p
+    
+    
+def grp2quat(p, a, f=None):
+    '''
+    This function returns a quaternion given an input generalized Rodrigues
+    parameter vector.
+    
+    Gibbs vector - (a = 0, f = 1)
+    MRP vector - (a = 1, f = 1)
+    Angle of rotation (small angles) - (f = 2(a+1))
+    
+    This last choice can be used with error GRP to get error roll-pitch-yaw.
+       
+    Parameters
+    ------
+    p : 3x1 numpy array, float
+        GRP vector for frame rotation 
+    a : float
+        scaling parameter between 0 and 1
+    f : float (optional)
+        scaling parameter, default = None will cause f = 2(a+1)
+    
+    Returns
+    ------
+    q : 4x1 numpy array, float
+        quaternion for frame rotation (vector part on top, q4 is scalar)
+    
+    Reference
+    ------
+    Crassidis and Markley, "Unscented Filtering for Spacecraft Attitude 
+        Estimation," 2003.
+    '''
+    
+    if not f:
+        f = 2.*(a + 1.)
+        
+    pnorm2 = float(np.dot(p.T, p))
+    q4 = (-a*pnorm2 + f*np.sqrt(f**2. + (1. - a**2.)*pnorm2))/(f**2. + pnorm2)
+    qvec = ((a + q4)/f) * p
+    
+    q = np.append(qvec, q4).reshape(4,1)
+    
+    return q
+
 
 def quat2gibbs(q):
     '''
@@ -1692,20 +1777,42 @@ def ehatphi2dcm(ehat, phi):
 #def test_att_error():
 #    
 #    
-#    euler123 = [2., 3., 4.]
-#    sequence = [3, 2, 1]
+#    euler123 = [1., 10., 4.]
+#    sequence = [1, 2, 3]
 #    
 #    DCM_BN = euler_angles(sequence, euler123[0]*pi/180., euler123[1]*pi/180.,
 #                          euler123[2]*pi/180.)
 #    
 #    mrp_BN = dcm2mrp(DCM_BN)
+#    gibbs_BN = dcm2gibbs(DCM_BN)  
 #    
+#    q_BN = dcm2quat(DCM_BN)
+#    
+#    grp_BN = quat2grp(q_BN, 1, 1)
+#    
+#    print('MRP', mrp_BN)
+#    print('MRP_check', grp_BN)
+#    
+#    grp_BN = quat2grp(q_BN, 0, 1)
+#    
+#    print('Gibbs', gibbs_BN)
+#    print('Gibbs check', grp_BN)
+#    
+#    grp_BN = quat2grp(q_BN, 1)
+#    
+#    print('Angles check')
 #    print(mrp_BN*4*180/pi)
+#    print(grp_BN*180/pi)
+#    
+#    q_check = grp2quat(grp_BN, 1)
+#    
+#    print('q', q_BN)
+#    print('q check', q_check)
 #    
 #    
 #    
 #    return
-#
+
 #test_att_error()
 
 #test_euler()

@@ -377,6 +377,80 @@ def ode_twobody_6dof_notorque(t, X, params):
     return dX
 
 
+def ode_twobody_6dof_notorque_ukf(t, X, params):
+    '''
+    This function works with ode to propagate object assuming
+    simple two-body dynamics and including attitude states assuming
+    no torques.  No perturbations included.
+
+    Parameters
+    ------
+    X : 6 element list
+      cartesian state vector (Inertial Frame)
+    t : m element list
+      vector of times when output is desired
+    args : tuple
+        additional arguments
+
+    Returns
+    ------
+    dX : 6 element list
+      state derivative vector
+    '''
+    
+    # Input parameters
+    spacecraftConfig = params[0]
+    
+    # Initialize
+    dX = [0.]*len(X)
+    n = 13
+    
+    # Loop over sigma points
+    for ind in range(25):
+
+        # Position states
+        x = float(X[ind*n])
+        y = float(X[ind*n + 1])
+        z = float(X[ind*n + 2])
+        dx = float(X[ind*n + 3])
+        dy = float(X[ind*n + 4])
+        dz = float(X[ind*n + 5])
+    
+        # Compute radius
+        r = np.linalg.norm([x, y, z])
+        
+        # Attitude states
+        qind = ind*n+6
+        wind = ind*n+10
+        q_BN = np.reshape(X[qind:qind+4], (4,1))
+        w_BN = np.reshape(X[wind:wind+3], (3,1))
+        
+        # Moment of inertia
+        I = spacecraftConfig['moi']
+        
+        # Torque vector
+        L = np.zeros((3,1))
+        
+        # Compute derivative vector
+        q_BN_dot = quat_derivative(q_BN, w_BN)
+        w_BN_dot = euler_dynamics(w_BN, I, L)
+    
+        # Derivative vector
+        dX[ind*n] = dx
+        dX[ind*n + 1] = dy
+        dX[ind*n + 2] = dz
+
+        dX[ind*n + 3] = -GM*x/r**3
+        dX[ind*n + 4] = -GM*y/r**3
+        dX[ind*n + 5] = -GM*z/r**3
+        
+        dX[qind:qind+4] = q_BN_dot.flatten()
+        dX[wind:wind+4] = w_BN_dot.flatten() 
+
+
+    return dX
+
+
 #def int_twobody_diff_entropy(X, t, inputs):
 #    '''
 #    This function works with odeint to propagate object assuming

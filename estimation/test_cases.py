@@ -230,8 +230,8 @@ def parameter_setup_cubesat(orbit_file, obj_id, mass, attitude, dim):
     brdfCoeff['rho'] = 0.75
     brdfCoeff['s'] = 1. - brdfCoeff['d']
     brdfCoeff['Fo'] = 0.75
-    brdfCoeff['nu'] = 0.5
-    brdfCoeff['nv'] = 0.5
+    brdfCoeff['nu'] = 1000
+    brdfCoeff['nv'] = 1000
 
     
     Rdiff = brdfCoeff['d']*brdfCoeff['rho']
@@ -433,8 +433,8 @@ def parameter_setup_boxwing(orbit_file, obj_id, mass, attitude, dim, mpanel,
     brdfCoeff['rho'] = 0.75
     brdfCoeff['s'] = 1. - brdfCoeff['d']
     brdfCoeff['Fo'] = 0.75
-    brdfCoeff['nu'] = 0.5
-    brdfCoeff['nv'] = 0.5
+    brdfCoeff['nu'] = 1000
+    brdfCoeff['nv'] = 1000
 
     
     Rdiff = brdfCoeff['d']*brdfCoeff['rho']
@@ -972,9 +972,27 @@ def generate_model_params(true_params_file, model_params_file):
         # Alter additional parameters as needed        
         forcesCoeff['Q'] = np.eye(3) * 1e-10
 
-    
+    # Non-spherical case
     else:
-        mistake
+        
+        # Integration function
+        spacecraftConfig['intfcn'] = ode_twobody_6dof_notorque_ukf
+        
+        # Initial covariance
+        Po = np.diag([1., 1., 1., 1e-6, 1e-6, 1e-6])  # km^2 and km^2/s^2
+        spacecraftConfig['covar'] = Po
+        
+        # Perturb initial state
+        pert_vect = np.multiply(np.sqrt(np.diag(Po)), np.random.randn(6,))
+        print(pert_vect)
+        print(spacecraftConfig['X'])
+        spacecraftConfig['X'] += \
+            pert_vect.reshape(spacecraftConfig['X'].shape)
+        
+        # Alter additional parameters as needed        
+        forcesCoeff['Q'] = np.eye(3) * 1e-10
+        forcesCoeff['sig_u'] = 1e-12
+        forcesCoeff['sig_v'] = 1e-12
         
         
     # Save data
