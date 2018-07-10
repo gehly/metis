@@ -8,7 +8,7 @@ import utilities.attitude as att
 
 
 
-def compute_mapp(sat2sun, sat2obs, spacecraftConfig, surfaces, q_IB=[]):
+def compute_mapp(sat2sun, sat2obs, spacecraftConfig, surfaces, q_BI=[]):
     '''
     This function computes the apparent magnitude of a space object
     
@@ -23,9 +23,9 @@ def compute_mapp(sat2sun, sat2obs, spacecraftConfig, surfaces, q_IB=[]):
     surfaces : dict
         contains parameters for the different space object surfaces, including
         body fixed unit vectors and reflectance parameters
-    q_IB : 4x1 numpy array, optional (required for 6DOF)
-        attitude quaternion to transform coordinates from body fixed to 
-        inertial frame
+    q_BI : 4x1 numpy array, optional (required for 6DOF)
+        attitude quaternion to transform coordinates from inertial to 
+        body fixed coordinates
     
     Returns
     ------
@@ -50,12 +50,19 @@ def compute_mapp(sat2sun, sat2obs, spacecraftConfig, surfaces, q_IB=[]):
     u_obs = sat2obs/np.linalg.norm(sat2obs)
     
     brdf_function = spacecraftConfig['brdf_function']
+    
+    # Spherical Objects
     if brdf_function == lambertian_sphere:
         
         # Compute BRDF for the sphere
         brdf_params = surfaces[0]['brdf_params']
         C_sunvis = brdf_params['cSunVis']
         brdf = brdf_function(u_sun, u_obs, brdf_params)
+        
+        if brdf > 1.:
+            print(surfaces)
+            print(brdf)
+            mistake
         
         # Compute Fobs per Reference 3
         sat_radius = spacecraftConfig['radius']
@@ -64,21 +71,28 @@ def compute_mapp(sat2sun, sat2obs, spacecraftConfig, surfaces, q_IB=[]):
         
         sum_Fobs = C_sunvis * (4./9.) * brdf * (sat_radius/sat_rg)**2. * \
         (sin(phase_angle) + (pi - phase_angle)*cos(phase_angle))
+#        
+#        print(brdf)
+#        print(sum_Fobs)
     
+    # Non-spherical objects composed of surfaces/facets
     else:
     
         # Loop over all surfaces to compute total light reflected to observer
         # per Reference 1
         sum_Fobs = 0.
+        sat_rg = np.linalg.norm(sat2obs)
         for ii in surfaces:
             
             # Retrieve BRDF parameters
             brdf_params = surfaces[ii]['brdf_params']
-            norm_body_hat = brdf_params['norm_body_hat']
-            u_body_hat = brdf_params['u_body_hat']
-            v_body_hat = brdf_params['v_body_hat']
+            norm_body_hat = surfaces[ii]['norm_body_hat']
+            u_body_hat = surfaces[ii]['u_body_hat']
+            v_body_hat = surfaces[ii]['v_body_hat']
+            area = surfaces[ii]['area']
     
             # Convert to ECI as needed
+            q_IB = att.quat_inverse(q_BI)
             norm_eci_hat = att.quat_rotate(q_IB, norm_body_hat)
             brdf_params['norm_eci_hat'] = norm_eci_hat
             brdf_params['u_eci_hat'] = att.quat_rotate(q_IB, u_body_hat)
@@ -94,14 +108,31 @@ def compute_mapp(sat2sun, sat2obs, spacecraftConfig, surfaces, q_IB=[]):
             # Compute BRDF for this surface
             brdf = brdf_function(u_sun, u_obs, brdf_params)
             
+            if brdf > 1.:
+                print(surfaces)
+                print(brdf)
+                mistake
+            
             # Compute Fsun and Fobs
+            C_sunvis = brdf_params['cSunVis']
             Fsun = C_sunvis*brdf*dot_n_sun
-            Fobs = Fsun*A*dot_n_obs/float(np.dot(sat2obs.T, sat2obs))
+            Fobs = Fsun*area*dot_n_obs/float(np.dot(sat2obs.T, sat2obs))
             
             sum_Fobs += Fobs
+            
+#            print(ii)
+#            print(surfaces[ii])
+#            print(brdf)
+#            print(np.cross(brdf_params['u_eci_hat'], brdf_params['v_eci_hat'], axis=0))
+#            print(sum_Fobs)
+            
+            
     
     # Compute mapp
     mapp = -26.74 - 2.5*log10(sum_Fobs/C_sunvis)
+    
+    print(mapp)
+#    mistake
     
     return mapp
 
@@ -306,7 +337,7 @@ def ashikhmin_shirley(u_sun, u_obs, brdf_params):
     dot_n_sun = float(np.dot(norm_eci_hat.T, u_sun))
     dot_n_obs = float(np.dot(norm_eci_hat.T, u_obs))
     dot_n_h = float(np.dot(norm_eci_hat.T, half_eci_hat))
-    dot_h_obs = float(np.dot(half_eci_hat.T, u_obs))
+    dot_h_sun = float(np.dot(half_eci_hat.T, u_sun))
     dot_h_u = float(np.dot(half_eci_hat.T, u_eci_hat))
     dot_h_v = float(np.dot(half_eci_hat.T, v_eci_hat))
     maxdot = max([dot_n_sun, dot_n_obs])
@@ -316,10 +347,10 @@ def ashikhmin_shirley(u_sun, u_obs, brdf_params):
                 * (1. - (1.-dot_n_obs/2.)**5.)
     
     # Compute specular BRDF
-    F = Rspec + (1. - Rspec)*(1. - dot_h_obs)**5.
-    z = (nu*dot_h_u**2. + nv*dot_h_v**2.)/(1. - dot_n_sun**2.)
+    F = Rspec + (1. - Rspec)*(1. - dot_h_sun)**5.
+    z = (nu*dot_h_u**2. + nv*dot_h_v**2.)/(1. - dot_n_h**2.)
     brdf_spec = np.sqrt((nu + 1.)*(nv + 1.))/(8.*pi) \
-                * dot_n_h**z/(dot_h_obs*maxdot) * F    
+                * dot_n_h**z/(dot_h_sun*maxdot) * F    
     
     # Compute total BRDF
     brdf = brdf_diff + brdf_spec
@@ -377,17 +408,17 @@ def ashikhmin_premoze(u_sun, u_obs, brdf_params):
     dot_n_sun = float(np.dot(norm_eci_hat.T, u_sun))
     dot_n_obs = float(np.dot(norm_eci_hat.T, u_obs))
     dot_n_h = float(np.dot(norm_eci_hat.T, half_eci_hat))
-    dot_h_obs = float(np.dot(half_eci_hat.T, u_obs))
+    dot_h_sun = float(np.dot(half_eci_hat.T, u_sun))
     dot_h_u = float(np.dot(half_eci_hat.T, u_eci_hat))
     dot_h_v = float(np.dot(half_eci_hat.T, v_eci_hat))
-    
+
     # Compute diffuse BRDF
     brdf_diff = (28.*Rdiff/(23.*pi))*(1. - Rspec)*(1. - (1.-dot_n_sun/2.)**5.) \
                 * (1. - (1.-dot_n_obs/2.)**5.)
     
     # Compute specular BRDF
-    F = Rspec + (1. - Rspec)*(1. - dot_h_obs)**5.
-    z = (nu*dot_h_u**2. + nv*dot_h_v**2.)/(1. - dot_n_sun**2.)
+    F = Rspec + (1. - Rspec)*(1. - dot_h_sun)**5.
+    z = (nu*dot_h_u**2. + nv*dot_h_v**2.)/(1. - dot_n_h**2.)
     brdf_spec = np.sqrt((nu + 1.)*(nv + 1.))/(8.*pi) \
                 * dot_n_h**z*F/(dot_n_sun + dot_n_obs - (dot_n_sun*dot_n_obs))  
     

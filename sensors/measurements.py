@@ -71,7 +71,9 @@ def compute_measurement(X, sun_gcrf, sensor, spacecraftConfig, surfaces, UTC,
             sat2obs = stat_gcrf - r_gcrf
             if spacecraftConfig['type'] == '3DoF':
                 Y[ii] = compute_mapp(sat2sun, sat2obs, spacecraftConfig, surfaces)
-            
+            elif spacecraftConfig['type'] == '6DoF':
+                q_BI = X[6:10].reshape(4,1)                
+                Y[ii] = compute_mapp(sat2sun, sat2obs, spacecraftConfig, surfaces, q_BI)
         else:
             print('Invalid Measurement Type! Entered: ', mtype)
             
