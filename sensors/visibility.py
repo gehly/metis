@@ -1,5 +1,5 @@
 import numpy as np
-from math import acos, asin
+from math import acos, asin, pi
 import sys
 import time
 
@@ -141,6 +141,12 @@ def check_visibility(state, UTC_times, sun_gcrf_array, moon_gcrf_array, sensor,
         
         # If still good, compute apparent mag
         if vis_flag:
+            
+#            print('az', az*180/pi)
+#            print('el', el*180/pi)
+#            print('sun az', sun_az*180/pi)
+#            print('sun el', sun_el*180/pi)
+            
             
             meas_types_mapp = ['mapp']
             Yi = compute_measurement(Xi, sun_gcrf, sensor, spacecraftConfig,

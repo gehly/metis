@@ -21,7 +21,7 @@ import utilities.attitude as att
 
 
 def unscented_kalman_filter(model_params_file, sensor_file, meas_file,
-                            ephemeris, ts, alpha=1e-4):
+                            ephemeris, ts, alpha=1.):
     '''
     
     '''
@@ -364,7 +364,7 @@ def ukf_6dof_predictor(X, P, delta_t, n, alpha,
     Xgrp[9:12] = X[10:13]
     Xrep = np.tile(Xgrp, (1, 12))
     chi_grp = np.concatenate((Xgrp, Xrep+(gam*sqP), Xrep-(gam*sqP)), axis=1)
-    
+
     # Form sigma point matrix for quaternions
     chi_quat = np.zeros((13, 25))
     chi_quat[:, 0] = X.flatten()
@@ -449,6 +449,10 @@ def ukf_6dof_predictor(X, P, delta_t, n, alpha,
     
 #    print(Pbar)
 #    print(np.linalg.eig(Pbar))
+#    
+#    print(Xgrp)
+#    print(qmean)
+#    mistake
     
     
     return Xgrp, Pbar, qmean
@@ -509,7 +513,11 @@ def ukf_6dof_corrector(Xgrp, Pbar, qmean, Yi, ti, n, alpha, sun_gcrf,
                                  surfaces, ti, EOP_data,
                                  sensor['meas_types'], XYs_df)
         meas_bar[:,jj] = Yj.flatten()
+        
+#        print(jj)
+#        print(Yj)
     
+#    print(Wm)
     Ybar = np.dot(meas_bar, Wm.T)
     Ybar = np.reshape(Ybar, (p, 1))
     Y_diff = meas_bar - np.dot(Ybar, np.ones((1, 25)))
@@ -517,6 +525,11 @@ def ukf_6dof_corrector(Xgrp, Pbar, qmean, Yi, ti, n, alpha, sun_gcrf,
     Pxy = np.dot(chi_diff,  np.dot(diagWc, Y_diff.T))
 
     Pyy += Rk
+    
+#    print(meas_bar)
+#    print(Yi)
+#    print(Ybar)
+#    print(Pyy)
 
     # Measurement Update
     K = np.dot(Pxy, np.linalg.inv(Pyy))
@@ -527,9 +540,9 @@ def ukf_6dof_corrector(Xgrp, Pbar, qmean, Yi, ti, n, alpha, sun_gcrf,
     dq = att.grp2quat(dp, 1)
     q = att.quat_composition(dq, qmean)
     X = np.zeros((13, 1))
-    X[0:6] = Xgrp[0:6].flatten()
-    X[6:10] = q.flatten()
-    X[10:13] = Xgrp[9:12].flatten()
+    X[0:6] = Xgrp[0:6]
+    X[6:10] = q
+    X[10:13] = Xgrp[9:12]
     
 #        # Regular update
 #        P = Pbar - np.dot(K, np.dot(Pyy, K.T))
@@ -540,14 +553,14 @@ def ukf_6dof_corrector(Xgrp, Pbar, qmean, Yi, ti, n, alpha, sun_gcrf,
     # Joseph Form
     cholPbar = np.linalg.inv(np.linalg.cholesky(Pbar))
     invPbar = np.dot(cholPbar.T, cholPbar)
-    P1 = (np.identity(6) - np.dot(np.dot(K, np.dot(Pyy, K.T)), invPbar))
+    P1 = (np.identity(12) - np.dot(np.dot(K, np.dot(Pyy, K.T)), invPbar))
     P = np.dot(P1, np.dot(Pbar, P1.T)) + np.dot(K, np.dot(Rk, K.T))
     
-    print('posterior')
-    print(X)
-    print(P)
-    print(Ybar)
-    print(Yi - Ybar)
+#    print('posterior')
+#    print(X)
+#    print(P)
+#    print(Ybar)
+#    print(Yi - Ybar)
 #        print(Pyy)
 #        print(Rk)
 #        print(Pxy)
@@ -556,7 +569,6 @@ def ukf_6dof_corrector(Xgrp, Pbar, qmean, Yi, ti, n, alpha, sun_gcrf,
 #    # Gaussian Likelihood
 #    beta = compute_gaussian(Yi, Ybar, Pyy)
 #    beta_list.append(beta)
-    
     
     return X, P
 

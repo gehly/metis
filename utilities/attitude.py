@@ -1816,7 +1816,19 @@ def ehatphi2dcm(ehat, phi):
 #test_att_error()
 
 #test_euler()
-
+    
+#def test_bug():
+#    
+#    q_IB = np.array([[ 0.46867662], [ 0.17383645], [-0.83205448], [-0.24043389]])
+#    
+#    n_hat = np.array([[-1.], [0.], [0.]])
+#    
+#    print(quat_rotate(q_IB, n_hat))
+#    
+#    
+#    return
+#
+#test_bug()
 
 #def test_parameter_conversions():
 #    '''

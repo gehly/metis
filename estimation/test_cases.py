@@ -39,6 +39,7 @@ from propagation.integration_functions import int_twobody_6dof_notorque
 from propagation.integration_functions import ode_twobody
 from propagation.integration_functions import ode_twobody_ukf
 from propagation.integration_functions import ode_twobody_6dof_notorque
+from propagation.integration_functions import ode_twobody_6dof_notorque_ukf
 from propagation.propagation_functions import propagate_orbit
 from data_processing.errors import compute_ukf_errors
 from data_processing.errors import plot_ukf_errors
@@ -230,8 +231,8 @@ def parameter_setup_cubesat(orbit_file, obj_id, mass, attitude, dim):
     brdfCoeff['rho'] = 0.75
     brdfCoeff['s'] = 1. - brdfCoeff['d']
     brdfCoeff['Fo'] = 0.75
-    brdfCoeff['nu'] = 1000
-    brdfCoeff['nv'] = 1000
+    brdfCoeff['nu'] = 10
+    brdfCoeff['nv'] = 10
 
     
     Rdiff = brdfCoeff['d']*brdfCoeff['rho']
@@ -433,8 +434,8 @@ def parameter_setup_boxwing(orbit_file, obj_id, mass, attitude, dim, mpanel,
     brdfCoeff['rho'] = 0.75
     brdfCoeff['s'] = 1. - brdfCoeff['d']
     brdfCoeff['Fo'] = 0.75
-    brdfCoeff['nu'] = 1000
-    brdfCoeff['nv'] = 1000
+    brdfCoeff['nu'] = 10
+    brdfCoeff['nv'] = 10
 
     
     Rdiff = brdfCoeff['d']*brdfCoeff['rho']
@@ -979,17 +980,21 @@ def generate_model_params(true_params_file, model_params_file):
         spacecraftConfig['intfcn'] = ode_twobody_6dof_notorque_ukf
         
         # Initial covariance
-        Po = np.diag([1., 1., 1., 1e-6, 1e-6, 1e-6])  # km^2 and km^2/s^2
+        ang = (1.*pi/180.)**2
+        angvel = (0.001*pi/180.)**2
+        Po = np.diag([1., 1., 1., 1e-6, 1e-6, 1e-6,
+                      ang, ang, ang, angvel, angvel, angvel])  # km, km/s, rad, rad/s
         spacecraftConfig['covar'] = Po
         
         # Perturb initial state
-        pert_vect = np.multiply(np.sqrt(np.diag(Po)), np.random.randn(6,))
+        pert_vect = np.multiply(np.sqrt(np.diag(Po[0:6, 0:6])), np.random.randn(6,))
+        pert_vect = np.append(pert_vect, np.zeros(7,))
         print(pert_vect)
         print(spacecraftConfig['X'])
         spacecraftConfig['X'] += \
             pert_vect.reshape(spacecraftConfig['X'].shape)
         
-        # Alter additional parameters as needed        
+        # Alter additional parameters as needed
         forcesCoeff['Q'] = np.eye(3) * 1e-10
         forcesCoeff['sig_u'] = 1e-12
         forcesCoeff['sig_v'] = 1e-12
@@ -1030,33 +1035,36 @@ if __name__ == '__main__':
     
     # General parameters
     obj_id = 25042
-    UTC = datetime(2018, 7, 8, 0, 0, 0) 
-    object_type = 'sphere_lamr_big'
+#    obj_id = 29495
+#    UTC = datetime(2018, 7, 12, 12, 0, 0) 
+    UTC = datetime(2018, 7, 12, 9, 0, 0)
+    object_type = 'cubesat_tumble'
     
     # Data directory
     datadir = Path('C:/Users/Steve/Documents/data/multiple_model/'
-                   '2018_07_08_leo')
+                   '2018_07_12_leo')
     
     # Filenames
-    init_orbit_file = datadir / 'iridium39_orbit_2018_07_08.pkl'
+    init_orbit_file = datadir / 'iridium39_orbit_2018_07_12.pkl'
+#    init_orbit_file = datadir / 'optus_orbit_2018_07_12.pkl'
     sensor_file = datadir / 'sensors_falcon_params.pkl'
     
-    fname = 'leo_' + object_type + '_2018_07_08_true_params.pkl'
+    fname = 'leo_' + object_type + '_2018_07_12_true_params.pkl'
     true_params_file = datadir / fname
     
-    fname = 'leo_' + object_type + '_2018_07_08_truth.pkl'
+    fname = 'leo_' + object_type + '_2018_07_12_truth.pkl'
     truth_file = datadir / fname
     
-    fname = 'leo_' + object_type + '_2018_07_08_meas.pkl'
+    fname = 'leo_' + object_type + '_2018_07_12_meas.pkl'
     meas_file = datadir / fname
     
-    fname = 'leo_' + object_type + '_2018_07_08_model_params.pkl'
+    fname = 'leo_' + object_type + '_2018_07_12_model_params.pkl'
     model_params_file = datadir / fname
     
-    fname = 'leo_' + object_type + '_2018_07_08_filter_output.pkl'
+    fname = 'leo_' + object_type + '_2018_07_12_filter_output.pkl'
     filter_output_file = datadir / fname
     
-    fname = 'leo_' + object_type + '_2018_07_08_filter_error.pkl'
+    fname = 'leo_' + object_type + '_2018_07_12_filter_error.pkl'
     error_file = datadir / fname
     
     
@@ -1074,7 +1082,7 @@ if __name__ == '__main__':
 #    generate_sensor_file(sensor_file)
 
     # Generate true params file
-#    generate_true_params_file(init_orbit_file, obj_id, object_type, true_params_file)
+    generate_true_params_file(init_orbit_file, obj_id, object_type, true_params_file)
     
     
     # Generate truth trajectory and measurements file
@@ -1084,22 +1092,22 @@ if __name__ == '__main__':
 #    generate_truth_file(true_params_file, truth_file, ephemeris, ts, ndays, dt)
     
 #    # Generate noisy measurements file
-    ndays = 3.
+    ndays = 0.5
 #    generate_noisy_meas(true_params_file, truth_file, sensor_file, meas_file,
 #                        ephemeris, ndays)
     
     # Generate model parameters file
-    generate_model_params(true_params_file, model_params_file)
+#    generate_model_params(true_params_file, model_params_file)
     
     
     
     # Run filter
-    run_filter(model_params_file, sensor_file, meas_file, filter_output_file,
-               ephemeris, ts, alpha=1e-4)
+#    run_filter(model_prisarams_file, sensor_file, meas_file, filter_output_file,
+#               ephemeris, ts, alpha=1.)
     
     # Compute and plot errors
-    compute_ukf_errors(filter_output_file, truth_file, error_file)
-    plot_ukf_errors(error_file)
+#    compute_ukf_errors(filter_output_file, truth_file, error_file)
+#    plot_ukf_errors(error_file)
     
     
     

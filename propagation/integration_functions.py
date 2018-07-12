@@ -404,7 +404,7 @@ def ode_twobody_6dof_notorque_ukf(t, X, params):
     # Initialize
     dX = [0.]*len(X)
     n = 13
-    
+
     # Loop over sigma points
     for ind in range(25):
 
@@ -445,8 +445,7 @@ def ode_twobody_6dof_notorque_ukf(t, X, params):
         dX[ind*n + 5] = -GM*z/r**3
         
         dX[qind:qind+4] = q_BN_dot.flatten()
-        dX[wind:wind+4] = w_BN_dot.flatten() 
-
+        dX[wind:wind+3] = w_BN_dot.flatten() 
 
     return dX
 

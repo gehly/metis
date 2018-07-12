@@ -41,9 +41,12 @@ def compute_measurement(X, sun_gcrf, sensor, spacecraftConfig, surfaces, UTC,
     
 #    print('\n measurements')
 #    print(stat_gcrf)
+#    print(r_gcrf)
 #    print(rho_hat_gcrf)
 #    print(rho_hat_enu)
 #    print('el', asin(rho_hat_enu[2])*180/pi)
+    
+    
     
     # Loop over measurement types
     Y = np.zeros((len(meas_types),1))
@@ -70,10 +73,15 @@ def compute_measurement(X, sun_gcrf, sensor, spacecraftConfig, surfaces, UTC,
             sat2sun = sun_gcrf - r_gcrf
             sat2obs = stat_gcrf - r_gcrf
             if spacecraftConfig['type'] == '3DoF':
-                Y[ii] = compute_mapp(sat2sun, sat2obs, spacecraftConfig, surfaces)
+                mapp = compute_mapp(sat2sun, sat2obs, spacecraftConfig, surfaces)                
+                Y[ii] = mapp
+               
+                    
             elif spacecraftConfig['type'] == '6DoF':
                 q_BI = X[6:10].reshape(4,1)                
-                Y[ii] = compute_mapp(sat2sun, sat2obs, spacecraftConfig, surfaces, q_BI)
+                mapp = compute_mapp(sat2sun, sat2obs, spacecraftConfig, surfaces, q_BI)                
+                Y[ii] = mapp
+                
         else:
             print('Invalid Measurement Type! Entered: ', mtype)
             

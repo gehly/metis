@@ -1,6 +1,7 @@
 import numpy as np
 from math import pi, sin, cos, tan, asin, acos, atan, atan2, log10
 import sys
+import copy
 
 sys.path.append('../')
 
@@ -85,18 +86,30 @@ def compute_mapp(sat2sun, sat2obs, spacecraftConfig, surfaces, q_BI=[]):
         for ii in surfaces:
             
             # Retrieve BRDF parameters
-            brdf_params = surfaces[ii]['brdf_params']
+            brdf_params = copy.deepcopy(surfaces[ii]['brdf_params'])
             norm_body_hat = surfaces[ii]['norm_body_hat']
             u_body_hat = surfaces[ii]['u_body_hat']
             v_body_hat = surfaces[ii]['v_body_hat']
             area = surfaces[ii]['area']
+            C_sunvis = brdf_params['cSunVis']
     
             # Convert to ECI as needed
             q_IB = att.quat_inverse(q_BI)
             norm_eci_hat = att.quat_rotate(q_IB, norm_body_hat)
-            brdf_params['norm_eci_hat'] = norm_eci_hat
-            brdf_params['u_eci_hat'] = att.quat_rotate(q_IB, u_body_hat)
-            brdf_params['v_eci_hat'] = att.quat_rotate(q_IB, v_body_hat)
+            u_eci_hat = att.quat_rotate(q_IB, u_body_hat)
+            v_eci_hat = att.quat_rotate(q_IB, v_body_hat)
+            
+#            print('surface', ii)
+#            print('q_IB', q_IB)
+#            print('norm body', norm_body_hat)
+#            print('norm eci', norm_eci_hat)
+#            print('u body', u_body_hat)
+#            print('u eci', u_eci_hat)
+            
+            brdf_params['norm_eci_hat'] = norm_eci_hat.copy()
+            brdf_params['u_eci_hat'] = u_eci_hat.copy()
+            brdf_params['v_eci_hat'] = v_eci_hat.copy()
+            surfaces[ii]['brdf_params'] = copy.deepcopy(brdf_params)
             
             # Check angles, if greater than 90 degrees, no light is reflected
             # from this surface to the observer, no need to compute BRDF
@@ -109,12 +122,11 @@ def compute_mapp(sat2sun, sat2obs, spacecraftConfig, surfaces, q_BI=[]):
             brdf = brdf_function(u_sun, u_obs, brdf_params)
             
             if brdf > 1.:
+                print(ii)
                 print(surfaces)
                 print(brdf)
-                mistake
             
-            # Compute Fsun and Fobs
-            C_sunvis = brdf_params['cSunVis']
+            # Compute Fsun and Fobs            
             Fsun = C_sunvis*brdf*dot_n_sun
             Fobs = Fsun*area*dot_n_obs/float(np.dot(sat2obs.T, sat2obs))
             
@@ -126,12 +138,20 @@ def compute_mapp(sat2sun, sat2obs, spacecraftConfig, surfaces, q_BI=[]):
 #            print(np.cross(brdf_params['u_eci_hat'], brdf_params['v_eci_hat'], axis=0))
 #            print(sum_Fobs)
             
-            
+    if sum_Fobs == 0.:
+        print(surfaces)
+        print(q_IB)
+        print(q_BI)
+        print(u_sun)
+        print(u_obs)
+        
+        mapp = 100.
+        
+    else:    
+        # Compute mapp
+        mapp = -26.74 - 2.5*log10(sum_Fobs/C_sunvis)
     
-    # Compute mapp
-    mapp = -26.74 - 2.5*log10(sum_Fobs/C_sunvis)
-    
-    print(mapp)
+#    print(mapp)
 #    mistake
     
     return mapp
@@ -421,6 +441,16 @@ def ashikhmin_premoze(u_sun, u_obs, brdf_params):
     z = (nu*dot_h_u**2. + nv*dot_h_v**2.)/(1. - dot_n_h**2.)
     brdf_spec = np.sqrt((nu + 1.)*(nv + 1.))/(8.*pi) \
                 * dot_n_h**z*F/(dot_n_sun + dot_n_obs - (dot_n_sun*dot_n_obs))  
+    
+    
+#    print('brdf diff', brdf_diff)
+#    print('brdf spec', brdf_spec)
+#    print('F', F)
+#    print('z', z)
+#    print('dot n h', dot_n_h)
+#    print(np.sqrt((nu + 1.)*(nv + 1.))/(8.*pi))
+#    print(dot_n_h**z*F)
+#    print((dot_n_sun + dot_n_obs - (dot_n_sun*dot_n_obs)))
     
     # Compute total BRDF
     brdf = brdf_diff + brdf_spec
