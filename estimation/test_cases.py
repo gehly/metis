@@ -364,7 +364,7 @@ def parameter_setup_boxwing(orbit_file, obj_id, mass, attitude, dim, mpanel,
     
     
     spacecraftConfig = {}
-    spacecraftConfig['type'] = '6DoF' # 6DoF or 3DoF
+    spacecraftConfig['type'] = '3att' # 6DoF or 3DoF
     spacecraftConfig['mass'] = mass  # kg
     spacecraftConfig['time'] = UTC  # UTC in datetime
     spacecraftConfig['brdf_function'] = ashikhmin_premoze
@@ -981,7 +981,7 @@ def generate_ukf_params(true_params_file, model_params_file):
         # Alter additional parameters as needed        
         forcesCoeff['Q'] = np.eye(3) * 1e-12
         
-    if spacecraftConfig['type'] == '3att':
+    elif spacecraftConfig['type'] == '3att':
         
         # Integration function
         spacecraftConfig['intfcn'] = ode_twobody_j2_drag_srp_notorque_ukf
@@ -1241,7 +1241,7 @@ if __name__ == '__main__':
 #    obj_id = 29495
 #    UTC = datetime(2018, 7, 12, 12, 0, 0) 
     UTC = datetime(2018, 7, 12, 9, 0, 0)
-    object_type = 'cubesat_nadir'
+    object_type = 'boxwing_tumble'
     
     # Data directory
     datadir = Path('C:/Users/Steve/Documents/data/multiple_model/'
@@ -1308,8 +1308,8 @@ if __name__ == '__main__':
 #    generate_mmae_params(true_params_file, init_orbit_file, mmae_params_file)
     
     # Run filter
-#    run_filter(model_params_file, sensor_file, meas_file, filter_output_file,
-#               ephemeris, ts, alpha=1e-4)
+#    run_filter(mohedel_params_file, sensor_file, meas_file, filter_output_file,
+#               epmeris, ts, alpha=1e-4)
     
     
     
