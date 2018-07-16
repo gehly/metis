@@ -125,14 +125,14 @@ def unscented_kalman_filter(model_params_file, sensor_file, meas_file,
         
         # Corrector
         if spacecraftConfig['type'] == '3DoF':
-            X, P = ukf_3dof_corrector(Xbar, Pbar, Yi, ti, n, alpha,
-                                      sun_gcrf, sensor, EOP_data, XYs_df,
-                                      spacecraftConfig, surfaces)
+            X, P, beta = ukf_3dof_corrector(Xbar, Pbar, Yi, ti, n, alpha,
+                                            sun_gcrf, sensor, EOP_data, XYs_df,
+                                            spacecraftConfig, surfaces)
             
         elif spacecraftConfig['type'] == '6DoF':
-            X, P = ukf_6dof_corrector(Xbar, Pbar, qmean, Yi, ti, n, alpha,
-                                      sun_gcrf, sensor, EOP_data, XYs_df,
-                                      spacecraftConfig, surfaces)
+            X, P, beta = ukf_6dof_corrector(Xbar, Pbar, qmean, Yi, ti, n, alpha,
+                                            sun_gcrf, sensor, EOP_data, XYs_df,
+                                            spacecraftConfig, surfaces)
         
         else:
             print('Spacecraft Type Error')
@@ -324,11 +324,11 @@ def ukf_3dof_corrector(Xbar, Pbar, Yi, ti, n, alpha, sun_gcrf,
     
 
 #    # Gaussian Likelihood
-#    beta = compute_gaussian(Yi, Ybar, Pyy)
+    beta = compute_gaussian(Yi, Ybar, Pyy)
 #    beta_list.append(beta)
     
     
-    return X, P
+    return X, P, beta
 
 
 def ukf_6dof_predictor(X, P, delta_t, n, alpha, 
@@ -567,10 +567,10 @@ def ukf_6dof_corrector(Xgrp, Pbar, qmean, Yi, ti, n, alpha, sun_gcrf,
     
 
 #    # Gaussian Likelihood
-#    beta = compute_gaussian(Yi, Ybar, Pyy)
+    beta = compute_gaussian(Yi, Ybar, Pyy)
 #    beta_list.append(beta)
     
-    return X, P
+    return X, P, beta
 
 
 ###############################################################################

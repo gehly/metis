@@ -45,8 +45,11 @@ from propagation.integration_functions import ode_twobody_6dof_notorque_ukf
 from propagation.propagation_functions import propagate_orbit
 from data_processing.errors import compute_ukf_errors
 from data_processing.errors import plot_ukf_errors
+from data_processing.errors import compute_mmae_errors
+from data_processing.errors import plot_mmae_errors
 
 from estimation import unscented_kalman_filter
+from multiple_model import multiple_model_filter
 
 
 def generate_init_orbit_file(obj_id, UTC, orbit_file):
@@ -943,7 +946,7 @@ def generate_noisy_meas(true_params_file, truth_file, sensor_file, meas_file,
 
 
 
-def generate_model_params(true_params_file, model_params_file):
+def generate_ukf_params(true_params_file, model_params_file):
     
     # Load parameters
     pklFile = open(true_params_file, 'rb')
@@ -1014,12 +1017,184 @@ def generate_model_params(true_params_file, model_params_file):
     return
 
 
+def generate_mmae_params(true_params_file, orbit_file, model_params_file):
+    
+    # Load parameters
+    pklFile = open(true_params_file, 'rb')
+    data = pickle.load(pklFile)
+    spacecraftConfig = data[0]
+    forcesCoeff = data[1]
+    surfaces = data[2]
+    eop_alldata = data[3]
+    XYs_df = data[4]
+    pklFile.close()
+    
+    
+    # Initial covariance
+    Po = np.diag([1., 1., 1., 1e-6, 1e-6, 1e-6])  # km^2 and km^2/s^2
+    
+    
+    # Perturb initial state
+    pert_vect = np.multiply(np.sqrt(np.diag(Po)), np.random.randn(6,))
+    print(pert_vect)
+    
+    # Parameter setup
+    model_bank = {}
+    
+    ###########################################################################
+    # Sphere LAMR Big
+    ###########################################################################
+    
+    model_id = 'sphere_lamr_big'
+    model_bank[model_id] = {}
+    model_bank[model_id]['weight'] = 0.25    
+    
+    # Basic Parameters
+    mass = 100.     # kg
+    radius = 1./np.sqrt(pi)    # m,  gives area = 1 m^2
+    
+    spacecraftConfig, forcesCoeff, surfaces = \
+        parameter_setup_sphere(orbit_file, obj_id, mass, radius)
+
+    # Integration function
+    spacecraftConfig['intfcn'] = ode_twobody_j2_drag_srp_ukf
+    
+    # Covariance, initial state, process noise
+    spacecraftConfig['covar'] = Po
+    
+    print(spacecraftConfig['X'])
+    spacecraftConfig['X'] += \
+        pert_vect.reshape(spacecraftConfig['X'].shape)
+    
+    # Alter additional parameters as needed        
+    forcesCoeff['Q'] = np.eye(3) * 1e-12
+    
+    model_bank[model_id]['spacecraftConfig'] = spacecraftConfig
+    model_bank[model_id]['forcesCoeff'] = forcesCoeff
+    model_bank[model_id]['surfaces'] = surfaces
+    
+    ###########################################################################
+    # Sphere MAMR Big
+    ###########################################################################
+    
+    model_id = 'sphere_mamr_big'
+    model_bank[model_id] = {}
+    model_bank[model_id]['weight'] = 0.25    
+    
+    # Basic Parameters
+    mass = 10.     # kg
+    radius = 1./np.sqrt(pi)    # m,  gives area = 1 m^2
+    
+    spacecraftConfig, forcesCoeff, surfaces = \
+        parameter_setup_sphere(orbit_file, obj_id, mass, radius)
+
+    # Integration function
+    spacecraftConfig['intfcn'] = ode_twobody_j2_drag_srp_ukf
+    
+    # Covariance, initial state, process noise
+    spacecraftConfig['covar'] = Po
+    
+    print(spacecraftConfig['X'])
+    spacecraftConfig['X'] += \
+        pert_vect.reshape(spacecraftConfig['X'].shape)
+    
+    # Alter additional parameters as needed        
+    forcesCoeff['Q'] = np.eye(3) * 1e-12
+    
+    model_bank[model_id]['spacecraftConfig'] = spacecraftConfig
+    model_bank[model_id]['forcesCoeff'] = forcesCoeff
+    model_bank[model_id]['surfaces'] = surfaces
+    
+    ###########################################################################
+    # Sphere LAMR Small
+    ###########################################################################
+    
+    model_id = 'sphere_lamr_small'
+    model_bank[model_id] = {}
+    model_bank[model_id]['weight'] = 0.25    
+    
+    # Basic Parameters
+    mass = 1.     # kg
+    radius = 0.1/np.sqrt(pi)    # m,  gives area = 0.01 m^2
+    
+    spacecraftConfig, forcesCoeff, surfaces = \
+        parameter_setup_sphere(orbit_file, obj_id, mass, radius)
+
+    # Integration function
+    spacecraftConfig['intfcn'] = ode_twobody_j2_drag_srp_ukf
+    
+    # Covariance, initial state, process noise
+    spacecraftConfig['covar'] = Po
+    
+    print(spacecraftConfig['X'])
+    spacecraftConfig['X'] += \
+        pert_vect.reshape(spacecraftConfig['X'].shape)
+    
+    # Alter additional parameters as needed        
+    forcesCoeff['Q'] = np.eye(3) * 1e-12
+    
+    model_bank[model_id]['spacecraftConfig'] = spacecraftConfig
+    model_bank[model_id]['forcesCoeff'] = forcesCoeff
+    model_bank[model_id]['surfaces'] = surfaces
+    
+    ###########################################################################
+    # Sphere MAMR Big
+    ###########################################################################
+    
+    model_id = 'sphere_mamr_small'
+    model_bank[model_id] = {}
+    model_bank[model_id]['weight'] = 0.25    
+    
+    # Basic Parameters
+    # Parameter setup
+    mass = 0.1     # kg
+    radius = 0.1/np.sqrt(pi)    # m,  gives area = 0.01 m^2
+    
+    spacecraftConfig, forcesCoeff, surfaces = \
+        parameter_setup_sphere(orbit_file, obj_id, mass, radius)
+
+    # Integration function
+    spacecraftConfig['intfcn'] = ode_twobody_j2_drag_srp_ukf
+    
+    # Covariance, initial state, process noise
+    spacecraftConfig['covar'] = Po
+    
+    print(spacecraftConfig['X'])
+    spacecraftConfig['X'] += \
+        pert_vect.reshape(spacecraftConfig['X'].shape)
+    
+    # Alter additional parameters as needed        
+    forcesCoeff['Q'] = np.eye(3) * 1e-12
+    
+    model_bank[model_id]['spacecraftConfig'] = spacecraftConfig
+    model_bank[model_id]['forcesCoeff'] = forcesCoeff
+    model_bank[model_id]['surfaces'] = surfaces
+    
+    
+    
+    # Save data
+    pklFile = open( model_params_file, 'wb' )
+    pickle.dump( [model_bank, eop_alldata, XYs_df], pklFile, -1 )
+    pklFile.close()
+    
+    
+    
+    return
+        
+
+
 def run_filter(model_params_file, sensor_file, meas_file, filter_output_file,
                ephemeris, ts, alpha=1e-4):
     
+#    filter_output = \
+#        unscented_kalman_filter(model_params_file, sensor_file, meas_file,
+#                                ephemeris, ts, alpha)
+        
+    
+    method = 'mmae'
     filter_output = \
-        unscented_kalman_filter(model_params_file, sensor_file, meas_file,
-                                ephemeris, ts, alpha)
+        multiple_model_filter(model_params_file, sensor_file, meas_file,
+                              ephemeris, ts, method, alpha)
         
     
     # Save data
@@ -1064,10 +1239,13 @@ if __name__ == '__main__':
     fname = 'leo_' + object_type + '_2018_07_12_model_params.pkl'
     model_params_file = datadir / fname
     
-    fname = 'leo_' + object_type + '_2018_07_12_filter_output.pkl'
+    fname = 'leo_sphere_mmae_2018_07_12_model_params.pkl'
+    mmae_params_file = datadir / fname
+    
+    fname = 'leo_sphere_mmae_2018_07_12_filter_output.pkl'
     filter_output_file = datadir / fname
     
-    fname = 'leo_' + object_type + '_2018_07_12_filter_error.pkl'
+    fname = 'leo_sphere_mmae_2018_07_12_filter_error.pkl'
     error_file = datadir / fname
     
     
@@ -1102,15 +1280,18 @@ if __name__ == '__main__':
     # Generate model parameters file
 #    generate_model_params(true_params_file, model_params_file)
     
-    
+    generate_mmae_params(true_params_file, init_orbit_file, mmae_params_file)
     
     # Run filter
-#    run_filter(model_params_file, sensor_file, meas_file, filter_output_file,
-#               ephemeris, ts, alpha=1.)
-#    
+    run_filter(mmae_params_file, sensor_file, meas_file, filter_output_file,
+               ephemeris, ts, alpha=1.)
+    
+    
+    
+    
     # Compute and plot errors
-    compute_ukf_errors(filter_output_file, truth_file, error_file)
-    plot_ukf_errors(error_file)
+    compute_mmae_errors(filter_output_file, truth_file, error_file)
+    plot_mmae_errors(error_file)
     
     
     

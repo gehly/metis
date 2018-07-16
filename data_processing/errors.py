@@ -1,6 +1,7 @@
 import numpy as np
 from math import pi
 import matplotlib.pyplot as plt
+from matplotlib.pyplot import cm
 import pickle
 from datetime import datetime
 from pathlib import Path
@@ -9,6 +10,7 @@ import sys
 sys.path.append('../')
 
 from utilities.attitude import quat2dcm, dcm2euler321
+from utilities.time_systems import jd2dt
 
 
 def compute_ukf_errors(filter_output_file, truth_file, error_file):
@@ -61,6 +63,84 @@ def compute_ukf_errors(filter_output_file, truth_file, error_file):
     # Save data
     pklFile = open( error_file, 'wb' )
     pickle.dump( [t_hrs, Xerr, sigs, resids], pklFile, -1 )
+    pklFile.close()
+
+    
+    return
+
+
+def compute_mmae_errors(filter_output_file, truth_file, error_file):
+    
+    # Load filter output
+    pklFile = open(filter_output_file, 'rb')
+    data = pickle.load(pklFile)
+    filter_output = data[0]
+    pklFile.close()
+    
+    # Load truth data
+    pklFile = open(truth_file, 'rb')
+    data = pickle.load(pklFile)
+    truth_time = data[0]
+    skyfield_time = data[1]
+    state = data[2]
+    pklFile.close()
+    
+    # Times
+    filter_JD = sorted(filter_output.keys())
+    filter_time = [jd2dt(JD) for JD in filter_JD]
+#    truth_time = [proptime2datetime(ti) for ti in sol_time]
+    
+    extracted_model0 = filter_output[filter_JD[0]]['extracted_model']
+    model_bank0 = filter_output[filter_JD[0]]['model_bank']
+    model_id_list = sorted(list(model_bank0.keys()))
+    
+    # Error output
+    L = len(filter_time)
+    m = len(model_bank0)
+    n = len(extracted_model0['est_means'])
+    t_hrs = np.zeros(L,)
+    Xerr = np.zeros((n,L))
+    sigs = np.zeros((n,L))
+    model_weights = np.zeros((m,L))
+    resids = np.zeros((3,L-1))
+    for ii in range(L):
+        
+        # Retrieve filter state
+        ti = filter_time[ii]
+        extracted_model = filter_output[filter_JD[ii]]['extracted_model']
+        Xest = extracted_model['est_means']
+        P = extracted_model['est_covars']
+        t_hrs[ii] = (ti - truth_time[0]).total_seconds()/3600.
+        
+        # Retrieve true state
+        check_inds = [abs((true - ti).total_seconds()) for true in truth_time]
+        ind = check_inds.index(min(check_inds))
+        Xtrue = state[ind,:].reshape(n,1)
+        
+        # Compute errors
+        Xerr[:,ii] = (Xest - Xtrue).flatten()
+        sigs[:,ii] = np.sqrt(np.diag(P))
+        
+        # Compute model weights
+        model_bank = filter_output[filter_JD[ii]]['model_bank']
+        jj = 0
+        wmax = 0.
+        for model_id in model_id_list:
+            wj = float(model_bank[model_id]['weight'])
+            model_weights[jj,ii] = wj
+            jj += 1
+            
+            if ii == 0:
+                continue
+            
+            resids_ii = model_bank[model_id]['resids']
+            if wj > wmax:
+                resids[:,ii-1] = resids_ii.flatten()
+
+    # Save data
+    pklFile = open( error_file, 'wb' )
+    pickle.dump([t_hrs, Xerr, sigs, resids, model_weights, model_id_list], 
+                pklFile, -1 )
     pklFile.close()
 
     
@@ -132,6 +212,89 @@ def plot_ukf_errors(error_file):
     plt.ylabel('Apparent Mag')
     plt.xlabel('Time [hours]')
     
+    plt.show()
+    
+    return
+
+
+def plot_mmae_errors(error_file):
+    
+    plt.close('all')
+    
+    # Load filter output
+    pklFile = open(error_file, 'rb')
+    data = pickle.load(pklFile)
+    t_hrs = data[0]
+    Xerr = data[1]
+    sigs = data[2]
+    resids = data[3]
+    model_weights = data[4]
+    model_id_list = data[5]
+    pklFile.close()    
+    
+    
+    plt.figure()
+    plt.subplot(3,1,1)
+    plt.plot(t_hrs, Xerr[0,:], 'k.')
+    plt.plot(t_hrs, 3*sigs[0,:], 'k--')
+    plt.plot(t_hrs, -3*sigs[0,:], 'k--')
+    plt.ylabel('X Error [km]')    
+    plt.title('Position Errors')
+    plt.subplot(3,1,2)
+    plt.plot(t_hrs, Xerr[1,:], 'k.')
+    plt.plot(t_hrs, 3*sigs[1,:], 'k--')
+    plt.plot(t_hrs, -3*sigs[1,:], 'k--')
+    plt.ylabel('Y Error [km]')
+    plt.subplot(3,1,3)
+    plt.plot(t_hrs, Xerr[2,:], 'k.')
+    plt.plot(t_hrs, 3*sigs[2,:], 'k--')
+    plt.plot(t_hrs, -3*sigs[2,:], 'k--')
+    plt.ylabel('Z Error [km]')
+    plt.xlabel('Time [hours]')
+    
+    plt.figure()
+    plt.subplot(3,1,1)
+    plt.plot(t_hrs, Xerr[3,:], 'k.')
+    plt.plot(t_hrs, 3*sigs[3,:], 'k--')
+    plt.plot(t_hrs, -3*sigs[3,:], 'k--')
+    plt.ylabel('dX Error [m/s]')    
+    plt.title('Velocity Errors')
+    plt.subplot(3,1,2)
+    plt.plot(t_hrs, Xerr[4,:], 'k.')
+    plt.plot(t_hrs, 3*sigs[4,:], 'k--')
+    plt.plot(t_hrs, -3*sigs[4,:], 'k--')
+    plt.ylabel('dY Error [m/s]')
+    plt.subplot(3,1,3)
+    plt.plot(t_hrs, Xerr[5,:], 'k.')
+    plt.plot(t_hrs, 3*sigs[5,:], 'k--')
+    plt.plot(t_hrs, -3*sigs[5,:], 'k--')
+    plt.ylabel('dZ Error [m/s]')
+    plt.xlabel('Time [hours]')
+    
+    plt.figure()
+    plt.subplot(3,1,1)
+    plt.plot(t_hrs[1:], resids[0,:]*3600., 'k.')
+    plt.ylabel('Right Asc [arcsec]')    
+    plt.title('Post-fit Residuals')
+    plt.subplot(3,1,2)
+    plt.plot(t_hrs[1:], resids[1,:]*3600., 'k.')
+    plt.ylabel('Declination [arcsec]')
+    plt.subplot(3,1,3)
+    plt.plot(t_hrs[1:], resids[2,:], 'k.')
+    plt.ylabel('Apparent Mag')
+    plt.xlabel('Time [hours]')
+    
+    
+    plt.figure()
+    n = len(model_id_list)
+    color=iter(cm.rainbow(np.linspace(0,1,n)))
+    for ii in range(n):
+        c=next(color)
+        plt.plot(t_hrs, model_weights[ii,:], '-.', c=c)
+    
+    plt.xlabel('Time [hours]')
+    plt.ylabel('Model Weights')
+    plt.legend(model_id_list)
     plt.show()
     
     return
