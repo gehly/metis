@@ -13,7 +13,7 @@ import sys
 
 
 
-def propagate_orbit(spacecraftConfig, forcesCoeff, surfaces, ephemeris,
+def propagate_orbit(spacecraftConfig, forcesCoeff, surfaces, eop_alldata,
                     ndays, dt, ode_flag=True):
 
     # Integrator 
@@ -31,7 +31,8 @@ def propagate_orbit(spacecraftConfig, forcesCoeff, surfaces, ephemeris,
 
         solver = ode(intfcn)
         solver.set_integrator(integrator, atol=int_tol, rtol=int_tol)
-        solver.set_f_params([spacecraftConfig, forcesCoeff, surfaces])
+        solver.set_f_params([spacecraftConfig, forcesCoeff, surfaces,
+                             eop_alldata])
         
         solver.set_initial_value(y0, tvec[0])
         state = np.zeros((len(tvec), len(y0)))

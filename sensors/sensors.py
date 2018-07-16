@@ -24,7 +24,7 @@ def define_sensors():
     az_lim = [0., 2.*pi]  # rad
     el_lim = [10.*pi/180., pi/2.]  # rad
     rg_lim = [0., 1e6]   # km
-    mapp_lim = 16.5
+    mapp_lim = 90.
     moon_angle_lim = 0.32  # rad
     sun_el_mask = -10.*pi/180.  # rad
     

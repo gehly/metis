@@ -38,6 +38,8 @@ from propagation.integration_functions import int_euler_dynamics_notorque
 from propagation.integration_functions import int_twobody_6dof_notorque
 from propagation.integration_functions import ode_twobody
 from propagation.integration_functions import ode_twobody_ukf
+from propagation.integration_functions import ode_twobody_j2_drag_srp
+from propagation.integration_functions import ode_twobody_j2_drag_srp_ukf
 from propagation.integration_functions import ode_twobody_6dof_notorque
 from propagation.integration_functions import ode_twobody_6dof_notorque_ukf
 from propagation.propagation_functions import propagate_orbit
@@ -84,7 +86,7 @@ def parameter_setup_sphere(orbit_file, obj_id, mass, radius):
     spacecraftConfig['radius'] = radius * 0.001 # km
     spacecraftConfig['time'] = UTC  # UTC in datetime
     spacecraftConfig['brdf_function'] = lambertian_sphere
-    spacecraftConfig['intfcn'] = ode_twobody
+    spacecraftConfig['intfcn'] = ode_twobody_j2_drag_srp
     spacecraftConfig['integrator'] = 'dop853'
     spacecraftConfig['X'] = np.concatenate((pos, vel))  # km, GCRF
     
@@ -105,11 +107,11 @@ def parameter_setup_sphere(orbit_file, obj_id, mass, radius):
     forcesCoeff['degree'] = degree
     forcesCoeff['dragCoeff'] = dragCoeff
     forcesCoeff['emissivity'] = emissivity
-    forcesCoeff['solar_flux'] = 1367. * 1e6  # w/km^2
+    forcesCoeff['solar_flux'] = 1367.  # w/m^2
 
     # Measurement Model Parameters
     brdfCoeff = {}
-    brdfCoeff['cSunVis'] = 455. * 1e6 # W/km^2
+    brdfCoeff['cSunVis'] = 455. # W/m^2
     brdfCoeff['d'] = 1.
     brdfCoeff['rho'] = 0.75
     brdfCoeff['s'] = 1 - brdfCoeff['d']
@@ -222,11 +224,11 @@ def parameter_setup_cubesat(orbit_file, obj_id, mass, attitude, dim):
     forcesCoeff['degree'] = degree
     forcesCoeff['dragCoeff'] = dragCoeff
     forcesCoeff['emissivity'] = emissivity
-    forcesCoeff['solar_flux'] = 1367. * 1e6  # w/km^2
+    forcesCoeff['solar_flux'] = 1367.  # w/m^2
 
     # Measurement Model Parameters
     brdfCoeff = {}
-    brdfCoeff['cSunVis'] = 455 * 1e6  #W/km^2
+    brdfCoeff['cSunVis'] = 455  #W/m^2
     brdfCoeff['d'] = 0.5
     brdfCoeff['rho'] = 0.75
     brdfCoeff['s'] = 1. - brdfCoeff['d']
@@ -425,11 +427,11 @@ def parameter_setup_boxwing(orbit_file, obj_id, mass, attitude, dim, mpanel,
     forcesCoeff['degree'] = degree
     forcesCoeff['dragCoeff'] = dragCoeff
     forcesCoeff['emissivity'] = emissivity
-    forcesCoeff['solar_flux'] = 1367. * 1e6  # w/km^2
+    forcesCoeff['solar_flux'] = 1367. # W/m^2
 
     # Measurement Model Parameters
     brdfCoeff = {}
-    brdfCoeff['cSunVis'] = 455 * 1e6  #W/km^2
+    brdfCoeff['cSunVis'] = 455.  #W/m^2
     brdfCoeff['d'] = 0.5
     brdfCoeff['rho'] = 0.75
     brdfCoeff['s'] = 1. - brdfCoeff['d']
@@ -672,10 +674,11 @@ def generate_truth_file(true_params_file, truth_file, ephemeris, ts, ndays, dt):
     spacecraftConfig = data[0]
     forcesCoeff = data[1]
     surfaces = data[2]
+    eop_alldata = data[3]
     pklFile.close()
     
     UTC_times, state = propagate_orbit(spacecraftConfig, forcesCoeff,
-                                       surfaces, ephemeris, ndays, dt)
+                                       surfaces, eop_alldata, ndays, dt)
     
     sec_array = [(UTC - UTC_times[0]).total_seconds() for UTC in UTC_times]
     
@@ -957,7 +960,7 @@ def generate_model_params(true_params_file, model_params_file):
     if spacecraftConfig['type'] == '3DoF':
         
         # Integration function
-        spacecraftConfig['intfcn'] = ode_twobody_ukf
+        spacecraftConfig['intfcn'] = ode_twobody_j2_drag_srp_ukf
         
         # Initial covariance
         Po = np.diag([1., 1., 1., 1e-6, 1e-6, 1e-6])  # km^2 and km^2/s^2
@@ -971,7 +974,7 @@ def generate_model_params(true_params_file, model_params_file):
             pert_vect.reshape(spacecraftConfig['X'].shape)
         
         # Alter additional parameters as needed        
-        forcesCoeff['Q'] = np.eye(3) * 1e-10
+        forcesCoeff['Q'] = np.eye(3) * 1e-12
 
     # Non-spherical case
     else:
@@ -1033,12 +1036,12 @@ def run_filter(model_params_file, sensor_file, meas_file, filter_output_file,
 
 if __name__ == '__main__':
     
-    # General parameters
+#     General parameters
     obj_id = 25042
 #    obj_id = 29495
 #    UTC = datetime(2018, 7, 12, 12, 0, 0) 
     UTC = datetime(2018, 7, 12, 9, 0, 0)
-    object_type = 'cubesat_tumble'
+    object_type = 'sphere_lamr_big'
     
     # Data directory
     datadir = Path('C:/Users/Steve/Documents/data/multiple_model/'
@@ -1082,17 +1085,17 @@ if __name__ == '__main__':
 #    generate_sensor_file(sensor_file)
 
     # Generate true params file
-    generate_true_params_file(init_orbit_file, obj_id, object_type, true_params_file)
+#    generate_true_params_file(init_orbit_file, obj_id, object_type, true_params_file)
     
     
     # Generate truth trajectory and measurements file
-    ndays = 7.
+    ndays = 3.
     dt = 10.
     
 #    generate_truth_file(true_params_file, truth_file, ephemeris, ts, ndays, dt)
     
 #    # Generate noisy measurements file
-    ndays = 0.5
+    ndays = 3.
 #    generate_noisy_meas(true_params_file, truth_file, sensor_file, meas_file,
 #                        ephemeris, ndays)
     
@@ -1102,12 +1105,12 @@ if __name__ == '__main__':
     
     
     # Run filter
-#    run_filter(model_prisarams_file, sensor_file, meas_file, filter_output_file,
+#    run_filter(model_params_file, sensor_file, meas_file, filter_output_file,
 #               ephemeris, ts, alpha=1.)
-    
+#    
     # Compute and plot errors
-#    compute_ukf_errors(filter_output_file, truth_file, error_file)
-#    plot_ukf_errors(error_file)
+    compute_ukf_errors(filter_output_file, truth_file, error_file)
+    plot_ukf_errors(error_file)
     
     
     
