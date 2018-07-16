@@ -9,7 +9,8 @@ import sys
 
 sys.path.append('../')
 
-from utilities.attitude import quat2dcm, dcm2euler321
+from utilities.attitude import quat2dcm, dcm2euler321, dcm2euler123
+from utilities.coordinate_systems import ric2eci, lvlh2ric
 from utilities.time_systems import jd2dt
 
 
@@ -38,11 +39,21 @@ def compute_ukf_errors(filter_output_file, truth_file, error_file):
     n = len(filter_output['X'][0])
     t_hrs = np.zeros(L,)
     Xerr = np.zeros((n,L))
-    sigs = np.zeros((n,L))
+    sigs = np.zeros((6,L))
     resids = np.zeros((3,L))
     resids[0,:] = [filter_output['resids'][ii][0] for ii in range(L)]
     resids[1,:] = [filter_output['resids'][ii][1] for ii in range(L)]
     resids[2,:] = [filter_output['resids'][ii][2] for ii in range(L)]
+    
+    roll = []
+    pitch = []
+    yaw = []
+    omega1 = []
+    omega2 = []
+    omega3 = []
+    qerr = np.zeros((4,L))
+    werr = np.zeros((3,L))
+    DCM_OL = lvlh2ric()
     for ii in range(L):
         
         # Retrieve filter state
@@ -58,6 +69,90 @@ def compute_ukf_errors(filter_output_file, truth_file, error_file):
         # Compute errors
         Xerr[:,ii] = (Xest - Xtrue).flatten()
         sigs[:,ii] = np.sqrt(np.diag(P))
+        
+        if n == 13:
+        
+            pos = Xest[0:3].reshape(3,1)
+            vel = Xest[3:6].reshape(3,1)
+            q_BN = Xest[6:10].reshape(4,1)
+            q_true = Xtrue[6:10].reshape(4,1)
+            DCM_BN= quat2dcm(q_BN)
+            DCM_NO = ric2eci(pos, vel)
+            DCM_BO = np.dot(DCM_BN, DCM_NO)
+            DCM_BL = np.dot(DCM_BO, DCM_OL)
+            
+            w_BN_B = Xest[10:13].reshape(3,1)
+            w_true = Xtrue[10:13].reshape(3,1)
+            w_ON_O = np.array([[0.], [0.], [np.linalg.norm(vel)/np.linalg.norm(pos)]])  # rad/s
+            w_LO_O = np.zeros((3,1))
+            w_LN_O = w_LO_O + w_ON_O
+            w_LN_B = np.dot(DCM_BO, w_LN_O)
+            w_BL_B = w_BN_B - w_LN_B
+            
+            r, p, y = dcm2euler123(DCM_BL)
+            
+            roll.append(r*180/pi)
+            pitch.append(p*180/pi)
+            yaw.append(y*180/pi)
+            
+            omega1.append(float(w_BL_B[0])*180/pi)
+            omega2.append(float(w_BL_B[1])*180/pi)
+            omega3.append(float(w_BL_B[2])*180/pi)
+    
+    if n == 13:    
+        plt.figure()
+        plt.subplot(3,1,1)
+        plt.plot(t_hrs, roll, 'k.')
+        plt.ylabel('Roll [deg]')    
+        plt.title('True Attitude')
+        plt.subplot(3,1,2)
+        plt.plot(t_hrs, pitch, 'k.')
+        plt.ylabel('Pitch [deg]')
+        plt.subplot(3,1,3)
+        plt.plot(t_hrs, yaw, 'k.')
+        plt.ylabel('Yaw [deg]')
+        plt.xlabel('Time [hours]')
+        
+        plt.figure()
+        plt.subplot(3,1,1)
+        plt.plot(t_hrs, omega1, 'k.')
+        plt.ylabel('Omega1 [deg/s]')    
+        plt.title('True Angular Velocity')
+        plt.subplot(3,1,2)
+        plt.plot(t_hrs, omega2, 'k.')
+        plt.ylabel('Omega2 [deg/s]')
+        plt.subplot(3,1,3)
+        plt.plot(t_hrs, omega3, 'k.')
+        plt.ylabel('Omega3 [deg/s]')
+        plt.xlabel('Time [hours]')
+        
+        plt.figure()
+        plt.subplot(4,1,1)
+        plt.plot(t_hrs, Xerr[6,:], 'k.')
+        plt.title('Quat Error')
+        plt.subplot(4,1,2)
+        plt.plot(t_hrs, Xerr[7,:], 'k.')
+        plt.subplot(4,1,3)
+        plt.plot(t_hrs, Xerr[8,:], 'k.')
+        plt.subplot(4,1,4)
+        plt.plot(t_hrs, Xerr[9,:], 'k.')
+        plt.xlabel('Time [hours]')
+        
+        plt.figure()
+        plt.subplot(3,1,1)
+        plt.plot(t_hrs, Xerr[10,:], 'k.')
+        plt.ylabel('wBN1 [deg/s]')    
+        plt.title('True Angular Velocity')
+        plt.subplot(3,1,2)
+        plt.plot(t_hrs, Xerr[11,:], 'k.')
+        plt.ylabel('wBN2 [deg/s]')
+        plt.subplot(3,1,3)
+        plt.plot(t_hrs, Xerr[12,:], 'k.')
+        plt.ylabel('wBN3 [deg/s]')
+        plt.xlabel('Time [hours]')
+        
+        
+        plt.show()
         
     
     # Save data
@@ -149,7 +244,7 @@ def compute_mmae_errors(filter_output_file, truth_file, error_file):
 
 def plot_ukf_errors(error_file):
     
-    plt.close('all')
+#    plt.close('all')
     
     # Load filter output
     pklFile = open(error_file, 'rb')

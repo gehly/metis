@@ -11,6 +11,8 @@ sys.path.append('../')
 
 from utilities.attitude import euler_dynamics
 from utilities.attitude import quat_derivative
+from utilities.attitude import quat_inverse
+from utilities.attitude import quat_rotate
 from utilities.constants import GM, Re, wE, J2, SF, c_light, AU_km
 from utilities.constants import stdatm_rho0, stdatm_ro, stdatm_H
 from utilities.eop_functions import get_eop_data
@@ -757,6 +759,394 @@ def ode_twobody_6dof_notorque_ukf(t, X, params):
         dX[qind:qind+4] = q_BN_dot.flatten()
         dX[wind:wind+3] = w_BN_dot.flatten() 
 
+    return dX
+
+
+def ode_twobody_j2_drag_srp_notorque(t, X, params):
+    '''
+    This function works with ode to propagate object assuming
+    simple two-body dynamics.  No perturbations included.
+
+    Parameters
+    ------
+    X : 6 element list
+      cartesian state vector (Inertial Frame)
+    t : m element list
+      vector of times when output is desired
+    args : tuple
+        additional arguments
+
+    Returns
+    ------
+    dX : 6 element list
+      state derivative vector
+    '''
+    
+    # Retrieve object parameters
+    spacecraftConfig = params[0]
+    forcesCoeff = params[1]
+    surfaces = params[2]
+
+    # State Vector
+    x = float(X[0])
+    y = float(X[1])
+    z = float(X[2])
+    dx = float(X[3])
+    dy = float(X[4])
+    dz = float(X[5])
+    
+    # Attitude states
+    q_BN = np.reshape(X[6:10], (4,1))
+    w_BN = np.reshape(X[10:13], (3,1))
+    q_NB = quat_inverse(q_BN)
+    
+    # Moment of inertia
+    I = spacecraftConfig['moi']
+    
+    # Torque vector
+    L = np.zeros((3,1))
+    
+    # Compute derivative vector
+    q_BN_dot = quat_derivative(q_BN, w_BN)
+    w_BN_dot = euler_dynamics(w_BN, I, L)
+    
+    # Full body parameters
+    mass = spacecraftConfig['mass']
+    Cd = forcesCoeff['dragCoeff']
+    emissivity = forcesCoeff['emissivity']
+    UTC0 = spacecraftConfig['time']
+    
+    # Current time
+    UTC = UTC0 + timedelta(seconds=t)
+
+    # Compute radius
+    r_vect = np.array([[x], [y], [z]])
+    r = np.linalg.norm(r_vect)
+
+    # Compute current solar position in ECI
+    TT_JD = utcdt2ttjd(UTC, 37.)
+    
+    # Compute TT in centuries since J2000 epoch
+    TT_cent = jd2cent(TT_JD)
+
+    # Convert to centuries and compute mean longitude of the sun
+    lam = 280.460 + 36000.771*TT_cent
+    lam = (lam % 360.) * pi/180.  # rad
+
+    # Compute mean anomaly of sun
+    M = 357.5277233 + 35999.05034*TT_cent
+    M = (M % 360.) * pi/180.  # rad
+
+    # Compute ecliptic long/lat
+    lam_ec = lam + (1.914666471*sin(M) + 0.019994643*sin(2.*M))*pi/180.  # rad
+
+    # Compute distance to sun in AU and obliquity of ecliptic plane
+    r_AU = 1.000140612 - 0.016708617*cos(M) - 0.000139589*cos(2.*M)  # AU
+    ep = (23.439291 - 0.0130042*TT_cent) * pi/180.
+
+    # Compute sun position vector in Mean Equator of Date (MOD) Frame
+    r_sun = r_AU*AU_km*np.array([[cos(lam_ec)], [cos(ep)*sin(lam_ec)],
+                                 [sin(ep)*sin(lam_ec)]])
+    rg_sun = np.linalg.norm(r_sun)
+
+    # Compute ra/dec of sun
+    dec = asin(sin(ep)*sin(lam_ec))
+    ra = atan2((cos(ep)*sin(lam_ec)/cos(dec)), (cos(lam_ec)/cos(dec)))
+
+    # Convert to ECI
+    sun_x = rg_sun*cos(dec)*cos(ra)
+    sun_y = rg_sun*cos(dec)*sin(ra)
+    sun_z = rg_sun*sin(dec)
+    sun_gcrf = np.array([[sun_x], [sun_y], [sun_z]])
+    
+    # Compute current position vector from sun
+    r_fromsun = r_vect - sun_gcrf
+    dsun = np.linalg.norm(r_fromsun)
+    u_sun = -r_fromsun/dsun
+    
+    # Compute drag component
+    # Find vector va of spacecraft relative to atmosphere
+    v_vect = np.array([[dx], [dy], [dz]])
+    w_vect = np.array([[0.], [0.], [wE]])
+    va_vect = v_vect - np.cross(w_vect, r_vect, axis=0)
+    va = np.linalg.norm(va_vect)
+    va_hat = va_vect/va
+    va_x = float(va_vect[0])
+    va_y = float(va_vect[1])
+    va_z = float(va_vect[2])
+    
+    # Compute total surface area perpendicular to atmosphere velocity
+    drag_area = 0.
+    a_srp = np.zeros((3,1))
+    for ii in surfaces:
+        area = surfaces[ii]['area']
+        norm_body_hat = surfaces[ii]['norm_body_hat']
+        norm_eci_hat = quat_rotate(q_NB, norm_body_hat)
+        va_dot = float(np.dot(va_hat.flatten(), norm_eci_hat.flatten()))        
+        if va_dot > 0:
+            drag_area += area*va_dot
+            
+        # check for eclipse
+        u_sat = r_vect/r
+        sun_angle = acos(np.dot(u_sun.flatten(), -u_sat.flatten()))
+        half_cone = asin(Re/r)
+        if sun_angle < half_cone:
+            continue
+            
+        d = surfaces[ii]['brdf_params']['d']
+        s = surfaces[ii]['brdf_params']['s']
+        rho = surfaces[ii]['brdf_params']['rho']
+        Fo = surfaces[ii]['brdf_params']['Fo']
+        
+        Rdiff = d*rho
+        Rspec = s*Fo
+        Rabs = 1. - Rdiff - Rspec
+    
+        sun_dot = float(np.dot(u_sun.flatten(), norm_eci_hat.flatten())) 
+        if sun_dot > 0.:
+            u_srp = 2.*((Rdiff/3.) + (Rabs*emissivity/3.) + Rspec*sun_dot) \
+                * norm_eci_hat + (1. - Rspec)*u_sun
+                
+            a_srp += -(SF*area*sun_dot**2./(mass*c_light*(dsun/AU_km)**2.)) * u_srp
+
+
+    x_srp = float(a_srp[0])
+    y_srp = float(a_srp[1])
+    z_srp = float(a_srp[2])
+    
+    A_m = drag_area/mass
+    drag = -0.5*A_m*Cd*stdatm_rho0*exp(-(r-stdatm_ro)/stdatm_H)
+
+    x_drag = drag*va*va_x
+    y_drag = drag*va*va_y
+    z_drag = drag*va*va_z
+
+    # Compute J2 component
+    x_j2 = - 1.5*J2*Re**2.*GM*((x/r**5.) - (5.*x*z**2./r**7.))
+    y_j2 = - 1.5*J2*Re**2.*GM*((y/r**5.) - (5.*y*z**2./r**7.))
+    z_j2 = - 1.5*J2*Re**2.*GM*((3.*z/r**5.) - (5.*z**3./r**7.)) 
+    
+    # Derivative vector
+    dX = [0.]*len(X)
+
+    dX[0] = dx
+    dX[1] = dy
+    dX[2] = dz
+    
+    dX[3] = -GM*x/r**3. + x_j2 + x_drag + x_srp
+    dX[4] = -GM*y/r**3. + y_j2 + y_drag + y_srp
+    dX[5] = -GM*z/r**3. + z_j2 + z_drag + z_srp
+    
+    dX[6:10] = q_BN_dot.flatten()
+    dX[10:13] = w_BN_dot.flatten() 
+    
+    
+    return dX
+
+
+def ode_twobody_j2_drag_srp_notorque_ukf(t, X, params):
+    '''
+    This function works with ode to propagate object assuming
+    simple two-body dynamics.  No perturbations included.
+
+    Parameters
+    ------
+    X : 6 element list
+      cartesian state vector (Inertial Frame)
+    t : m element list
+      vector of times when output is desired
+    args : tuple
+        additional arguments
+
+    Returns
+    ------
+    dX : 6 element list
+      state derivative vector
+    '''
+    
+    # Derivative vector
+    dX = [0.]*len(X)
+    
+    # Retrieve object parameters
+    spacecraftConfig = params[0]
+    forcesCoeff = params[1]
+    surfaces = params[2]
+    
+    # Attitude states
+    q_BN = np.reshape(X[6:10], (4,1))
+    w_BN = np.reshape(X[10:13], (3,1))
+    q_NB = quat_inverse(q_BN)
+    
+    # Moment of inertia
+    I = spacecraftConfig['moi']
+    
+    # Torque vector
+    L = np.zeros((3,1))
+    
+    # Compute derivative vector
+    q_BN_dot = quat_derivative(q_BN, w_BN)
+    w_BN_dot = euler_dynamics(w_BN, I, L)
+    
+    # Full body parameters
+    mass = spacecraftConfig['mass']
+    Cd = forcesCoeff['dragCoeff']
+    emissivity = forcesCoeff['emissivity']
+    UTC0 = spacecraftConfig['time']
+    
+    # Current time
+    UTC = UTC0 + timedelta(seconds=t)
+
+    # Compute current solar position in ECI
+    TT_JD = utcdt2ttjd(UTC, 37.)
+    
+    # Compute TT in centuries since J2000 epoch
+    TT_cent = jd2cent(TT_JD)
+
+    # Convert to centuries and compute mean longitude of the sun
+    lam = 280.460 + 36000.771*TT_cent
+    lam = (lam % 360.) * pi/180.  # rad
+
+    # Compute mean anomaly of sun
+    M = 357.5277233 + 35999.05034*TT_cent
+    M = (M % 360.) * pi/180.  # rad
+
+    # Compute ecliptic long/lat
+    lam_ec = lam + (1.914666471*sin(M) + 0.019994643*sin(2.*M))*pi/180.  # rad
+
+    # Compute distance to sun in AU and obliquity of ecliptic plane
+    r_AU = 1.000140612 - 0.016708617*cos(M) - 0.000139589*cos(2.*M)  # AU
+    ep = (23.439291 - 0.0130042*TT_cent) * pi/180.
+
+    # Compute sun position vector in Mean Equator of Date (MOD) Frame
+    r_sun = r_AU*AU_km*np.array([[cos(lam_ec)], [cos(ep)*sin(lam_ec)],
+                                 [sin(ep)*sin(lam_ec)]])
+    rg_sun = np.linalg.norm(r_sun)
+
+    # Compute ra/dec of sun
+    dec = asin(sin(ep)*sin(lam_ec))
+    ra = atan2((cos(ep)*sin(lam_ec)/cos(dec)), (cos(lam_ec)/cos(dec)))
+
+    # Convert to ECI
+    sun_x = rg_sun*cos(dec)*cos(ra)
+    sun_y = rg_sun*cos(dec)*sin(ra)
+    sun_z = rg_sun*sin(dec)
+    sun_gcrf = np.array([[sun_x], [sun_y], [sun_z]])
+    
+    # State Vector
+    for kk in range(13):
+        
+        if kk == 0:
+            x = float(X[0])
+            y = float(X[1])
+            z = float(X[2])
+            dx = float(X[3])
+            dy = float(X[4])
+            dz = float(X[5])
+            
+        else:
+            x = float(X[(kk-1)*6+13])
+            y = float(X[(kk-1)*6+14])
+            z = float(X[(kk-1)*6+15])
+            dx = float(X[(kk-1)*6+16])
+            dy = float(X[(kk-1)*6+17])
+            dz = float(X[(kk-1)*6+18])
+    
+        # Compute radius
+        r_vect = np.array([[x], [y], [z]])
+        r = np.linalg.norm(r_vect)
+        
+        # Compute current position vector from sun
+        r_fromsun = r_vect - sun_gcrf
+        dsun = np.linalg.norm(r_fromsun)
+        u_sun = -r_fromsun/dsun
+        
+        # Compute drag component
+        # Find vector va of spacecraft relative to atmosphere
+        v_vect = np.array([[dx], [dy], [dz]])
+        w_vect = np.array([[0.], [0.], [wE]])
+        va_vect = v_vect - np.cross(w_vect, r_vect, axis=0)
+        va = np.linalg.norm(va_vect)
+        va_hat = va_vect/va
+        va_x = float(va_vect[0])
+        va_y = float(va_vect[1])
+        va_z = float(va_vect[2])
+        
+        # Compute total surface area perpendicular to atmosphere velocity
+        drag_area = 0.
+        a_srp = np.zeros((3,1))
+        for ii in surfaces:
+            area = surfaces[ii]['area']
+            norm_body_hat = surfaces[ii]['norm_body_hat']
+            norm_eci_hat = quat_rotate(q_NB, norm_body_hat)
+            va_dot = float(np.dot(va_hat.flatten(), norm_eci_hat.flatten()))        
+            if va_dot > 0:
+                drag_area += area*va_dot
+                
+            # check for eclipse
+            u_sat = r_vect/r
+            sun_angle = acos(np.dot(u_sun.flatten(), -u_sat.flatten()))
+            half_cone = asin(Re/r)
+            if sun_angle < half_cone:
+                continue
+                
+            d = surfaces[ii]['brdf_params']['d']
+            s = surfaces[ii]['brdf_params']['s']
+            rho = surfaces[ii]['brdf_params']['rho']
+            Fo = surfaces[ii]['brdf_params']['Fo']
+            
+            Rdiff = d*rho
+            Rspec = s*Fo
+            Rabs = 1. - Rdiff - Rspec
+        
+            sun_dot = float(np.dot(u_sun.flatten(), norm_eci_hat.flatten())) 
+            if sun_dot > 0.:
+                u_srp = 2.*((Rdiff/3.) + (Rabs*emissivity/3.) + Rspec*sun_dot) \
+                    * norm_eci_hat + (1. - Rspec)*u_sun
+                    
+                a_srp += -(SF*area*sun_dot**2./(mass*c_light*(dsun/AU_km)**2.)) * u_srp
+    
+    
+        x_srp = float(a_srp[0])
+        y_srp = float(a_srp[1])
+        z_srp = float(a_srp[2])
+        
+        A_m = drag_area/mass
+        drag = -0.5*A_m*Cd*stdatm_rho0*exp(-(r-stdatm_ro)/stdatm_H)
+    
+        x_drag = drag*va*va_x
+        y_drag = drag*va*va_y
+        z_drag = drag*va*va_z
+    
+        # Compute J2 component
+        x_j2 = - 1.5*J2*Re**2.*GM*((x/r**5.) - (5.*x*z**2./r**7.))
+        y_j2 = - 1.5*J2*Re**2.*GM*((y/r**5.) - (5.*y*z**2./r**7.))
+        z_j2 = - 1.5*J2*Re**2.*GM*((3.*z/r**5.) - (5.*z**3./r**7.)) 
+    
+        
+        if kk == 0:
+            dX[0] = dx
+            dX[1] = dy
+            dX[2] = dz
+            
+            dX[3] = -GM*x/r**3. + x_j2 + x_drag + x_srp
+            dX[4] = -GM*y/r**3. + y_j2 + y_drag + y_srp
+            dX[5] = -GM*z/r**3. + z_j2 + z_drag + z_srp
+            
+            dX[6:10] = q_BN_dot.flatten()
+            dX[10:13] = w_BN_dot.flatten()
+            
+        else:            
+            dX[(kk-1)*6+13] = dx
+            dX[(kk-1)*6+14] = dy
+            dX[(kk-1)*6+15] = dz
+            
+            dX[(kk-1)*6+16] = -GM*x/r**3. + x_j2 + x_drag + x_srp
+            dX[(kk-1)*6+17] = -GM*y/r**3. + y_j2 + y_drag + y_srp
+            dX[(kk-1)*6+18] = -GM*z/r**3. + z_j2 + z_drag + z_srp
+            
+#    print(X[10:13])
+#    print(dX[10:13])
+    
     return dX
 
 

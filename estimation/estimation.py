@@ -103,6 +103,12 @@ def unscented_kalman_filter(model_params_file, sensor_file, meas_file,
             Xbar, Pbar = \
                 ukf_3dof_predictor(X, P, delta_t, n, alpha, 
                                    spacecraftConfig, forcesCoeff, surfaces)
+                
+        # Predictor
+        elif spacecraftConfig['type'] == '3att':
+            Xbar, Pbar = \
+                ukf_3att_predictor(X, P, delta_t, n, alpha, 
+                                   spacecraftConfig, forcesCoeff, surfaces)
         
         elif spacecraftConfig['type'] == '6DoF':
             Xbar, Pbar, qmean = \
@@ -126,6 +132,11 @@ def unscented_kalman_filter(model_params_file, sensor_file, meas_file,
         # Corrector
         if spacecraftConfig['type'] == '3DoF':
             X, P, beta = ukf_3dof_corrector(Xbar, Pbar, Yi, ti, n, alpha,
+                                            sun_gcrf, sensor, EOP_data, XYs_df,
+                                            spacecraftConfig, surfaces)
+            
+        elif spacecraftConfig['type'] == '3att':
+            X, P, beta = ukf_3att_corrector(Xbar, Pbar, Yi, ti, n, alpha,
                                             sun_gcrf, sensor, EOP_data, XYs_df,
                                             spacecraftConfig, surfaces)
             
@@ -314,6 +325,7 @@ def ukf_3dof_corrector(Xbar, Pbar, Yi, ti, n, alpha, sun_gcrf,
     P = np.dot(P1, np.dot(Pbar, P1.T)) + np.dot(K, np.dot(Rk, K.T))
     
     print('posterior')
+    print(Xbar)
     print(X)
     print(P)
     print(Ybar)
@@ -329,6 +341,191 @@ def ukf_3dof_corrector(Xbar, Pbar, Yi, ti, n, alpha, sun_gcrf,
     
     
     return X, P, beta
+
+
+
+
+
+def ukf_3att_predictor(X, P, delta_t, n, alpha, 
+                       spacecraftConfig, forcesCoeff, surfaces):
+    
+    # Integration parameters
+    int_tol = 1e-12
+    int_dt = 10.
+    intfcn = spacecraftConfig['intfcn']
+    integrator = spacecraftConfig['integrator']   
+    Q = forcesCoeff['Q']
+    
+    #Compute Weights
+    n = 6
+    beta = 2.
+    kappa = 3. - n
+    lam = alpha**2 * (n + kappa) - n
+    gam = np.sqrt(n + lam)
+
+    Wm = 1./(2.*(n + lam)) * np.ones((1,2*n))
+    Wm = list(Wm.flatten())
+    Wc = copy.copy(Wm)
+    Wm.insert(0,lam/(n + lam))
+    Wc.insert(0,lam/(n + lam) + (1 - alpha**2 + beta))
+    Wm = np.asarray(Wm)
+    diagWc = np.diag(Wc)    
+    
+    # Predictor step
+    # Compute sigma points for propagation
+    sqP = np.linalg.cholesky(P)
+    Xpv = X[0:6].reshape(6,1)
+    Xrep = np.tile(Xpv, (1, n))
+    chi = np.concatenate((Xrep+(gam*sqP), Xrep-(gam*sqP)), axis=1)
+    chi_v = np.reshape(chi, (n*(2*n), 1), order='F')    
+    chi_v = np.concatenate((X, chi_v), axis=0)
+
+    # Integrate chi
+    if delta_t == 0.:
+        intout = chi_v.T
+    else:
+        y0 = chi_v.flatten()
+        tvec = np.arange(0., delta_t+(0.1*int_dt), int_dt)
+        solver = ode(intfcn)
+        solver.set_integrator(integrator, atol=int_tol, rtol=int_tol)
+        solver.set_f_params([spacecraftConfig, forcesCoeff, surfaces])
+        
+        solver.set_initial_value(y0, tvec[0])
+        intout = np.zeros((len(tvec), len(y0)))
+        intout[0] = y0
+        
+        k = 1
+        while solver.successful() and solver.t < tvec[-1]:
+            solver.integrate(tvec[k])
+            intout[k] = solver.y
+            k += 1
+
+    # Extract values for later calculations
+    chi_v = intout[-1,:]
+    Xatt = chi_v[6:13].reshape(7,1)
+    chi_rep = chi_v[13:]
+    chi_bar = np.reshape(chi_rep, (n, 2*n), order='F')
+    pv_bar = chi_v[0:6].reshape(6,1)
+    chi_bar = np.concatenate((pv_bar, chi_bar), axis=1)
+
+    # Add process noise
+    Xbar = np.dot(chi_bar, Wm.T)
+    Xbar = np.reshape(Xbar, (6, 1))
+    chi_diff = chi_bar - np.dot(Xbar, np.ones((1, (2*n+1))))
+    if delta_t > 100.:
+        Pbar = np.dot(chi_diff, np.dot(diagWc, chi_diff.T))
+    else:
+        print('\n Process Noise')
+        Gamma1 = np.eye(3) * 0.5*delta_t**2.
+        Gamma2 = np.eye(3) * delta_t
+        Gamma = np.concatenate((Gamma1, Gamma2), axis=0)        
+        Pbar = np.dot(chi_diff, np.dot(diagWc, chi_diff.T)) + \
+            np.dot(Gamma, np.dot(Q, Gamma.T))
+
+    # Re-symmetric pos def
+    Pbar = 0.5 * (Pbar + Pbar.T)
+    
+#    print(Pbar)
+#    print(np.linalg.eig(Pbar))
+    
+    Xbar = np.concatenate((Xbar, Xatt), axis=0)
+    
+    
+    return Xbar, Pbar
+
+
+def ukf_3att_corrector(Xbar, Pbar, Yi, ti, n, alpha, sun_gcrf,
+                       sensor, EOP_data, XYs_df, spacecraftConfig, surfaces):
+    
+    
+    #Compute Weights
+    n = 6
+    beta = 2.
+    kappa = 3. - n
+    lam = alpha**2 * (n + kappa) - n
+    gam = np.sqrt(n + lam)
+
+    Wm = 1./(2.*(n + lam)) * np.ones((1,2*n))
+    Wm = list(Wm.flatten())
+    Wc = copy.copy(Wm)
+    Wm.insert(0,lam/(n + lam))
+    Wc.insert(0,lam/(n + lam) + (1 - alpha**2 + beta))
+    Wm = np.asarray(Wm)
+    diagWc = np.diag(Wc)  
+    
+    # Sensor parameters
+    meas_types = sensor['meas_types']
+    sigma_dict = sensor['sigma_dict']
+    p = len(meas_types)
+    
+    # Measurement noise
+    var = []
+    for mt in meas_types:
+        var.append(sigma_dict[mt]**2.)
+    Rk = np.diag(var)
+    
+    # Recompute sigma points to incorporate process noise
+    sqP = np.linalg.cholesky(Pbar)
+    Xpv = Xbar[0:6].reshape(6,1)
+    Xatt = Xbar[6:13].reshape(7,1)
+    Xrep = np.tile(Xpv, (1, n))
+    chi_bar = np.concatenate((Xpv, Xrep+(gam*sqP), Xrep-(gam*sqP)), axis=1) 
+    chi_diff = chi_bar - np.dot(Xpv, np.ones((1, (2*n+1))))
+    
+    
+    # Computed measurements    
+    meas_bar = np.zeros((p, 2*n+1))
+    for jj in range(chi_bar.shape[1]):
+        Xj = chi_bar[:,jj].reshape(6,1)
+        Xj_full = np.concatenate((Xj, Xatt), axis=0)
+        Yj = compute_measurement(Xj_full, sun_gcrf, sensor, spacecraftConfig,
+                                 surfaces, ti, EOP_data,
+                                 sensor['meas_types'], XYs_df)
+        meas_bar[:,jj] = Yj.flatten()
+    
+    Ybar = np.dot(meas_bar, Wm.T)
+    Ybar = np.reshape(Ybar, (p, 1))
+    Y_diff = meas_bar - np.dot(Ybar, np.ones((1, (2*n+1))))
+    Pyy = np.dot(Y_diff, np.dot(diagWc, Y_diff.T))
+    Pxy = np.dot(chi_diff,  np.dot(diagWc, Y_diff.T))
+
+    Pyy += Rk
+
+    # Measurement Update
+    K = np.dot(Pxy, np.linalg.inv(Pyy))
+    X = Xpv + np.dot(K, Yi-Ybar)
+    X = np.concatenate((X, Xatt), axis=0)
+    
+#        # Regular update
+#        P = Pbar - np.dot(K, np.dot(Pyy, K.T))
+#
+#        # Re-symmetric pos def
+#        P = 0.5 * (P + P.T)
+    
+    # Joseph Form
+    cholPbar = np.linalg.inv(np.linalg.cholesky(Pbar))
+    invPbar = np.dot(cholPbar.T, cholPbar)
+    P1 = (np.identity(6) - np.dot(np.dot(K, np.dot(Pyy, K.T)), invPbar))
+    P = np.dot(P1, np.dot(Pbar, P1.T)) + np.dot(K, np.dot(Rk, K.T))
+    
+    print('posterior')
+    print(Xbar)
+    print(X)
+    print(P)
+    print(Ybar)
+    print(Yi - Ybar)
+#        print(Pyy)
+#        print(Rk)
+#        print(Pxy)
+    
+
+#    # Gaussian Likelihood
+    beta = compute_gaussian(Yi, Ybar, Pyy)
+#    beta_list.append(beta)
+    
+    
+    return X, P, beta
+
 
 
 def ukf_6dof_predictor(X, P, delta_t, n, alpha, 

@@ -42,6 +42,8 @@ from propagation.integration_functions import ode_twobody_j2_drag_srp
 from propagation.integration_functions import ode_twobody_j2_drag_srp_ukf
 from propagation.integration_functions import ode_twobody_6dof_notorque
 from propagation.integration_functions import ode_twobody_6dof_notorque_ukf
+from propagation.integration_functions import ode_twobody_j2_drag_srp_notorque
+from propagation.integration_functions import ode_twobody_j2_drag_srp_notorque_ukf
 from propagation.propagation_functions import propagate_orbit
 from data_processing.errors import compute_ukf_errors
 from data_processing.errors import plot_ukf_errors
@@ -185,11 +187,11 @@ def parameter_setup_cubesat(orbit_file, obj_id, mass, attitude, dim):
     
     
     spacecraftConfig = {}
-    spacecraftConfig['type'] = '6DoF' # 6DoF or 3DoF
+    spacecraftConfig['type'] = '3att' # 6DoF or 3DoF
     spacecraftConfig['mass'] = mass  # kg
     spacecraftConfig['time'] = UTC  # UTC in datetime
     spacecraftConfig['brdf_function'] = ashikhmin_premoze
-    spacecraftConfig['intfcn'] = ode_twobody_6dof_notorque
+    spacecraftConfig['intfcn'] = ode_twobody_j2_drag_srp_notorque
     spacecraftConfig['integrator'] = 'dop853'
     spacecraftConfig['X'] = \
         np.concatenate((pos.flatten(), vel.flatten(), q_BN.flatten(),
@@ -366,7 +368,7 @@ def parameter_setup_boxwing(orbit_file, obj_id, mass, attitude, dim, mpanel,
     spacecraftConfig['mass'] = mass  # kg
     spacecraftConfig['time'] = UTC  # UTC in datetime
     spacecraftConfig['brdf_function'] = ashikhmin_premoze
-    spacecraftConfig['intfcn'] = ode_twobody_6dof_notorque
+    spacecraftConfig['intfcn'] = ode_twobody_j2_drag_srp_notorque
     spacecraftConfig['integrator'] = 'dop853'
     spacecraftConfig['X'] = \
         np.concatenate((pos.flatten(), vel.flatten(), q_BN.flatten(),
@@ -727,7 +729,7 @@ def generate_truth_file(true_params_file, truth_file, ephemeris, ts, ndays, dt):
     plt.xlabel('Time [hours]')
     
     
-    if spacecraftConfig['type'] == '6DoF':
+    if spacecraftConfig['type'] == '6DoF' or spacecraftConfig['type'] == '3att':
         
         roll = []
         pitch = []
@@ -978,6 +980,29 @@ def generate_ukf_params(true_params_file, model_params_file):
         
         # Alter additional parameters as needed        
         forcesCoeff['Q'] = np.eye(3) * 1e-12
+        
+    if spacecraftConfig['type'] == '3att':
+        
+        # Integration function
+        spacecraftConfig['intfcn'] = ode_twobody_j2_drag_srp_notorque_ukf
+        
+        # Initial covariance
+        Po = np.diag([1., 1., 1., 1e-6, 1e-6, 1e-6])  # km^2 and km^2/s^2
+        spacecraftConfig['covar'] = Po
+        
+        # Perturb initial state
+        pert_vect = np.multiply(np.sqrt(np.diag(Po)), np.random.randn(6,))
+        print(pert_vect)
+        print(spacecraftConfig['X'])
+        spacecraftConfig['X'][0:6] += \
+            pert_vect.flatten()
+        
+        print(spacecraftConfig['X'])
+        
+        
+        # Alter additional parameters as needed        
+        forcesCoeff['Q'] = np.eye(3) * 1e-10
+        
 
     # Non-spherical case
     else:
@@ -1186,15 +1211,15 @@ def generate_mmae_params(true_params_file, orbit_file, model_params_file):
 def run_filter(model_params_file, sensor_file, meas_file, filter_output_file,
                ephemeris, ts, alpha=1e-4):
     
-#    filter_output = \
-#        unscented_kalman_filter(model_params_file, sensor_file, meas_file,
-#                                ephemeris, ts, alpha)
+    filter_output = \
+        unscented_kalman_filter(model_params_file, sensor_file, meas_file,
+                                ephemeris, ts, alpha)
         
     
-    method = 'mmae'
-    filter_output = \
-        multiple_model_filter(model_params_file, sensor_file, meas_file,
-                              ephemeris, ts, method, alpha)
+#    method = 'mmae'
+#    filter_output = \
+#        multiple_model_filter(model_params_file, sensor_file, meas_file,
+#                              ephemeris, ts, method, alpha)
         
     
     # Save data
@@ -1216,7 +1241,7 @@ if __name__ == '__main__':
 #    obj_id = 29495
 #    UTC = datetime(2018, 7, 12, 12, 0, 0) 
     UTC = datetime(2018, 7, 12, 9, 0, 0)
-    object_type = 'sphere_lamr_big'
+    object_type = 'cubesat_nadir'
     
     # Data directory
     datadir = Path('C:/Users/Steve/Documents/data/multiple_model/'
@@ -1242,10 +1267,10 @@ if __name__ == '__main__':
     fname = 'leo_sphere_mmae_2018_07_12_model_params.pkl'
     mmae_params_file = datadir / fname
     
-    fname = 'leo_sphere_mmae_2018_07_12_filter_output.pkl'
+    fname = 'leo_' + object_type + '_2018_07_12_filter_output.pkl'
     filter_output_file = datadir / fname
     
-    fname = 'leo_sphere_mmae_2018_07_12_filter_error.pkl'
+    fname = 'leo_' + object_type + '_2018_07_12_filter_error.pkl'
     error_file = datadir / fname
     
     
@@ -1278,21 +1303,24 @@ if __name__ == '__main__':
 #                        ephemeris, ndays)
     
     # Generate model parameters file
-#    generate_model_params(true_params_file, model_params_file)
+#    generate_ukf_params(true_params_file, model_params_file)
     
-    generate_mmae_params(true_params_file, init_orbit_file, mmae_params_file)
+#    generate_mmae_params(true_params_file, init_orbit_file, mmae_params_file)
     
     # Run filter
-    run_filter(mmae_params_file, sensor_file, meas_file, filter_output_file,
-               ephemeris, ts, alpha=1.)
+#    run_filter(model_params_file, sensor_file, meas_file, filter_output_file,
+#               ephemeris, ts, alpha=1e-4)
     
     
     
     
     # Compute and plot errors
-    compute_mmae_errors(filter_output_file, truth_file, error_file)
-    plot_mmae_errors(error_file)
+#    compute_mmae_errors(filter_output_file, truth_file, error_file)
+#    plot_mmae_errors(error_file)
     
+    
+    compute_ukf_errors(filter_output_file, truth_file, error_file)
+    plot_ukf_errors(error_file)
     
     
     

@@ -77,7 +77,7 @@ def compute_measurement(X, sun_gcrf, sensor, spacecraftConfig, surfaces, UTC,
                 Y[ii] = mapp
                
                     
-            elif spacecraftConfig['type'] == '6DoF':
+            elif spacecraftConfig['type'] == '6DoF' or spacecraftConfig['type'] == '3att':
                 q_BI = X[6:10].reshape(4,1)                
                 mapp = compute_mapp(sat2sun, sat2obs, spacecraftConfig, surfaces, q_BI)                
                 Y[ii] = mapp
