@@ -120,6 +120,11 @@ def unscented_kalman_filter(model_params_file, sensor_file, meas_file,
             print(spacecraftConfig)
             break
         
+        print('\n\n Predictor Step')
+        print(ti)
+        print(Xbar)
+        print(Pbar)
+        
 
         # Skyfield time and sun position
         UTC_skyfield = ts.utc(ti.replace(tzinfo=utc))
@@ -149,6 +154,12 @@ def unscented_kalman_filter(model_params_file, sensor_file, meas_file,
             print('Spacecraft Type Error')
             print(spacecraftConfig)
             break
+        
+        print('\n\n Corrector Step')
+        print(ti)
+        print(X)
+        print(P)
+        print(beta)
         
         # Update with post-fit solution
         spacecraftConfig['time'] = ti     

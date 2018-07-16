@@ -193,6 +193,9 @@ def compute_mmae_errors(filter_output_file, truth_file, error_file):
     L = len(filter_time)
     m = len(model_bank0)
     n = len(extracted_model0['est_means'])
+    
+    print(extracted_model0)
+    
     t_hrs = np.zeros(L,)
     Xerr = np.zeros((n,L))
     sigs = np.zeros((n,L))
@@ -210,7 +213,7 @@ def compute_mmae_errors(filter_output_file, truth_file, error_file):
         # Retrieve true state
         check_inds = [abs((true - ti).total_seconds()) for true in truth_time]
         ind = check_inds.index(min(check_inds))
-        Xtrue = state[ind,:].reshape(n,1)
+        Xtrue = state[ind,0:6].reshape(n,1)
         
         # Compute errors
         Xerr[:,ii] = (Xest - Xtrue).flatten()

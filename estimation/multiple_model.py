@@ -8,8 +8,10 @@ from skyfield.api import utc
 sys.path.append('../')
 
 from estimation import ukf_3dof_predictor
+from estimation import ukf_3att_predictor
 from estimation import ukf_6dof_predictor
 from estimation import ukf_3dof_corrector
+from estimation import ukf_3att_corrector
 from estimation import ukf_6dof_corrector
 
 from utilities.time_systems import dt2jd
@@ -64,7 +66,7 @@ def multiple_model_filter(model_params_file, sensor_file, meas_file,
     P0 = model_bank[model_id0]['spacecraftConfig']['covar']
     extracted_model = {}
     extracted_model['est_weights'] = np.array([1.])
-    extracted_model['est_means'] = X0.copy()
+    extracted_model['est_means'] = np.reshape(X0[0:6], (6,1))
     extracted_model['est_covars'] = P0.copy()
     
     UTC_JD = dt2jd(t0)
@@ -163,6 +165,12 @@ def multiple_model_predictor(model_bank0, ti, alpha=1.):
             Xbar, Pbar = \
                 ukf_3dof_predictor(X, P, delta_t, n, alpha, 
                                    spacecraftConfig, forcesCoeff, surfaces)
+
+        elif spacecraftConfig['type'] == '3att':
+            Xbar, Pbar = \
+                ukf_3att_predictor(X, P, delta_t, n, alpha, 
+                                   spacecraftConfig, forcesCoeff, surfaces)
+                
         
         elif spacecraftConfig['type'] == '6DoF':
             Xbar, Pbar, qmean = \
@@ -173,6 +181,11 @@ def multiple_model_predictor(model_bank0, ti, alpha=1.):
             print('Spacecraft Type Error')
             print(spacecraftConfig)
             break
+        
+        print('\n\n Predictor Step')
+        print(ti)
+        print(Xbar)
+        print(Pbar)
     
         # Update output
         model_bank[model_id]['spacecraftConfig']['X'] = Xbar.copy()
@@ -205,6 +218,13 @@ def multiple_model_corrector(model_bank_in, Yi, ti, sun_gcrf, sensor, EOP_data,
                                             sun_gcrf, sensor, EOP_data, XYs_df,
                                             spacecraftConfig, surfaces)
             
+        
+        elif spacecraftConfig['type'] == '3att':
+            X, P, beta = ukf_3att_corrector(Xbar, Pbar, Yi, ti, n, alpha,
+                                            sun_gcrf, sensor, EOP_data, XYs_df,
+                                            spacecraftConfig, surfaces)
+            
+            
         elif spacecraftConfig['type'] == '6DoF':
             X, P, beta = ukf_6dof_corrector(Xbar, Pbar, qmean, Yi, ti, n, alpha,
                                             sun_gcrf, sensor, EOP_data, XYs_df,
@@ -214,6 +234,13 @@ def multiple_model_corrector(model_bank_in, Yi, ti, sun_gcrf, sensor, EOP_data,
             print('Spacecraft Type Error')
             print(spacecraftConfig)
             break
+        
+        
+        print('\n\n Corrector Step')
+        print(ti)
+        print(X)
+        print(P)
+        print(beta)
         
         # Compute post-fit residuals
         Ybar_post = compute_measurement(X, sun_gcrf, sensor, spacecraftConfig,
@@ -424,13 +451,14 @@ def merge_model_bank(model_bank):
 def merge_GMM_list(w_list, m_list, P_list):
     
     wbar = sum(w_list)
-    msum = sum([w_list[ii]*m_list[ii] for ii in range(len(w_list))])            
+    m_list2 = [np.reshape(m[0:6], (6,1)) for m in m_list]
+    msum = sum([w_list[ii]*m_list2[ii][0:6] for ii in range(len(w_list))])            
     mbar = (1./wbar) * msum
     
     Psum = np.zeros(P_list[0].shape)
     for ii in range(len(w_list)):
         wi = w_list[ii]
-        mi = m_list[ii]
+        mi = m_list2[ii]
         Pi = P_list[ii]
         
         Psum += wi*(Pi + np.dot((mbar-mi), (mbar-mi).T))
