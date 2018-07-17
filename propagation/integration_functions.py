@@ -888,6 +888,9 @@ def ode_twobody_j2_drag_srp_notorque(t, X, params):
             
         # check for eclipse
         u_sat = r_vect/r
+        if r < Re:
+            continue
+        
         sun_angle = acos(np.dot(u_sun.flatten(), -u_sat.flatten()))
         half_cone = asin(Re/r)
         if sun_angle < half_cone:
@@ -1082,8 +1085,11 @@ def ode_twobody_j2_drag_srp_notorque_ukf(t, X, params):
             if va_dot > 0:
                 drag_area += area*va_dot
                 
-            # check for eclipse
+            # Check for eclipse
             u_sat = r_vect/r
+            if r < Re:
+                continue
+            
             sun_angle = acos(np.dot(u_sun.flatten(), -u_sat.flatten()))
             half_cone = asin(Re/r)
             if sun_angle < half_cone:

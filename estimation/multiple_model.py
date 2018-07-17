@@ -20,7 +20,8 @@ from sensors.measurements import compute_measurement
 
 
 def multiple_model_filter(model_params_file, sensor_file, meas_file,
-                          ephemeris, ts, method='mmae', alpha=1.):
+                          filter_output_file, ephemeris, ts, method='mmae',
+                          alpha=1.):
     '''
     
     '''
@@ -123,6 +124,12 @@ def multiple_model_filter(model_params_file, sensor_file, meas_file,
         
 #        if ii > 3:
 #            mistake
+        
+        # Save data
+        pklFile = open( filter_output_file, 'wb' )
+        pickle.dump( [output_dict], pklFile, -1 )
+        pklFile.close()
+
         
     return output_dict
     
@@ -379,6 +386,19 @@ def estimate_extractor(model_bank, method='averaged'):
         extracted_model['est_weights'] = np.array([wbar])
         extracted_model['est_means'] = mbar.copy()
         extracted_model['est_covars'] = Pbar.copy()
+        
+        # Reset pos/vel states to average values
+        for model_id in model_bank:
+            X = model_bank[model_id]['spacecraftConfig']['X']
+            if len(X) > 6:
+                Xatt = X[6:13].reshape(7,1)
+                Xf = np.concatenate((mbar, Xatt), axis=0)
+            else:
+                Xf = mbar.copy()
+            
+            model_bank[model_id]['spacecraftConfig']['X'] = Xf.copy()
+            model_bank[model_id]['spacecraftConfig']['covar'] = Pbar.copy()
+            
         
     
     # Adaptive Likelihood Mixtures resets individual models with weighted 

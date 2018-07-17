@@ -1463,7 +1463,7 @@ def run_filter(model_params_file, sensor_file, meas_file, filter_output_file,
     method = 'mmae'
     filter_output = \
         multiple_model_filter(model_params_file, sensor_file, meas_file,
-                              ephemeris, ts, method, alpha)
+                              filter_output_file, ephemeris, ts, method, alpha)
         
     
     # Save data
@@ -1485,7 +1485,7 @@ if __name__ == '__main__':
 #    obj_id = 29495
 #    UTC = datetime(2018, 7, 12, 12, 0, 0) 
     UTC = datetime(2018, 7, 12, 9, 0, 0)
-    object_type = 'cubesat_nadir'
+    object_type = 'sphere_lamr_big'
     
     # Data directory
     datadir = Path('C:/Users/Steve/Documents/data/multiple_model/'
@@ -1508,13 +1508,13 @@ if __name__ == '__main__':
     fname = 'leo_' + object_type + '_2018_07_12_model_params.pkl'
     model_params_file = datadir / fname
     
-    fname = 'leo_cubesat_mmae_2018_07_12_model_params.pkl'
+    fname = 'leo_mmae_2018_07_12_model_params.pkl'
     mmae_params_file = datadir / fname
     
-    fname = 'leo_cubesat_mmae_2018_07_12_filter_output.pkl'
+    fname = 'leo_sphere_mmae_2018_07_12_filter_output.pkl'
     filter_output_file = datadir / fname
     
-    fname = 'leo_cubesat_mmae_2018_07_12_filter_error.pkl'
+    fname = 'leo_sphere_mmae_2018_07_12_filter_error.pkl'
     error_file = datadir / fname
     
     
@@ -1549,11 +1549,11 @@ if __name__ == '__main__':
     # Generate model parameters file
 #    generate_ukf_params(true_params_file, model_params_file)
     
-    generate_mmae_params(true_params_file, init_orbit_file, mmae_params_file)
+#    generate_mmae_params(true_params_file, init_orbit_file, mmae_params_file)
     
     # Run filter
-#    run_filter(mmae_params_file, sensor_file, meas_file, filter_output_file,
-#               ephemeris, ts, alpha=1e-4)
+    run_filter(mmae_params_file, sensor_file, meas_file, filter_output_file,
+               ephemeris, ts, alpha=1e-4)
     
     
     
