@@ -376,9 +376,8 @@ def estimate_extractor(model_bank, method='averaged'):
     
     extracted_model = {}
     
-    # Traditional MMAE uses weighted average as the best estimate
-    # Reference 1
-    if method == 'averaged' or method == 'mmae':
+    
+    if method == 'averaged':
         
         wbar, mbar, Pbar = merge_model_bank(model_bank)
 
@@ -399,6 +398,18 @@ def estimate_extractor(model_bank, method='averaged'):
             model_bank[model_id]['spacecraftConfig']['X'] = Xf.copy()
             model_bank[model_id]['spacecraftConfig']['covar'] = Pbar.copy()
             
+    
+    # Traditional MMAE uses weighted average as the best estimate
+    # Reference 1
+    elif method == 'mmae':
+            
+        wbar, mbar, Pbar = merge_model_bank(model_bank)
+
+        extracted_model = {}
+        extracted_model['est_weights'] = np.array([wbar])
+        extracted_model['est_means'] = mbar.copy()
+        extracted_model['est_covars'] = Pbar.copy()
+        
         
     
     # Adaptive Likelihood Mixtures resets individual models with weighted 

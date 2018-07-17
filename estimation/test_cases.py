@@ -1552,15 +1552,15 @@ if __name__ == '__main__':
 #    generate_mmae_params(true_params_file, init_orbit_file, mmae_params_file)
     
     # Run filter
-    run_filter(mmae_params_file, sensor_file, meas_file, filter_output_file,
-               ephemeris, ts, alpha=1e-4)
-    
+#    run_filter(mmae_params_file, sensor_file, meas_file, filter_output_file,
+#               ephemeris, ts, alpha=1e-4)
+#    
     
     
     
     # Compute and plot errors
-#    compute_mmae_errors(filter_output_file, truth_file, error_file)
-#    plot_mmae_errors(error_file)
+    compute_mmae_errors(filter_output_file, truth_file, error_file)
+    plot_mmae_errors(error_file)
     
     
 #    compute_ukf_errors(filter_output_file, truth_file, error_file)
