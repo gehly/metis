@@ -10,7 +10,7 @@ import sys
 sys.path.append('../')
 
 from utilities.attitude import quat2dcm, dcm2euler321, dcm2euler123
-from utilities.coordinate_systems import ric2eci, lvlh2ric
+from utilities.coordinate_systems import ric2eci, lvlh2ric, eci2ric
 from utilities.time_systems import jd2dt
 
 
@@ -197,8 +197,8 @@ def compute_mmae_errors(filter_output_file, truth_file, error_file):
     print(extracted_model0)
     
     t_hrs = np.zeros(L,)
-    Xerr = np.zeros((n,L))
-    sigs = np.zeros((n,L))
+    Xerr = np.zeros((n+3,L))
+    sigs = np.zeros((n+3,L))
     model_weights = np.zeros((m,L))
     resids = np.zeros((3,L-1))
     for ii in range(L):
@@ -216,8 +216,18 @@ def compute_mmae_errors(filter_output_file, truth_file, error_file):
         Xtrue = state[ind,0:6].reshape(n,1)
         
         # Compute errors
-        Xerr[:,ii] = (Xest - Xtrue).flatten()
-        sigs[:,ii] = np.sqrt(np.diag(P))
+        Xerr[0:6,ii] = (Xest - Xtrue).flatten()
+        sigs[0:6,ii] = np.sqrt(np.diag(P))
+        
+        # Compute RIC errors
+        r_vect = Xtrue[0:3].reshape(3,1)
+        v_vect = Xtrue[3:6].reshape(3,1)
+        pos_err = Xerr[0:3,ii].reshape(3,1)
+        P_pos = P[0:3,0:3]
+        ric_err = eci2ric(r_vect, v_vect, pos_err)
+        P_ric = eci2ric(r_vect, v_vect, P_pos)
+        Xerr[6:9,ii] = ric_err.flatten()
+        sigs[6:9,ii] = np.sqrt(np.diag(P_ric))
         
         # Compute model weights
         model_bank = filter_output[filter_JD[ii]]['model_bank']
@@ -371,6 +381,24 @@ def plot_mmae_errors(error_file):
     
     plt.figure()
     plt.subplot(3,1,1)
+    plt.plot(t_hrs, Xerr[6,:], 'k.')
+    plt.plot(t_hrs, 3*sigs[6,:], 'k--')
+    plt.plot(t_hrs, -3*sigs[6,:], 'k--')
+    plt.ylabel('Radial [km]')    
+    plt.subplot(3,1,2)
+    plt.plot(t_hrs, Xerr[7,:], 'k.')
+    plt.plot(t_hrs, 3*sigs[7,:], 'k--')
+    plt.plot(t_hrs, -3*sigs[7,:], 'k--')
+    plt.ylabel('In-Track [km]')
+    plt.subplot(3,1,3)
+    plt.plot(t_hrs, Xerr[8,:], 'k.')
+    plt.plot(t_hrs, 3*sigs[8,:], 'k--')
+    plt.plot(t_hrs, -3*sigs[8,:], 'k--')
+    plt.ylabel('Cross-Track [km]')
+    plt.xlabel('Time [hours]')
+    
+    plt.figure()
+    plt.subplot(3,1,1)
     plt.plot(t_hrs[1:], resids[0,:]*3600., 'k.')
     plt.ylabel('Right Asc [arcsec]')    
     plt.title('Post-fit Residuals')
@@ -383,16 +411,35 @@ def plot_mmae_errors(error_file):
     plt.xlabel('Time [hours]')
     
     
+    legend = ['Sphere LAMRB', 'Sphere MAMRB', 'Sphere LAMRS', 'Sphere MAMRS']
+#              'Cube Nadir', 'Cube Spin', 'Cube Tumble', 'BW Nadir', 'BW Spin',
+#              'BW Tumble']
+    
+    legend = sorted(legend)
+    print(legend)
+    print(model_id_list)
+    
+    cmap = plt.get_cmap('gnuplot')
+    colors = [cmap(i) for i in np.linspace(0, 1, 10)]
+    
+    colors[2] = 'c'
+    colors[3] = 'm'
+    colors[5] = 'g'
+    colors[6] = 'b'
+    colors[9] = 'r'
+    
     plt.figure()
     n = len(model_id_list)
-    color=iter(cm.rainbow(np.linspace(0,1,n)))
     for ii in range(n):
-        c=next(color)
-        plt.plot(t_hrs, model_weights[ii,:], '-.', c=c)
+        c=colors[ii]
+        plt.plot(t_hrs, model_weights[ii,:], 'o--', c=c, lw=3)
     
-    plt.xlabel('Time [hours]')
-    plt.ylabel('Model Weights')
-    plt.legend(model_id_list)
+    plt.xlabel('Time [hours]', fontsize=14)
+    plt.ylabel('Model Weights', fontsize=14)
+    plt.ylim([-0.1, 1.1])
+    plt.xlim([-5, 36])
+    plt.xticks([0, 5, 10, 15, 20, 25, 30, 35])
+    plt.legend(legend, loc='upper left')
     plt.show()
     
     return
@@ -532,11 +579,11 @@ if __name__ == '__main__':
    # General parameters
     obj_id = 25042
     UTC = datetime(2018, 7, 5, 0, 0, 0) 
-    object_type = 'cubesat_spin'
+    object_type = 'sphere_med'
     
     # Data directory
     datadir = Path('C:/Users/Steve/Documents/data/multiple_model/'
-                   '2018_07_05_leo')
+                   '2018_07_12_leo/sphere_med')
     
     # Filenames
     init_orbit_file = datadir / 'iridium39_orbit_2018_07_05.pkl'
@@ -545,7 +592,7 @@ if __name__ == '__main__':
     fname = 'leo_' + object_type + '_2018_07_05_true_params.pkl'
     true_params_file = datadir / fname
     
-    fname = 'leo_' + object_type + '_2018_07_05_truth.pkl'
+    fname = 'leo_' + object_type + '_2018_07_12_truth.pkl'
     truth_file = datadir / fname
     
     fname = 'leo_' + object_type + '_2018_07_05_meas.pkl'
@@ -554,18 +601,21 @@ if __name__ == '__main__':
     fname = 'leo_' + object_type + '_2018_07_05_model_params.pkl'
     model_params_file = datadir / fname
     
-    fname = 'leo_' + object_type + '_2018_07_05_filter_output.pkl'
+    fname = 'leo_sphere_med_mmae_2018_07_12_filter_output.pkl'
     filter_output_file = datadir / fname
     
-    fname = 'leo_' + object_type + '_2018_07_05_filter_error.pkl'
+    fname = 'leo_sphere_med_mmae_2018_07_12_filter_error.pkl'
     error_file = datadir / fname
     
     # Plot truth data
-    plot_truth(truth_file)
+#    plot_truth(truth_file)
     
     # Compute and plot errors
 #    compute_ukf_errors(filter_output_file, truth_file, error_file)
 #    plot_ukf_errors(error_file)
+    
+    compute_mmae_errors(filter_output_file, truth_file, error_file)
+    plot_mmae_errors(error_file)
     
     
 

@@ -592,6 +592,16 @@ def generate_true_params_file(orbit_file, obj_id, object_type, param_file):
         spacecraftConfig, forcesCoeff, surfaces = \
             parameter_setup_sphere(orbit_file, obj_id, mass, radius)
             
+    if object_type == 'sphere_med':
+        
+        # Parameter setup
+        mass = 10.     # kg
+        radius = 0.5/np.sqrt(pi)    # m,  gives area = 0.25 m^2
+        
+        spacecraftConfig, forcesCoeff, surfaces = \
+            parameter_setup_sphere(orbit_file, obj_id, mass, radius)       
+            
+            
     if object_type == 'cubesat_nadir':
         
         mass = 1.  # kg
@@ -1201,241 +1211,241 @@ def generate_mmae_params(true_params_file, orbit_file, model_params_file):
     model_bank[model_id]['forcesCoeff'] = forcesCoeff
     model_bank[model_id]['surfaces'] = surfaces
     
-    ###########################################################################
-    # Cubesat Nadir
-    ###########################################################################    
-    
-    model_id = 'cubesat_nadir'
-    model_bank[model_id] = {}
-    model_bank[model_id]['weight'] = 0.1
-    
-    mass = 1.  # kg
-    attitude = np.array([0., 0., 0., 0., 0., 0.])  # deg, deg/s
-    dim = np.array([0.3, 0.1, 0.1])  # m
-    
-    spacecraftConfig, forcesCoeff, surfaces = \
-        parameter_setup_cubesat(orbit_file, obj_id, mass, attitude, dim)
-    
-    # Integration function
-    spacecraftConfig['intfcn'] = ode_twobody_j2_drag_srp_notorque_ukf
-    
-    # Initial covariance
-    spacecraftConfig['covar'] = Po
-    
-    # Perturb initial state
-    print(pert_vect)
-    print(spacecraftConfig['X'])
-    spacecraftConfig['X'][0:6] += \
-        pert_vect.flatten()
-    
-    print(spacecraftConfig['X'])    
-    
-    # Alter additional parameters as needed        
-    forcesCoeff['Q'] = np.eye(3) * 1e-10
-    
-    
-    model_bank[model_id]['spacecraftConfig'] = spacecraftConfig
-    model_bank[model_id]['forcesCoeff'] = forcesCoeff
-    model_bank[model_id]['surfaces'] = surfaces
-    
-    
-    ###########################################################################
-    # Cubesat Spin
-    ###########################################################################    
-    
-    model_id = 'cubesat_spin'
-    model_bank[model_id] = {}
-    model_bank[model_id]['weight'] = 0.1
-    
-    mass = 1.  # kg
-    attitude = np.array([0., 0., 0., 0., 1., 0.])  # deg, deg/s
-    dim = np.array([0.3, 0.1, 0.1])  # m
-    
-    spacecraftConfig, forcesCoeff, surfaces = \
-        parameter_setup_cubesat(orbit_file, obj_id, mass, attitude, dim)
-    
-    # Integration function
-    spacecraftConfig['intfcn'] = ode_twobody_j2_drag_srp_notorque_ukf
-    
-    # Initial covariance
-    spacecraftConfig['covar'] = Po
-    
-    # Perturb initial state
-    print(pert_vect)
-    print(spacecraftConfig['X'])
-    spacecraftConfig['X'][0:6] += \
-        pert_vect.flatten()
-    
-    print(spacecraftConfig['X'])    
-    
-    # Alter additional parameters as needed        
-    forcesCoeff['Q'] = np.eye(3) * 1e-10
-    
-    
-    model_bank[model_id]['spacecraftConfig'] = spacecraftConfig
-    model_bank[model_id]['forcesCoeff'] = forcesCoeff
-    model_bank[model_id]['surfaces'] = surfaces
-    
-    
-    ###########################################################################
-    # Cubesat Tumble
-    ###########################################################################    
-    
-    model_id = 'cubesat_tumble'
-    model_bank[model_id] = {}
-    model_bank[model_id]['weight'] = 0.1
-    
-    mass = 1.  # kg
-    attitude = np.array([0., 0., 0., 1., 1., 1.])  # deg, deg/s
-    dim = np.array([0.3, 0.1, 0.1])  # m
-    
-    spacecraftConfig, forcesCoeff, surfaces = \
-        parameter_setup_cubesat(orbit_file, obj_id, mass, attitude, dim)
-    
-    # Integration function
-    spacecraftConfig['intfcn'] = ode_twobody_j2_drag_srp_notorque_ukf
-    
-    # Initial covariance
-    spacecraftConfig['covar'] = Po
-    
-    # Perturb initial state
-    print(pert_vect)
-    print(spacecraftConfig['X'])
-    spacecraftConfig['X'][0:6] += \
-        pert_vect.flatten()
-    
-    print(spacecraftConfig['X'])    
-    
-    # Alter additional parameters as needed        
-    forcesCoeff['Q'] = np.eye(3) * 1e-10
-    
-    
-    model_bank[model_id]['spacecraftConfig'] = spacecraftConfig
-    model_bank[model_id]['forcesCoeff'] = forcesCoeff
-    model_bank[model_id]['surfaces'] = surfaces
-    
-    
-    ###########################################################################
-    # Boxwing Nadir
-    ###########################################################################    
-    
-    model_id = 'boxwing_nadir'
-    model_bank[model_id] = {}
-    model_bank[model_id]['weight'] = 0.1
-    
-    mass = 200.  # kg
-    mpanel = 5.  # kg
-    attitude = np.array([0., 0., 0., 0., 0., 0.])  # deg, deg/s
-    dim = np.array([1.0, 1.0, 1.0])  # m
-    paneldim = np.array([0.02, 1.0, 0.5])
-    
-    spacecraftConfig, forcesCoeff, surfaces = \
-        parameter_setup_boxwing(orbit_file, obj_id, mass, attitude, dim,
-                                mpanel, paneldim)
-    
-    # Integration function
-    spacecraftConfig['intfcn'] = ode_twobody_j2_drag_srp_notorque_ukf
-    
-    # Initial covariance
-    spacecraftConfig['covar'] = Po
-    
-    # Perturb initial state
-    print(pert_vect)
-    print(spacecraftConfig['X'])
-    spacecraftConfig['X'][0:6] += \
-        pert_vect.flatten()
-    
-    print(spacecraftConfig['X'])    
-    
-    # Alter additional parameters as needed        
-    forcesCoeff['Q'] = np.eye(3) * 1e-10
-    
-    
-    model_bank[model_id]['spacecraftConfig'] = spacecraftConfig
-    model_bank[model_id]['forcesCoeff'] = forcesCoeff
-    model_bank[model_id]['surfaces'] = surfaces
-    
-    
-    ###########################################################################
-    # Boxwing Spin
-    ###########################################################################    
-    
-    model_id = 'boxwing_spin'
-    model_bank[model_id] = {}
-    model_bank[model_id]['weight'] = 0.1
-    
-    mass = 200.  # kg
-    mpanel = 5.  # kg
-    attitude = np.array([0., 0., 0., 0., 1., 0.])  # deg, deg/s
-    dim = np.array([1.0, 1.0, 1.0])  # m
-    paneldim = np.array([0.02, 1.0, 0.5])
-    
-    spacecraftConfig, forcesCoeff, surfaces = \
-        parameter_setup_boxwing(orbit_file, obj_id, mass, attitude, dim,
-                                mpanel, paneldim)
-    
-    # Integration function
-    spacecraftConfig['intfcn'] = ode_twobody_j2_drag_srp_notorque_ukf
-    
-    # Initial covariance
-    spacecraftConfig['covar'] = Po
-    
-    # Perturb initial state
-    print(pert_vect)
-    print(spacecraftConfig['X'])
-    spacecraftConfig['X'][0:6] += \
-        pert_vect.flatten()
-    
-    print(spacecraftConfig['X'])    
-    
-    # Alter additional parameters as needed        
-    forcesCoeff['Q'] = np.eye(3) * 1e-10
-    
-    
-    model_bank[model_id]['spacecraftConfig'] = spacecraftConfig
-    model_bank[model_id]['forcesCoeff'] = forcesCoeff
-    model_bank[model_id]['surfaces'] = surfaces
-    
-            
-   ###########################################################################
-    # Boxwing Tumble
-    ###########################################################################    
-    
-    model_id = 'boxwing_tumble'
-    model_bank[model_id] = {}
-    model_bank[model_id]['weight'] = 0.1
-    
-    mass = 200.  # kg
-    mpanel = 5.  # kg
-    attitude = np.array([0., 0., 0., 1., 1., 1.])  # deg, deg/s
-    dim = np.array([1.0, 1.0, 1.0])  # m
-    paneldim = np.array([0.02, 1.0, 0.5])
-    
-    spacecraftConfig, forcesCoeff, surfaces = \
-        parameter_setup_boxwing(orbit_file, obj_id, mass, attitude, dim,
-                                mpanel, paneldim)
-    
-    # Integration function
-    spacecraftConfig['intfcn'] = ode_twobody_j2_drag_srp_notorque_ukf
-    
-    # Initial covariance
-    spacecraftConfig['covar'] = Po
-    
-    # Perturb initial state
-    print(pert_vect)
-    print(spacecraftConfig['X'])
-    spacecraftConfig['X'][0:6] += \
-        pert_vect.flatten()
-    
-    print(spacecraftConfig['X'])    
-    
-    # Alter additional parameters as needed        
-    forcesCoeff['Q'] = np.eye(3) * 1e-10
-    
-    
-    model_bank[model_id]['spacecraftConfig'] = spacecraftConfig
-    model_bank[model_id]['forcesCoeff'] = forcesCoeff
-    model_bank[model_id]['surfaces'] = surfaces
+#    ###########################################################################
+#    # Cubesat Nadir
+#    ###########################################################################    
+#    
+#    model_id = 'cubesat_nadir'
+#    model_bank[model_id] = {}
+#    model_bank[model_id]['weight'] = 0.1
+#    
+#    mass = 1.  # kg
+#    attitude = np.array([0., 0., 0., 0., 0., 0.])  # deg, deg/s
+#    dim = np.array([0.3, 0.1, 0.1])  # m
+#    
+#    spacecraftConfig, forcesCoeff, surfaces = \
+#        parameter_setup_cubesat(orbit_file, obj_id, mass, attitude, dim)
+#    
+#    # Integration function
+#    spacecraftConfig['intfcn'] = ode_twobody_j2_drag_srp_notorque_ukf
+#    
+#    # Initial covariance
+#    spacecraftConfig['covar'] = Po
+#    
+#    # Perturb initial state
+#    print(pert_vect)
+#    print(spacecraftConfig['X'])
+#    spacecraftConfig['X'][0:6] += \
+#        pert_vect.flatten()
+#    
+#    print(spacecraftConfig['X'])    
+#    
+#    # Alter additional parameters as needed        
+#    forcesCoeff['Q'] = np.eye(3) * 1e-10
+#    
+#    
+#    model_bank[model_id]['spacecraftConfig'] = spacecraftConfig
+#    model_bank[model_id]['forcesCoeff'] = forcesCoeff
+#    model_bank[model_id]['surfaces'] = surfaces
+#    
+#    
+#    ###########################################################################
+#    # Cubesat Spin
+#    ###########################################################################    
+#    
+#    model_id = 'cubesat_spin'
+#    model_bank[model_id] = {}
+#    model_bank[model_id]['weight'] = 0.1
+#    
+#    mass = 1.  # kg
+#    attitude = np.array([0., 0., 0., 0., 1., 0.])  # deg, deg/s
+#    dim = np.array([0.3, 0.1, 0.1])  # m
+#    
+#    spacecraftConfig, forcesCoeff, surfaces = \
+#        parameter_setup_cubesat(orbit_file, obj_id, mass, attitude, dim)
+#    
+#    # Integration function
+#    spacecraftConfig['intfcn'] = ode_twobody_j2_drag_srp_notorque_ukf
+#    
+#    # Initial covariance
+#    spacecraftConfig['covar'] = Po
+#    
+#    # Perturb initial state
+#    print(pert_vect)
+#    print(spacecraftConfig['X'])
+#    spacecraftConfig['X'][0:6] += \
+#        pert_vect.flatten()
+#    
+#    print(spacecraftConfig['X'])    
+#    
+#    # Alter additional parameters as needed        
+#    forcesCoeff['Q'] = np.eye(3) * 1e-10
+#    
+#    
+#    model_bank[model_id]['spacecraftConfig'] = spacecraftConfig
+#    model_bank[model_id]['forcesCoeff'] = forcesCoeff
+#    model_bank[model_id]['surfaces'] = surfaces
+#    
+#    
+#    ###########################################################################
+#    # Cubesat Tumble
+#    ###########################################################################    
+#    
+#    model_id = 'cubesat_tumble'
+#    model_bank[model_id] = {}
+#    model_bank[model_id]['weight'] = 0.1
+#    
+#    mass = 1.  # kg
+#    attitude = np.array([0., 0., 0., 1., 1., 1.])  # deg, deg/s
+#    dim = np.array([0.3, 0.1, 0.1])  # m
+#    
+#    spacecraftConfig, forcesCoeff, surfaces = \
+#        parameter_setup_cubesat(orbit_file, obj_id, mass, attitude, dim)
+#    
+#    # Integration function
+#    spacecraftConfig['intfcn'] = ode_twobody_j2_drag_srp_notorque_ukf
+#    
+#    # Initial covariance
+#    spacecraftConfig['covar'] = Po
+#    
+#    # Perturb initial state
+#    print(pert_vect)
+#    print(spacecraftConfig['X'])
+#    spacecraftConfig['X'][0:6] += \
+#        pert_vect.flatten()
+#    
+#    print(spacecraftConfig['X'])    
+#    
+#    # Alter additional parameters as needed        
+#    forcesCoeff['Q'] = np.eye(3) * 1e-10
+#    
+#    
+#    model_bank[model_id]['spacecraftConfig'] = spacecraftConfig
+#    model_bank[model_id]['forcesCoeff'] = forcesCoeff
+#    model_bank[model_id]['surfaces'] = surfaces
+#    
+#    
+#    ###########################################################################
+#    # Boxwing Nadir
+#    ###########################################################################    
+#    
+#    model_id = 'boxwing_nadir'
+#    model_bank[model_id] = {}
+#    model_bank[model_id]['weight'] = 0.1
+#    
+#    mass = 200.  # kg
+#    mpanel = 5.  # kg
+#    attitude = np.array([0., 0., 0., 0., 0., 0.])  # deg, deg/s
+#    dim = np.array([1.0, 1.0, 1.0])  # m
+#    paneldim = np.array([0.02, 1.0, 0.5])
+#    
+#    spacecraftConfig, forcesCoeff, surfaces = \
+#        parameter_setup_boxwing(orbit_file, obj_id, mass, attitude, dim,
+#                                mpanel, paneldim)
+#    
+#    # Integration function
+#    spacecraftConfig['intfcn'] = ode_twobody_j2_drag_srp_notorque_ukf
+#    
+#    # Initial covariance
+#    spacecraftConfig['covar'] = Po
+#    
+#    # Perturb initial state
+#    print(pert_vect)
+#    print(spacecraftConfig['X'])
+#    spacecraftConfig['X'][0:6] += \
+#        pert_vect.flatten()
+#    
+#    print(spacecraftConfig['X'])    
+#    
+#    # Alter additional parameters as needed        
+#    forcesCoeff['Q'] = np.eye(3) * 1e-10
+#    
+#    
+#    model_bank[model_id]['spacecraftConfig'] = spacecraftConfig
+#    model_bank[model_id]['forcesCoeff'] = forcesCoeff
+#    model_bank[model_id]['surfaces'] = surfaces
+#    
+#    
+#    ###########################################################################
+#    # Boxwing Spin
+#    ###########################################################################    
+#    
+#    model_id = 'boxwing_spin'
+#    model_bank[model_id] = {}
+#    model_bank[model_id]['weight'] = 0.1
+#    
+#    mass = 200.  # kg
+#    mpanel = 5.  # kg
+#    attitude = np.array([0., 0., 0., 0., 1., 0.])  # deg, deg/s
+#    dim = np.array([1.0, 1.0, 1.0])  # m
+#    paneldim = np.array([0.02, 1.0, 0.5])
+#    
+#    spacecraftConfig, forcesCoeff, surfaces = \
+#        parameter_setup_boxwing(orbit_file, obj_id, mass, attitude, dim,
+#                                mpanel, paneldim)
+#    
+#    # Integration function
+#    spacecraftConfig['intfcn'] = ode_twobody_j2_drag_srp_notorque_ukf
+#    
+#    # Initial covariance
+#    spacecraftConfig['covar'] = Po
+#    
+#    # Perturb initial state
+#    print(pert_vect)
+#    print(spacecraftConfig['X'])
+#    spacecraftConfig['X'][0:6] += \
+#        pert_vect.flatten()
+#    
+#    print(spacecraftConfig['X'])    
+#    
+#    # Alter additional parameters as needed        
+#    forcesCoeff['Q'] = np.eye(3) * 1e-10
+#    
+#    
+#    model_bank[model_id]['spacecraftConfig'] = spacecraftConfig
+#    model_bank[model_id]['forcesCoeff'] = forcesCoeff
+#    model_bank[model_id]['surfaces'] = surfaces
+#    
+#            
+#   ###########################################################################
+#    # Boxwing Tumble
+#    ###########################################################################    
+#    
+#    model_id = 'boxwing_tumble'
+#    model_bank[model_id] = {}
+#    model_bank[model_id]['weight'] = 0.1
+#    
+#    mass = 200.  # kg
+#    mpanel = 5.  # kg
+#    attitude = np.array([0., 0., 0., 1., 1., 1.])  # deg, deg/s
+#    dim = np.array([1.0, 1.0, 1.0])  # m
+#    paneldim = np.array([0.02, 1.0, 0.5])
+#    
+#    spacecraftConfig, forcesCoeff, surfaces = \
+#        parameter_setup_boxwing(orbit_file, obj_id, mass, attitude, dim,
+#                                mpanel, paneldim)
+#    
+#    # Integration function
+#    spacecraftConfig['intfcn'] = ode_twobody_j2_drag_srp_notorque_ukf
+#    
+#    # Initial covariance
+#    spacecraftConfig['covar'] = Po
+#    
+#    # Perturb initial state
+#    print(pert_vect)
+#    print(spacecraftConfig['X'])
+#    spacecraftConfig['X'][0:6] += \
+#        pert_vect.flatten()
+#    
+#    print(spacecraftConfig['X'])    
+#    
+#    # Alter additional parameters as needed        
+#    forcesCoeff['Q'] = np.eye(3) * 1e-10
+#    
+#    
+#    model_bank[model_id]['spacecraftConfig'] = spacecraftConfig
+#    model_bank[model_id]['forcesCoeff'] = forcesCoeff
+#    model_bank[model_id]['surfaces'] = surfaces
             
 
     
@@ -1485,7 +1495,7 @@ if __name__ == '__main__':
 #    obj_id = 29495
 #    UTC = datetime(2018, 7, 12, 12, 0, 0) 
     UTC = datetime(2018, 7, 12, 9, 0, 0)
-    object_type = 'sphere_lamr_big'
+    object_type = 'sphere_med'
     
     # Data directory
     datadir = Path('C:/Users/Steve/Documents/data/multiple_model/'
@@ -1508,13 +1518,13 @@ if __name__ == '__main__':
     fname = 'leo_' + object_type + '_2018_07_12_model_params.pkl'
     model_params_file = datadir / fname
     
-    fname = 'leo_mmae_2018_07_12_model_params.pkl'
+    fname = 'leo_sphere_med_mmae_2018_07_12_model_params.pkl'
     mmae_params_file = datadir / fname
     
-    fname = 'leo_sphere_mmae_2018_07_12_filter_output.pkl'
+    fname = 'leo_sphere_med_mmae_2018_07_12_filter_output.pkl'
     filter_output_file = datadir / fname
     
-    fname = 'leo_sphere_mmae_2018_07_12_filter_error.pkl'
+    fname = 'leo_sphere_med_mmae_2018_07_12_filter_error.pkl'
     error_file = datadir / fname
     
     
@@ -1559,8 +1569,8 @@ if __name__ == '__main__':
     
     
     # Compute and plot errors
-    compute_mmae_errors(filter_output_file, truth_file, error_file)
-    plot_mmae_errors(error_file)
+#    compute_mmae_errors(filter_output_file, truth_file, error_file)
+#    plot_mmae_errors(error_file)
     
     
 #    compute_ukf_errors(filter_output_file, truth_file, error_file)
