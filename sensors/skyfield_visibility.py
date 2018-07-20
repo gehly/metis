@@ -4,15 +4,13 @@ import os
 import sys
 import csv
 
-cwd = os.getcwd()
-metis_dir = cwd[0:-10]
-sys.path.append(metis_dir)
+sys.path.append('../')
 
 from skyfield.constants import ERAD
 from skyfield.api import Topos, EarthSatellite, Loader
 
-from sensors.sensors import define_sensors
-from tle_functions import get_spacetrack_tle_data
+from sensors import define_sensors
+from utilities.tle_functions import get_spacetrack_tle_data
 
 
 def define_RSOs(obj_id_list):
@@ -581,6 +579,8 @@ if __name__ == '__main__':
     ndays = 6
     dt = 10  # sec    
     UTC_now = ts.now().utc
+    print(UTC_now)
+    mistake
     sec_array = list(range(0,86400*ndays,dt))
     UTC_array = ts.utc(UTC_now[0], UTC_now[1], UTC_now[2]+3, UTC_now[3],
                        UTC_now[4], sec_array)

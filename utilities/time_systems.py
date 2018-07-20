@@ -26,6 +26,30 @@ def dt2mjd(dt):
     return MJD
 
 
+def mjd2dt(MJD):
+    '''
+    This function converts a Modified Julian Date (MJD) to calendar datetime
+    object.  MJD is fractional days since 1858-11-17 00:00:00.  No conversion 
+    between time systems is performed.
+    
+    Parameters
+    ------
+    MJD : float
+        fractional days since 1858-11-17 00:00:00
+    
+    Returns
+    ------
+    dt : datetime object
+        time in calendar format
+        
+    '''
+    
+    MJD_datetime = datetime(1858, 11, 17, 0, 0, 0)
+    dt = MJD_datetime + timedelta(days=MJD)
+    
+    return dt
+
+
 def dt2jd(dt):
     '''
     This function converts a calendar time to Julian Date (JD) fractional days
@@ -48,6 +72,30 @@ def dt2jd(dt):
     JD = MJD + 2400000.5
     
     return JD
+
+
+def jd2dt(JD):
+    '''
+    This function converts from Julian Date (JD) fractional days
+    since 12:00:00 Jan 1 4713 BC to a calendar datetime object.  No conversion 
+    between time systems is performed.
+    
+    Parameters
+    ------
+    JD : float
+        fractional days since 12:00:00 Jan 1 4713 BC    
+    
+    Returns
+    ------
+    dt : datetime object
+        time in calendar format
+    
+    '''
+    
+    MJD = JD - 2400000.5
+    dt = mjd2dt(MJD)
+    
+    return dt
 
 
 def utcdt2maisec(UTC):

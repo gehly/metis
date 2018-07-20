@@ -3,9 +3,12 @@ from math import pi, sin, cos, modf
 import requests
 import pandas as pd
 import os
+import sys
 
-from time_systems import dt2mjd
-from numerical_methods import interp_lagrange
+sys.path.append('../')
+
+from utilities.time_systems import dt2mjd
+from utilities.numerical_methods import interp_lagrange
 
 ###############################################################################
 #
@@ -265,7 +268,15 @@ def get_nutation_data(TEME_flag=True):
     return IAU1980_nutation
 
 
-def init_XYs2006(TT1, TT2):
+def get_XYs2006_alldata():
+    
+    # Load data
+    XYs_df = pd.read_csv(os.path.join('../input_data', 'IAU2006_XYs.csv'))
+    
+    return XYs_df
+
+
+def init_XYs2006(TT1, TT2, XYs_df=[]):
     '''
     This loads the data file containing CIP coordinates, X and Y, as well as 
     the CIO locator, s. The data file is named IAU2006_XYs.csv.
@@ -297,9 +308,11 @@ def init_XYs2006(TT1, TT2):
     
     '''
     
-    # Load data
-    df = pd.read_csv(os.path.join('../input_data', 'IAU2006_XYs.csv'))
-    XYs_data = df.values
+    # Load data if needed
+    if len(XYs_df) == 0:        
+        XYs_df = pd.read_csv(os.path.join('../input_data', 'IAU2006_XYs.csv'))        
+        
+    XYs_alldata = XYs_df.values
     
     # Compute MJD and round to nearest whole day
     MJD1 = int(round(dt2mjd(TT1)))
@@ -309,7 +322,7 @@ def init_XYs2006(TT1, TT2):
     num = 10
     
     # Find rows
-    MJD_data = df['MJD (0h TT)'].tolist()
+    MJD_data = XYs_df['MJD (0h TT)'].tolist()
     
     if MJD1 < MJD_data[0]:
         print('Error: init_XYs2006 start date before first XYs time')
@@ -330,9 +343,9 @@ def init_XYs2006(TT1, TT2):
         row2 = MJD_data.index(MJD2) + num
         
     if row2 == -1:
-        XYs_data = XYs_data[row1:, :]
+        XYs_data = XYs_alldata[row1:, :]
     else:
-        XYs_data = XYs_data[row1:row2, :]
+        XYs_data = XYs_alldata[row1:row2, :]
     
     return XYs_data
 
