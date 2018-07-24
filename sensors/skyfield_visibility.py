@@ -13,7 +13,7 @@ from sensors import define_sensors
 from utilities.tle_functions import get_spacetrack_tle_data
 
 
-def define_RSOs(obj_id_list):
+def define_RSOs(obj_id_list, tle_dict={}):
     '''
     This function generates the resident space object (RSO) dictionary by 
     retrieving data about RSOs including recent position/velocity states
@@ -24,6 +24,9 @@ def define_RSOs(obj_id_list):
     ------
     obj_id_list : list
         object NORAD IDs (int)
+    tle_dict : dictionary, optional
+        Two Line Element information, indexed by object ID (default = empty)
+        If none provided, script will retrieve from space-track.org
     
     Returns
     ------
@@ -39,8 +42,10 @@ def define_RSOs(obj_id_list):
     # Include options here to import from space-track, celestrak, text file,
     # other URL, graph database, ...
     
-    # Download from space-track.org
-    tle_dict = get_spacetrack_tle_data(obj_id_list)    
+    if len(tle_dict) == 0:
+        
+        # Download from space-track.org
+        tle_dict = get_spacetrack_tle_data(obj_id_list)    
 
     # Retrieve TLE data and form RSO dictionary using skyfield
     for obj_id in obj_id_list:
@@ -64,7 +69,8 @@ def define_RSOs(obj_id_list):
 
 
 
-def compute_visible_passes(UTC_array, obj_id_list, sensor_id_list, ephemeris):
+def compute_visible_passes(UTC_array, obj_id_list, sensor_id_list, ephemeris,
+                           tle_dict={}):
     '''
     This function computes the visible passes for a given list of 
     resident space objects (RSOs) from one or more sensors. Output includes
@@ -97,7 +103,7 @@ def compute_visible_passes(UTC_array, obj_id_list, sensor_id_list, ephemeris):
     Re = ERAD/1000.   # km
     
     # Generate resident space object dictionary
-    rso_dict = define_RSOs(obj_id_list)
+    rso_dict = define_RSOs(obj_id_list, tle_dict)
     
     # Load sensor data
     # Include options here to load from file, URL, graph database, ...
@@ -324,57 +330,60 @@ def compute_pass(UTC_vis, rg_vis, el_vis, sensor):
     rg_min_list = []
     el_max_list = []
     
-    # Loop over times
-    rg_min = 1e12
-    el_max = -1.
-    ti_prior = UTC_vis[0]
-    start = UTC_vis[0]
-    stop = UTC_vis[0]
-    TCA = UTC_vis[0]
-    TME = UTC_vis[0]
-    for ii in range(len(UTC_vis)):
-        
-        ti = UTC_vis[ii]
-        rg_km = rg_vis[ii]
-        el_rad = el_vis[ii]
-        
-        # If current time is close to previous, pass continues
-        if (ti.tdb - ti_prior.tdb)*86400. < (max_gap+1.):
-
-            # Update pass stop time and JD_prior for next iteration
-            stop = ti
-            ti_prior = ti
+    # Only process if needed
+    if len(UTC_vis) > 0 :
+    
+        # Loop over times
+        rg_min = 1e12
+        el_max = -1.
+        ti_prior = UTC_vis[0]
+        start = UTC_vis[0]
+        stop = UTC_vis[0]
+        TCA = UTC_vis[0]
+        TME = UTC_vis[0]
+        for ii in range(len(UTC_vis)):
             
-            # Check if this is pass time of closest approach (TCA)
-            if rg_km < rg_min:
+            ti = UTC_vis[ii]
+            rg_km = rg_vis[ii]
+            el_rad = el_vis[ii]
+            
+            # If current time is close to previous, pass continues
+            if (ti.tdb - ti_prior.tdb)*86400. < (max_gap+1.):
+    
+                # Update pass stop time and JD_prior for next iteration
+                stop = ti
+                ti_prior = ti
+                
+                # Check if this is pass time of closest approach (TCA)
+                if rg_km < rg_min:
+                    TCA = ti
+                    rg_min = float(rg_km)
+                
+                # Check if this is pass time of maximum elevation (TME)
+                if el_rad > el_max:
+                    TME = ti
+                    el_max = float(el_rad)
+    
+            # If current time is far from previous or if we reached
+            # the end of UTC list, pass has ended
+            if ((ti.tdb - ti_prior.tdb)*86400. >= (max_gap+1.) or ii == (len(UTC_vis)-1)):
+                
+                # Store output
+                start_list.append(start)
+                stop_list.append(stop)
+                TCA_list.append(TCA)
+                TME_list.append(TME)
+                rg_min_list.append(rg_min)
+                el_max_list.append(el_max)
+                
+                # Reset for new pass next round
+                start = ti
                 TCA = ti
-                rg_min = float(rg_km)
-            
-            # Check if this is pass time of maximum elevation (TME)
-            if el_rad > el_max:
                 TME = ti
+                stop = ti
+                ti_prior = ti
+                rg_min = float(rg_km)
                 el_max = float(el_rad)
-
-        # If current time is far from previous or if we reached
-        # the end of UTC list, pass has ended
-        if ((ti.tdb - ti_prior.tdb)*86400. >= (max_gap+1.) or ii == (len(UTC_vis)-1)):
-            
-            # Store output
-            start_list.append(start)
-            stop_list.append(stop)
-            TCA_list.append(TCA)
-            TME_list.append(TME)
-            rg_min_list.append(rg_min)
-            el_max_list.append(el_max)
-            
-            # Reset for new pass next round
-            start = ti
-            TCA = ti
-            TME = ti
-            stop = ti
-            ti_prior = ti
-            rg_min = float(rg_km)
-            el_max = float(el_rad)
                         
     return start_list, stop_list, TCA_list, TME_list, rg_min_list, el_max_list
 
