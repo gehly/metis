@@ -1,11 +1,12 @@
 from math import pi
 import pickle
 
-def define_sensors():
+def define_sensors(sensor_id_list):
     
     # Initialize
     sensor_dict = {}
     
+    arcsec2rad = pi/(3600.*180.)
     
     # Falcon Telescopes
     # Common Parameters
@@ -31,8 +32,8 @@ def define_sensors():
     # Measurement types and noise
     meas_types = ['ra', 'dec', 'mapp']
     sigma_dict = {}
-    sigma_dict['ra'] = 5./206265.   # rad
-    sigma_dict['dec'] = 5./206265.  # rad
+    sigma_dict['ra'] = 5.*arcsec2rad   # rad
+    sigma_dict['dec'] = 5.*arcsec2rad  # rad
     sigma_dict['mapp'] = 0.1
     
     # Pass parameters
@@ -240,6 +241,135 @@ def define_sensors():
     sensor_dict['Perth Falcon']['min_pass'] = min_pass
     sensor_dict['Perth Falcon']['max_pass'] = max_pass
 
+
+
+    print('Stromlo Laser')
+    lat_gs = -35.31805
+    lon_gs = 149.00776
+    ht_gs = 0.742  # km
+    geodetic_latlonht = [lat_gs, lon_gs, ht_gs]
+    
+    # Constraints/Limits
+    az_lim = [0., 2.*pi]  # rad
+    el_lim = [20.*pi/180., 80.*pi/180.]  # rad
+    rg_lim = [0., 10000.]   # km
+    
+    # FOV dimensions
+    LAM_dim = 0.5   # deg
+    PHI_dim = 0.5   # deg
+    
+    # Convert to radians
+    LAM_half = 0.5*LAM_dim*pi/180
+    PHI_half = 0.5*PHI_dim*pi/180
+    FOV_hlim = [-LAM_half, LAM_half]
+    FOV_vlim = [-PHI_half, PHI_half]
+   
+    # Measurement types and noise
+    meas_types = ['rg', 'az', 'el']
+    sigma_dict = {}
+    sigma_dict['rg'] = 0.001  # km
+    sigma_dict['az'] = 5.*arcsec2rad   # rad
+    sigma_dict['el'] = 5.*arcsec2rad  # rad
+    
+    # Pass parameters
+    max_pass = 6000.
+    min_pass = 60.
+    max_gap = 60.
+    obs_gap = 1.
+    
+    # Location and constraints
+    sensor_dict['Stromlo Laser'] = {}
+    sensor_dict['Stromlo Laser']['geodetic_latlonht'] = geodetic_latlonht
+    sensor_dict['Stromlo Laser']['el_lim'] = el_lim
+    sensor_dict['Stromlo Laser']['az_lim'] = az_lim
+    sensor_dict['Stromlo Laser']['rg_lim'] = rg_lim
+    sensor_dict['Stromlo Laser']['FOV_hlim'] = FOV_hlim
+    sensor_dict['Stromlo Laser']['FOV_vlim'] = FOV_vlim
+    sensor_dict['Stromlo Laser']['laser_power'] = 1.  # Watts
+    
+    # Measurements and noise
+    sensor_dict['Stromlo Laser']['meas_types'] = meas_types
+    sensor_dict['Stromlo Laser']['sigma_dict'] = sigma_dict
+    
+    # Pass parameters
+    sensor_dict['Stromlo Laser']['max_gap'] = max_gap
+    sensor_dict['Stromlo Laser']['obs_gap'] = obs_gap
+    sensor_dict['Stromlo Laser']['min_pass'] = min_pass
+    sensor_dict['Stromlo Laser']['max_pass'] = max_pass
+
+
+    # Set up sensors
+    print('ADFA UHF Radio')
+    lat_gs = -35.29
+    lon_gs = 149.17
+    ht_gs = 0.606 # km	
+    geodetic_latlonht = [lat_gs, lon_gs, ht_gs]
+    
+    # Constraints/Limits
+    az_lim = [0., 2.*pi]  # rad
+    el_lim = [0., pi/2.]  # rad
+    rg_lim = [0., 5000.]   # km
+    
+    # FOV dimensions
+    LAM_dim = 20.   # deg
+    PHI_dim = 20.   # deg
+    
+    # Convert to radians
+    LAM_half = 0.5*LAM_dim*pi/180
+    PHI_half = 0.5*PHI_dim*pi/180
+    FOV_hlim = [-LAM_half, LAM_half]
+    FOV_vlim = [-PHI_half, PHI_half]
+    
+    # Frequency limiits
+    freq_lim = [300e6, 3e9]  # Hz
+   
+    # Measurement types and noise
+    meas_types = ['rg', 'az', 'el']
+    sigma_dict = {}
+    sigma_dict['rg'] = 0.010  # km
+    sigma_dict['az'] = 5.*pi/180.   # rad
+    sigma_dict['el'] = 5.*pi/180.  # rad
+    
+    # Pass parameters
+    max_pass = 6000.
+    min_pass = 60.
+    max_gap = 60.
+    obs_gap = 1.
+    
+    # Location and constraints
+    sensor_dict['ADFA UHF Radio'] = {}
+    sensor_dict['ADFA UHF Radio']['geodetic_latlonht'] = geodetic_latlonht
+    sensor_dict['ADFA UHF Radio']['el_lim'] = el_lim
+    sensor_dict['ADFA UHF Radio']['az_lim'] = az_lim
+    sensor_dict['ADFA UHF Radio']['rg_lim'] = rg_lim
+    sensor_dict['ADFA UHF Radio']['FOV_hlim'] = FOV_hlim
+    sensor_dict['ADFA UHF Radio']['FOV_vlim'] = FOV_vlim
+    sensor_dict['ADFA UHF Radio']['freq_lim'] = freq_lim
+    
+    # Measurements and noise
+    sensor_dict['ADFA UHF Radio']['meas_types'] = meas_types
+    sensor_dict['ADFA UHF Radio']['sigma_dict'] = sigma_dict
+    
+    # Pass parameters
+    sensor_dict['ADFA UHF Radio']['max_gap'] = max_gap
+    sensor_dict['ADFA UHF Radio']['obs_gap'] = obs_gap
+    sensor_dict['ADFA UHF Radio']['min_pass'] = min_pass
+    sensor_dict['ADFA UHF Radio']['max_pass'] = max_pass
+    
+
+
+    # Remove sensors not in list
+    sensor_remove_list = list(set(sensor_dict.keys()) - set(sensor_id_list))
+    for sensor_id in sensor_remove_list:
+        sensor_dict.pop(sensor_id, None)
+
+    
+    return sensor_dict
+
+
+def get_database_sensor_data(sensor_id_list):    
+    
+    sensor_dict = {}
     
     return sensor_dict
 

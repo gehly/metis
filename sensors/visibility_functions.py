@@ -10,10 +10,12 @@ from skyfield.constants import ERAD
 from skyfield.api import Topos, EarthSatellite, Loader
 
 from sensors import define_sensors
+from sensors import get_database_sensor_data
 from utilities.tle_functions import get_spacetrack_tle_data
+from utilities.tle_functions import get_database_tle_data
 
 
-def define_RSOs(obj_id_list):
+def define_RSOs(obj_id_list, tle_dict={}, source='spacetrack'):
     '''
     This function generates the resident space object (RSO) dictionary by 
     retrieving data about RSOs including recent position/velocity states
@@ -24,6 +26,12 @@ def define_RSOs(obj_id_list):
     ------
     obj_id_list : list
         object NORAD IDs (int)
+    tle_dict : dictionary, optional
+        Two Line Element information, indexed by object ID (default = empty)
+        If none provided, script will retrieve from source
+    source : string, optional
+        designates source of tle_dict information if empty
+        (default = spacetrack)
     
     Returns
     ------
@@ -39,8 +47,18 @@ def define_RSOs(obj_id_list):
     # Include options here to import from space-track, celestrak, text file,
     # other URL, graph database, ...
     
-    # Download from space-track.org
-    tle_dict = get_spacetrack_tle_data(obj_id_list)    
+    if len(tle_dict) == 0:
+        
+        # Download from space-track.org
+        if source == 'spacetrack':            
+            
+            tle_dict = get_spacetrack_tle_data(obj_id_list)
+            
+        # Retrieve from graph database
+        if source == 'database':
+            
+            tle_dict = get_database_tle_data(obj_id_list)
+        
 
     # Retrieve TLE data and form RSO dictionary using skyfield
     for obj_id in obj_id_list:
@@ -54,17 +72,48 @@ def define_RSOs(obj_id_list):
         
         
     # Initialize object size
-    # Include options here for RCS from SATCAT, graph database, ...    
-    for obj_id in obj_id_list:
+    # Include options here for RCS from SATCAT, graph database, ...  
+    
+    # Retrieve from database
+    if source == 'database':        
         
-        # Dummy value for all satellites
-        rso_dict[obj_id]['rcs_m2'] = 1.
+        rso_dict = get_database_object_params(rso_dict)
+    
+    # Use default values
+    else:
+        for obj_id in obj_id_list:
+            
+            # Dummy value for all satellites            
+            rso_dict[obj_id]['radius_m'] = 1.
+            rso_dict[obj_id]['albedo'] = 0.1
+            rso_dict[obj_id]['listen_flag'] = False
+            rso_dict[obj_id]['frequency_hz'] = 1.
+            rso_dict[obj_id]['laser_lim'] = 0.
+    
+    return rso_dict
+
+
+def get_database_object_params(rso_dict):
+    '''
+    This function retrieve object parameters such as radius and albedo from
+    the database.
+    
+    '''
+    
+    # List of objects to retrieve data for
+    obj_id_list = sorted(rso_dict.keys())
+    
+    # Retrieve data for each object in list
+    
+    # Add data to rso_dict
+    
     
     return rso_dict
 
 
 
-def compute_visible_passes(UTC_array, obj_id_list, sensor_id_list, ephemeris):
+def compute_visible_passes(UTC_array, obj_id_list, sensor_id_list, ephemeris,
+                           tle_dict={}, source='spacetrack'):
     '''
     This function computes the visible passes for a given list of 
     resident space objects (RSOs) from one or more sensors. Output includes
@@ -97,18 +146,17 @@ def compute_visible_passes(UTC_array, obj_id_list, sensor_id_list, ephemeris):
     Re = ERAD/1000.   # km
     
     # Generate resident space object dictionary
-    rso_dict = define_RSOs(obj_id_list)
+    rso_dict = define_RSOs(obj_id_list, tle_dict, source)
     
     # Load sensor data
     # Include options here to load from file, URL, graph database, ...
     
-    # Load from script
-    sensor_dict = define_sensors()
-    
-    # Remove sensors not in list
-    sensor_remove_list = list(set(sensor_dict.keys()) - set(sensor_id_list))
-    for sensor_id in sensor_remove_list:
-        sensor_dict.pop(sensor_id, None)
+    # Load from database
+    if source == 'database':        
+        sensor_dict = get_database_sensor_data(sensor_id_list)
+        
+    else:        
+        sensor_dict = define_sensors(sensor_id_list)    
     
     # Instantiate a skyfield object for each sensor in list
     for sensor_id in sensor_dict.keys():
@@ -142,21 +190,14 @@ def compute_visible_passes(UTC_array, obj_id_list, sensor_id_list, ephemeris):
         rso = rso_dict[obj_id]
         rso_gcrf_array = rso['satellite'].at(UTC_array).position.km
         
-        # Retrieve object size and albedo if available/needed
-        radius_km = rcs2radius_meters(rso['rcs_m2'])/1000.
+        # Retrieve object size, albedo
+        radius_km = rso['radius_m']/1000.
+        albedo = rso['albedo']
 
         # Loop over sensors        
         for sensor_id in sensor_dict:
             sensor = sensor_dict[sensor_id]
             sensor_gcrf_array = sensor['statTopos'].at(UTC_array).position.km
-            
-            # Constraint parameters
-            el_lim = sensor['el_lim']
-            az_lim = sensor['az_lim']
-            rg_lim = sensor['rg_lim']
-            sun_elmask = sensor['sun_elmask']
-            mapp_lim = sensor['mapp_lim']
-            moon_angle_lim = sensor['moon_angle_lim']
             
             # Compute topocentric RSO position
             # For earth satellites, calling observe and apparent is costly
@@ -170,7 +211,12 @@ def compute_visible_passes(UTC_array, obj_id_list, sensor_id_list, ephemeris):
             # system barycenter
             sensor_ssb = earth + sensor['statTopos']
             sun_topo = sensor_ssb.at(UTC_array).observe(sun).apparent()
-            sun_el_array, sun_az_array, sun_rg_array = sun_topo.altaz()
+            sun_el_array, sun_az_array, sun_rg_array = sun_topo.altaz()            
+                        
+            # Constraint parameters
+            el_lim = sensor['el_lim']
+            az_lim = sensor['az_lim']
+            rg_lim = sensor['rg_lim']
             
             # Find indices where az/el/range constraints are met
             el_inds0 = np.where(el_array.radians > el_lim[0])[0]
@@ -178,18 +224,43 @@ def compute_visible_passes(UTC_array, obj_id_list, sensor_id_list, ephemeris):
             az_inds0 = np.where(az_array.radians > az_lim[0])[0]
             az_inds1 = np.where(az_array.radians < az_lim[1])[0]
             rg_inds0 = np.where(rg_array.km > rg_lim[0])[0]
-            rg_inds1 = np.where(rg_array.km < rg_lim[1])[0]
-            
-            # Check sun constraint (ensures station is dark if needed)
-            sun_el_inds = np.where(sun_el_array.radians < sun_elmask)[0]
+            rg_inds1 = np.where(rg_array.km < rg_lim[1])[0]            
             
             # Find all common elements to create candidate visible index list
+            # based on position constraints
             common_el = set(el_inds0).intersection(set(el_inds1))
             common_az = set(az_inds0).intersection(set(az_inds1))
             common_rg = set(rg_inds0).intersection(set(rg_inds1))
             common1 = common_el.intersection(common_az)
-            common2 = common1.intersection(common_rg)
-            common_inds = list(common2.intersection(set(sun_el_inds)))
+            common_pos = common1.intersection(common_rg)
+            
+            # Sunlit/station dark constraint
+            if 'sun_elmask' in sensor:
+                sun_elmask = sensor['sun_elmask']
+                
+                # Check sun constraint (ensures station is dark if needed)
+                sun_el_inds = np.where(sun_el_array.radians < sun_elmask)[0]                
+                common_inds = list(common_pos.intersection(set(sun_el_inds)))
+                
+            # Laser constraints
+            if 'laser_power' in sensor and rso['laser_lim'] > 0.:
+                laser_lim = rso['laser_lim']
+                laser_power = sensor['laser_power']
+                if laser_power < laser_lim:
+                    common_inds = common_pos
+                
+            if 'laser_power' in sensor and rso['laser_lim'] <= 0.:
+                common_inds = []
+                
+            # Radio constraints
+            if 'freq_lim' in sensor and rso['listen_flag']:
+                frequency = rso['frequency_hz']
+                freq_lim = sensor['freq_lim']
+                if frequency > freq_lim[0] and frequency < freq_lim[1]:
+                    common_inds = common_pos                
+            
+            if 'freq_lim' in sensor and not rso['listen_flag']:
+                common_inds = []
             
             # Initialze visibility array for this sensor and object
             vis_array = np.zeros(rso_gcrf_array.shape[1],)
@@ -216,18 +287,22 @@ def compute_visible_passes(UTC_array, obj_id_list, sensor_id_list, ephemeris):
                 else:
                     half_cone = asin(Re/r)
                     if sun_angle < half_cone:
-                        vis_array[ii] = False                
-                
+                        vis_array[ii] = False
+
                 # Check too close to moon
-                if moon_angle < moon_angle_lim:
-                    vis_array[ii] = False
+                if 'moon_angle_lim' in sensor:
+                    moon_angle_lim = sensor['moon_angle_lim']
+                    if moon_angle < moon_angle_lim:
+                        vis_array[ii] = False
                                 
                 # Check apparent magnitude
                 # Optional input for albedo could be retrieved for each object
-                # from catalog                
-                mapp = compute_mapp(phase_angle, rg_km, radius_km)
-                if mapp > mapp_lim:
-                    vis_array[ii] = False
+                # from catalog
+                if 'mapp_lim' in sensor:
+                    mapp_lim = sensor['mapp_lim']
+                    mapp = compute_mapp(phase_angle, rg_km, radius_km, albedo)
+                    if mapp > mapp_lim:
+                        vis_array[ii] = False
             
             vis_inds = np.where(vis_array)[0]
             UTC_vis = UTC_array[vis_inds]
@@ -324,57 +399,60 @@ def compute_pass(UTC_vis, rg_vis, el_vis, sensor):
     rg_min_list = []
     el_max_list = []
     
-    # Loop over times
-    rg_min = 1e12
-    el_max = -1.
-    ti_prior = UTC_vis[0]
-    start = UTC_vis[0]
-    stop = UTC_vis[0]
-    TCA = UTC_vis[0]
-    TME = UTC_vis[0]
-    for ii in range(len(UTC_vis)):
-        
-        ti = UTC_vis[ii]
-        rg_km = rg_vis[ii]
-        el_rad = el_vis[ii]
-        
-        # If current time is close to previous, pass continues
-        if (ti.tdb - ti_prior.tdb)*86400. < (max_gap+1.):
-
-            # Update pass stop time and JD_prior for next iteration
-            stop = ti
-            ti_prior = ti
+    # Only process if needed
+    if len(UTC_vis) > 0 :
+    
+        # Loop over times
+        rg_min = 1e12
+        el_max = -1.
+        ti_prior = UTC_vis[0]
+        start = UTC_vis[0]
+        stop = UTC_vis[0]
+        TCA = UTC_vis[0]
+        TME = UTC_vis[0]
+        for ii in range(len(UTC_vis)):
             
-            # Check if this is pass time of closest approach (TCA)
-            if rg_km < rg_min:
+            ti = UTC_vis[ii]
+            rg_km = rg_vis[ii]
+            el_rad = el_vis[ii]
+            
+            # If current time is close to previous, pass continues
+            if (ti.tdb - ti_prior.tdb)*86400. < (max_gap+1.):
+    
+                # Update pass stop time and JD_prior for next iteration
+                stop = ti
+                ti_prior = ti
+                
+                # Check if this is pass time of closest approach (TCA)
+                if rg_km < rg_min:
+                    TCA = ti
+                    rg_min = float(rg_km)
+                
+                # Check if this is pass time of maximum elevation (TME)
+                if el_rad > el_max:
+                    TME = ti
+                    el_max = float(el_rad)
+    
+            # If current time is far from previous or if we reached
+            # the end of UTC list, pass has ended
+            if ((ti.tdb - ti_prior.tdb)*86400. >= (max_gap+1.) or ii == (len(UTC_vis)-1)):
+                
+                # Store output
+                start_list.append(start)
+                stop_list.append(stop)
+                TCA_list.append(TCA)
+                TME_list.append(TME)
+                rg_min_list.append(rg_min)
+                el_max_list.append(el_max)
+                
+                # Reset for new pass next round
+                start = ti
                 TCA = ti
-                rg_min = float(rg_km)
-            
-            # Check if this is pass time of maximum elevation (TME)
-            if el_rad > el_max:
                 TME = ti
+                stop = ti
+                ti_prior = ti
+                rg_min = float(rg_km)
                 el_max = float(el_rad)
-
-        # If current time is far from previous or if we reached
-        # the end of UTC list, pass has ended
-        if ((ti.tdb - ti_prior.tdb)*86400. >= (max_gap+1.) or ii == (len(UTC_vis)-1)):
-            
-            # Store output
-            start_list.append(start)
-            stop_list.append(stop)
-            TCA_list.append(TCA)
-            TME_list.append(TME)
-            rg_min_list.append(rg_min)
-            el_max_list.append(el_max)
-            
-            # Reset for new pass next round
-            start = ti
-            TCA = ti
-            TME = ti
-            stop = ti
-            ti_prior = ti
-            rg_min = float(rg_km)
-            el_max = float(el_rad)
                         
     return start_list, stop_list, TCA_list, TME_list, rg_min_list, el_max_list
 
@@ -558,40 +636,6 @@ def generate_visibility_file(vis_dict, vis_file, vis_file_min_el):
     return
 
 
-###############################################################################
-# Stand-alone execution
-###############################################################################
 
-
-if __name__ == '__main__':    
-    
-    load = Loader(os.path.join(metis_dir, 'skyfield_data'))
-    ts = load.timescale()
-    ephemeris = load('de430t.bsp')
-
-    obj_id_list = [43014]
-    sensor_id_list = ['PSU Falcon', 'NJC Falcon', 'FLC Falcon']
-    
-    # Minimum elevation pass for output file
-    vis_file_min_el = 20.  # deg
-    
-    # Create an array of times
-    ndays = 6
-    dt = 10  # sec    
-    UTC_now = ts.now().utc
-    print(UTC_now)
-    mistake
-    sec_array = list(range(0,86400*ndays,dt))
-    UTC_array = ts.utc(UTC_now[0], UTC_now[1], UTC_now[2]+3, UTC_now[3],
-                       UTC_now[4], sec_array)
-    
-    # Generate visible pass dictionary
-    vis_dict = compute_visible_passes(UTC_array, obj_id_list, sensor_id_list,
-                                      ephemeris)
-
-    # Generate output file
-    outdir = os.path.join(metis_dir, 'skyfield_data')
-    vis_file = os.path.join(outdir, 'visible_passes.csv')
-    generate_visibility_file(vis_dict, vis_file, vis_file_min_el)
 
 
