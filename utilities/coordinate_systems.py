@@ -14,6 +14,7 @@ from utilities.time_systems import jd2cent
 from utilities.eop_functions import get_celestrak_eop_alldata
 from utilities.eop_functions import get_eop_data
 from utilities.eop_functions import compute_precession_IAU1976
+from utilities.eop_functions import get_nutation_data
 from utilities.eop_functions import compute_nutation_IAU1980
 from utilities.eop_functions import eqnequinox_IAU1982_simple
 from utilities.eop_functions import compute_polarmotion
@@ -674,6 +675,16 @@ if __name__ == '__main__':
     print(v_ITRF)
     print(r_GCRF - r_check)
     print(v_GCRF - v_check)
+    
+    
+    IAU1980nut = get_nutation_data()
+    r_TEME, v_TEME = gcrf2teme(r_GCRF, v_GCRF, UTC, IAU1980nut, EOP_data)
+    r_check, v_check = teme2gcrf(r_TEME, v_TEME, UTC, IAU1980nut, EOP_data)
+    
+    print(r_TEME)
+    print(v_TEME)
+    print(r_check - r_GCRF)
+    print(v_check - v_GCRF)
     
     
     
