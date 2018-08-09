@@ -84,6 +84,30 @@ def get_spacetrack_tle_data(obj_id_list, username='', password=''):
     return tle_dict
 
 
+def get_database_tle_data(obj_id_list):
+    '''
+    This function retrieves the latest two-line element (TLE) data for objects
+    in the input list from the database.
+    
+    '''
+    
+    tle_dict = {}
+    
+    
+    return tle_dict
+
+
+def put_database_tle_data(tle_dict):
+    '''
+    This function puts the latest two-line element (TLE) data for objects
+    into the database.
+    
+    '''
+    
+    
+    return
+
+
 def propagate_TLE(obj_id_list, UTC_list, username='', password=''):
     '''
     This function retrieves TLE data for the objects in the input list from
