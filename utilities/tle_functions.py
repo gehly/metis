@@ -252,7 +252,7 @@ def kep2tle(obj_id_list, kep_dict):
     return tle_dict
 
 
-def launchecef2tle(obj_id_list, ecef_dict):
+def launchecef2tle(obj_id_list, ecef_dict, offline_flag=False):
     '''
     This function converts from ECEF position and velocity to TLE format.
     
@@ -264,6 +264,9 @@ def launchecef2tle(obj_id_list, ecef_dict):
         dictionary of dictionaries containing launch coordinates, indexed by
         object ID
         each entry contains r_ITRF, v_ITRF, UTC datetime
+    offline_flag : boolean, optional
+        flag to determine whether to retrieve EOP data from internet or from
+        a locally saved file (default = False)
     
     Returns
     ------
@@ -276,7 +279,7 @@ def launchecef2tle(obj_id_list, ecef_dict):
     tle_dict = {}
     
     # Retrieve latest EOP data from celestrak.com
-    eop_alldata = get_celestrak_eop_alldata()
+    eop_alldata = get_celestrak_eop_alldata(offline_flag)
     
     # Retrieve IAU Nutation data from file
     IAU1980_nutation = get_nutation_data()
@@ -342,7 +345,8 @@ def launchecef2tle(obj_id_list, ecef_dict):
     return tle_dict
 
 
-def propagate_TLE(obj_id_list, UTC_list, username='', password=''):
+def propagate_TLE(obj_id_list, UTC_list, offline_flag=False, username='',
+                  password=''):
     '''
     This function retrieves TLE data for the objects in the input list from
     space-track.org and propagates them to the times given in UTC_list.  The
@@ -355,6 +359,9 @@ def propagate_TLE(obj_id_list, UTC_list, username='', password=''):
         object NORAD IDs
     UTC_list : list
         datetime objects in UTC
+    offline_flag : boolean, optional
+        flag to determine whether to retrieve EOP data from internet or from
+        a locally saved file (default = False)
     username : string, optional
         space-track.org username (code will prompt for input if not supplied)
     password : string, optional
@@ -372,7 +379,7 @@ def propagate_TLE(obj_id_list, UTC_list, username='', password=''):
     tle_dict = get_spacetrack_tle_data(obj_id_list, username, password)
     
     # Retrieve latest EOP data from celestrak.com
-    eop_alldata = get_celestrak_eop_alldata()
+    eop_alldata = get_celestrak_eop_alldata(offline_flag)
     
     # Retrieve IAU Nutation data from file
     IAU1980_nutation = get_nutation_data()
