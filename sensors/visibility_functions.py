@@ -87,7 +87,7 @@ def define_RSOs(obj_id_list, tle_dict={}, source='spacetrack'):
             rso_dict[obj_id]['radius_m'] = 1.
             rso_dict[obj_id]['albedo'] = 0.1
             rso_dict[obj_id]['listen_flag'] = False
-            rso_dict[obj_id]['frequency_hz'] = 1.
+            rso_dict[obj_id]['frequency_hz'] = 900e6
             rso_dict[obj_id]['laser_lim'] = 0.
     
     return rso_dict
@@ -156,8 +156,8 @@ def compute_visible_passes(UTC_array, obj_id_list, sensor_id_list, ephemeris,
         sensor_dict = get_database_sensor_data(sensor_id_list)
         
     else:        
-        sensor_dict = define_sensors(sensor_id_list)    
-    
+        sensor_dict = define_sensors(sensor_id_list)
+
     # Instantiate a skyfield object for each sensor in list
     for sensor_id in sensor_dict.keys():
         geodetic_latlonht = sensor_dict[sensor_id]['geodetic_latlonht']
@@ -242,27 +242,46 @@ def compute_visible_passes(UTC_array, obj_id_list, sensor_id_list, ephemeris,
                 sun_el_inds = np.where(sun_el_array.radians < sun_elmask)[0]                
                 common_inds = list(common_pos.intersection(set(sun_el_inds)))
                 
-            # Laser constraints
-            if 'laser_power' in sensor and rso['laser_lim'] > 0.:
-                laser_lim = rso['laser_lim']
-                laser_power = sensor['laser_power']
-                if laser_power < laser_lim:
-                    common_inds = common_pos
+#                print(sensor_id)
+#                print('sun_elmask', sun_elmask)
                 
-            if 'laser_power' in sensor and rso['laser_lim'] <= 0.:
+            # Laser constraints
+            if 'laser_output' in sensor and rso['laser_lim'] > 0.:
+                laser_lim = rso['laser_lim']
+                laser_output = sensor['laser_output']
+                if laser_output < laser_lim:
+                    common_inds = list(common_pos)
+                    
+#                print(sensor_id)
+#                print('laser lim', laser_lim)
+#                print('laser output', laser_output)
+                
+            if 'laser_output' in sensor and rso['laser_lim'] <= 0.:
                 common_inds = []
+                
+#                print(sensor_id)
+#                print('laser lim', rso['laser_lim'])
                 
             # Radio constraints
             if 'freq_lim' in sensor and rso['listen_flag']:
                 frequency = rso['frequency_hz']
                 freq_lim = sensor['freq_lim']
                 if frequency > freq_lim[0] and frequency < freq_lim[1]:
-                    common_inds = common_pos                
+                    common_inds = list(common_pos)
+                    
+#                print(sensor_id)
+#                print('freq lim', freq_lim)
+#                print('freq', frequency)
             
             if 'freq_lim' in sensor and not rso['listen_flag']:
                 common_inds = []
+                
+#                print(sensor_id)
+#                print('freq lim', sensor['freq_lim'])
+#                print(rso['listen_flag'])
             
             # Initialze visibility array for this sensor and object
+#            print(common_inds)
             vis_array = np.zeros(rso_gcrf_array.shape[1],)
             vis_array[common_inds] = True
             

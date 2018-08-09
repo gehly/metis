@@ -285,7 +285,7 @@ def define_sensors(sensor_id_list):
     sensor_dict['Stromlo Laser']['rg_lim'] = rg_lim
     sensor_dict['Stromlo Laser']['FOV_hlim'] = FOV_hlim
     sensor_dict['Stromlo Laser']['FOV_vlim'] = FOV_vlim
-    sensor_dict['Stromlo Laser']['laser_power'] = 1.  # Watts
+    sensor_dict['Stromlo Laser']['laser_output'] = 1.  # Watts
     
     # Measurements and noise
     sensor_dict['Stromlo Laser']['meas_types'] = meas_types
