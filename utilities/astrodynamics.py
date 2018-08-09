@@ -165,67 +165,6 @@ def mean2hyp(M, e):
     return H
 
 
-def launch2tle(obj_id_list, launch_elem_list):
-    
-    
-    # Initialize output
-    tle_dict = {}
-    
-    # Loop over objects
-    ii = 0
-    for obj_id in obj_id_list:
-        
-        # Retrieve launch elements for this object
-        launch_elem = launch_elem_list[ii]
-        ra = launch_elem['ra']
-        rp = launch_elem['rp']
-        i = launch_elem['i']
-        RAAN = launch_elem['RAAN']
-        w = launch_elem['w']
-        M = launch_elem['M']
-        date = launch_elem['date']
-        
-        # Compute mean motion in rev/day
-        a = (ra + rp)/2.
-        n = np.sqrt(GME/a**3.)
-        n *= 86400./(2.*pi)
-        
-        # Compute eccentricity
-        e = 1. - rp/a
-        
-        # Compute launch year and day of year
-        year2 = str(date.year)[2:4]
-        doy = date.timetuple().tm_yday
-        dfrac = date.hour/24. + date.minute/1440. + \
-            (date.second + date.microsecond/1e6)/86400.
-        
-        # Format for output
-        line1 = '1 ' + str(obj_id) + 'U ' + year2 + '001A   ' + year2 + \
-            str(doy).zfill(3) + '.' + str(dfrac)[2:10] + \
-            '  .00000000  00000-0  00000-0 0    10'
-            
-        line2 = '2 ' + str(obj_id) + ' ' + '{:8.4f}'.format(i) + ' ' + \
-            '{:8.4f}'.format(RAAN) + ' ' + str(e)[2:9] + ' ' + \
-            '{:8.4f}'.format(w) + ' ' + '{:8.4f}'.format(M) + ' ' + \
-            '{:11.8f}'.format(n) + '    10'
-            
-        # Add to dictionary
-        tle_dict[obj_id] = {}
-        tle_dict[obj_id]['line1'] = line1
-        tle_dict[obj_id]['line2'] = line2
-        
-        print(line1)
-        print(line2)
-        
-        # Increment counter
-        ii += 1
-        
-        
-    
-    
-    return tle_dict
-
-
 def element_conversion(x_in, iflag, oflag, GM=3.986004e5, dt=0.):
     '''
     This funciton converts between Keplerian orbital elements

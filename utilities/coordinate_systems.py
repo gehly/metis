@@ -112,6 +112,59 @@ def teme2gcrf(r_TEME, v_TEME, UTC, IAU1980nut, EOP_data):
     return r_GCRF, v_GCRF
 
 
+def gcrf2teme(r_GCRF, v_GCRF, UTC, IAU1980nut, EOP_data):
+    '''
+    This function converts position and velocity vectors from the GCRF inertial
+    frame to the True Equator Mean Equinox (TEME) frame used for TLEs. 
+    
+    Parameters
+    ------
+    r_GCRF : 3x1 numpy array
+        position vector in GCRF frame
+    v_GCRF : 3x1 numpy array
+        velocity vector in GCRF frame 
+    UTC : datetime object
+        time in UTC
+    IAU1980nut : 2D numpy array
+        nutation coefficients
+    EOP_data : dictionary
+        EOP data for the given time including pole coordinates and offsets,
+        time offsets, and length of day  
+    
+    Returns
+    ------ 
+    r_TEME : 3x1 numpy array
+        position vector in TEME frame
+    v_TEME : 3x1 numpy array
+        velocity vector in TEME frame
+    '''
+    
+    # Compute TT in JD format
+    TT_JD = utcdt2ttjd(UTC, EOP_data['TAI_UTC'])
+    
+    # Compute TT in centuries since J2000 epoch
+    TT_cent = jd2cent(TT_JD)
+    
+    # IAU 1976 Precession
+    P = compute_precession_IAU1976(TT_cent)
+    
+    # IAU 1980 Nutation
+    N, FA, Eps_A, Eps_true, dPsi, dEps = \
+        compute_nutation_IAU1980(IAU1980nut, TT_cent, EOP_data['ddPsi'],
+                                 EOP_data['ddEps'])
+
+    # Equation of the Equinonx 1982
+    R = eqnequinox_IAU1982_simple(dPsi, Eps_A)
+    
+    # Compute transformation matrix and output
+    GCRF_TEME = np.dot(P, np.dot(N, R))
+    
+    r_TEME = np.dot(GCRF_TEME.T, r_GCRF)
+    v_TEME = np.dot(GCRF_TEME.T, v_GCRF)
+    
+    return r_TEME, v_TEME
+
+
 def gcrf2itrf(r_GCRF, v_GCRF, UTC, EOP_data, XYs_df=[]):
     '''
     This function converts a position and velocity vector in the GCRF(ECI)
