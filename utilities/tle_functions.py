@@ -1,9 +1,10 @@
 import numpy as np
-from math import pi
+from math import pi, asin, atan2
 import requests
 import getpass
-from datetime import datetime
+from datetime import datetime, timedelta
 import sys
+import matplotlib.pyplot as plt
 
 sys.path.append('../')
 
@@ -345,8 +346,139 @@ def launchecef2tle(obj_id_list, ecef_dict, offline_flag=False):
     return tle_dict
 
 
-def propagate_TLE(obj_id_list, UTC_list, offline_flag=False, username='',
-                  password=''):
+def tletime2datetime(line1):
+    '''
+    This function computes a UTC datetime object from the TLE line1 input year,
+    day of year, and fractional day.
+    
+    Parameters
+    ------
+    line1 : string
+        first line of TLE, contains day of year and fractional day
+    
+    Returns
+    ------
+    UTC : datetime object
+        UTC datetime object
+        
+    Reference
+    ------
+    https://celestrak.com/columns/v04n03/#FAQ03
+    
+    While talking about the epoch, this is perhaps a good place to answer the
+    other time-related questions. First, how is the epoch time format
+    interpreted? This question is best answered by using an example. An epoch
+    of 98001.00000000 corresponds to 0000 UT on 1998 January 01—in other words,
+    midnight between 1997 December 31 and 1998 January 01. An epoch of 
+    98000.00000000 would actually correspond to the beginning of 
+    1997 December 31—strange as that might seem. Note that the epoch day starts
+    at UT midnight (not noon) and that all times are measured mean solar rather 
+    than sidereal time units (the answer to our third question).
+    
+    '''
+    
+    year2 = line1[18:20]
+    doy = float(line1[20:32])  
+    
+    if int(year2) < 50.:
+        year = int('20' + year2)
+    else:
+        year = int('19' + year2)
+    
+    # Need to subtract 1 from day of year to add to this base datetime
+    # In TLE definition doy = 001.000 for Jan 1 Midnight UTC
+    base = datetime(year, 1, 1, 0, 0, 0)
+    UTC = base + timedelta(days=(doy-1.))
+        
+    print(doy)
+    print(year)
+    print(UTC)
+    
+    doy = UTC.timetuple().tm_yday
+    
+    print(doy)
+    
+    return UTC
+
+
+def plot_tle_spread(tle_dict, UTC_list=[]):
+    '''
+    This function propagates a set of TLEs to a common time and plots object
+    locations in measurement space.
+    
+    Parameters
+    ------
+    tle_dict : dictionary
+        Two Line Element information, indexed by object ID
+
+    '''
+    
+    obj_id_list = sorted(tle_dict.keys())
+    
+    if len(UTC_list) == 0:
+        obj_id = obj_id_list[0]
+        line1 = tle_dict[obj_id]['line1']
+        UTC = tletime2datetime(line1)
+        UTC_list = [UTC]
+        
+    output_state = propagate_TLE(obj_id_list, UTC_list, tle_dict)    
+    
+    ra_array = np.zeros((len(obj_id_list), len(UTC_list)))
+    dec_array = np.zeros((len(obj_id_list), len(UTC_list)))
+    ii = 0
+    for obj_id in obj_id_list:
+        
+        r_GCRF_list = output_state[obj_id]['r_GCRF']
+        jj = 0
+        for r_GCRF in r_GCRF_list:
+            x = float(r_GCRF[0])
+            y = float(r_GCRF[1])
+            z = float(r_GCRF[2])
+            r = np.linalg.norm(r_GCRF)
+            
+            ra_array[ii,jj] = atan2(y,x)*180/pi
+            dec_array[ii,jj] = asin(z/r)*180/pi
+            
+            jj += 1
+        
+        ii += 1  
+            
+    
+    jj = 0        
+    for UTC in UTC_list:
+        
+        plt.figure()
+        
+        plt.scatter(ra_array[:,jj], dec_array[:,jj], marker='o', s=50,
+                    c=np.linspace(0,1,len(obj_id_list)),
+                    cmap=plt.get_cmap('nipy_spectral'))
+        
+        for label, x, y in zip(obj_id_list, ra_array[:,jj], dec_array[:,jj]):
+            plt.annotate(
+            label,
+            xy=(x, y), xytext=(-20, 20),
+            textcoords='offset points', ha='right', va='bottom',
+            bbox=dict(boxstyle='round,pad=0.5', fc='yellow', alpha=0.5),
+            arrowprops=dict(arrowstyle = '->', connectionstyle='arc3,rad=0'))
+            
+        plt.xlabel('Right Ascension [deg]')
+        plt.ylabel('Declination [deg]')
+        plt.title('TLE Measurement Space ' + UTC.strftime("%Y-%m-%d %H:%M:%S"))
+
+        plt.xlim([-180, 180])
+        plt.ylim([-90, 90])
+        
+        jj += 1
+        
+    
+    
+    plt.show()
+    
+    return
+
+
+def propagate_TLE(obj_id_list, UTC_list, tle_dict={}, offline_flag=False,
+                  username='', password=''):
     '''
     This function retrieves TLE data for the objects in the input list from
     space-track.org and propagates them to the times given in UTC_list.  The
@@ -375,8 +507,14 @@ def propagate_TLE(obj_id_list, UTC_list, offline_flag=False, username='',
         
     '''
     
-    # Retrieve latest TLE data from space-track.org
-    tle_dict = get_spacetrack_tle_data(obj_id_list, username, password)
+    # If no TLE information is provided, retrieve from sources as needed
+    if len(tle_dict) == 0:
+    
+        # Retrieve latest TLE data from space-track.org
+        tle_dict = get_spacetrack_tle_data(obj_id_list, username, password)
+        
+        # Retreive TLE data from database
+        
     
     # Retrieve latest EOP data from celestrak.com
     eop_alldata = get_celestrak_eop_alldata(offline_flag)
@@ -440,16 +578,18 @@ def propagate_TLE(obj_id_list, UTC_list, offline_flag=False, username='',
 if __name__ == '__main__' :
 
     
-    obj_id_list = [43014]
-    UTC_list = [datetime(2018, 6, 23, 0, 0, 0)]
+    obj_id_list = [43013, 43014, 43015, 43016]
+#    UTC_list = [datetime(2018, 6, 23, 0, 0, 0)]
+#    
+#    
+#    output_state = propagate_TLE(obj_id_list, UTC_list)
+#    
+#    print(output_state)
     
+    plt.close('all')
     
-    output_state = propagate_TLE(obj_id_list, UTC_list)
-    
-    print(output_state)
-    
-    
-    
+    tle_dict = get_spacetrack_tle_data(obj_id_list)
+    plot_tle_spread(tle_dict)
     
     
     
