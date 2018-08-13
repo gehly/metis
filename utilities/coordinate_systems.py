@@ -403,6 +403,23 @@ def ric2eci(rc_vect, vc_vect, Qin=[]):
 
 
 def lvlh2ric():
+    '''
+    This function computes the rotation matrix to convert coordinates from the
+    LVLH frame to the orbit (RIC) frame. LVLH is used to define roll-pitch-yaw
+    angles (x-axis along track, z-axis toward nadir)
+    
+    r_RIC = OL * r_LVLH
+    
+    Parameters
+    ------
+    None
+    
+    Returns
+    ------
+    OL : 3x3 numpy array
+        DCM rotation matrix
+        
+    '''
 
     OL = np.array([[0.,  0., -1.],
                    [1.,  0.,  0.],
@@ -412,6 +429,23 @@ def lvlh2ric():
 
 
 def ric2lvlh():
+    '''
+    This function computes the rotation matrix to convert coordinates from the
+    orbit (RIC) frame to the LVLH frame. LVLH is used to define roll-pitch-yaw
+    angles (x-axis along track, z-axis toward nadir)
+    
+    r_LVLH = LO * r_RIC
+    
+    Parameters
+    ------
+    None
+    
+    Returns
+    ------
+    LO : 3x3 numpy array
+        DCM rotation matrix
+        
+    '''
 
     OL = np.array([[0.,  0., -1.],
                    [1.,  0.,  0.],

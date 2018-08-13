@@ -1,9 +1,10 @@
 import numpy as np
-from math import pi
+from math import pi, asin, atan2
 import requests
 import getpass
-from datetime import datetime
+from datetime import datetime, timedelta
 import sys
+import matplotlib.pyplot as plt
 
 sys.path.append('../')
 
@@ -29,15 +30,22 @@ from sgp4.earth_gravity import wgs84
 ###############################################################################
 
 
-def get_spacetrack_tle_data(obj_id_list, username='', password=''):
+def get_spacetrack_tle_data(obj_id_list, UTC_list = [], username='',
+                            password=''):
     '''
-    This function retrieves the latest two-line element (TLE) data for objects
+    This function retrieves the two-line element (TLE) data for objects
     in the input list from space-track.org.
     
     Parameters
     ------
     obj_id_list : list
         object NORAD IDs (int)
+    UTC_list : list, optional
+        UTC datetime objects to specify desired times for TLEs to retrieve
+        - if empty code will retrieve latest available
+        - if 1 entry, code will retrieve all TLEs in the following 1 day window
+        - if 2 entries, code will retrieve all TLEs between first and second time
+          (default = empty)
     username : string, optional
         space-track.org username (code will prompt for input if not supplied)
     password : string, optional
@@ -46,7 +54,7 @@ def get_spacetrack_tle_data(obj_id_list, username='', password=''):
     Returns
     ------
     tle_dict : dictionary
-        indexed by object ID, each item has two strings, one for each line
+        indexed by object ID, each item has two lists of strings for each line
     '''
     
     if len(username) == 0:    
@@ -56,9 +64,24 @@ def get_spacetrack_tle_data(obj_id_list, username='', password=''):
     
     myString = ",".join(map(str, obj_id_list))
     
-    pageData = ('//www.space-track.org/basicspacedata/query/class/tle_latest/'
-                'ORDINAL/1/NORAD_CAT_ID/' + myString + '/orderby/'
-                'TLE_LINE1 ASC/format/tle')
+    # If only one time is given, add 1 day increment to produce window
+    if len(UTC_list) ==  1:
+        UTC_list.append(UTC_list[0] + timedelta(days=1.))
+    
+    # If times are specified, retrieve from window
+    if len(UTC_list) == 2:        
+        UTC0 = UTC_list[0].strftime('%Y-%m-%d')
+        UTC1 = UTC_list[1].strftime('%Y-%m-%d')
+        pageData = ('//www.space-track.org/basicspacedata/query/class/tle/'
+                    'EPOCH/' + UTC0 + '--' + UTC1 + '/NORAD_CAT_ID/' + 
+                    myString + '/orderby/TLE_LINE1 ASC/format/tle')
+        
+    # Otherwise, get latest available
+    else:    
+        pageData = ('//www.space-track.org/basicspacedata/query/class/'
+                    'tle_latest/ORDINAL/1/NORAD_CAT_ID/' + myString + 
+                    '/orderby/TLE_LINE1 ASC/format/tle')
+        
     payload = {'identity':username, 'password':password, 'submit':'Login'}
     
     with requests.Session() as s:
@@ -71,8 +94,9 @@ def get_spacetrack_tle_data(obj_id_list, username='', password=''):
     tle_dict = {}
     nchar = 69
     nskip = 2
-    ii = 0  
-    for obj_id in obj_id_list:
+    ntle = int(round(len(r.text)/142.))
+    for ii in range(ntle):
+        
         line1_start = ii*2*(nchar+nskip)
         line1_stop = ii*2*(nchar+nskip) + nchar
         line2_start = ii*2*(nchar+nskip) + nchar + nskip
@@ -80,11 +104,15 @@ def get_spacetrack_tle_data(obj_id_list, username='', password=''):
         line1 = r.text[line1_start:line1_stop]
         line2 = r.text[line2_start:line2_stop]
 
-        tle_dict[obj_id] = {}
-        tle_dict[obj_id]['line1'] = line1
-        tle_dict[obj_id]['line2'] = line2
+        obj_id = int(line1[2:7])
         
-        ii += 1
+        if obj_id not in tle_dict:
+            tle_dict[obj_id] = {}
+            tle_dict[obj_id]['line1_list'] = []
+            tle_dict[obj_id]['line2_list'] = []
+            
+        tle_dict[obj_id]['line1_list'].append(line1)
+        tle_dict[obj_id]['line2_list'].append(line2)
     
     return tle_dict
 
@@ -175,8 +203,8 @@ def launch2tle(obj_id_list, launch_elem_dict):
             
         # Add to dictionary
         tle_dict[obj_id] = {}
-        tle_dict[obj_id]['line1'] = line1
-        tle_dict[obj_id]['line2'] = line2
+        tle_dict[obj_id]['line1_list'] = [line1]
+        tle_dict[obj_id]['line2_list'] = [line2]
         
         print(line1)
         print(line2)
@@ -242,8 +270,8 @@ def kep2tle(obj_id_list, kep_dict):
             
         # Add to dictionary
         tle_dict[obj_id] = {}
-        tle_dict[obj_id]['line1'] = line1
-        tle_dict[obj_id]['line2'] = line2
+        tle_dict[obj_id]['line1_list'] = [line1]
+        tle_dict[obj_id]['line2_list'] = [line2]
         
         print(line1)
         print(line2)
@@ -252,7 +280,7 @@ def kep2tle(obj_id_list, kep_dict):
     return tle_dict
 
 
-def launchecef2tle(obj_id_list, ecef_dict):
+def launchecef2tle(obj_id_list, ecef_dict, offline_flag=False):
     '''
     This function converts from ECEF position and velocity to TLE format.
     
@@ -264,6 +292,9 @@ def launchecef2tle(obj_id_list, ecef_dict):
         dictionary of dictionaries containing launch coordinates, indexed by
         object ID
         each entry contains r_ITRF, v_ITRF, UTC datetime
+    offline_flag : boolean, optional
+        flag to determine whether to retrieve EOP data from internet or from
+        a locally saved file (default = False)
     
     Returns
     ------
@@ -276,7 +307,7 @@ def launchecef2tle(obj_id_list, ecef_dict):
     tle_dict = {}
     
     # Retrieve latest EOP data from celestrak.com
-    eop_alldata = get_celestrak_eop_alldata()
+    eop_alldata = get_celestrak_eop_alldata(offline_flag)
     
     # Retrieve IAU Nutation data from file
     IAU1980_nutation = get_nutation_data()
@@ -332,8 +363,8 @@ def launchecef2tle(obj_id_list, ecef_dict):
             
         # Add to dictionary
         tle_dict[obj_id] = {}
-        tle_dict[obj_id]['line1'] = line1
-        tle_dict[obj_id]['line2'] = line2
+        tle_dict[obj_id]['line1_list'] = [line1]
+        tle_dict[obj_id]['line2_list'] = [line2]
         
         print(line1)
         print(line2)
@@ -342,7 +373,215 @@ def launchecef2tle(obj_id_list, ecef_dict):
     return tle_dict
 
 
-def propagate_TLE(obj_id_list, UTC_list, username='', password=''):
+def tletime2datetime(line1):
+    '''
+    This function computes a UTC datetime object from the TLE line1 input year,
+    day of year, and fractional day.
+    
+    Parameters
+    ------
+    line1 : string
+        first line of TLE, contains day of year and fractional day
+    
+    Returns
+    ------
+    UTC : datetime object
+        UTC datetime object
+        
+    Reference
+    ------
+    https://celestrak.com/columns/v04n03/#FAQ03
+    
+    While talking about the epoch, this is perhaps a good place to answer the
+    other time-related questions. First, how is the epoch time format
+    interpreted? This question is best answered by using an example. An epoch
+    of 98001.00000000 corresponds to 0000 UT on 1998 January 01—in other words,
+    midnight between 1997 December 31 and 1998 January 01. An epoch of 
+    98000.00000000 would actually correspond to the beginning of 
+    1997 December 31—strange as that might seem. Note that the epoch day starts
+    at UT midnight (not noon) and that all times are measured mean solar rather 
+    than sidereal time units (the answer to our third question).
+    
+    '''
+    
+    year2 = line1[18:20]
+    doy = float(line1[20:32])  
+    
+    if int(year2) < 50.:
+        year = int('20' + year2)
+    else:
+        year = int('19' + year2)
+    
+    # Need to subtract 1 from day of year to add to this base datetime
+    # In TLE definition doy = 001.000 for Jan 1 Midnight UTC
+    base = datetime(year, 1, 1, 0, 0, 0)
+    UTC = base + timedelta(days=(doy-1.))
+    
+    doy = UTC.timetuple().tm_yday
+    
+    return UTC
+
+
+def plot_tle_radec(tle_dict, UTC_list=[], display_flag=False):
+    '''
+    This function propagates a set of TLEs to a common time and plots object
+    locations in measurement space.
+    
+    Parameters
+    ------
+    tle_dict : dictionary
+        Two Line Element information, indexed by object ID
+
+    '''
+    
+    obj_id_list = sorted(tle_dict.keys())
+    
+    if len(UTC_list) == 0:
+        obj_id = obj_id_list[0]
+        line1 = tle_dict[obj_id]['line1_list'][0]
+        UTC = tletime2datetime(line1)
+        UTC_list = [UTC]
+        
+    output_state = propagate_TLE(obj_id_list, UTC_list, tle_dict)    
+    
+    ra_array = np.zeros((len(obj_id_list), len(UTC_list)))
+    dec_array = np.zeros((len(obj_id_list), len(UTC_list)))
+    ii = 0
+    for obj_id in obj_id_list:
+        
+        r_GCRF_list = output_state[obj_id]['r_GCRF']
+        jj = 0
+        for r_GCRF in r_GCRF_list:
+            x = float(r_GCRF[0])
+            y = float(r_GCRF[1])
+            z = float(r_GCRF[2])
+            r = np.linalg.norm(r_GCRF)
+            
+            ra_array[ii,jj] = atan2(y,x)*180/pi
+            dec_array[ii,jj] = asin(z/r)*180/pi
+            
+            jj += 1
+        
+        ii += 1  
+            
+    
+    jj = 0        
+    for UTC in UTC_list:
+        
+        plt.figure()
+        
+        plt.scatter(ra_array[:,jj], dec_array[:,jj], marker='o', s=50,
+                    c=np.linspace(0,1,len(obj_id_list)),
+                    cmap=plt.get_cmap('nipy_spectral'))
+        
+        for label, x, y in zip(obj_id_list, ra_array[:,jj], dec_array[:,jj]):
+            plt.annotate(
+            label,
+            xy=(x, y), xytext=(-20, 20),
+            textcoords='offset points', ha='right', va='bottom',
+            bbox=dict(boxstyle='round,pad=0.5', fc='yellow', alpha=0.5),
+            arrowprops=dict(arrowstyle = '->', connectionstyle='arc3,rad=0'))
+            
+        plt.xlabel('Right Ascension [deg]')
+        plt.ylabel('Declination [deg]')
+        plt.title('TLE Measurement Space ' + UTC.strftime("%Y-%m-%d %H:%M:%S"))
+
+        plt.xlim([-180, 180])
+        plt.ylim([-90, 90])
+        
+        jj += 1
+        
+    if display_flag:
+        plt.show()
+    
+    return
+
+
+def plot_all_tle_common_time(obj_id_list, UTC_list):
+    '''
+    This function retrieves all TLEs for desired objects within the window
+    specified by UTC_list. It finds the object with the most TLEs during the 
+    window and propagates all other TLEs to each epoch for that object, then
+    plots them together in measurement space.
+    
+    Parameters
+    ------
+    obj_id_list : list
+        object NORAD IDs, int
+    UTC_list : list
+        2 element list giving start and end times as UTC datetime objects    
+    
+    '''
+    
+    # Retrieve all TLEs in window
+    tle_dict = get_spacetrack_tle_data(obj_id_list, UTC_list)
+    
+    print(tle_dict)
+    
+    # Find object with most TLE entries
+    nmax = 0
+    for obj_id in obj_id_list:
+        line1_list = tle_dict[obj_id]['line1_list']
+        ntle = len(line1_list)
+        if ntle > nmax:
+            nmax = ntle
+            plot_obj = obj_id
+    
+    print('plot obj', plot_obj)
+    print('nmax', nmax)
+    
+    # Plot all TLEs at all times
+    line1_list = tle_dict[plot_obj]['line1_list']
+    for line1 in line1_list:
+        UTC = tletime2datetime(line1)
+        print(UTC)
+        plot_tle_radec(tle_dict, UTC_list=[UTC])
+    
+    
+    plt.show()
+    
+    return
+
+
+def find_closest_tle_epoch(line1_list, line2_list, UTC):
+    '''
+    This function finds the TLE with the epoch closest to the given UTC time.
+    
+    Parameters
+    ------
+    line1_list : list
+        list of TLE line1 strings
+    line2_list : list
+        list of TLE line2 strings
+    UTC : datetime object
+        UTC time for which closest TLE is desired
+        
+    Returns
+    ------
+    line1 : string
+        TLE line1 with epoch closest to UTC
+    line2 : string
+        TLE line2 with epoch closest to UTC
+    
+    '''
+    
+    minimum = 1e12
+    for ii in range(len(line1_list)):
+        line1 = line1_list[ii]
+        tle_epoch = tletime2datetime(line1)
+        dt_sec = abs((UTC - tle_epoch).total_seconds())
+        if dt_sec < minimum:
+            ind = ii
+            minimum = dt_sec
+            
+    line1 = line1_list[ind]
+    line2 = line2_list[ind]
+    
+    return line1, line2
+
+
+def propagate_TLE(obj_id_list, UTC_list, tle_dict={}, offline_flag=False,
+                  username='', password=''):
     '''
     This function retrieves TLE data for the objects in the input list from
     space-track.org and propagates them to the times given in UTC_list.  The
@@ -355,6 +594,9 @@ def propagate_TLE(obj_id_list, UTC_list, username='', password=''):
         object NORAD IDs
     UTC_list : list
         datetime objects in UTC
+    offline_flag : boolean, optional
+        flag to determine whether to retrieve EOP data from internet or from
+        a locally saved file (default = False)
     username : string, optional
         space-track.org username (code will prompt for input if not supplied)
     password : string, optional
@@ -368,11 +610,17 @@ def propagate_TLE(obj_id_list, UTC_list, username='', password=''):
         
     '''
     
-    # Retrieve latest TLE data from space-track.org
-    tle_dict = get_spacetrack_tle_data(obj_id_list, username, password)
+    # If no TLE information is provided, retrieve from sources as needed
+    if len(tle_dict) == 0:
+    
+        # Retrieve latest TLE data from space-track.org
+        tle_dict = get_spacetrack_tle_data(obj_id_list, username, password)
+        
+        # Retreive TLE data from database
+        
     
     # Retrieve latest EOP data from celestrak.com
-    eop_alldata = get_celestrak_eop_alldata()
+    eop_alldata = get_celestrak_eop_alldata(offline_flag)
     
     # Retrieve IAU Nutation data from file
     IAU1980_nutation = get_nutation_data()
@@ -381,8 +629,8 @@ def propagate_TLE(obj_id_list, UTC_list, username='', password=''):
     output_state = {}
     for obj_id in obj_id_list:
         
-        line1 = tle_dict[obj_id]['line1']
-        line2 = tle_dict[obj_id]['line2']
+        line1_list = tle_dict[obj_id]['line1_list']
+        line2_list = tle_dict[obj_id]['line2_list']
         
         output_state[obj_id] = {}
         output_state[obj_id]['UTC'] = []
@@ -393,6 +641,9 @@ def propagate_TLE(obj_id_list, UTC_list, username='', password=''):
         
         # Loop over times
         for UTC in UTC_list:
+            
+            # Find the closest TLE by epoch
+            line1, line2 = find_closest_tle_epoch(line1_list, line2_list, UTC)
             
             # Propagate TLE using SGP4
             satellite = twoline2rv(line1, line2, wgs84)
@@ -433,16 +684,19 @@ def propagate_TLE(obj_id_list, UTC_list, username='', password=''):
 if __name__ == '__main__' :
 
     
-    obj_id_list = [43014]
-    UTC_list = [datetime(2018, 6, 23, 0, 0, 0)]
+    obj_id_list = [43013, 43014, 43015, 43016]
+    UTC_list = [datetime(2017, 11, 18, 0, 0, 0),
+                datetime(2017, 11, 19, 0, 0, 0)]
+#    
+#    
+#    output_state = propagate_TLE(obj_id_list, UTC_list)
+#    
+#    print(output_state)
     
+    plt.close('all')
     
-    output_state = propagate_TLE(obj_id_list, UTC_list)
-    
-    print(output_state)
-    
-    
-    
+#    tle_dict = get_spacetrack_tle_data(obj_id_list, UTC_list)
+    plot_all_tle_common_time(obj_id_list, UTC_list)
     
     
     

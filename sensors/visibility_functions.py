@@ -13,9 +13,10 @@ from sensors import define_sensors
 from sensors import get_database_sensor_data
 from utilities.tle_functions import get_spacetrack_tle_data
 from utilities.tle_functions import get_database_tle_data
+from utilities.tle_functions import find_closest_tle_epoch
 
 
-def define_RSOs(obj_id_list, tle_dict={}, source='spacetrack'):
+def define_RSOs(obj_id_list, UTC, tle_dict={}, source='spacetrack'):
     '''
     This function generates the resident space object (RSO) dictionary by 
     retrieving data about RSOs including recent position/velocity states
@@ -52,7 +53,8 @@ def define_RSOs(obj_id_list, tle_dict={}, source='spacetrack'):
         # Download from space-track.org
         if source == 'spacetrack':            
             
-            tle_dict = get_spacetrack_tle_data(obj_id_list)
+            UTC_list = [UTC]
+            tle_dict = get_spacetrack_tle_data(obj_id_list, UTC_list)
             
         # Retrieve from graph database
         if source == 'database':
@@ -62,8 +64,10 @@ def define_RSOs(obj_id_list, tle_dict={}, source='spacetrack'):
 
     # Retrieve TLE data and form RSO dictionary using skyfield
     for obj_id in obj_id_list:
-        line1 = tle_dict[obj_id]['line1']
-        line2 = tle_dict[obj_id]['line2']
+        line1_list = tle_dict[obj_id]['line1_list']
+        line2_list = tle_dict[obj_id]['line2_list']
+        
+        line1, line2 = find_closest_tle_epoch(line1_list, line2_list, UTC)
         
         # Instantiate skyfield object
         satellite = EarthSatellite(line1, line2, name=str(obj_id))
@@ -86,9 +90,9 @@ def define_RSOs(obj_id_list, tle_dict={}, source='spacetrack'):
             # Dummy value for all satellites            
             rso_dict[obj_id]['radius_m'] = 1.
             rso_dict[obj_id]['albedo'] = 0.1
-            rso_dict[obj_id]['listen_flag'] = False
+            rso_dict[obj_id]['listen_flag'] = True
             rso_dict[obj_id]['frequency_hz'] = 900e6
-            rso_dict[obj_id]['laser_lim'] = 0.
+            rso_dict[obj_id]['laser_lim'] = 10.
     
     return rso_dict
 
@@ -146,7 +150,9 @@ def compute_visible_passes(UTC_array, obj_id_list, sensor_id_list, ephemeris,
     Re = ERAD/1000.   # km
     
     # Generate resident space object dictionary
-    rso_dict = define_RSOs(obj_id_list, tle_dict, source)
+    UTC0 = UTC_array[0].utc_datetime()
+    UTC0 = UTC0.replace(tzinfo=None)
+    rso_dict = define_RSOs(obj_id_list, UTC0, tle_dict, source)
     
     # Load sensor data
     # Include options here to load from file, URL, graph database, ...

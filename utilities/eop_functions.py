@@ -4,6 +4,7 @@ import requests
 import pandas as pd
 import os
 import sys
+import pickle
 
 sys.path.append('../')
 
@@ -52,13 +53,19 @@ from utilities.numerical_methods import interp_lagrange
 ###############################################################################
 
 
-def get_celestrak_eop_alldata():
+def get_celestrak_eop_alldata(offline_flag=False):
     '''
     This function retrieves the full EOP data file from celestrak.com.
     
     Format
     ------
     http://celestrak.com/SpaceData/EOP-format.asp
+    
+    Parameters
+    ------
+    offline_flag : boolean, optional
+        flag to determine whether to retrieve EOP data from internet or from
+        a locally saved file (default = False)
     
     Returns
     ------
@@ -67,22 +74,53 @@ def get_celestrak_eop_alldata():
         information
     '''
     
-    pageData = 'https://celestrak.com/SpaceData/eop19620101.txt'
-
-    r = requests.get(pageData)
-    if r.status_code != requests.codes.ok:
-        print("Error: Page data request failed.")            
+    if offline_flag:
+        
+        # Load data from file
+        fname = os.path.join('../input_data', 'eop_alldata.pkl')        
+        pklFile = open(fname, 'rb')
+        data = pickle.load(pklFile)
+        data_text = data[0]
+        pklFile.close() 
+        
+    else:
     
-    ind_BEGIN_OBSERVED = r.text.find('BEGIN OBSERVED')
-    ind_END_OBSERVED = r.text.find('END OBSERVED')
-    ind_BEGIN_PREDICTED = r.text.find('BEGIN PREDICTED')
-    ind_END_PREDICTED = r.text.find('END PREDICTED')
-
-    # Reduce to data
-    data_text = r.text[ind_BEGIN_OBSERVED+16:ind_END_OBSERVED] \
-        + r.text[ind_BEGIN_PREDICTED+17:ind_END_PREDICTED]
+        # Retrieve data from internet
+        pageData = 'https://celestrak.com/SpaceData/eop19620101.txt'
+    
+        r = requests.get(pageData)
+        if r.status_code != requests.codes.ok:
+            print("Error: Page data request failed.")            
+        
+        ind_BEGIN_OBSERVED = r.text.find('BEGIN OBSERVED')
+        ind_END_OBSERVED = r.text.find('END OBSERVED')
+        ind_BEGIN_PREDICTED = r.text.find('BEGIN PREDICTED')
+        ind_END_PREDICTED = r.text.find('END PREDICTED')
+    
+        # Reduce to data
+        data_text = r.text[ind_BEGIN_OBSERVED+16:ind_END_OBSERVED] \
+            + r.text[ind_BEGIN_PREDICTED+17:ind_END_PREDICTED]
 
     return data_text
+
+
+def save_celestrak_eop_alldata():
+    '''
+    This function saves EOP data in a pickle file for use when offline or
+    for reducing computational demand.
+    
+    '''
+    
+    data_text = get_celestrak_eop_alldata()
+    
+    fname = os.path.join('../input_data', 'eop_alldata.pkl')
+    
+    # Save data    
+    pklFile = open( fname, 'wb' )
+    pickle.dump( [data_text], pklFile, -1 )
+    pklFile.close()
+    
+    return
 
 
 def get_eop_data(data_text, UTC):
