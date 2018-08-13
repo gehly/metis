@@ -416,19 +416,13 @@ def tletime2datetime(line1):
     # In TLE definition doy = 001.000 for Jan 1 Midnight UTC
     base = datetime(year, 1, 1, 0, 0, 0)
     UTC = base + timedelta(days=(doy-1.))
-        
-    print(doy)
-    print(year)
-    print(UTC)
     
     doy = UTC.timetuple().tm_yday
-    
-    print(doy)
     
     return UTC
 
 
-def plot_tle_spread(tle_dict, UTC_list=[]):
+def plot_tle_radec(tle_dict, UTC_list=[], display_flag=False):
     '''
     This function propagates a set of TLEs to a common time and plots object
     locations in measurement space.
@@ -497,6 +491,51 @@ def plot_tle_spread(tle_dict, UTC_list=[]):
         
         jj += 1
         
+    if display_flag:
+        plt.show()
+    
+    return
+
+
+def plot_all_tle_common_time(obj_id_list, UTC_list):
+    '''
+    This function retrieves all TLEs for desired objects within the window
+    specified by UTC_list. It finds the object with the most TLEs during the 
+    window and propagates all other TLEs to each epoch for that object, then
+    plots them together in measurement space.
+    
+    Parameters
+    ------
+    obj_id_list : list
+        object NORAD IDs, int
+    UTC_list : list
+        2 element list giving start and end times as UTC datetime objects    
+    
+    '''
+    
+    # Retrieve all TLEs in window
+    tle_dict = get_spacetrack_tle_data(obj_id_list, UTC_list)
+    
+    print(tle_dict)
+    
+    # Find object with most TLE entries
+    nmax = 0
+    for obj_id in obj_id_list:
+        line1_list = tle_dict[obj_id]['line1_list']
+        ntle = len(line1_list)
+        if ntle > nmax:
+            nmax = ntle
+            plot_obj = obj_id
+    
+    print('plot obj', plot_obj)
+    print('nmax', nmax)
+    
+    # Plot all TLEs at all times
+    line1_list = tle_dict[plot_obj]['line1_list']
+    for line1 in line1_list:
+        UTC = tletime2datetime(line1)
+        print(UTC)
+        plot_tle_radec(tle_dict, UTC_list=[UTC])
     
     
     plt.show()
@@ -656,8 +695,8 @@ if __name__ == '__main__' :
     
     plt.close('all')
     
-    tle_dict = get_spacetrack_tle_data(obj_id_list, UTC_list)
-    plot_tle_spread(tle_dict, UTC_list)
+#    tle_dict = get_spacetrack_tle_data(obj_id_list, UTC_list)
+    plot_all_tle_common_time(obj_id_list, UTC_list)
     
     
     
