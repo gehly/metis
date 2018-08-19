@@ -18,9 +18,22 @@ from utilities.time_systems import dt2jd
 from utilities.eop_functions import get_eop_data
 from sensors.measurements import compute_measurement
 
+###############################################################################
+#
+# This file contains functions to implement the Interacting Multiple Model
+# algorithm, used to identify and estimate maneuvering target parameters.
+#
+# References
+#   [1] Blackman, S. and Popoli, R., "Design and Analysis of Modern Tracking
+#       Systems," Artech House Radar Library, 1999.
+#
+#
+#
+###############################################################################
+
 
 def imm_filter(model_params_file, sensor_file, meas_file, filter_output_file,
-               ephemeris, ts, method='mdist', alpha=1.):
+               ephemeris, ts, method='imm_mixcovar', alpha=1.):
     '''
     
     '''
@@ -136,7 +149,7 @@ def imm_filter(model_params_file, sensor_file, meas_file, filter_output_file,
     return output_dict
 
 
-def imm_mixing(model_bank_in, TPM):
+def imm_mixing(model_bank_in, TPM, method='imm_mixcovar'):
     '''
     
     '''
@@ -180,12 +193,19 @@ def imm_mixing(model_bank_in, TPM):
             mj += mu[ii,jj] * mi
             
         # Compute weighted mean covar Pj
-        Pj = np.zeros((n,n))
-        for ii in range(r):
-            mi = mi_list[ii]
-            Pi = Pi_list[ii]
-            DP = np.dot((mi-mj), (mi-mj).T)
-            Pj += mu[ii,jj] * (Pi + DP)
+        # Option to mix covariances
+        if method == 'imm_mixcovar':
+            Pj = np.zeros((n,n))
+            for ii in range(r):
+                mi = mi_list[ii]
+                Pi = Pi_list[ii]
+                DP = np.dot((mi-mj), (mi-mj).T)
+                Pj += mu[ii,jj] * (Pi + DP)
+        
+        # Option to retain model covariance - no mixing
+        # Per Reference [1] P. 232, mixing covars may degrade performance
+        else:
+            Pj = Pi_list[jj]
             
         # Store output
         mj_list.append(mj)
