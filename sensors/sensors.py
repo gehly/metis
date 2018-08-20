@@ -469,7 +469,7 @@ def define_sensors(sensor_id_list):
 
     print('Arequipa Laser')
     lat_gs = -16.4657
-    lon_gs =  71.4930
+    lon_gs =  -71.4930
     ht_gs = 2.48905  # km
     geodetic_latlonht = [lat_gs, lon_gs, ht_gs]
     
@@ -524,7 +524,7 @@ def define_sensors(sensor_id_list):
 
     print('Arequipa Optical')
     lat_gs = -16.4657
-    lon_gs =  71.4930
+    lon_gs =  -71.4930
     ht_gs = 2.48905  # km
     geodetic_latlonht = [lat_gs, lon_gs, ht_gs]
     
@@ -690,6 +690,118 @@ def define_sensors(sensor_id_list):
     sensor_dict['Haleakala Optical']['min_pass'] = min_pass
     sensor_dict['Haleakala Optical']['max_pass'] = max_pass
 
+    
+    print('Yarragadee Laser')
+    lat_gs =  -29.0464
+    lon_gs =  115.3467
+    ht_gs = 0.244  # km
+    geodetic_latlonht = [lat_gs, lon_gs, ht_gs]
+    
+    # Constraints/Limits
+    az_lim = [0., 2.*pi]  # rad
+    el_lim = [20.*pi/180., 80.*pi/180.]  # rad
+    rg_lim = [0., 10000.]   # km
+    
+    # FOV dimensions
+    LAM_dim = 0.5   # deg
+    PHI_dim = 0.5   # deg
+    
+    # Convert to radians
+    LAM_half = 0.5*LAM_dim*pi/180
+    PHI_half = 0.5*PHI_dim*pi/180
+    FOV_hlim = [-LAM_half, LAM_half]
+    FOV_vlim = [-PHI_half, PHI_half]
+   
+    # Measurement types and noise
+    meas_types = ['rg', 'az', 'el']
+    sigma_dict = {}
+    sigma_dict['rg'] = 0.001  # km
+    sigma_dict['az'] = 5.*arcsec2rad   # rad
+    sigma_dict['el'] = 5.*arcsec2rad  # rad
+    
+    # Pass parameters
+    max_pass = 6000.
+    min_pass = 60.
+    max_gap = 60.
+    obs_gap = 1.
+    
+    # Location and constraints
+    sensor_dict['Yarragadee Laser'] = {}
+    sensor_dict['Yarragadee Laser']['geodetic_latlonht'] = geodetic_latlonht
+    sensor_dict['Yarragadee Laser']['el_lim'] = el_lim
+    sensor_dict['Yarragadee Laser']['az_lim'] = az_lim
+    sensor_dict['Yarragadee Laser']['rg_lim'] = rg_lim
+    sensor_dict['Yarragadee Laser']['FOV_hlim'] = FOV_hlim
+    sensor_dict['Yarragadee Laser']['FOV_vlim'] = FOV_vlim
+    sensor_dict['Yarragadee Laser']['laser_output'] = 1.  # Watts
+    
+    # Measurements and noise
+    sensor_dict['Yarragadee Laser']['meas_types'] = meas_types
+    sensor_dict['Yarragadee Laser']['sigma_dict'] = sigma_dict
+    
+    # Pass parameters
+    sensor_dict['Yarragadee Laser']['max_gap'] = max_gap
+    sensor_dict['Yarragadee Laser']['obs_gap'] = obs_gap
+    sensor_dict['Yarragadee Laser']['min_pass'] = min_pass
+    sensor_dict['Yarragadee Laser']['max_pass'] = max_pass
+
+
+    print('Yarragadee Optical')
+    lat_gs =  -29.0464
+    lon_gs =  115.3467
+    ht_gs = 0.244  # km
+    geodetic_latlonht = [lat_gs, lon_gs, ht_gs]
+    
+    # Constraints/Limits
+    az_lim = [0., 2.*pi]  # rad
+    el_lim = [20.*pi/180., 80.*pi/180.]  # rad
+    rg_lim = [0., 1e6]   # km
+    mapp_lim = 16.
+    sun_el_mask = -10.*pi/180.
+    
+    # FOV dimensions
+    LAM_dim = 0.5   # deg
+    PHI_dim = 0.5   # deg
+    
+    # Convert to radians
+    LAM_half = 0.5*LAM_dim*pi/180
+    PHI_half = 0.5*PHI_dim*pi/180
+    FOV_hlim = [-LAM_half, LAM_half]
+    FOV_vlim = [-PHI_half, PHI_half]
+   
+    # Measurement types and noise
+    meas_types = ['az', 'el']
+    sigma_dict = {}
+    sigma_dict['az'] = 5.*arcsec2rad   # rad
+    sigma_dict['el'] = 5.*arcsec2rad  # rad
+    
+    # Pass parameters
+    max_pass = 6000.
+    min_pass = 60.
+    max_gap = 60.
+    obs_gap = 1.
+    
+    # Location and constraints
+    sensor_dict['Yarragadee Optical'] = {}
+    sensor_dict['Yarragadee Optical']['geodetic_latlonht'] = geodetic_latlonht
+    sensor_dict['Yarragadee Optical']['mapp_lim'] = mapp_lim
+    sensor_dict['Yarragadee Optical']['sun_elmask'] = sun_el_mask
+    sensor_dict['Yarragadee Optical']['el_lim'] = el_lim
+    sensor_dict['Yarragadee Optical']['az_lim'] = az_lim
+    sensor_dict['Yarragadee Optical']['rg_lim'] = rg_lim
+    sensor_dict['Yarragadee Optical']['FOV_hlim'] = FOV_hlim
+    sensor_dict['Yarragadee Optical']['FOV_vlim'] = FOV_vlim
+    
+    # Measurements and noise
+    sensor_dict['Yarragadee Optical']['meas_types'] = meas_types
+    sensor_dict['Yarragadee Optical']['sigma_dict'] = sigma_dict
+    
+    # Pass parameters
+    sensor_dict['Yarragadee Optical']['max_gap'] = max_gap
+    sensor_dict['Yarragadee Optical']['obs_gap'] = obs_gap
+    sensor_dict['Yarragadee Optical']['min_pass'] = min_pass
+    sensor_dict['Yarragadee Optical']['max_pass'] = max_pass
+
 
     # Set up sensors
     print('ADFA UHF Radio')
@@ -767,9 +879,9 @@ def get_database_sensor_data(sensor_id_list):
     return sensor_dict
 
 
-def generate_sensor_file(sensor_file):
+def generate_sensor_file(sensor_id_list, sensor_file):
     
-    sensor_dict = define_sensors()
+    sensor_dict = define_sensors(sensor_id_list)
     
     # Save data    
     pklFile = open( sensor_file, 'wb' )

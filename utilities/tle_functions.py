@@ -192,6 +192,7 @@ def launch2tle(obj_id_list, launch_elem_dict):
         doy = UTC.timetuple().tm_yday
         dfrac = UTC.hour/24. + UTC.minute/1440. + \
             (UTC.second + UTC.microsecond/1e6)/86400.
+        dfrac = '{0:.15f}'.format(dfrac)
         
         # Format for output
         line1 = '1 ' + str(obj_id) + 'U ' + year2 + '001A   ' + year2 + \

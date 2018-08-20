@@ -12,7 +12,9 @@ from skyfield.api import Loader, utc
 
 sys.path.append('../')
 
+from utilities.constants import Re
 from utilities.tle_functions import propagate_TLE
+from utilities.tle_functions import launch2tle
 from utilities.eop_functions import get_celestrak_eop_alldata
 from utilities.eop_functions import get_XYs2006_alldata
 from utilities.eop_functions import get_eop_data
@@ -30,8 +32,6 @@ from sensors.sensors import generate_sensor_file
 from sensors.brdf_models import lambertian_sphere
 from sensors.brdf_models import ashikhmin_premoze
 from sensors.measurements import compute_measurement
-from sensors.measurements import ecef2azelrange_rad
-from sensors.visibility import check_visibility
 from propagation.integration_functions import int_twobody
 from propagation.integration_functions import int_twobody_ukf
 from propagation.integration_functions import int_euler_dynamics_notorque
@@ -54,13 +54,13 @@ from estimation import unscented_kalman_filter
 from multiple_model import multiple_model_filter
 
 
-def generate_init_orbit_file(obj_id, UTC, orbit_file):
+def generate_init_orbit_file(obj_id, UTC, orbit_file, tle_dict={}):
     
     
     # Retrieve latest TLE info and propagate to desired start time using SGP4
     obj_id_list = [obj_id]
     UTC_list = [UTC]
-    output_state = propagate_TLE(obj_id_list, UTC_list)
+    output_state = propagate_TLE(obj_id_list, UTC_list, tle_dict)
 
     print(output_state)
     
@@ -1396,8 +1396,8 @@ def run_filter(model_params_file, sensor_file, meas_file, filter_output_file,
 if __name__ == '__main__':
     
 #     General parameters
-    obj_id = 25042
-    UTC = datetime(2018, 7, 12, 9, 0, 0)
+    obj_id = 90003
+    UTC = datetime(2018, 12, 9, 12, 0, 0)
     object_type = 'sphere_low_drag'
     
     # Data directory
@@ -1405,8 +1405,8 @@ if __name__ == '__main__':
                    '2018_08_20_imm')
     
     # Filenames
-    init_orbit_file = datadir / 'iridium39_orbit_2018_07_12.pkl'
-    sensor_file = datadir / 'sensors_ilrs_params.pkl'
+    init_orbit_file = datadir / '500km_orbit_2018_12_09.pkl'
+    sensor_file = datadir / 'sensors_ilrs_laser.pkl'
     
     fname = 'leo_' + object_type + '_2018_07_12_true_params.pkl'
     true_params_file = datadir / fname
@@ -1437,14 +1437,29 @@ if __name__ == '__main__':
     ts = load.timescale()
     
     
-    # Generate initial orbit file       
-    generate_init_orbit_file(obj_id, UTC, init_orbit_file)
+#    # Generate initial orbit file
+#    obj_id = 90003
+#    launch_elem_dict = {}
+#    launch_elem_dict[obj_id] = {}
+#    launch_elem_dict[obj_id]['ra'] = Re + 505.
+#    launch_elem_dict[obj_id]['rp'] = Re + 500.
+#    launch_elem_dict[obj_id]['i'] = 97.6
+#    launch_elem_dict[obj_id]['RAAN'] = 318.
+#    launch_elem_dict[obj_id]['w'] = 0.
+#    launch_elem_dict[obj_id]['M'] = 0.
+#    launch_elem_dict[obj_id]['UTC'] = UTC
+#    obj_id_list = [90003]
+#    tle_dict = launch2tle(obj_id_list, launch_elem_dict)
+#    generate_init_orbit_file(obj_id, UTC, init_orbit_file, tle_dict)
     
     # Generate sensor file
-#    generate_sensor_file(sensor_file)
+#    sensor_id_list = ['Stromlo Laser', 'Zimmerwald Laser',
+#                      'Arequipa Laser', 'Haleakala Laser',
+#                      'Yarragadee Laser']
+#    generate_sensor_file(sensor_id_list, sensor_file)
 
     # Generate true params file
-#    generate_true_params_file(init_orbit_file, obj_id, object_type, true_params_file)
+    generate_true_params_file(init_orbit_file, obj_id, object_type, true_params_file)
     
     
     # Generate truth trajectory and measurements file
