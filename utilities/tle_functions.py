@@ -177,6 +177,8 @@ def launch2tle(obj_id_list, launch_elem_dict):
         M = launch_elem['M']
         UTC = launch_elem['UTC']
         
+        #TODO compute mean elements and convert to TEME frame
+        
         # Compute mean motion in rev/day
         a = (ra + rp)/2.
         n = np.sqrt(GME/a**3.)
@@ -247,6 +249,8 @@ def kep2tle(obj_id_list, kep_dict):
         w = kep_elem['w']
         M = kep_elem['M']
         UTC = kep_elem['UTC']
+        
+        #TODO compute mean elements and convert to TEME frame
         
         # Compute mean motion in rev/day
         n = np.sqrt(GME/a**3.)
@@ -329,6 +333,9 @@ def launchecef2tle(obj_id_list, ecef_dict, offline_flag=False):
         # Convert GCRF to TEME
         r_TEME, v_TEME = gcrf2teme(r_GCRF, v_GCRF, UTC, IAU1980_nutation,
                                    EOP_data)
+        
+        
+        #TODO compute mean elements
         
         # Convert TEME to Keplerian elements
         x_in = np.concatenate((r_TEME, v_TEME), axis=0)

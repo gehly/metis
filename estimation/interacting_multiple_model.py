@@ -44,6 +44,7 @@ def imm_filter(model_params_file, sensor_file, meas_file, filter_output_file,
     model_bank = data[0]
     eop_alldata = data[1]
     XYs_df = data[2]
+    TPM = data[3]
     pklFile.close()
     
     print(model_bank)
@@ -96,7 +97,7 @@ def imm_filter(model_params_file, sensor_file, meas_file, filter_output_file,
         print('Current time: ', ti)
         
         # Mixing Step
-        model_bank = imm_mixing(model_bank)
+        model_bank = imm_mixing(model_bank, TPM, method)
         
         # Predictor step
         model_bank = multiple_model_predictor(model_bank, ti, alpha)    
