@@ -1408,7 +1408,7 @@ if __name__ == '__main__':
     init_orbit_file = datadir / '500km_orbit_2018_12_09.pkl'
     sensor_file = datadir / 'sensors_ilrs_laser.pkl'
     
-    fname = 'leo_' + object_type + '_2018_07_12_true_params.pkl'
+    fname = '500km_' + object_type + '_2018_12_09_true_params.pkl'
     true_params_file = datadir / fname
     
     fname = 'leo_' + object_type + '_2018_07_12_truth.pkl'

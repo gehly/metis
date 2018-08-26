@@ -12,6 +12,71 @@ def define_sensors(sensor_id_list):
     # Common Parameters
     
     # FOV dimensions
+    LAM_dim = 0.73   # deg
+    PHI_dim = 0.59   # deg
+    
+    # Convert to radians
+    LAM_half = 0.5*LAM_dim*pi/180
+    PHI_half = 0.5*PHI_dim*pi/180
+    FOV_hlim = [-LAM_half, LAM_half]
+    FOV_vlim = [-PHI_half, PHI_half]
+    
+    # Constraints/Limits
+    az_lim = [0., 2.*pi]  # rad
+    el_lim = [10.*pi/180., pi/2.]  # rad
+    rg_lim = [0., 1e6]   # km
+    mapp_lim = 16.
+    moon_angle_lim = 0.32  # rad
+    sun_el_mask = -10.*pi/180.  # rad
+    
+    # Measurement types and noise
+    meas_types = ['ra', 'dec', 'mapp']
+    sigma_dict = {}
+    sigma_dict['ra'] = 5.*arcsec2rad   # rad
+    sigma_dict['dec'] = 5.*arcsec2rad  # rad
+    sigma_dict['mapp'] = 0.1
+    
+    # Pass parameters
+    max_pass = 6000.
+    min_pass = 60.
+    max_gap = 60.
+    obs_gap = 1.
+    
+    
+    # Set up sensors
+    print('RMIT ROO')
+    lat_gs = -37.68
+    lon_gs = 145.06
+    ht_gs = 0.1724 # km	
+    geodetic_latlonht = [lat_gs, lon_gs, ht_gs]
+    
+    # Location and constraints
+    sensor_dict['RMIT ROO'] = {}
+    sensor_dict['RMIT ROO']['geodetic_latlonht'] = geodetic_latlonht
+    sensor_dict['RMIT ROO']['mapp_lim'] = mapp_lim
+    sensor_dict['RMIT ROO']['moon_angle_lim'] = moon_angle_lim
+    sensor_dict['RMIT ROO']['el_lim'] = el_lim
+    sensor_dict['RMIT ROO']['az_lim'] = az_lim
+    sensor_dict['RMIT ROO']['rg_lim'] = rg_lim
+    sensor_dict['RMIT ROO']['FOV_hlim'] = FOV_hlim
+    sensor_dict['RMIT ROO']['FOV_vlim'] = FOV_vlim
+    sensor_dict['RMIT ROO']['sun_elmask'] = sun_el_mask
+    
+    # Measurements and noise
+    sensor_dict['RMIT ROO']['meas_types'] = meas_types
+    sensor_dict['RMIT ROO']['sigma_dict'] = sigma_dict
+    
+    # Pass parameters
+    sensor_dict['RMIT ROO']['max_gap'] = max_gap
+    sensor_dict['RMIT ROO']['obs_gap'] = obs_gap
+    sensor_dict['RMIT ROO']['min_pass'] = min_pass
+    sensor_dict['RMIT ROO']['max_pass'] = max_pass
+
+
+     # Falcon Telescopes
+    # Common Parameters
+    
+    # FOV dimensions
     LAM_dim = 30./60.   # deg
     PHI_dim = 30./60.   # deg
     
@@ -41,8 +106,8 @@ def define_sensors(sensor_id_list):
     min_pass = 60.
     max_gap = 60.
     obs_gap = 1.
-
-    # Set up sensors
+    
+    
     print('UNSW Falcon')
     lat_gs = -35.29
     lon_gs = 149.17
