@@ -13,7 +13,7 @@ from utilities.attitude import euler_dynamics
 from utilities.attitude import quat_derivative
 from utilities.attitude import quat_inverse
 from utilities.attitude import quat_rotate
-from utilities.constants import GM, Re, wE, J2, SF, c_light, AU_km
+from utilities.constants import GME, Re, wE, J2E, SF, c_light, AU_km
 from utilities.constants import stdatm_rho0, stdatm_ro, stdatm_H
 from utilities.eop_functions import get_eop_data
 from utilities.time_systems import jd2cent

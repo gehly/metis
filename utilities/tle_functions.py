@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 
 sys.path.append('../')
 
+from sensors.sensors import define_sensors
 from utilities.eop_functions import get_celestrak_eop_alldata
 from utilities.eop_functions import get_nutation_data
 from utilities.eop_functions import get_eop_data
@@ -15,6 +16,7 @@ from utilities.coordinate_systems import teme2gcrf
 from utilities.coordinate_systems import gcrf2teme
 from utilities.coordinate_systems import gcrf2itrf
 from utilities.coordinate_systems import itrf2gcrf
+from utilities.coordinate_systems import latlonht2ecef
 from utilities.astrodynamics import element_conversion
 from utilities.constants import GME
 
@@ -177,6 +179,8 @@ def launch2tle(obj_id_list, launch_elem_dict):
         M = launch_elem['M']
         UTC = launch_elem['UTC']
         
+        #TODO compute mean elements and convert to TEME frame
+        
         # Compute mean motion in rev/day
         a = (ra + rp)/2.
         n = np.sqrt(GME/a**3.)
@@ -190,6 +194,7 @@ def launch2tle(obj_id_list, launch_elem_dict):
         doy = UTC.timetuple().tm_yday
         dfrac = UTC.hour/24. + UTC.minute/1440. + \
             (UTC.second + UTC.microsecond/1e6)/86400.
+        dfrac = '{0:.15f}'.format(dfrac)
         
         # Format for output
         line1 = '1 ' + str(obj_id) + 'U ' + year2 + '001A   ' + year2 + \
@@ -247,6 +252,8 @@ def kep2tle(obj_id_list, kep_dict):
         w = kep_elem['w']
         M = kep_elem['M']
         UTC = kep_elem['UTC']
+        
+        #TODO compute mean elements and convert to TEME frame
         
         # Compute mean motion in rev/day
         n = np.sqrt(GME/a**3.)
@@ -329,6 +336,9 @@ def launchecef2tle(obj_id_list, ecef_dict, offline_flag=False):
         # Convert GCRF to TEME
         r_TEME, v_TEME = gcrf2teme(r_GCRF, v_GCRF, UTC, IAU1980_nutation,
                                    EOP_data)
+        
+        
+        #TODO compute mean elements
         
         # Convert TEME to Keplerian elements
         x_in = np.concatenate((r_TEME, v_TEME), axis=0)
@@ -422,7 +432,8 @@ def tletime2datetime(line1):
     return UTC
 
 
-def plot_tle_radec(tle_dict, UTC_list=[], display_flag=False):
+def plot_tle_radec(tle_dict, UTC_list=[], sensor_list=[], display_flag=False,
+                   offline_flag=False):
     '''
     This function propagates a set of TLEs to a common time and plots object
     locations in measurement space.
@@ -482,15 +493,108 @@ def plot_tle_radec(tle_dict, UTC_list=[], display_flag=False):
             bbox=dict(boxstyle='round,pad=0.5', fc='yellow', alpha=0.5),
             arrowprops=dict(arrowstyle = '->', connectionstyle='arc3,rad=0'))
             
-        plt.xlabel('Right Ascension [deg]')
-        plt.ylabel('Declination [deg]')
+        plt.xlabel('Geocentric Right Ascension [deg]')
+        plt.ylabel('Geocentric Declination [deg]')
         plt.title('TLE Measurement Space ' + UTC.strftime("%Y-%m-%d %H:%M:%S"))
 
         plt.xlim([-180, 180])
         plt.ylim([-90, 90])
         
         jj += 1
+    
+    # If sensor location specified, compute and plot topocentric coordinates
+    if len(sensor_list) > 0:
         
+        # Retrieve latest EOP data from celestrak.com
+        eop_alldata = get_celestrak_eop_alldata(offline_flag)
+        
+        # Retrive sensor parameters and loop over sensors
+        sensor_dict = define_sensors(sensor_list)        
+        for sensor_id in sensor_list:
+            sensor = sensor_dict[sensor_id]
+            latlonht = sensor['geodetic_latlonht']
+            lat = latlonht[0]
+            lon = latlonht[1]
+            ht = latlonht[2]
+            sensor_ecef = latlonht2ecef(lat, lon, ht)
+            
+            center = [85.82990416666667, 5.990788888888889]
+            FOV_hlim = [lim*180/pi for lim in sensor['FOV_hlim']]
+            FOV_vlim = [lim*180/pi for lim in sensor['FOV_vlim']]
+            FOVh = [center[0] + FOV_hlim[0], center[0] + FOV_hlim[1]]
+            FOVv = [center[1] + FOV_vlim[0], center[1] + FOV_vlim[1]]
+            
+            topo_ra_array = np.zeros((len(obj_id_list), len(UTC_list)))
+            topo_dec_array = np.zeros((len(obj_id_list), len(UTC_list)))
+            ii = 0
+            for obj_id in obj_id_list:
+                
+                r_GCRF_list = output_state[obj_id]['r_GCRF']
+                
+                jj = 0
+                for r_GCRF in r_GCRF_list:
+                    x = float(r_GCRF[0])
+                    y = float(r_GCRF[1])
+                    z = float(r_GCRF[2])
+                    r = np.linalg.norm(r_GCRF)
+                    
+                    UTC = UTC_list[jj]
+                    EOP_data = get_eop_data(eop_alldata, UTC)
+                    sensor_eci, dum = itrf2gcrf(sensor_ecef, np.zeros((3,1)),
+                                                UTC, EOP_data)
+                    
+                    xs = float(sensor_eci[0])
+                    ys = float(sensor_eci[1])
+                    zs = float(sensor_eci[2])
+                    rg = np.linalg.norm(r_GCRF - sensor_eci)
+                    
+                    topo_ra_array[ii,jj] = atan2((y-ys),(x-xs))*180/pi
+                    topo_dec_array[ii,jj] = asin((z-zs)/rg)*180/pi
+                    
+                    print(obj_id)
+                    print(topo_ra_array)
+                    print(topo_dec_array)
+                    
+                    jj += 1
+                
+                ii += 1
+                
+            kk = 0        
+            for UTC in UTC_list:
+                plt.figure()
+                
+                plt.plot(FOVh, [FOVv[0], FOVv[0]], 'k--', lw=2)
+                plt.plot(FOVh, [FOVv[1], FOVv[1]], 'k--', lw=2)
+                plt.plot([FOVh[0], FOVh[0]], FOVv, 'k--', lw=2)
+                plt.plot([FOVh[1], FOVh[1]], FOVv, 'k--', lw=2)
+            
+                plt.scatter(topo_ra_array[:,kk], topo_dec_array[:,kk], marker='o', s=50,
+                            c=np.linspace(0,1,len(obj_id_list)),
+                            cmap=plt.get_cmap('nipy_spectral'))
+                
+                for label, x, y in zip(obj_id_list, topo_ra_array[:,kk], topo_dec_array[:,kk]):
+                    
+                    if label == 39613 or label == 40267:
+                        xytext1 = (0, -30)
+                    else:
+                        xytext1 = (-20, 20)
+                    
+                    plt.annotate(
+                    label,
+                    xy=(x, y), xytext=xytext1,
+                    textcoords='offset points', ha='right', va='bottom',
+                    bbox=dict(boxstyle='round,pad=0.5', fc='yellow', alpha=0.5),
+                    arrowprops=dict(arrowstyle = '->', connectionstyle='arc3,rad=0'))
+                    
+                plt.xlabel('Topocentric Right Ascension [deg]')
+                plt.ylabel('Topocentric Declination [deg]')
+                plt.title('TLE Measurement Space (' + sensor_id + ') ' + UTC.strftime("%Y-%m-%d %H:%M:%S"))
+        
+                plt.xlim([-180, 180])
+                plt.ylim([-90, 90])
+                
+                kk += 1
+            
     if display_flag:
         plt.show()
     
@@ -684,19 +788,41 @@ def propagate_TLE(obj_id_list, UTC_list, tle_dict={}, offline_flag=False,
 if __name__ == '__main__' :
 
     
-    obj_id_list = [43013, 43014, 43015, 43016]
-    UTC_list = [datetime(2017, 11, 18, 0, 0, 0),
-                datetime(2017, 11, 19, 0, 0, 0)]
+#    obj_id_list = [2639, 20777, 28544, 29495, 40146, 42816]
+#    UTC_list = [datetime(2018, 4, 20, 0, 0, 0),
+#                 datetime(2018, 4, 21, 0, 0, 0)]
+    
+    obj_id_list = [40940, 39613, 36287, 39487, 40267, 41836]
+    UTC_list = [datetime(2018, 1, 16, 12, 43, 20)]
+    sensor_list = ['RMIT ROO']
 #    
 #    
-#    output_state = propagate_TLE(obj_id_list, UTC_list)
+    
 #    
 #    print(output_state)
     
     plt.close('all')
     
-#    tle_dict = get_spacetrack_tle_data(obj_id_list, UTC_list)
-    plot_all_tle_common_time(obj_id_list, UTC_list)
+    tle_dict = get_spacetrack_tle_data(obj_id_list, UTC_list)
+#    
+#    UTC_list = [datetime(2018, 4, 20, 8, 0, 0)]
+#    
+#    output_state = propagate_TLE(obj_id_list, UTC_list, tle_dict)
+#    
+#    for obj_id in obj_id_list:
+#        r_GCRF = output_state[obj_id]['r_GCRF'][0]
+#        v_GCRF = output_state[obj_id]['v_GCRF'][0]
+#        x_in = np.concatenate((r_GCRF, v_GCRF), axis=0)
+#        print(obj_id)
+#        print(x_in)
+#        elem = element_conversion(x_in, 1, 0)
+#        print(elem)
+    
+    
+    
+    plot_tle_radec(tle_dict, UTC_list, sensor_list, display_flag=True)
+    
+#    plot_all_tle_common_time(obj_id_list, UTC_list)
     
     
     

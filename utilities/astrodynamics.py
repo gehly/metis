@@ -165,6 +165,36 @@ def mean2hyp(M, e):
     return H
 
 
+def mean2osc(elem):
+    '''
+    This function converts mean Keplerian elements to osculating Keplerian
+    elements using Brouwer-Lyddane Theory.
+    
+    References
+    ------
+    [1] Schaub, H. and Junkins, J.L., Analytical Mechanics of Space Systems."
+        2nd ed., 2009.
+    '''
+    
+    
+    return
+
+
+def osc2mean(elem):
+    '''
+    This function converts osculating Keplerian elements to mean Keplerian
+    elements using Brouwer-Lyddane Theory.
+    
+    References
+    ------
+    [1] Schaub, H. and Junkins, J.L., Analytical Mechanics of Space Systems."
+        2nd ed., 2009.
+    '''
+    
+    
+    return
+
+
 def element_conversion(x_in, iflag, oflag, GM=3.986004e5, dt=0.):
     '''
     This funciton converts between Keplerian orbital elements

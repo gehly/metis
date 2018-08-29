@@ -21,6 +21,8 @@ if __name__ == '__main__':
     ephemeris = load('de430t.bsp')
     ts = load.timescale()
     
+    UTC = datetime(2018, 12, 9, 12, 0, 0)
+    
     launch_elem_dict = {}
     
     # Given orbit data
@@ -32,7 +34,7 @@ if __name__ == '__main__':
     launch_elem_dict[obj_id]['RAAN'] = 309.966
     launch_elem_dict[obj_id]['w'] = 0.
     launch_elem_dict[obj_id]['M'] = 0.
-    launch_elem_dict[obj_id]['UTC'] = datetime(2018, 11, 30, 5, 0, 0)
+    launch_elem_dict[obj_id]['UTC'] = UTC
 
     obj_id = 90002
     launch_elem_dict[obj_id] = {}
@@ -42,21 +44,37 @@ if __name__ == '__main__':
     launch_elem_dict[obj_id]['RAAN'] = 317.567
     launch_elem_dict[obj_id]['w'] = 0.
     launch_elem_dict[obj_id]['M'] = 0.
-    launch_elem_dict[obj_id]['UTC'] = datetime(2018, 11, 30, 5, 0, 0)
+    launch_elem_dict[obj_id]['UTC'] = UTC
+    
+    
+    obj_id = 90003
+    launch_elem_dict[obj_id] = {}
+    launch_elem_dict[obj_id]['ra'] = Re + 505.
+    launch_elem_dict[obj_id]['rp'] = Re + 500.
+    launch_elem_dict[obj_id]['i'] = 97.6
+    launch_elem_dict[obj_id]['RAAN'] = 318.
+    launch_elem_dict[obj_id]['w'] = 0.
+    launch_elem_dict[obj_id]['M'] = 0.
+    launch_elem_dict[obj_id]['UTC'] = UTC
         
     
-    obj_id_list = [90001, 90002]
+    obj_id_list = [90003]
     
     
     tle_dict = launch2tle(obj_id_list, launch_elem_dict)
     
-    sensor_id_list = ['UNSW Falcon', 'ADFA UHF Radio', 'Stromlo Laser']
+    sensor_id_list = ['Stromlo Optical', 'Zimmerwald Optical',
+                      'Arequipa Optical', 'Haleakala Optical',
+                      'Yarragadee Optical']
     
+    
+    
+    UTC2 = datetime(2018, 12, 9, 12, 0, 0)
     
     # Times for visibility check
     ndays = 3
     dt = 10
-    UTC0 = ts.utc(launch_elem_dict[90001]['UTC'].replace(tzinfo=utc)).utc
+    UTC0 = ts.utc(launch_elem_dict[90003]['UTC'].replace(tzinfo=utc)).utc
     sec_array = list(range(0,86400*ndays,dt))
     skyfield_times = ts.utc(UTC0[0], UTC0[1], UTC0[2],
                             UTC0[3], UTC0[4], sec_array)
@@ -71,7 +89,7 @@ if __name__ == '__main__':
     # Generate output file
     vis_file_min_el = 10.
     outdir = os.path.join(metis_dir, 'skyfield_data')
-    vis_file = os.path.join(outdir, 'Fleet_visible_passes.csv')
+    vis_file = os.path.join(outdir, 'iac_visible_passes.csv')
     generate_visibility_file(vis_dict, vis_file, vis_file_min_el)
     
     

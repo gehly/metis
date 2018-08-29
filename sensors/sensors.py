@@ -12,8 +12,8 @@ def define_sensors(sensor_id_list):
     # Common Parameters
     
     # FOV dimensions
-    LAM_dim = 30./60.   # deg
-    PHI_dim = 30./60.   # deg
+    LAM_dim = 0.73   # deg
+    PHI_dim = 0.59   # deg
     
     # Convert to radians
     LAM_half = 0.5*LAM_dim*pi/180
@@ -25,7 +25,7 @@ def define_sensors(sensor_id_list):
     az_lim = [0., 2.*pi]  # rad
     el_lim = [10.*pi/180., pi/2.]  # rad
     rg_lim = [0., 1e6]   # km
-    mapp_lim = 90.
+    mapp_lim = 16.
     moon_angle_lim = 0.32  # rad
     sun_el_mask = -10.*pi/180.  # rad
     
@@ -41,8 +41,73 @@ def define_sensors(sensor_id_list):
     min_pass = 60.
     max_gap = 60.
     obs_gap = 1.
-
+    
+    
     # Set up sensors
+    print('RMIT ROO')
+    lat_gs = -37.68
+    lon_gs = 145.06
+    ht_gs = 0.1724 # km	
+    geodetic_latlonht = [lat_gs, lon_gs, ht_gs]
+    
+    # Location and constraints
+    sensor_dict['RMIT ROO'] = {}
+    sensor_dict['RMIT ROO']['geodetic_latlonht'] = geodetic_latlonht
+    sensor_dict['RMIT ROO']['mapp_lim'] = mapp_lim
+    sensor_dict['RMIT ROO']['moon_angle_lim'] = moon_angle_lim
+    sensor_dict['RMIT ROO']['el_lim'] = el_lim
+    sensor_dict['RMIT ROO']['az_lim'] = az_lim
+    sensor_dict['RMIT ROO']['rg_lim'] = rg_lim
+    sensor_dict['RMIT ROO']['FOV_hlim'] = FOV_hlim
+    sensor_dict['RMIT ROO']['FOV_vlim'] = FOV_vlim
+    sensor_dict['RMIT ROO']['sun_elmask'] = sun_el_mask
+    
+    # Measurements and noise
+    sensor_dict['RMIT ROO']['meas_types'] = meas_types
+    sensor_dict['RMIT ROO']['sigma_dict'] = sigma_dict
+    
+    # Pass parameters
+    sensor_dict['RMIT ROO']['max_gap'] = max_gap
+    sensor_dict['RMIT ROO']['obs_gap'] = obs_gap
+    sensor_dict['RMIT ROO']['min_pass'] = min_pass
+    sensor_dict['RMIT ROO']['max_pass'] = max_pass
+
+
+     # Falcon Telescopes
+    # Common Parameters
+    
+    # FOV dimensions
+    LAM_dim = 30./60.   # deg
+    PHI_dim = 30./60.   # deg
+    
+    # Convert to radians
+    LAM_half = 0.5*LAM_dim*pi/180
+    PHI_half = 0.5*PHI_dim*pi/180
+    FOV_hlim = [-LAM_half, LAM_half]
+    FOV_vlim = [-PHI_half, PHI_half]
+    
+    # Constraints/Limits
+    az_lim = [0., 2.*pi]  # rad
+    el_lim = [10.*pi/180., pi/2.]  # rad
+    rg_lim = [0., 1e6]   # km
+    mapp_lim = 16.
+    moon_angle_lim = 0.32  # rad
+    sun_el_mask = -10.*pi/180.  # rad
+    
+    # Measurement types and noise
+    meas_types = ['ra', 'dec', 'mapp']
+    sigma_dict = {}
+    sigma_dict['ra'] = 5.*arcsec2rad   # rad
+    sigma_dict['dec'] = 5.*arcsec2rad  # rad
+    sigma_dict['mapp'] = 0.1
+    
+    # Pass parameters
+    max_pass = 6000.
+    min_pass = 60.
+    max_gap = 60.
+    obs_gap = 1.
+    
+    
     print('UNSW Falcon')
     lat_gs = -35.29
     lon_gs = 149.17
@@ -244,9 +309,9 @@ def define_sensors(sensor_id_list):
 
 
     print('Stromlo Laser')
-    lat_gs = -35.31805
-    lon_gs = 149.00776
-    ht_gs = 0.742  # km
+    lat_gs = -35.3161
+    lon_gs = 149.0099
+    ht_gs = 0.805  # km
     geodetic_latlonht = [lat_gs, lon_gs, ht_gs]
     
     # Constraints/Limits
@@ -296,6 +361,511 @@ def define_sensors(sensor_id_list):
     sensor_dict['Stromlo Laser']['obs_gap'] = obs_gap
     sensor_dict['Stromlo Laser']['min_pass'] = min_pass
     sensor_dict['Stromlo Laser']['max_pass'] = max_pass
+
+
+    print('Stromlo Optical')
+    lat_gs = -35.3161
+    lon_gs = 149.0099
+    ht_gs = 0.805  # km
+    geodetic_latlonht = [lat_gs, lon_gs, ht_gs]
+    
+    # Constraints/Limits
+    az_lim = [0., 2.*pi]  # rad
+    el_lim = [20.*pi/180., 80.*pi/180.]  # rad
+    rg_lim = [0., 1e6]   # km
+    mapp_lim = 16.
+    sun_el_mask = -10.*pi/180.
+    
+    # FOV dimensions
+    LAM_dim = 0.5   # deg
+    PHI_dim = 0.5   # deg
+    
+    # Convert to radians
+    LAM_half = 0.5*LAM_dim*pi/180
+    PHI_half = 0.5*PHI_dim*pi/180
+    FOV_hlim = [-LAM_half, LAM_half]
+    FOV_vlim = [-PHI_half, PHI_half]
+   
+    # Measurement types and noise
+    meas_types = ['az', 'el']
+    sigma_dict = {}
+    sigma_dict['az'] = 5.*arcsec2rad   # rad
+    sigma_dict['el'] = 5.*arcsec2rad  # rad
+    
+    # Pass parameters
+    max_pass = 6000.
+    min_pass = 60.
+    max_gap = 60.
+    obs_gap = 1.
+    
+    # Location and constraints
+    sensor_dict['Stromlo Optical'] = {}
+    sensor_dict['Stromlo Optical']['geodetic_latlonht'] = geodetic_latlonht
+    sensor_dict['Stromlo Optical']['mapp_lim'] = mapp_lim
+    sensor_dict['Stromlo Optical']['sun_elmask'] = sun_el_mask
+    sensor_dict['Stromlo Optical']['el_lim'] = el_lim
+    sensor_dict['Stromlo Optical']['az_lim'] = az_lim
+    sensor_dict['Stromlo Optical']['rg_lim'] = rg_lim
+    sensor_dict['Stromlo Optical']['FOV_hlim'] = FOV_hlim
+    sensor_dict['Stromlo Optical']['FOV_vlim'] = FOV_vlim
+    
+    # Measurements and noise
+    sensor_dict['Stromlo Optical']['meas_types'] = meas_types
+    sensor_dict['Stromlo Optical']['sigma_dict'] = sigma_dict
+    
+    # Pass parameters
+    sensor_dict['Stromlo Optical']['max_gap'] = max_gap
+    sensor_dict['Stromlo Optical']['obs_gap'] = obs_gap
+    sensor_dict['Stromlo Optical']['min_pass'] = min_pass
+    sensor_dict['Stromlo Optical']['max_pass'] = max_pass
+
+
+    print('Zimmerwald Laser')
+    lat_gs = 46.8772
+    lon_gs = 7.4652
+    ht_gs = 0.9512  # km
+    geodetic_latlonht = [lat_gs, lon_gs, ht_gs]
+    
+    # Constraints/Limits
+    az_lim = [0., 2.*pi]  # rad
+    el_lim = [20.*pi/180., 80.*pi/180.]  # rad
+    rg_lim = [0., 10000.]   # km
+    
+    # FOV dimensions
+    LAM_dim = 0.5   # deg
+    PHI_dim = 0.5   # deg
+    
+    # Convert to radians
+    LAM_half = 0.5*LAM_dim*pi/180
+    PHI_half = 0.5*PHI_dim*pi/180
+    FOV_hlim = [-LAM_half, LAM_half]
+    FOV_vlim = [-PHI_half, PHI_half]
+   
+    # Measurement types and noise
+    meas_types = ['rg', 'az', 'el']
+    sigma_dict = {}
+    sigma_dict['rg'] = 0.001  # km
+    sigma_dict['az'] = 5.*arcsec2rad   # rad
+    sigma_dict['el'] = 5.*arcsec2rad  # rad
+    
+    # Pass parameters
+    max_pass = 6000.
+    min_pass = 60.
+    max_gap = 60.
+    obs_gap = 1.
+    
+    # Location and constraints
+    sensor_dict['Zimmerwald Laser'] = {}
+    sensor_dict['Zimmerwald Laser']['geodetic_latlonht'] = geodetic_latlonht
+    sensor_dict['Zimmerwald Laser']['el_lim'] = el_lim
+    sensor_dict['Zimmerwald Laser']['az_lim'] = az_lim
+    sensor_dict['Zimmerwald Laser']['rg_lim'] = rg_lim
+    sensor_dict['Zimmerwald Laser']['FOV_hlim'] = FOV_hlim
+    sensor_dict['Zimmerwald Laser']['FOV_vlim'] = FOV_vlim
+    sensor_dict['Zimmerwald Laser']['laser_output'] = 1.  # Watts
+    
+    # Measurements and noise
+    sensor_dict['Zimmerwald Laser']['meas_types'] = meas_types
+    sensor_dict['Zimmerwald Laser']['sigma_dict'] = sigma_dict
+    
+    # Pass parameters
+    sensor_dict['Zimmerwald Laser']['max_gap'] = max_gap
+    sensor_dict['Zimmerwald Laser']['obs_gap'] = obs_gap
+    sensor_dict['Zimmerwald Laser']['min_pass'] = min_pass
+    sensor_dict['Zimmerwald Laser']['max_pass'] = max_pass
+
+
+    print('Zimmerwald Optical')
+    lat_gs = 46.8772
+    lon_gs = 7.4652
+    ht_gs = 0.9512  # km
+    geodetic_latlonht = [lat_gs, lon_gs, ht_gs]
+    
+    # Constraints/Limits
+    az_lim = [0., 2.*pi]  # rad
+    el_lim = [20.*pi/180., 80.*pi/180.]  # rad
+    rg_lim = [0., 1e6]   # km
+    mapp_lim = 16.
+    sun_el_mask = -10.*pi/180.
+    
+    # FOV dimensions
+    LAM_dim = 0.5   # deg
+    PHI_dim = 0.5   # deg
+    
+    # Convert to radians
+    LAM_half = 0.5*LAM_dim*pi/180
+    PHI_half = 0.5*PHI_dim*pi/180
+    FOV_hlim = [-LAM_half, LAM_half]
+    FOV_vlim = [-PHI_half, PHI_half]
+   
+    # Measurement types and noise
+    meas_types = ['az', 'el']
+    sigma_dict = {}
+    sigma_dict['az'] = 5.*arcsec2rad   # rad
+    sigma_dict['el'] = 5.*arcsec2rad  # rad
+    
+    # Pass parameters
+    max_pass = 6000.
+    min_pass = 60.
+    max_gap = 60.
+    obs_gap = 1.
+    
+    # Location and constraints
+    sensor_dict['Zimmerwald Optical'] = {}
+    sensor_dict['Zimmerwald Optical']['geodetic_latlonht'] = geodetic_latlonht
+    sensor_dict['Zimmerwald Optical']['mapp_lim'] = mapp_lim
+    sensor_dict['Zimmerwald Optical']['sun_elmask'] = sun_el_mask
+    sensor_dict['Zimmerwald Optical']['el_lim'] = el_lim
+    sensor_dict['Zimmerwald Optical']['az_lim'] = az_lim
+    sensor_dict['Zimmerwald Optical']['rg_lim'] = rg_lim
+    sensor_dict['Zimmerwald Optical']['FOV_hlim'] = FOV_hlim
+    sensor_dict['Zimmerwald Optical']['FOV_vlim'] = FOV_vlim
+    
+    # Measurements and noise
+    sensor_dict['Zimmerwald Optical']['meas_types'] = meas_types
+    sensor_dict['Zimmerwald Optical']['sigma_dict'] = sigma_dict
+    
+    # Pass parameters
+    sensor_dict['Zimmerwald Optical']['max_gap'] = max_gap
+    sensor_dict['Zimmerwald Optical']['obs_gap'] = obs_gap
+    sensor_dict['Zimmerwald Optical']['min_pass'] = min_pass
+    sensor_dict['Zimmerwald Optical']['max_pass'] = max_pass
+
+
+    print('Arequipa Laser')
+    lat_gs = -16.4657
+    lon_gs =  -71.4930
+    ht_gs = 2.48905  # km
+    geodetic_latlonht = [lat_gs, lon_gs, ht_gs]
+    
+    # Constraints/Limits
+    az_lim = [0., 2.*pi]  # rad
+    el_lim = [20.*pi/180., 80.*pi/180.]  # rad
+    rg_lim = [0., 10000.]   # km
+    
+    # FOV dimensions
+    LAM_dim = 0.5   # deg
+    PHI_dim = 0.5   # deg
+    
+    # Convert to radians
+    LAM_half = 0.5*LAM_dim*pi/180
+    PHI_half = 0.5*PHI_dim*pi/180
+    FOV_hlim = [-LAM_half, LAM_half]
+    FOV_vlim = [-PHI_half, PHI_half]
+   
+    # Measurement types and noise
+    meas_types = ['rg', 'az', 'el']
+    sigma_dict = {}
+    sigma_dict['rg'] = 0.001  # km
+    sigma_dict['az'] = 5.*arcsec2rad   # rad
+    sigma_dict['el'] = 5.*arcsec2rad  # rad
+    
+    # Pass parameters
+    max_pass = 6000.
+    min_pass = 60.
+    max_gap = 60.
+    obs_gap = 1.
+    
+    # Location and constraints
+    sensor_dict['Arequipa Laser'] = {}
+    sensor_dict['Arequipa Laser']['geodetic_latlonht'] = geodetic_latlonht
+    sensor_dict['Arequipa Laser']['el_lim'] = el_lim
+    sensor_dict['Arequipa Laser']['az_lim'] = az_lim
+    sensor_dict['Arequipa Laser']['rg_lim'] = rg_lim
+    sensor_dict['Arequipa Laser']['FOV_hlim'] = FOV_hlim
+    sensor_dict['Arequipa Laser']['FOV_vlim'] = FOV_vlim
+    sensor_dict['Arequipa Laser']['laser_output'] = 1.  # Watts
+    
+    # Measurements and noise
+    sensor_dict['Arequipa Laser']['meas_types'] = meas_types
+    sensor_dict['Arequipa Laser']['sigma_dict'] = sigma_dict
+    
+    # Pass parameters
+    sensor_dict['Arequipa Laser']['max_gap'] = max_gap
+    sensor_dict['Arequipa Laser']['obs_gap'] = obs_gap
+    sensor_dict['Arequipa Laser']['min_pass'] = min_pass
+    sensor_dict['Arequipa Laser']['max_pass'] = max_pass
+
+
+    print('Arequipa Optical')
+    lat_gs = -16.4657
+    lon_gs =  -71.4930
+    ht_gs = 2.48905  # km
+    geodetic_latlonht = [lat_gs, lon_gs, ht_gs]
+    
+    # Constraints/Limits
+    az_lim = [0., 2.*pi]  # rad
+    el_lim = [20.*pi/180., 80.*pi/180.]  # rad
+    rg_lim = [0., 1e6]   # km
+    mapp_lim = 16.
+    sun_el_mask = -10.*pi/180.
+    
+    # FOV dimensions
+    LAM_dim = 0.5   # deg
+    PHI_dim = 0.5   # deg
+    
+    # Convert to radians
+    LAM_half = 0.5*LAM_dim*pi/180
+    PHI_half = 0.5*PHI_dim*pi/180
+    FOV_hlim = [-LAM_half, LAM_half]
+    FOV_vlim = [-PHI_half, PHI_half]
+   
+    # Measurement types and noise
+    meas_types = ['az', 'el']
+    sigma_dict = {}
+    sigma_dict['az'] = 5.*arcsec2rad   # rad
+    sigma_dict['el'] = 5.*arcsec2rad  # rad
+    
+    # Pass parameters
+    max_pass = 6000.
+    min_pass = 60.
+    max_gap = 60.
+    obs_gap = 1.
+    
+    # Location and constraints
+    sensor_dict['Arequipa Optical'] = {}
+    sensor_dict['Arequipa Optical']['geodetic_latlonht'] = geodetic_latlonht
+    sensor_dict['Arequipa Optical']['mapp_lim'] = mapp_lim
+    sensor_dict['Arequipa Optical']['sun_elmask'] = sun_el_mask
+    sensor_dict['Arequipa Optical']['el_lim'] = el_lim
+    sensor_dict['Arequipa Optical']['az_lim'] = az_lim
+    sensor_dict['Arequipa Optical']['rg_lim'] = rg_lim
+    sensor_dict['Arequipa Optical']['FOV_hlim'] = FOV_hlim
+    sensor_dict['Arequipa Optical']['FOV_vlim'] = FOV_vlim
+    
+    # Measurements and noise
+    sensor_dict['Arequipa Optical']['meas_types'] = meas_types
+    sensor_dict['Arequipa Optical']['sigma_dict'] = sigma_dict
+    
+    # Pass parameters
+    sensor_dict['Arequipa Optical']['max_gap'] = max_gap
+    sensor_dict['Arequipa Optical']['obs_gap'] = obs_gap
+    sensor_dict['Arequipa Optical']['min_pass'] = min_pass
+    sensor_dict['Arequipa Optical']['max_pass'] = max_pass
+
+
+    print('Haleakala Laser')
+    lat_gs =  20.706489
+    lon_gs =  203.743079
+    ht_gs = 3.056272  # km
+    geodetic_latlonht = [lat_gs, lon_gs, ht_gs]
+    
+    # Constraints/Limits
+    az_lim = [0., 2.*pi]  # rad
+    el_lim = [20.*pi/180., 80.*pi/180.]  # rad
+    rg_lim = [0., 10000.]   # km
+    
+    # FOV dimensions
+    LAM_dim = 0.5   # deg
+    PHI_dim = 0.5   # deg
+    
+    # Convert to radians
+    LAM_half = 0.5*LAM_dim*pi/180
+    PHI_half = 0.5*PHI_dim*pi/180
+    FOV_hlim = [-LAM_half, LAM_half]
+    FOV_vlim = [-PHI_half, PHI_half]
+   
+    # Measurement types and noise
+    meas_types = ['rg', 'az', 'el']
+    sigma_dict = {}
+    sigma_dict['rg'] = 0.001  # km
+    sigma_dict['az'] = 5.*arcsec2rad   # rad
+    sigma_dict['el'] = 5.*arcsec2rad  # rad
+    
+    # Pass parameters
+    max_pass = 6000.
+    min_pass = 60.
+    max_gap = 60.
+    obs_gap = 1.
+    
+    # Location and constraints
+    sensor_dict['Haleakala Laser'] = {}
+    sensor_dict['Haleakala Laser']['geodetic_latlonht'] = geodetic_latlonht
+    sensor_dict['Haleakala Laser']['el_lim'] = el_lim
+    sensor_dict['Haleakala Laser']['az_lim'] = az_lim
+    sensor_dict['Haleakala Laser']['rg_lim'] = rg_lim
+    sensor_dict['Haleakala Laser']['FOV_hlim'] = FOV_hlim
+    sensor_dict['Haleakala Laser']['FOV_vlim'] = FOV_vlim
+    sensor_dict['Haleakala Laser']['laser_output'] = 1.  # Watts
+    
+    # Measurements and noise
+    sensor_dict['Haleakala Laser']['meas_types'] = meas_types
+    sensor_dict['Haleakala Laser']['sigma_dict'] = sigma_dict
+    
+    # Pass parameters
+    sensor_dict['Haleakala Laser']['max_gap'] = max_gap
+    sensor_dict['Haleakala Laser']['obs_gap'] = obs_gap
+    sensor_dict['Haleakala Laser']['min_pass'] = min_pass
+    sensor_dict['Haleakala Laser']['max_pass'] = max_pass
+
+
+    print('Haleakala Optical')
+    lat_gs =  20.706489
+    lon_gs =  203.743079
+    ht_gs = 3.056272  # km
+    geodetic_latlonht = [lat_gs, lon_gs, ht_gs]
+    
+    # Constraints/Limits
+    az_lim = [0., 2.*pi]  # rad
+    el_lim = [20.*pi/180., 80.*pi/180.]  # rad
+    rg_lim = [0., 1e6]   # km
+    mapp_lim = 16.
+    sun_el_mask = -10.*pi/180.
+    
+    # FOV dimensions
+    LAM_dim = 0.5   # deg
+    PHI_dim = 0.5   # deg
+    
+    # Convert to radians
+    LAM_half = 0.5*LAM_dim*pi/180
+    PHI_half = 0.5*PHI_dim*pi/180
+    FOV_hlim = [-LAM_half, LAM_half]
+    FOV_vlim = [-PHI_half, PHI_half]
+   
+    # Measurement types and noise
+    meas_types = ['az', 'el']
+    sigma_dict = {}
+    sigma_dict['az'] = 5.*arcsec2rad   # rad
+    sigma_dict['el'] = 5.*arcsec2rad  # rad
+    
+    # Pass parameters
+    max_pass = 6000.
+    min_pass = 60.
+    max_gap = 60.
+    obs_gap = 1.
+    
+    # Location and constraints
+    sensor_dict['Haleakala Optical'] = {}
+    sensor_dict['Haleakala Optical']['geodetic_latlonht'] = geodetic_latlonht
+    sensor_dict['Haleakala Optical']['mapp_lim'] = mapp_lim
+    sensor_dict['Haleakala Optical']['sun_elmask'] = sun_el_mask
+    sensor_dict['Haleakala Optical']['el_lim'] = el_lim
+    sensor_dict['Haleakala Optical']['az_lim'] = az_lim
+    sensor_dict['Haleakala Optical']['rg_lim'] = rg_lim
+    sensor_dict['Haleakala Optical']['FOV_hlim'] = FOV_hlim
+    sensor_dict['Haleakala Optical']['FOV_vlim'] = FOV_vlim
+    
+    # Measurements and noise
+    sensor_dict['Haleakala Optical']['meas_types'] = meas_types
+    sensor_dict['Haleakala Optical']['sigma_dict'] = sigma_dict
+    
+    # Pass parameters
+    sensor_dict['Haleakala Optical']['max_gap'] = max_gap
+    sensor_dict['Haleakala Optical']['obs_gap'] = obs_gap
+    sensor_dict['Haleakala Optical']['min_pass'] = min_pass
+    sensor_dict['Haleakala Optical']['max_pass'] = max_pass
+
+    
+    print('Yarragadee Laser')
+    lat_gs =  -29.0464
+    lon_gs =  115.3467
+    ht_gs = 0.244  # km
+    geodetic_latlonht = [lat_gs, lon_gs, ht_gs]
+    
+    # Constraints/Limits
+    az_lim = [0., 2.*pi]  # rad
+    el_lim = [20.*pi/180., 80.*pi/180.]  # rad
+    rg_lim = [0., 10000.]   # km
+    
+    # FOV dimensions
+    LAM_dim = 0.5   # deg
+    PHI_dim = 0.5   # deg
+    
+    # Convert to radians
+    LAM_half = 0.5*LAM_dim*pi/180
+    PHI_half = 0.5*PHI_dim*pi/180
+    FOV_hlim = [-LAM_half, LAM_half]
+    FOV_vlim = [-PHI_half, PHI_half]
+   
+    # Measurement types and noise
+    meas_types = ['rg', 'az', 'el']
+    sigma_dict = {}
+    sigma_dict['rg'] = 0.001  # km
+    sigma_dict['az'] = 5.*arcsec2rad   # rad
+    sigma_dict['el'] = 5.*arcsec2rad  # rad
+    
+    # Pass parameters
+    max_pass = 6000.
+    min_pass = 60.
+    max_gap = 60.
+    obs_gap = 1.
+    
+    # Location and constraints
+    sensor_dict['Yarragadee Laser'] = {}
+    sensor_dict['Yarragadee Laser']['geodetic_latlonht'] = geodetic_latlonht
+    sensor_dict['Yarragadee Laser']['el_lim'] = el_lim
+    sensor_dict['Yarragadee Laser']['az_lim'] = az_lim
+    sensor_dict['Yarragadee Laser']['rg_lim'] = rg_lim
+    sensor_dict['Yarragadee Laser']['FOV_hlim'] = FOV_hlim
+    sensor_dict['Yarragadee Laser']['FOV_vlim'] = FOV_vlim
+    sensor_dict['Yarragadee Laser']['laser_output'] = 1.  # Watts
+    
+    # Measurements and noise
+    sensor_dict['Yarragadee Laser']['meas_types'] = meas_types
+    sensor_dict['Yarragadee Laser']['sigma_dict'] = sigma_dict
+    
+    # Pass parameters
+    sensor_dict['Yarragadee Laser']['max_gap'] = max_gap
+    sensor_dict['Yarragadee Laser']['obs_gap'] = obs_gap
+    sensor_dict['Yarragadee Laser']['min_pass'] = min_pass
+    sensor_dict['Yarragadee Laser']['max_pass'] = max_pass
+
+
+    print('Yarragadee Optical')
+    lat_gs =  -29.0464
+    lon_gs =  115.3467
+    ht_gs = 0.244  # km
+    geodetic_latlonht = [lat_gs, lon_gs, ht_gs]
+    
+    # Constraints/Limits
+    az_lim = [0., 2.*pi]  # rad
+    el_lim = [20.*pi/180., 80.*pi/180.]  # rad
+    rg_lim = [0., 1e6]   # km
+    mapp_lim = 16.
+    sun_el_mask = -10.*pi/180.
+    
+    # FOV dimensions
+    LAM_dim = 0.5   # deg
+    PHI_dim = 0.5   # deg
+    
+    # Convert to radians
+    LAM_half = 0.5*LAM_dim*pi/180
+    PHI_half = 0.5*PHI_dim*pi/180
+    FOV_hlim = [-LAM_half, LAM_half]
+    FOV_vlim = [-PHI_half, PHI_half]
+   
+    # Measurement types and noise
+    meas_types = ['az', 'el']
+    sigma_dict = {}
+    sigma_dict['az'] = 5.*arcsec2rad   # rad
+    sigma_dict['el'] = 5.*arcsec2rad  # rad
+    
+    # Pass parameters
+    max_pass = 6000.
+    min_pass = 60.
+    max_gap = 60.
+    obs_gap = 1.
+    
+    # Location and constraints
+    sensor_dict['Yarragadee Optical'] = {}
+    sensor_dict['Yarragadee Optical']['geodetic_latlonht'] = geodetic_latlonht
+    sensor_dict['Yarragadee Optical']['mapp_lim'] = mapp_lim
+    sensor_dict['Yarragadee Optical']['sun_elmask'] = sun_el_mask
+    sensor_dict['Yarragadee Optical']['el_lim'] = el_lim
+    sensor_dict['Yarragadee Optical']['az_lim'] = az_lim
+    sensor_dict['Yarragadee Optical']['rg_lim'] = rg_lim
+    sensor_dict['Yarragadee Optical']['FOV_hlim'] = FOV_hlim
+    sensor_dict['Yarragadee Optical']['FOV_vlim'] = FOV_vlim
+    
+    # Measurements and noise
+    sensor_dict['Yarragadee Optical']['meas_types'] = meas_types
+    sensor_dict['Yarragadee Optical']['sigma_dict'] = sigma_dict
+    
+    # Pass parameters
+    sensor_dict['Yarragadee Optical']['max_gap'] = max_gap
+    sensor_dict['Yarragadee Optical']['obs_gap'] = obs_gap
+    sensor_dict['Yarragadee Optical']['min_pass'] = min_pass
+    sensor_dict['Yarragadee Optical']['max_pass'] = max_pass
 
 
     # Set up sensors
@@ -374,9 +944,9 @@ def get_database_sensor_data(sensor_id_list):
     return sensor_dict
 
 
-def generate_sensor_file(sensor_file):
+def generate_sensor_file(sensor_id_list, sensor_file):
     
-    sensor_dict = define_sensors()
+    sensor_dict = define_sensors(sensor_id_list)
     
     # Save data    
     pklFile = open( sensor_file, 'wb' )
