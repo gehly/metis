@@ -551,6 +551,10 @@ def plot_tle_radec(tle_dict, UTC_list=[], sensor_list=[], display_flag=False,
                     topo_ra_array[ii,jj] = atan2((y-ys),(x-xs))*180/pi
                     topo_dec_array[ii,jj] = asin((z-zs)/rg)*180/pi
                     
+                    print(obj_id)
+                    print(topo_ra_array)
+                    print(topo_dec_array)
+                    
                     jj += 1
                 
                 ii += 1
@@ -784,13 +788,13 @@ def propagate_TLE(obj_id_list, UTC_list, tle_dict={}, offline_flag=False,
 if __name__ == '__main__' :
 
     
-    obj_id_list = [2639, 20777, 28544, 29495, 40146, 42816]
-    UTC_list = [datetime(2018, 4, 20, 0, 0, 0),
-                 datetime(2018, 4, 21, 0, 0, 0)]
+#    obj_id_list = [2639, 20777, 28544, 29495, 40146, 42816]
+#    UTC_list = [datetime(2018, 4, 20, 0, 0, 0),
+#                 datetime(2018, 4, 21, 0, 0, 0)]
     
-#    obj_id_list = [40940, 39613, 36287, 39487, 40267, 41836]
-#    UTC_list = [datetime(2018, 1, 16, 12, 43, 20)]
-#    sensor_list = ['RMIT ROO']
+    obj_id_list = [40940, 39613, 36287, 39487, 40267, 41836]
+    UTC_list = [datetime(2018, 1, 16, 12, 43, 20)]
+    sensor_list = ['RMIT ROO']
 #    
 #    
     
@@ -800,23 +804,23 @@ if __name__ == '__main__' :
     plt.close('all')
     
     tle_dict = get_spacetrack_tle_data(obj_id_list, UTC_list)
+#    
+#    UTC_list = [datetime(2018, 4, 20, 8, 0, 0)]
+#    
+#    output_state = propagate_TLE(obj_id_list, UTC_list, tle_dict)
+#    
+#    for obj_id in obj_id_list:
+#        r_GCRF = output_state[obj_id]['r_GCRF'][0]
+#        v_GCRF = output_state[obj_id]['v_GCRF'][0]
+#        x_in = np.concatenate((r_GCRF, v_GCRF), axis=0)
+#        print(obj_id)
+#        print(x_in)
+#        elem = element_conversion(x_in, 1, 0)
+#        print(elem)
     
-    UTC_list = [datetime(2018, 4, 20, 8, 0, 0)]
-    
-    output_state = propagate_TLE(obj_id_list, UTC_list, tle_dict)
-    
-    for obj_id in obj_id_list:
-        r_GCRF = output_state[obj_id]['r_GCRF'][0]
-        v_GCRF = output_state[obj_id]['v_GCRF'][0]
-        x_in = np.concatenate((r_GCRF, v_GCRF), axis=0)
-        print(obj_id)
-        print(x_in)
-        elem = element_conversion(x_in, 1, 0)
-        print(elem)
     
     
-    
-#    plot_tle_radec(tle_dict, UTC_list, sensor_list, display_flag=True)
+    plot_tle_radec(tle_dict, UTC_list, sensor_list, display_flag=True)
     
 #    plot_all_tle_common_time(obj_id_list, UTC_list)
     
