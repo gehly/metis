@@ -7,7 +7,7 @@ import sys
 
 sys.path.append('../')
 
-from utilities.constants import GME
+from utilities.constants import GME, J2E, Re
 
 ############################################################################
 # Orbit Stuff
@@ -176,6 +176,18 @@ def mean2osc(elem):
         2nd ed., 2009.
     '''
     
+    # Retrieve inputs
+    a = float(elem[0])
+    e = float(elem[1])
+    i = float(elem[2]) * pi/180
+    RAAN = float(elem[3]) * pi/180
+    w = float(elem[4]) * pi/180
+    Mo = float(elem[5]) * pi/180
+    
+    # Compute gamma parameter
+    gamma2 = (J2E/2.) * (Re/a)**2.
+    
+    
     
     return
 
@@ -191,8 +203,45 @@ def osc2mean(elem):
         2nd ed., 2009.
     '''
     
+    # Retrieve inputs
+    a = float(elem[0])
+    e = float(elem[1])
+    i = float(elem[2]) * pi/180
+    RAAN = float(elem[3]) * pi/180
+    w = float(elem[4]) * pi/180
+    Mo = float(elem[5]) * pi/180
+    
+    # Compute gamma parameter
+    gamma2 = -(J2E/2.) * (Re/a)**2.
+    
     
     return
+
+
+def brouwer_lyddane(a0,e0,i0,RAAN0,w0,M0,gamma0):
+    '''
+    
+    
+    '''
+    
+    # Compute transformation parameters
+    eta = np.sqrt(1. - e0**2.)
+    gamma1 = gamma0/eta**4.
+    
+    # Compute true anomaly
+    E0 = mean2ecc(M0, e0)
+    f0 = ecc2true(E0, e0)
+    
+    a_r = (1. + e0*cos(f0))/eta**2.
+    
+    a1 = a0 + a0*gamma0*((3.*cos(i0)**2. -1.)*(a_r**3. - (1./eta)**3.) + 
+                         (3.*(1.-cos(i0)**2.)*a_r**3.*cos(2.*w0 + f0)))
+    
+    
+                           
+                           
+    
+    return a1, e1, i1, RAAN1, w1, M1
 
 
 def element_conversion(x_in, iflag, oflag, GM=3.986004e5, dt=0.):
