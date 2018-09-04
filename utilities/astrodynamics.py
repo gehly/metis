@@ -270,8 +270,20 @@ def brouwer_lyddane(a0,e0,i0,RAAN0,w0,M0,gamma0):
                - (gamma1/2.)*cos(i0) * \
               (6.*(f0 - M0 + e0*sin(f0)) - 3.*sin(2.*w0 + 2.*f0) - 3.*e0*sin(2.*w0 + f0) - e0*sin(2.*w0 + 3.*f0))
                
-              
-                           
+    edM = (gamma1/8.)*e0*eta**3. * \
+          (1. - 11.*cos(i0)**2. - 40.*((cos(i0)**4.)/(1.-5.*cos(i0)**2.))) - (gamma1/4.)*eta**3. * \
+          (2.*(3.*cos(i0)**2. - 1.)*((a_r*eta)**2. + a_r + 1.)*sin(f0) + 
+           3.*(1. - cos(i0)**2.)*((-(a_r*eta)**2. - a_r + 1.)*sin(2.*w0 + f0) +
+           ((a_r*eta)**2. + a_r + (1./3.))*sin(2*w0 + 3.*f0)))
+          
+    dRAAN = -(gamma1/8.)*e0**2.*cos(i0) * \
+             (11. + 80.*(cos(i0)**2.)/(1.-5.*cos(i0)**2.) + 
+              200.*(cos(i0)**4.)/((1.-5.*cos(i0)**2.)**2.)) - (gamma1/2.)*cos(i0) * \
+             (6.*(f0 - M0 + e0*sin(f0)) - 3.*sin(2.*w0 + 2.*f0) - 
+              3.*e0*sin(2.*w0 + f0) - e0*sin(2.*w0 + 3.*f0))  
+
+
+                             
     
     return a1, e1, i1, RAAN1, w1, M1
 
