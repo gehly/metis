@@ -220,7 +220,15 @@ def osc2mean(elem0):
 
 def brouwer_lyddane(a0,e0,i0,RAAN0,w0,M0,gamma0):
     '''
+    This function converts between osculating and mean Keplerian elements
+    using Brouwer-Lyddane Theory. The input gamma value determines whether 
+    the transformation is from osculating to mean elements or vice versa.
+    The same calculations are performed in either case.
     
+    References
+    ------
+    [1] Schaub, H. and Junkins, J.L., Analytical Mechanics of Space Systems."
+        2nd ed., 2009.
     
     '''
     
@@ -232,6 +240,7 @@ def brouwer_lyddane(a0,e0,i0,RAAN0,w0,M0,gamma0):
     E0 = mean2ecc(M0, e0)
     f0 = ecc2true(E0, e0)
     
+    # Compute intermediate terms
     a_r = (1. + e0*cos(f0))/eta**2.
     
     a1 = a0 + a0*gamma0*((3.*cos(i0)**2. - 1.)*(a_r**3. - (1./eta)**3.) + 
