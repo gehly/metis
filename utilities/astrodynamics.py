@@ -7,7 +7,7 @@ import sys
 
 sys.path.append('../')
 
-from utilities.constants import GME
+from utilities.constants import GME, J2E, Re
 
 ############################################################################
 # Orbit Stuff
@@ -165,7 +165,7 @@ def mean2hyp(M, e):
     return H
 
 
-def mean2osc(elem):
+def mean2osc(elem0):
     '''
     This function converts mean Keplerian elements to osculating Keplerian
     elements using Brouwer-Lyddane Theory.
@@ -176,11 +176,23 @@ def mean2osc(elem):
         2nd ed., 2009.
     '''
     
+    # Retrieve input elements
+    a0 = float(elem0[0])
+    e0 = float(elem0[1])
+    i0 = float(elem0[2]) * pi/180
+    RAAN0 = float(elem0[3]) * pi/180
+    w0 = float(elem0[4]) * pi/180
+    M0 = float(elem0[5]) * pi/180
     
-    return
+    # Compute gamma parameter
+    gamma0 = (J2E/2.) * (Re/a)**2.
+    
+    
+    
+    return elem1
 
 
-def osc2mean(elem):
+def osc2mean(elem0):
     '''
     This function converts osculating Keplerian elements to mean Keplerian
     elements using Brouwer-Lyddane Theory.
@@ -191,8 +203,77 @@ def osc2mean(elem):
         2nd ed., 2009.
     '''
     
+    # Retrieve input elements
+    a0 = float(elem0[0])
+    e0 = float(elem0[1])
+    i0 = float(elem0[2]) * pi/180
+    RAAN0 = float(elem0[3]) * pi/180
+    w0 = float(elem0[4]) * pi/180
+    M0 = float(elem0[5]) * pi/180
     
-    return
+    # Compute gamma parameter
+    gamma0 = -(J2E/2.) * (Re/a)**2.
+    
+    
+    return elem1
+
+
+def brouwer_lyddane(a0,e0,i0,RAAN0,w0,M0,gamma0):
+    '''
+    This function converts between osculating and mean Keplerian elements
+    using Brouwer-Lyddane Theory. The input gamma value determines whether 
+    the transformation is from osculating to mean elements or vice versa.
+    The same calculations are performed in either case.
+    
+    References
+    ------
+    [1] Schaub, H. and Junkins, J.L., Analytical Mechanics of Space Systems."
+        2nd ed., 2009.
+    
+    '''
+    
+    # Compute transformation parameters
+    eta = np.sqrt(1. - e0**2.)
+    gamma1 = gamma0/eta**4.
+    
+    # Compute true anomaly
+    E0 = mean2ecc(M0, e0)
+    f0 = ecc2true(E0, e0)
+    
+    # Compute intermediate terms
+    a_r = (1. + e0*cos(f0))/eta**2.
+    
+    a1 = a0 + a0*gamma0*((3.*cos(i0)**2. - 1.)*(a_r**3. - (1./eta)**3.) + 
+                         (3.*(1.-cos(i0)**2.)*a_r**3.*cos(2.*w0 + 2.*f0)))
+    
+    de1 = (gamma1/8.)*e0*eta**2.*(1. - 11.*cos(i0)**2. - 40.*((cos(i0)**4.) / 
+                                  (1.-5.*cos(i0)**2.)))*cos(2.*w0)
+    
+    de = de1 + (eta**2./2.) * \
+        (gamma0*((3.*cos(i0)**2. - 1.)/(eta**6.) * 
+                 (e0*eta + e0/(1.+eta) + 3.*cos(f0) + 3.*e0*cos(f0)**2. + e0**2.*cos(f0)**3.) + 
+              3.*(1.-cos(i0)**2.)/eta**6.*(e0 + 3.*cos(f0) + 3.*e0*cos(f0)**2. + e0**2.*cos(f0)**3.) * cos(2.*w0 + 2.*f0))
+                - gamma1*(1.-cos(i0)**2.)*(3.*cos(2*w0 + f0) + cos(2.*w0 + 3.*f0)))
+
+    di = -(e0*de1/(eta**2.*tan(i0))) + (gamma1/2.)*cos(i0)*np.sqrt(1.-cos(i0)**2.) * \
+          (3.*cos(2*w0 + 2.*f0) + 3.*e0*cos(2.*w0 + f0) + e0*cos(2.*w0 + 3.*f0))
+          
+    MwRAAN1 = M0 + w0 + RAAN0 + (gamma1/8.)*eta**3. * \
+              (1. - 11.*cos(i0)**2. - 40.*((cos(i0)**4.)/(1.-5.*cos(i0)**2.))) - (gamma1/16.) * \
+              (2. + e0**2. - 11.*(2.+3.*e0**2.)*cos(i0)**2. 
+               - 40.*(2.+5.*e0**2.)*((cos(i0)**4.)/(1.-5.*cos(i0)**2.))  
+               - 400.*e0**2.*(cos(i0)**6.)/((1.-5.*cos(i0)**2.)**2.)) + (gamma1/4.) * \
+              (-6.*(1.-5.*cos(i0)**2.)*(f0 - M0 + e0*sin(f0)) 
+               + (3.-5.*cos(i0)**2.)*(3.*sin(2.*w0 + 2.*f0) + 3.*e0*sin(2.*w0 + f0) + e0*sin(2.*w0 + 3.*f0))) \
+               - (gamma1/8.)*e0**2.*cos(i0) * \
+              (11. + 80.*(cos(i0)**2.)/(1.-5.*cos(i0)**2.) + 200.*(cos(i0)**4.)/((1.-5.*cos(i0)**2.)**2.)) \
+               - (gamma1/2.)*cos(i0) * \
+              (6.*(f0 - M0 + e0*sin(f0)) - 3.*sin(2.*w0 + 2.*f0) - 3.*e0*sin(2.*w0 + f0) - e0*sin(2.*w0 + 3.*f0))
+               
+              
+                           
+    
+    return a1, e1, i1, RAAN1, w1, M1
 
 
 def element_conversion(x_in, iflag, oflag, GM=3.986004e5, dt=0.):
