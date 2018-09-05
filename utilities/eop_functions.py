@@ -70,8 +70,8 @@ def get_celestrak_eop_alldata(offline_flag=False):
     Parameters
     ------
     offline_flag : boolean, optional
-        flag to determine whether to retrieve EOP data from internet or from
-        a locally saved file (default = False)
+        flag to indicate internet access, if True will load data from local
+        files (default=False)
     
     Returns
     ------
@@ -315,7 +315,7 @@ def get_nutation_data(TEME_flag=True):
 def get_XYs2006_alldata():
     
     # Load data
-    XYs_df = pd.read_csv(os.path.join('../input_data', 'IAU2006_XYs.csv'))
+    XYs_df = pd.read_csv(os.path.join(input_data_dir, 'IAU2006_XYs.csv'))
     
     return XYs_df
 
