@@ -165,57 +165,100 @@ def mean2hyp(M, e):
     return H
 
 
-def mean2osc(elem0):
+def mean2osc(mean_elem):
     '''
     This function converts mean Keplerian elements to osculating Keplerian
     elements using Brouwer-Lyddane Theory.
     
+    Parameters
+    ------
+    mean_elem : list
+        Mean Keplerian orbital elements [km, deg]
+        [a,e,i,RAAN,w,M]
+    
+    Returns
+    ------
+    osc_elem : list
+        Osculating Keplerian orbital elements [km, deg]
+        [a,e,i,RAAN,w,M]
+    
     References
     ------
     [1] Schaub, H. and Junkins, J.L., Analytical Mechanics of Space Systems."
         2nd ed., 2009.
     '''
     
-    # Retrieve input elements
-    a0 = float(elem0[0])
-    e0 = float(elem0[1])
-    i0 = float(elem0[2]) * pi/180
-    RAAN0 = float(elem0[3]) * pi/180
-    w0 = float(elem0[4]) * pi/180
-    M0 = float(elem0[5]) * pi/180
+    # Retrieve input elements, convert to radians
+    a0 = float(mean_elem[0])
+    e0 = float(mean_elem[1])
+    i0 = float(mean_elem[2]) * pi/180
+    RAAN0 = float(mean_elem[3]) * pi/180
+    w0 = float(mean_elem[4]) * pi/180
+    M0 = float(mean_elem[5]) * pi/180
     
     # Compute gamma parameter
-    gamma0 = (J2E/2.) * (Re/a)**2.
+    gamma0 = (J2E/2.) * (Re/a0)**2.
     
+    # Compute first order Brouwer-Lyddane transformation
+    a1,e1,i1,RAAN1,w1,M1 = brouwer_lyddane(a0,e0,i0,RAAN0,w0,M0,gamma0)
     
+    # Convert angles to degree for output
+    i1 *= 180./pi
+    RAAN1 *= 180./pi
+    w1 *= 180./pi
+    M1 *= 180./pi
     
-    return elem1
+    osc_elem = [a1,e1,i1,RAAN1,w1,M1]
+    
+    return osc_elem
 
 
-def osc2mean(elem0):
+def osc2mean(osc_elem):
     '''
     This function converts osculating Keplerian elements to mean Keplerian
     elements using Brouwer-Lyddane Theory.
     
+    Parameters
+    ------
+    elem0 : list
+        Osculating Keplerian orbital elements [km, deg]
+        [a,e,i,RAAN,w,M]
+    
+    Returns
+    ------
+    elem1 : list
+        Mean Keplerian orbital elements [km, deg]
+        [a,e,i,RAAN,w,M]
+    
     References
     ------
     [1] Schaub, H. and Junkins, J.L., Analytical Mechanics of Space Systems."
         2nd ed., 2009.
     '''
     
-    # Retrieve input elements
-    a0 = float(elem0[0])
-    e0 = float(elem0[1])
-    i0 = float(elem0[2]) * pi/180
-    RAAN0 = float(elem0[3]) * pi/180
-    w0 = float(elem0[4]) * pi/180
-    M0 = float(elem0[5]) * pi/180
+    # Retrieve input elements, convert to radians
+    a0 = float(osc_elem[0])
+    e0 = float(osc_elem[1])
+    i0 = float(osc_elem[2]) * pi/180
+    RAAN0 = float(osc_elem[3]) * pi/180
+    w0 = float(osc_elem[4]) * pi/180
+    M0 = float(osc_elem[5]) * pi/180
     
     # Compute gamma parameter
-    gamma0 = -(J2E/2.) * (Re/a)**2.
+    gamma0 = -(J2E/2.) * (Re/a0)**2.
     
+    # Compute first order Brouwer-Lyddane transformation
+    a1,e1,i1,RAAN1,w1,M1 = brouwer_lyddane(a0,e0,i0,RAAN0,w0,M0,gamma0)
     
-    return elem1
+    # Convert angles to degree for output
+    i1 *= 180./pi
+    RAAN1 *= 180./pi
+    w1 *= 180./pi
+    M1 *= 180./pi
+    
+    mean_elem = [a1,e1,i1,RAAN1,w1,M1]    
+    
+    return mean_elem
 
 
 def brouwer_lyddane(a0,e0,i0,RAAN0,w0,M0,gamma0):
@@ -224,6 +267,38 @@ def brouwer_lyddane(a0,e0,i0,RAAN0,w0,M0,gamma0):
     using Brouwer-Lyddane Theory. The input gamma value determines whether 
     the transformation is from osculating to mean elements or vice versa.
     The same calculations are performed in either case.
+    
+    Parameters
+    ------
+    a0 : float
+        semi-major axis [km]
+    e0 : float
+        eccentricity
+    i0 : float
+        inclination [rad]
+    RAAN0 : float
+        right ascension of ascending node [rad]
+    w0 : float 
+        argument of periapsis [rad]
+    M0 : float
+        mean anomaly [rad]
+    gamma0 : float
+        intermediate calculation parameter        
+    
+    Returns 
+    ------
+    a1 : float
+        semi-major axis [km]
+    e1 : float
+        eccentricity
+    i1 : float
+        inclination [rad]
+    RAAN1 : float
+        right ascension of ascending node [rad]
+    w1 : float 
+        argument of periapsis [rad]
+    M1 : float
+        mean anomaly [rad]
     
     References
     ------
@@ -242,9 +317,6 @@ def brouwer_lyddane(a0,e0,i0,RAAN0,w0,M0,gamma0):
     
     # Compute intermediate terms
     a_r = (1. + e0*cos(f0))/eta**2.
-    
-    a1 = a0 + a0*gamma0*((3.*cos(i0)**2. - 1.)*(a_r**3. - (1./eta)**3.) + 
-                         (3.*(1.-cos(i0)**2.)*a_r**3.*cos(2.*w0 + 2.*f0)))
     
     de1 = (gamma1/8.)*e0*eta**2.*(1. - 11.*cos(i0)**2. - 40.*((cos(i0)**4.) / 
                                   (1.-5.*cos(i0)**2.)))*cos(2.*w0)
@@ -270,8 +342,37 @@ def brouwer_lyddane(a0,e0,i0,RAAN0,w0,M0,gamma0):
                - (gamma1/2.)*cos(i0) * \
               (6.*(f0 - M0 + e0*sin(f0)) - 3.*sin(2.*w0 + 2.*f0) - 3.*e0*sin(2.*w0 + f0) - e0*sin(2.*w0 + 3.*f0))
                
-              
-                           
+    edM = (gamma1/8.)*e0*eta**3. * \
+          (1. - 11.*cos(i0)**2. - 40.*((cos(i0)**4.)/(1.-5.*cos(i0)**2.))) - (gamma1/4.)*eta**3. * \
+          (2.*(3.*cos(i0)**2. - 1.)*((a_r*eta)**2. + a_r + 1.)*sin(f0) + 
+           3.*(1. - cos(i0)**2.)*((-(a_r*eta)**2. - a_r + 1.)*sin(2.*w0 + f0) +
+           ((a_r*eta)**2. + a_r + (1./3.))*sin(2*w0 + 3.*f0)))
+          
+    dRAAN = -(gamma1/8.)*e0**2.*cos(i0) * \
+             (11. + 80.*(cos(i0)**2.)/(1.-5.*cos(i0)**2.) + 
+              200.*(cos(i0)**4.)/((1.-5.*cos(i0)**2.)**2.)) - (gamma1/2.)*cos(i0) * \
+             (6.*(f0 - M0 + e0*sin(f0)) - 3.*sin(2.*w0 + 2.*f0) - 
+              3.*e0*sin(2.*w0 + f0) - e0*sin(2.*w0 + 3.*f0))  
+
+    d1 = (e0 + de)*sin(M0) + edM*cos(M0)
+    d2 = (e0 + de)*cos(M0) - edM*sin(M0)
+    d3 = (sin(i0/2.) + cos(i0/2.)*(di/2.))*sin(RAAN0) + sin(i0/2.)*dRAAN*cos(RAAN0)
+    d4 = (sin(i0/2.) + cos(i0/2.)*(di/2.))*cos(RAAN0) - sin(i0/2.)*dRAAN*sin(RAAN0)
+    
+    # Compute transformed elements
+    a1 = a0 + a0*gamma0*((3.*cos(i0)**2. - 1.)*(a_r**3. - (1./eta)**3.) + 
+                         (3.*(1.-cos(i0)**2.)*a_r**3.*cos(2.*w0 + 2.*f0)))
+    
+    e1 = np.sqrt(d1**2. + d2**2.)
+    
+    i1 = 2.*asin(np.sqrt(d3**2. + d4**4.))
+    
+    RAAN1 = atan2(d3, d4)
+    
+    M1 = atan2(d1, d2)
+    
+    w1 = MwRAAN1 - RAAN1 - M1    
+                             
     
     return a1, e1, i1, RAAN1, w1, M1
 
