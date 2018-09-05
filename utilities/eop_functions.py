@@ -5,8 +5,14 @@ import pandas as pd
 import os
 import sys
 import pickle
+from pathlib import Path
 
 sys.path.append('../')
+
+cwd = os.getcwd()
+ind = cwd.find('metis')
+metis_dir = Path(cwd[0:ind+5])
+input_data_dir = metis_dir / 'input_data'
 
 from utilities.time_systems import dt2mjd
 from utilities.numerical_methods import interp_lagrange
@@ -113,7 +119,7 @@ def save_celestrak_eop_alldata():
     
     data_text = get_celestrak_eop_alldata()
     
-    fname = os.path.join('../input_data', 'eop_alldata.pkl')
+    fname = os.path.join(input_data_dir, 'eop_alldata.pkl')
     
     # Save data    
     pklFile = open( fname, 'wb' )
@@ -295,7 +301,7 @@ def get_nutation_data(TEME_flag=True):
         array of nutation coefficients    
     '''
     
-    df = pd.read_csv(os.path.join('../input_data', 'IAU1980_nutation.csv'))
+    df = pd.read_csv(os.path.join(input_data_dir, 'IAU1980_nutation.csv'))
     
     # For TEME-GCRF conversion, reduce to 4 largest entries      
     if TEME_flag:          
@@ -348,7 +354,7 @@ def init_XYs2006(TT1, TT2, XYs_df=[]):
     
     # Load data if needed
     if len(XYs_df) == 0:        
-        XYs_df = pd.read_csv(os.path.join('../input_data', 'IAU2006_XYs.csv'))        
+        XYs_df = pd.read_csv(os.path.join(input_data_dir, 'IAU2006_XYs.csv'))        
         
     XYs_alldata = XYs_df.values
     
