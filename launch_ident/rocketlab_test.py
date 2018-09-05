@@ -1,14 +1,27 @@
 import numpy as np
 from datetime import datetime
 import sys
+import os
+from pathlib import Path
 
 sys.path.append('../')
 
+cwd = os.getcwd()
+ind = cwd.find('metis')
+metis_dir = Path(cwd[0:ind+5])
+
+from skyfield.api import Loader, utc
+
 from utilities.tle_functions import launchecef2tle, propagate_TLE, gcrf2tle
 from utilities.tle_functions import tledict2dataframe
+from sensors.visibility_functions import compute_visible_passes
+from sensors.visibility_functions import generate_visibility_file
 
 if __name__ == '__main__':
     
+    load = Loader(os.path.join(metis_dir, 'skyfield_data'))
+    ephemeris = load('de430t.bsp')
+    ts = load.timescale()
     
     # RocketLab launch data from June 2018
     UTC = datetime(2018,6,23,4,10,21)
@@ -58,7 +71,7 @@ if __name__ == '__main__':
     # Times for visibility check
     ndays = 3
     dt = 10
-    UTC0 = ts.utc(launch_elem_dict[90003]['UTC'].replace(tzinfo=utc)).utc
+    UTC0 = ts.utc(UTC.replace(tzinfo=utc)).utc
     sec_array = list(range(0,86400*ndays,dt))
     skyfield_times = ts.utc(UTC0[0], UTC0[1], UTC0[2],
                             UTC0[3], UTC0[4], sec_array)
@@ -72,6 +85,6 @@ if __name__ == '__main__':
     
     # Generate output file
     vis_file_min_el = 10.
-    outdir = os.path.join(metis_dir, 'skyfield_data')
-    vis_file = os.path.join(outdir, 'iac_visible_passes.csv')
+    outdir = os.getcwd()
+    vis_file = os.path.join(outdir, 'rocketlab_visible_passes.csv')
     generate_visibility_file(vis_dict, vis_file, vis_file_min_el)

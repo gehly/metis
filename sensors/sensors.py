@@ -940,13 +940,6 @@ def define_sensors(sensor_id_list=[]):
     return sensor_dict
 
 
-def get_database_sensor_data(sensor_id_list):    
-    
-    sensor_dict = {}
-    
-    return sensor_dict
-
-
 def generate_sensor_file(sensor_file, sensor_id_list=[]):
     
     sensor_dict = define_sensors(sensor_id_list)
