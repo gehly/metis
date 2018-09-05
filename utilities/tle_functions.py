@@ -174,6 +174,10 @@ def launch2tle(obj_id_list, launch_elem_dict):
     # Initialize output
     tle_dict = {}
     
+    # Load EOP and IAU data
+    eop_alldata = get_celestrak_eop_alldata()    
+    IAU1980nut = get_nutation_data()
+    
     # Loop over objects
     for obj_id in obj_id_list:
         
@@ -196,6 +200,18 @@ def launch2tle(obj_id_list, launch_elem_dict):
         
         # Compute eccentricity
         e = 1. - rp/a
+        
+        # Compute GCRF position and velocity
+        x_in = [a,e,i,RAAN,w,M]
+        x_out = element_conversion(x_in, 0, 1)
+        r_GCRF = np.reshape(x_out[0:3], (3,1))
+        v_GCRF = np.reshape(x_out[3:6], (3,1))
+        
+        # Convert to TEME, recompute osculating elements and mean elements
+        EOP_data = get_eop_data(eop_alldata, UTC)
+        r_TEME, v_TEME = gcrf2teme(r_GCRF, v_GCRF, UTC, IAU1980nut, EOP_data)
+        x_in = np.concatenate((r_TEME, v_TEME), axis=0)
+        
         
         # Compute launch year and day of year
         year2 = str(UTC.year)[2:4]
@@ -391,6 +407,7 @@ def launchecef2tle(obj_id_list, ecef_dict, offline_flag=False):
     return tle_dict
 
 
+<<<<<<< HEAD
 def tletime2datetime(line1):
     '''
     This function computes a UTC datetime object from the TLE line1 input year,
@@ -438,6 +455,13 @@ def tletime2datetime(line1):
     doy = UTC.timetuple().tm_yday
     
     return UTC
+=======
+def gcrf2tle(r_GCRF, v_GCRF, UTC):
+    
+    
+    
+    return tle_dict
+>>>>>>> astrodynamics
 
 
 def plot_tle_radec(tle_dict, UTC_list=[], sensor_list=[], display_flag=False,

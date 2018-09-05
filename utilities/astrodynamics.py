@@ -365,13 +365,19 @@ def brouwer_lyddane(a0,e0,i0,RAAN0,w0,M0,gamma0):
     
     e1 = np.sqrt(d1**2. + d2**2.)
     
-    i1 = 2.*asin(np.sqrt(d3**2. + d4**4.))
+    i1 = 2.*asin(np.sqrt(d3**2. + d4**2.))
     
     RAAN1 = atan2(d3, d4)
     
     M1 = atan2(d1, d2)
     
-    w1 = MwRAAN1 - RAAN1 - M1    
+    w1 = MwRAAN1 - RAAN1 - M1
+    
+    while w1 > 2.*pi:
+        w1 -= 2.*pi
+        
+    while w1 < 0.:
+        w1 += 2.*pi
                              
     
     return a1, e1, i1, RAAN1, w1, M1
@@ -499,6 +505,8 @@ def element_conversion(x_in, iflag, oflag, GM=3.986004e5, dt=0.):
         ih_vect = h_vect/h
         RAAN = atan2(ih_vect[0], -ih_vect[1])   # rad
         i = acos(ih_vect[2])   # rad
+        while RAAN < 0.:
+            RAAN += 2.*pi
 
         # Calculate eccentricity
         e_vect = np.cross(v_vect, h_vect, axis=0)/GM - ir_vect
@@ -519,6 +527,8 @@ def element_conversion(x_in, iflag, oflag, GM=3.986004e5, dt=0.):
 
         # Calculate argument of periapsis
         w = atan2(PN[0][2], PN[1][2])  # rad
+        while w < 0.:
+            w += 2.*pi
 
         # Calculate true anomaly, eccentric/hyperbolic anomaly, mean anomaly
         cross1 = np.cross(ie_vect, ir_vect, axis=0)
@@ -539,90 +549,6 @@ def element_conversion(x_in, iflag, oflag, GM=3.986004e5, dt=0.):
             Mo = e*sinh(Hrad) - Hrad  # rad
         else:
             print('Error, input orbit is parabolic, a = ', a)
-    
-#    elif iflag == 2:
-#        
-#        # Setup inputs structure
-#        inputs = {}
-#        eopFile = os.path.join(DataDir, 'EOP_1962_DATA.txt')
-#        xysFile = os.path.join(DataDir, 'IAU2006_XYs.txt')
-#        lsFile = os.path.join(DataDir, 'leapsec.dat')
-#        myIAU = CU.IAU2006CIO(EOPFile=eopFile, XYsFile=xysFile, LeapSecFile=lsFile)
-#        inputs['myIAU'] = myIAU
-#        
-#        # Retrieve input elements, convert to radians
-#        ra = float(x_in[0])
-#        rp = float(x_in[1])
-#        i = float(x_in[2]) * pi/180
-#        LTAN_h = float(x_in[3][0])
-#        LTAN_m = float(x_in[3][1])
-#        LTAN_s = float(x_in[3][2])
-#        w = float(x_in[4]) * pi/180
-#        site_lat = float(x_in[5]) * pi/180
-#        site_lon = float(x_in[6]) * pi/180
-#        t0 = x_in[7]
-#        
-#        # Compute semi-major axis and eccentricity
-#        a = (ra + rp)/2.
-#        e = 1 - (rp/a)
-#        
-#        # Compute mean motion and angular momentum
-#        n = np.sqrt(GM/a**3)
-#        p = a*(1 - e**2.)
-#        h = np.sqrt(GM*p)
-#        
-##        print 'ra', ra
-##        print 'rp', rp
-##        print 'a', a
-##        print 'e', e
-##        print 'p', p
-##        print 'n', n
-##        print 'h', h
-#        
-#        # Compute curren JED_JD
-#        JED_JD = UTC_G_2_JED_JD(t0)
-##        print 'JED_JD', JED_JD
-#        
-#        # Compute LTAN in rad
-#        LTAN = LTAN_h*(pi/12.) + LTAN_m*(pi/720.) + LTAN_s*(pi/43200)
-##        print 'LTAN', LTAN
-#        
-#        # Compute current sun right ascension
-#        sun = ephem.Sun()
-#        sun.compute((t0[0], t0[1], t0[2], t0[3], t0[4], t0[5]))
-#        sun_ra = sun.g_ra
-#        
-##        print 'sun_ra', float(sun_ra)
-#        
-#        # Compute RAAN (sun LTAN = pi)
-#        RAAN = sun_ra + (LTAN - pi)
-##        print 'RAAN', RAAN
-#        
-#        # Compute geodetic longitude of ascending node
-#        f = -w  # theta = 0 at ascending node
-#        Erad = 2*atan(np.sqrt((1-e)/(1+e))*tan(f/2))
-#        r = a*(1 - e*cos(Erad))
-#        node_eci = np.array([[r*cos(RAAN)], [r*sin(RAAN)], [0.]])
-#        node_ecef = eci2ecef(node_eci, inputs, JED_JD)
-#        node_lat, node_lon, node_ht = ecef2latlonht(node_ecef)
-#        node_lat *= pi/180.
-#        node_lon *= pi/180.
-#        
-##        print 'node_lat', node_lat
-##        print 'node_lon', node_lon
-#        
-#        # Find Mo corresponding to lat/lon
-#        delta_lon = site_lon - node_lon
-#        delta_lat = site_lat - node_lat
-#        theta_site = acos(cos(delta_lon)*cos(delta_lat))
-#        f_site = theta_site - w
-#        E_site = 2*atan(np.sqrt((1-e)/(1+e))*tan(f_site/2))
-#        Mo = E_site - e*sin(E_site)
-#        
-##        print 'theta_site', theta_site
-##        print 'f_site', f_site
-##        print 'Mo', Mo
-
         
     else:
         print('Error: Invalid Input Flag!')
