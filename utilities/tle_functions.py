@@ -128,262 +128,6 @@ def get_spacetrack_tle_data(obj_id_list, UTC_list = [], username='',
     return tle_dict, tle_df
 
 
-def launch2tle(obj_id_list, launch_elem_dict):
-    '''
-    This function converts from commonly used launch elements to TLE format.
-    
-    Parameters
-    ------
-    obj_id_list : list
-        object NORAD IDs (int)
-    launch_elem_dict : dictionary
-        dictionary of dictionaries containing launch elements, indexed by
-        object ID
-        each entry contains rp, ra, i, RAAN, w, M, UTC datetime
-    
-    Returns
-    ------
-    tle_dict : dictionary
-        Two Line Element information, indexed by object ID
-    
-    '''
-
-    # Initialize output
-    tle_dict = {}
-    
-    # Load EOP and IAU data
-    eop_alldata = get_celestrak_eop_alldata()    
-    IAU1980nut = get_nutation_data()
-    
-    # Loop over objects
-    for obj_id in obj_id_list:
-        
-        # Retrieve launch elements for this object
-        launch_elem = launch_elem_dict[obj_id]
-        ra = launch_elem['ra']
-        rp = launch_elem['rp']
-        i = launch_elem['i']
-        RAAN = launch_elem['RAAN']
-        w = launch_elem['w']
-        M = launch_elem['M']
-        UTC = launch_elem['UTC']
-        
-        #TODO compute mean elements and convert to TEME frame
-        
-        # Compute mean motion in rev/day
-        a = (ra + rp)/2.
-        n = np.sqrt(GME/a**3.)
-        n *= 86400./(2.*pi)
-        
-        # Compute eccentricity
-        e = 1. - rp/a
-        
-        # Compute GCRF position and velocity
-        x_in = [a,e,i,RAAN,w,M]
-        x_out = element_conversion(x_in, 0, 1)
-        r_GCRF = np.reshape(x_out[0:3], (3,1))
-        v_GCRF = np.reshape(x_out[3:6], (3,1))
-        
-        # Convert to TEME, recompute osculating elements and mean elements
-        EOP_data = get_eop_data(eop_alldata, UTC)
-        r_TEME, v_TEME = gcrf2teme(r_GCRF, v_GCRF, UTC, IAU1980nut, EOP_data)
-        x_in = np.concatenate((r_TEME, v_TEME), axis=0)
-        
-        
-        # Compute launch year and day of year
-        year2 = str(UTC.year)[2:4]
-        doy = UTC.timetuple().tm_yday
-        dfrac = UTC.hour/24. + UTC.minute/1440. + \
-            (UTC.second + UTC.microsecond/1e6)/86400.
-        dfrac = '{0:.15f}'.format(dfrac)
-        
-        # Format for output
-        line1 = '1 ' + str(obj_id) + 'U ' + year2 + '001A   ' + year2 + \
-            str(doy).zfill(3) + '.' + str(dfrac)[2:10] + \
-            '  .00000000  00000-0  00000-0 0    10'
-            
-        line2 = '2 ' + str(obj_id) + ' ' + '{:8.4f}'.format(i) + ' ' + \
-            '{:8.4f}'.format(RAAN) + ' ' + str(e)[2:9] + ' ' + \
-            '{:8.4f}'.format(w) + ' ' + '{:8.4f}'.format(M) + ' ' + \
-            '{:11.8f}'.format(n) + '    10'
-            
-        # Add to dictionary
-        tle_dict[obj_id] = {}
-        tle_dict[obj_id]['line1_list'] = [line1]
-        tle_dict[obj_id]['line2_list'] = [line2]
-        
-        print(line1)
-        print(line2)
-
-    return tle_dict
-
-
-def kep2tle(obj_id_list, kep_dict):    
-    '''
-    This function converts from Keplerian orbital elements to TLE format.
-    
-    Parameters
-    ------
-    obj_id_list : list
-        object NORAD IDs (int)
-    kep_dict : dictionary
-        dictionary of dictionaries containing launch elements, indexed by
-        object ID
-        each entry contains a, e, i, RAAN, w, M, UTC datetime
-    
-    Returns
-    ------
-    tle_dict : dictionary
-        Two Line Element information, indexed by object ID
-    
-    '''
-    
-    # Initialize output
-    tle_dict = {}
-    
-    # Loop over objects
-    for obj_id in obj_id_list:
-        
-        # Retrieve launch elements for this object
-        kep_elem = kep_dict[obj_id]
-        a = kep_elem['a']
-        e = kep_elem['e']
-        i = kep_elem['i']
-        RAAN = kep_elem['RAAN']
-        w = kep_elem['w']
-        M = kep_elem['M']
-        UTC = kep_elem['UTC']
-        
-        #TODO compute mean elements and convert to TEME frame
-        
-        # Compute mean motion in rev/day
-        n = np.sqrt(GME/a**3.)
-        n *= 86400./(2.*pi)
-
-        # Compute launch year and day of year
-        year2 = str(UTC.year)[2:4]
-        doy = UTC.timetuple().tm_yday
-        dfrac = UTC.hour/24. + UTC.minute/1440. + \
-            (UTC.second + UTC.microsecond/1e6)/86400.
-        
-        # Format for output
-        line1 = '1 ' + str(obj_id) + 'U ' + year2 + '001A   ' + year2 + \
-            str(doy).zfill(3) + '.' + str(dfrac)[2:10] + \
-            '  .00000000  00000-0  00000-0 0    10'
-            
-        line2 = '2 ' + str(obj_id) + ' ' + '{:8.4f}'.format(i) + ' ' + \
-            '{:8.4f}'.format(RAAN) + ' ' + str(e)[2:9] + ' ' + \
-            '{:8.4f}'.format(w) + ' ' + '{:8.4f}'.format(M) + ' ' + \
-            '{:11.8f}'.format(n) + '    10'
-            
-        # Add to dictionary
-        tle_dict[obj_id] = {}
-        tle_dict[obj_id]['line1_list'] = [line1]
-        tle_dict[obj_id]['line2_list'] = [line2]
-        
-        print(line1)
-        print(line2)
-    
-    
-    return tle_dict
-
-
-def launchecef2tle(obj_id_list, ecef_dict, offline_flag=False):
-    '''
-    This function converts from ECEF position and velocity to TLE format.
-    
-    Parameters
-    ------
-    obj_id_list : list
-        object NORAD IDs (int)
-    ecef_dict : dictionary
-        dictionary of dictionaries containing launch coordinates, indexed by
-        object ID
-        each entry contains r_ITRF, v_ITRF, UTC datetime
-    offline_flag : boolean, optional
-        flag to determine whether to retrieve EOP data from internet or from
-        a locally saved file (default = False)
-    
-    Returns
-    ------
-    tle_dict : dictionary
-        Two Line Element information, indexed by object ID
-    
-    '''
-    
-     # Initialize output
-    tle_dict = {}
-    
-    # Retrieve latest EOP data from celestrak.com
-    eop_alldata = get_celestrak_eop_alldata(offline_flag)
-    
-    # Retrieve IAU Nutation data from file
-    IAU1980_nutation = get_nutation_data()
-    
-    # Loop over objects
-    for obj_id in obj_id_list:
-        
-        # Retrieve launch coordinates for this object
-        r_ITRF = ecef_dict[obj_id]['r_ITRF']
-        v_ITRF = ecef_dict[obj_id]['v_ITRF']
-        UTC = ecef_dict[obj_id]['UTC']
-        
-        # Get EOP data for this time
-        EOP_data = get_eop_data(eop_alldata, UTC)
-        
-        # Convert ITRF to GCRF
-        r_GCRF, v_GCRF = itrf2gcrf(r_ITRF, v_ITRF, UTC, EOP_data)
-        
-        # Convert GCRF to TEME
-        r_TEME, v_TEME = gcrf2teme(r_GCRF, v_GCRF, UTC, IAU1980_nutation,
-                                   EOP_data)
-        
-        
-        #TODO compute mean elements
-        
-        # Convert TEME to Keplerian elements
-        x_in = np.concatenate((r_TEME, v_TEME), axis=0)
-        x_out = element_conversion(x_in, 1, 0)
-
-        a = float(x_out[0])
-        e = float(x_out[1])
-        i = float(x_out[2])
-        RAAN = float(x_out[3])
-        w = float(x_out[4])
-        M = float(x_out[5])
-        
-        # Compute mean motion in rev/day
-        n = np.sqrt(GME/a**3.)
-        n *= 86400./(2.*pi)
-
-        # Compute launch year and day of year
-        year2 = str(UTC.year)[2:4]
-        doy = UTC.timetuple().tm_yday
-        dfrac = UTC.hour/24. + UTC.minute/1440. + \
-            (UTC.second + UTC.microsecond/1e6)/86400.
-        
-        # Format for output
-        line1 = '1 ' + str(obj_id) + 'U ' + year2 + '001A   ' + year2 + \
-            str(doy).zfill(3) + '.' + str(dfrac)[2:10] + \
-            '  .00000000  00000-0  00000-0 0    10'
-            
-        line2 = '2 ' + str(obj_id) + ' ' + '{:8.4f}'.format(i) + ' ' + \
-            '{:8.4f}'.format(RAAN) + ' ' + str(e)[2:9] + ' ' + \
-            '{:8.4f}'.format(w) + ' ' + '{:8.4f}'.format(M) + ' ' + \
-            '{:11.8f}'.format(n) + '    10'
-            
-        # Add to dictionary
-        tle_dict[obj_id] = {}
-        tle_dict[obj_id]['line1_list'] = [line1]
-        tle_dict[obj_id]['line2_list'] = [line2]
-        
-        print(line1)
-        print(line2)
-    
-    
-    return tle_dict
-
-
 def tletime2datetime(line1):
     '''
     This function computes a UTC datetime object from the TLE line1 input year,
@@ -415,9 +159,11 @@ def tletime2datetime(line1):
     
     '''
     
+    # Get 2 digit year and day of year
     year2 = line1[18:20]
     doy = float(line1[20:32])  
     
+    # Compute century and add to year
     if int(year2) < 50.:
         year = int('20' + year2)
     else:
@@ -428,16 +174,296 @@ def tletime2datetime(line1):
     base = datetime(year, 1, 1, 0, 0, 0)
     UTC = base + timedelta(days=(doy-1.))
     
+    # Compute day of year to check
     doy = UTC.timetuple().tm_yday
     
     return UTC
 
 
-def gcrf2tle(r_GCRF, v_GCRF, UTC):
+def launch2tle(obj_id_list, launch_elem_dict):
+    '''
+    This function converts from commonly used launch elements to TLE format.
     
+    Parameters
+    ------
+    obj_id_list : list
+        object NORAD IDs (int)
+    launch_elem_dict : dictionary
+        dictionary of dictionaries containing launch elements, indexed by
+        object ID
+        each entry contains rp, ra, i, RAAN, w, M, UTC datetime
     
+    Returns
+    ------
+    tle_dict : dictionary
+        Two Line Element information, indexed by object ID
     
-    return tle_dict
+    '''
+
+    # Initialize output
+    tle_dict = {}
+    tle_list = []
+    
+    # Loop over objects
+    for obj_id in obj_id_list:
+        
+        # Retrieve launch elements for this object
+        launch_elem = launch_elem_dict[obj_id]
+        ra = launch_elem['ra']
+        rp = launch_elem['rp']
+        i = launch_elem['i']
+        RAAN = launch_elem['RAAN']
+        w = launch_elem['w']
+        M = launch_elem['M']
+        UTC = launch_elem['UTC']
+
+        # Compute mean motion in rev/day
+        a = (ra + rp)/2.
+        n = np.sqrt(GME/a**3.)
+        n *= 86400./(2.*pi)
+        
+        # Compute eccentricity
+        e = 1. - rp/a
+        
+        # Compute GCRF position and velocity
+        x_in = [a,e,i,RAAN,w,M]
+        x_out = element_conversion(x_in, 0, 1)
+        r_GCRF = np.reshape(x_out[0:3], (3,1))
+        v_GCRF = np.reshape(x_out[3:6], (3,1))
+        
+        # Compute TLE data for this object
+        line1, line2 = gcrf2tle(obj_id, r_GCRF, v_GCRF, UTC)
+    
+        # Add to dictionary
+        tle_dict[obj_id] = {}
+        tle_dict[obj_id]['UTC_list'] = [UTC]
+        tle_dict[obj_id]['line1_list'] = [line1]
+        tle_dict[obj_id]['line2_list'] = [line2]
+        
+        # Generate dataframe output
+        linelist = [obj_id,line1,line2]
+        tle_list.append(linelist)
+        
+    tle_df = pd.DataFrame(tle_list, columns=['norad','line1','line2'])
+
+    return tle_dict, tle_df
+
+
+def kep2tle(obj_id_list, kep_dict):    
+    '''
+    This function converts from Keplerian orbital elements to TLE format.
+    
+    Parameters
+    ------
+    obj_id_list : list
+        object NORAD IDs (int)
+    kep_dict : dictionary
+        dictionary of dictionaries containing launch elements, indexed by
+        object ID
+        each entry contains a, e, i, RAAN, w, M, UTC datetime
+    
+    Returns
+    ------
+    tle_dict : dictionary
+        indexed by object ID, each item has two lists of strings for each line
+    tle_df : pandas dataframe
+        norad, tle line1, tle line2
+
+    '''
+    
+    # Initialize output
+    tle_dict = {}
+    tle_list = []
+    
+    # Loop over objects
+    for obj_id in obj_id_list:
+        
+        # Retrieve launch elements for this object
+        kep_elem = kep_dict[obj_id]
+        a = kep_elem['a']
+        e = kep_elem['e']
+        i = kep_elem['i']
+        RAAN = kep_elem['RAAN']
+        w = kep_elem['w']
+        M = kep_elem['M']
+        UTC = kep_elem['UTC']
+        
+        # Compute GCRF position/velocity
+        x_in = [a,e,i,RAAN,w,M]
+        x_out = element_conversion(x_in, 0, 1)
+        r_GCRF = np.reshape(x_out[0:3], (3,1))
+        v_GCRF = np.reshape(x_out[3:6], (3,1))
+        
+        # Compute TLE data for this object
+        line1, line2 = gcrf2tle(obj_id, r_GCRF, v_GCRF, UTC)
+    
+        # Add to dictionary
+        tle_dict[obj_id] = {}
+        tle_dict[obj_id]['UTC_list'] = [UTC]
+        tle_dict[obj_id]['line1_list'] = [line1]
+        tle_dict[obj_id]['line2_list'] = [line2]
+        
+        # Generate dataframe output
+        linelist = [obj_id,line1,line2]
+        tle_list.append(linelist)
+        
+    tle_df = pd.DataFrame(tle_list, columns=['norad','line1','line2'])
+    
+    return tle_dict, tle_df
+
+
+def launchecef2tle(obj_id_list, ecef_dict, offline_flag=False):
+    '''
+    This function converts from ECEF position and velocity to TLE format.
+    
+    Parameters
+    ------
+    obj_id_list : list
+        object NORAD IDs (int)
+    ecef_dict : dictionary
+        dictionary of dictionaries containing launch coordinates, indexed by
+        object ID
+        each entry contains r_ITRF, v_ITRF, UTC datetime
+    offline_flag : boolean, optional
+        flag to determine whether to retrieve EOP data from internet or from
+        a locally saved file (default = False)
+    
+    Returns
+    ------
+    tle_dict : dictionary
+        indexed by object ID, each item has two lists of strings for each line
+    tle_df : pandas dataframe
+        norad, tle line1, tle line2    
+    
+    '''
+    
+     # Initialize output
+    tle_dict = {}
+    tle_list = []
+    
+    # Retrieve latest EOP data from celestrak.com
+    eop_alldata = get_celestrak_eop_alldata(offline_flag)
+    
+    # Retrieve IAU Nutation data from file
+    IAU1980nut = get_nutation_data()
+    
+    # Loop over objects
+    for obj_id in obj_id_list:
+        
+        # Retrieve launch coordinates for this object
+        r_ITRF = ecef_dict[obj_id]['r_ITRF']
+        v_ITRF = ecef_dict[obj_id]['v_ITRF']
+        UTC = ecef_dict[obj_id]['UTC']
+        
+        # Get EOP data for this time
+        EOP_data = get_eop_data(eop_alldata, UTC)
+        
+        # Convert ITRF to GCRF
+        r_GCRF, v_GCRF = itrf2gcrf(r_ITRF, v_ITRF, UTC, EOP_data)
+        
+        # Compute TLE data for this object
+        line1, line2 = gcrf2tle(obj_id, r_GCRF, v_GCRF, UTC, EOP_data,
+                                    IAU1980nut)
+    
+        # Add to dictionary
+        tle_dict[obj_id] = {}
+        tle_dict[obj_id]['UTC_list'] = [UTC]
+        tle_dict[obj_id]['line1_list'] = [line1]
+        tle_dict[obj_id]['line2_list'] = [line2]
+        
+        # Generate dataframe output
+        linelist = [obj_id,line1,line2]
+        tle_list.append(linelist)
+        
+    tle_df = pd.DataFrame(tle_list, columns=['norad','line1','line2'])
+    
+    return tle_dict, tle_df
+
+
+def gcrf2tle(obj_id, r_GCRF, v_GCRF, UTC, EOP_data=[], IAU1980nut=[],
+             offline_flag=False):
+    '''
+    This function generates Two Line Element (TLE) data in proper format given
+    input position and velocity in ECI (GCRF) coordinates.
+    
+    Parameters
+    ------
+    obj_id : int
+        NORAD ID of object
+    r_GCRF : 3x1 numpy array
+        position in GCRF [km]
+    v_GCRF : 3x1 numpy array
+        velocity in GCRF [km/s]
+    UTC : datetime object
+        epoch time of pos/vel state and TLE in UTC
+    EOP_data : list, optional
+        Earth orientation parameters, if empty will download from celestrak
+        (default=[])
+    IAU1980nut : dataframe, optional
+        nutation parameters, if empty will load from file (default=[])
+    offline_flag : boolean, optional
+        flag to indicate internet access, if True will load data from local
+        files (default=False)
+        
+    Returns
+    ------
+    line1 : string
+        first line of TLE
+    line2 : string
+        second line of TLE
+    '''
+    
+    # Retrieve latest EOP data from celestrak.com, if needed
+    if len(EOP_data) == 0:        
+        
+        eop_alldata = get_celestrak_eop_alldata(offline_flag)
+        EOP_data = get_eop_data(eop_alldata, UTC)
+    
+    # Retrieve IAU Nutation data from file, if needed
+    if len(IAU1980nut) == 0:
+        IAU1980nut = get_nutation_data()    
+    
+    # Convert to TEME, recompute osculating elements
+    r_TEME, v_TEME = gcrf2teme(r_GCRF, v_GCRF, UTC, IAU1980nut, EOP_data)
+    x_in = np.concatenate((r_TEME, v_TEME), axis=0)
+    osc_elem = element_conversion(x_in, 1, 0)
+    
+    # Convert to mean elements
+    # TODO currently it appears osculating elements gives more accurate result
+    # Need further investigation of proper computation of TLEs.
+    # Temporary solution, just use osculating elements instead of mean elements
+    mean_elem = list(osc_elem.flatten())
+    
+    # Retrieve elements
+    a = float(mean_elem[0])
+    e = float(mean_elem[1])
+    i = float(mean_elem[2])
+    RAAN = float(mean_elem[3])
+    w = float(mean_elem[4])
+    M = float(mean_elem[5])
+    
+    # Compute mean motion in rev/day
+    n = np.sqrt(GME/a**3.)
+    n *= 86400./(2.*pi)
+    
+    # Compute launch year and day of year
+    year2 = str(UTC.year)[2:4]
+    doy = UTC.timetuple().tm_yday
+    dfrac = UTC.hour/24. + UTC.minute/1440. + \
+        (UTC.second + UTC.microsecond/1e6)/86400.
+    dfrac = '{0:.15f}'.format(dfrac)
+    
+    # Format for output
+    line1 = '1 ' + str(obj_id) + 'U ' + year2 + '001A   ' + year2 + \
+        str(doy).zfill(3) + '.' + str(dfrac)[2:10] + \
+        '  .00000000  00000-0  00000-0 0    10'
+        
+    line2 = '2 ' + str(obj_id) + ' ' + '{:8.4f}'.format(i) + ' ' + \
+        '{:8.4f}'.format(RAAN) + ' ' + str(e)[2:9] + ' ' + \
+        '{:8.4f}'.format(w) + ' ' + '{:8.4f}'.format(M) + ' ' + \
+        '{:11.8f}'.format(n) + '    10'
+
+    return line1, line2
 
 
 def plot_tle_radec(tle_dict, UTC_list=[], sensor_list=[], display_flag=False,
