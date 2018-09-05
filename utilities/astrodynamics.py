@@ -13,6 +13,29 @@ from utilities.constants import GME, J2E, Re
 # Orbit Stuff
 ############################################################################
 
+
+def meanmot2sma(n, GM=GME):
+    '''
+    This function computs the semi-major axis given mean motion.
+    
+    Parameters
+    ------
+    n : float
+        mean motion [rad/s]
+    GM : float, optional
+        gravitational parameter, default is earth GME [km^3/s^2]
+    
+    Returns
+    ------
+    a : float
+        semi-major axis [km]
+    '''
+    
+    a = (GM/n**2.)**(1./3.)    
+    
+    return a
+
+
 def mean2ecc(M, e):
     '''
     This function converts from Mean Anomaly to Eccentric Anomaly
