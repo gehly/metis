@@ -105,42 +105,73 @@ def get_spacetrack_tle_data(obj_id_list, UTC_list = [], username='',
         line2_stop = ii*2*(nchar+nskip) + 2*nchar + nskip
         line1 = r.text[line1_start:line1_stop]
         line2 = r.text[line2_start:line2_stop]
+        UTC = tletime2datetime(line1)
 
         obj_id = int(line1[2:7])
         
         if obj_id not in tle_dict:
             tle_dict[obj_id] = {}
+            tle_dict[obj_id]['UTC_list'] = []
             tle_dict[obj_id]['line1_list'] = []
             tle_dict[obj_id]['line2_list'] = []
             
+        tle_dict[obj_id]['UTC_list'].append(UTC)
         tle_dict[obj_id]['line1_list'].append(line1)
         tle_dict[obj_id]['line2_list'].append(line2)
     
     return tle_dict
 
 
-def get_database_tle_data(obj_id_list):
+def tletime2datetime(line1):
     '''
-    This function retrieves the latest two-line element (TLE) data for objects
-    in the input list from the database.
+    This function computes a UTC datetime object from the TLE line1 input year,
+    day of year, and fractional day.
+    
+    Parameters
+    ------
+    line1 : string
+        first line of TLE, contains day of year and fractional day
+    
+    Returns
+    ------
+    UTC : datetime object
+        UTC datetime object
+        
+    Reference
+    ------
+    https://celestrak.com/columns/v04n03/#FAQ03
+    
+    While talking about the epoch, this is perhaps a good place to answer the
+    other time-related questions. First, how is the epoch time format
+    interpreted? This question is best answered by using an example. An epoch
+    of 98001.00000000 corresponds to 0000 UT on 1998 January 01—in other words,
+    midnight between 1997 December 31 and 1998 January 01. An epoch of 
+    98000.00000000 would actually correspond to the beginning of 
+    1997 December 31—strange as that might seem. Note that the epoch day starts
+    at UT midnight (not noon) and that all times are measured mean solar rather 
+    than sidereal time units (the answer to our third question).
     
     '''
     
-    tle_dict = {}
+    # Retrieve last 2 digits of year and day of year
+    year2 = line1[18:20]
+    doy = float(line1[20:32])  
     
+    # Add correct 2 digit century
+    if int(year2) < 50.:
+        year = int('20' + year2)
+    else:
+        year = int('19' + year2)
     
-    return tle_dict
-
-
-def put_database_tle_data(tle_dict):
-    '''
-    This function puts the latest two-line element (TLE) data for objects
-    into the database.
+    # Need to subtract 1 from day of year to add to this base datetime
+    # In TLE definition doy = 001.000 for Jan 1 Midnight UTC
+    base = datetime(year, 1, 1, 0, 0, 0)
+    UTC = base + timedelta(days=(doy-1.))
     
-    '''
+    # Check day of year
+    doy = UTC.timetuple().tm_yday
     
-    
-    return
+    return UTC
 
 
 def launch2tle(obj_id_list, launch_elem_dict):
@@ -208,6 +239,7 @@ def launch2tle(obj_id_list, launch_elem_dict):
             
         # Add to dictionary
         tle_dict[obj_id] = {}
+        tle_dict[obj_id]['UTC_list'] = [UTC]
         tle_dict[obj_id]['line1_list'] = [line1]
         tle_dict[obj_id]['line2_list'] = [line2]
         
@@ -277,6 +309,7 @@ def kep2tle(obj_id_list, kep_dict):
             
         # Add to dictionary
         tle_dict[obj_id] = {}
+        tle_dict[obj_id]['UTC_list'] = [UTC]
         tle_dict[obj_id]['line1_list'] = [line1]
         tle_dict[obj_id]['line2_list'] = [line2]
         
@@ -373,6 +406,7 @@ def launchecef2tle(obj_id_list, ecef_dict, offline_flag=False):
             
         # Add to dictionary
         tle_dict[obj_id] = {}
+        tle_dict[obj_id]['UTC_list'] = [UTC]
         tle_dict[obj_id]['line1_list'] = [line1]
         tle_dict[obj_id]['line2_list'] = [line2]
         
@@ -381,55 +415,6 @@ def launchecef2tle(obj_id_list, ecef_dict, offline_flag=False):
     
     
     return tle_dict
-
-
-def tletime2datetime(line1):
-    '''
-    This function computes a UTC datetime object from the TLE line1 input year,
-    day of year, and fractional day.
-    
-    Parameters
-    ------
-    line1 : string
-        first line of TLE, contains day of year and fractional day
-    
-    Returns
-    ------
-    UTC : datetime object
-        UTC datetime object
-        
-    Reference
-    ------
-    https://celestrak.com/columns/v04n03/#FAQ03
-    
-    While talking about the epoch, this is perhaps a good place to answer the
-    other time-related questions. First, how is the epoch time format
-    interpreted? This question is best answered by using an example. An epoch
-    of 98001.00000000 corresponds to 0000 UT on 1998 January 01—in other words,
-    midnight between 1997 December 31 and 1998 January 01. An epoch of 
-    98000.00000000 would actually correspond to the beginning of 
-    1997 December 31—strange as that might seem. Note that the epoch day starts
-    at UT midnight (not noon) and that all times are measured mean solar rather 
-    than sidereal time units (the answer to our third question).
-    
-    '''
-    
-    year2 = line1[18:20]
-    doy = float(line1[20:32])  
-    
-    if int(year2) < 50.:
-        year = int('20' + year2)
-    else:
-        year = int('19' + year2)
-    
-    # Need to subtract 1 from day of year to add to this base datetime
-    # In TLE definition doy = 001.000 for Jan 1 Midnight UTC
-    base = datetime(year, 1, 1, 0, 0, 0)
-    UTC = base + timedelta(days=(doy-1.))
-    
-    doy = UTC.timetuple().tm_yday
-    
-    return UTC
 
 
 def plot_tle_radec(tle_dict, UTC_list=[], sensor_list=[], display_flag=False,
@@ -793,7 +778,8 @@ if __name__ == '__main__' :
 #                 datetime(2018, 4, 21, 0, 0, 0)]
     
     obj_id_list = [40940, 39613, 36287, 39487, 40267, 41836]
-    UTC_list = [datetime(2018, 1, 16, 12, 43, 20)]
+    UTC_list = [datetime(2018, 1, 16, 12, 43, 20),
+                datetime(2018, 1, 18, 20, 0, 0)]
     sensor_list = ['RMIT ROO']
 #    
 #    
@@ -804,6 +790,7 @@ if __name__ == '__main__' :
     plt.close('all')
     
     tle_dict = get_spacetrack_tle_data(obj_id_list, UTC_list)
+    print(tle_dict)
 #    
 #    UTC_list = [datetime(2018, 4, 20, 8, 0, 0)]
 #    
@@ -820,7 +807,7 @@ if __name__ == '__main__' :
     
     
     
-    plot_tle_radec(tle_dict, UTC_list, sensor_list, display_flag=True)
+#    plot_tle_radec(tle_dict, UTC_list, sensor_list, display_flag=True)
     
 #    plot_all_tle_common_time(obj_id_list, UTC_list)
     
