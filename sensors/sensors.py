@@ -1,7 +1,9 @@
 from math import pi
+import os
 import pickle
+import pandas as pd
 
-def define_sensors(sensor_id_list):
+def define_sensors(sensor_id_list=[]):
     
     # Initialize
     sensor_dict = {}
@@ -929,9 +931,10 @@ def define_sensors(sensor_id_list):
 
 
     # Remove sensors not in list
-    sensor_remove_list = list(set(sensor_dict.keys()) - set(sensor_id_list))
-    for sensor_id in sensor_remove_list:
-        sensor_dict.pop(sensor_id, None)
+    if len(sensor_id_list) > 0:
+        sensor_remove_list = list(set(sensor_dict.keys()) - set(sensor_id_list))
+        for sensor_id in sensor_remove_list:
+            sensor_dict.pop(sensor_id, None)
 
     
     return sensor_dict
@@ -944,13 +947,19 @@ def get_database_sensor_data(sensor_id_list):
     return sensor_dict
 
 
-def generate_sensor_file(sensor_id_list, sensor_file):
+def generate_sensor_file(sensor_file, sensor_id_list=[]):
     
     sensor_dict = define_sensors(sensor_id_list)
     
-    # Save data    
-    pklFile = open( sensor_file, 'wb' )
-    pickle.dump( [sensor_dict], pklFile, -1 )
-    pklFile.close()
+    # Save data
+    fname, ext = os.path.splitext(sensor_file) 
+    if ext == 'pkl':
+        pklFile = open( sensor_file, 'wb' )
+        pickle.dump( [sensor_dict], pklFile, -1 )
+        pklFile.close()
+    
+    if ext == 'csv':
+        sensors = pd.DataFrame.from_dict(sensor_dict).T
+        sensors.to_csv('sensors.csv')
     
     return
