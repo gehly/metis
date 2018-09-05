@@ -30,7 +30,7 @@ if __name__ == '__main__':
     ###########################################################################
     # TLE to GCRF back to TLE
     ###########################################################################
-    obj_id = 40940
+    obj_id = 43013
     obj_id_list = [obj_id]
     UTC_list = [datetime(2018, 1, 16, 12, 43, 20)]
     
@@ -57,6 +57,12 @@ if __name__ == '__main__':
     x_in = np.concatenate((r_TEME, v_TEME), axis=0)
     osc_elem = astro.element_conversion(x_in, 1, 0)
     mean_elem = astro.osc2mean(osc_elem)
+    mean_elem = list(osc_elem.flatten())
+    
+    print(osc_elem)
+    print(mean_elem)
+
+#    mean_elem = list(osc_elem)
     kep_dict = {}
     kep_dict[obj_id] = {}
     kep_dict[obj_id]['a'] = mean_elem[0]
@@ -69,6 +75,14 @@ if __name__ == '__main__':
     tle_dict = tle.kep2tle(obj_id_list, kep_dict)
     
     print(tle_dict)
+    
+    output_state = tle.propagate_TLE(obj_id_list, [UTC], tle_dict)
+    UTC = output_state[obj_id]['UTC'][0]
+    r_GCRF2 = output_state[obj_id]['r_GCRF'][0]
+    v_GCRF2 = output_state[obj_id]['v_GCRF'][0]
+    print(UTC)
+    print('r_GCRF check', r_GCRF - r_GCRF2)
+    print('v_GCRF check', v_GCRF - v_GCRF2)
     
     
     
