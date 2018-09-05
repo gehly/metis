@@ -123,32 +123,9 @@ def get_spacetrack_tle_data(obj_id_list, UTC_list = [], username='',
         linelist = [obj_id,line1,line2]
         tle_list.append(linelist)  
         
-    tle_df = pd.DataFrame(tle_list, columns=['norad','line1','line2'])   
+    tle_df = pd.DataFrame(tle_list, columns=['norad','line1','line2'])
+    
     return tle_dict, tle_df
-
-
-def get_database_tle_data(obj_id_list):
-    '''
-    This function retrieves the latest two-line element (TLE) data for objects
-    in the input list from the database.
-    
-    '''
-    
-    tle_dict = {}
-    
-    
-    return tle_dict
-
-
-def put_database_tle_data(tle_dict):
-    '''
-    This function puts the latest two-line element (TLE) data for objects
-    into the database.
-    
-    '''
-    
-    
-    return
 
 
 def launch2tle(obj_id_list, launch_elem_dict):
@@ -407,7 +384,6 @@ def launchecef2tle(obj_id_list, ecef_dict, offline_flag=False):
     return tle_dict
 
 
-<<<<<<< HEAD
 def tletime2datetime(line1):
     '''
     This function computes a UTC datetime object from the TLE line1 input year,
@@ -455,13 +431,13 @@ def tletime2datetime(line1):
     doy = UTC.timetuple().tm_yday
     
     return UTC
-=======
+
+
 def gcrf2tle(r_GCRF, v_GCRF, UTC):
     
     
     
     return tle_dict
->>>>>>> astrodynamics
 
 
 def plot_tle_radec(tle_dict, UTC_list=[], sensor_list=[], display_flag=False,
