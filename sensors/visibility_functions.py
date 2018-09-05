@@ -9,10 +9,8 @@ sys.path.append('../')
 from skyfield.constants import ERAD
 from skyfield.api import Topos, EarthSatellite, Loader
 
-from sensors import define_sensors
-from sensors import get_database_sensor_data
+from sensors.sensors import define_sensors
 from utilities.tle_functions import get_spacetrack_tle_data
-from utilities.tle_functions import get_database_tle_data
 from utilities.tle_functions import find_closest_tle_epoch
 
 
@@ -58,8 +56,8 @@ def define_RSOs(obj_id_list, UTC, tle_dict={}, source='spacetrack'):
             
         # Retrieve from graph database
         if source == 'database':
-            
-            tle_dict = get_database_tle_data(obj_id_list)
+            tle_dict = {}
+#            tle_dict = get_database_tle_data(obj_id_list)
         
 
     # Retrieve TLE data and form RSO dictionary using skyfield
@@ -79,9 +77,10 @@ def define_RSOs(obj_id_list, UTC, tle_dict={}, source='spacetrack'):
     # Include options here for RCS from SATCAT, graph database, ...  
     
     # Retrieve from database
-    if source == 'database':        
+    if source == 'database':
+        rso_dict = {}
         
-        rso_dict = get_database_object_params(rso_dict)
+#        rso_dict = get_database_object_params(rso_dict)
     
     # Use default values
     else:

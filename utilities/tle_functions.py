@@ -109,14 +109,17 @@ def get_spacetrack_tle_data(obj_id_list, UTC_list = [], username='',
         line2_stop = ii*2*(nchar+nskip) + 2*nchar + nskip
         line1 = r.text[line1_start:line1_stop]
         line2 = r.text[line2_start:line2_stop]
+        UTC = tletime2datetime(line1)
 
         obj_id = int(line1[2:7])
         
         if obj_id not in tle_dict:
             tle_dict[obj_id] = {}
+            tle_dict[obj_id]['UTC_list'] = []
             tle_dict[obj_id]['line1_list'] = []
             tle_dict[obj_id]['line2_list'] = []
-            
+        
+        tle_dict[obj_id]['UTC_list'].append(UTC)
         tle_dict[obj_id]['line1_list'].append(line1)
         tle_dict[obj_id]['line2_list'].append(line2)
         
@@ -126,6 +129,36 @@ def get_spacetrack_tle_data(obj_id_list, UTC_list = [], username='',
     tle_df = pd.DataFrame(tle_list, columns=['norad','line1','line2'])
     
     return tle_dict, tle_df
+
+
+def tledict2dataframe(tle_dict):
+    '''
+    This function computes a pandas dataframe with TLE data given an input
+    dictionary with TLE data.
+    
+    Parameters
+    ------
+    tle_dict : dictionary
+        indexed by object ID, each item has two lists of strings for each line
+        
+    Returns
+    ------
+    tle_df : pandas dataframe
+        norad, tle line1, tle line2
+        
+    '''
+    
+    tle_list = []
+    for obj_id in tle_dict:
+        for ii in range(len(tle_dict[obj_id]['line1_list'])):
+            line1 = tle_dict[obj_id]['line1_list'][ii]
+            line2 = tle_dict[obj_id]['line2_list'][ii]
+            linelist = [obj_id, line1, line2]
+            tle_list.append(linelist)
+    
+    tle_df = pd.DataFrame(tle_list, columns=['norad','line1','line2'])
+    
+    return tle_df
 
 
 def tletime2datetime(line1):
