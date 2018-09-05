@@ -365,7 +365,7 @@ def brouwer_lyddane(a0,e0,i0,RAAN0,w0,M0,gamma0):
     
     e1 = np.sqrt(d1**2. + d2**2.)
     
-    i1 = 2.*asin(np.sqrt(d3**2. + d4**4.))
+    i1 = 2.*asin(np.sqrt(d3**2. + d4**2.))
     
     RAAN1 = atan2(d3, d4)
     
