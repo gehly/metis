@@ -18,6 +18,23 @@ from utilities.constants import Re
 from sensors.visibility_functions import compute_visible_passes
 from sensors.visibility_functions import generate_visibility_file
 
+
+
+# Generate TLEs every 4 hours for first 24 hours, then every 12-24 hours after
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 if __name__ == '__main__':
     
     load = Loader(os.path.join(metis_dir, 'skyfield_data'))
