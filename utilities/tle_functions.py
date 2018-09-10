@@ -668,7 +668,7 @@ def plot_tle_radec(tle_dict, UTC_list=[], sensor_list=[], display_flag=False,
     return
 
 
-def plot_all_tle_common_time(obj_id_list, UTC_list):
+def plot_all_tle_common_time(obj_id_list, UTC_list, tle_dict={}):
     '''
     This function retrieves all TLEs for desired objects within the window
     specified by UTC_list. It finds the object with the most TLEs during the 
@@ -685,7 +685,8 @@ def plot_all_tle_common_time(obj_id_list, UTC_list):
     '''
     
     # Retrieve all TLEs in window
-    tle_dict = get_spacetrack_tle_data(obj_id_list, UTC_list)
+    if len(tle_dict) == 0:
+        tle_dict, tle_df = get_spacetrack_tle_data(obj_id_list, UTC_list)
     
     print(tle_dict)
     
@@ -785,7 +786,8 @@ def propagate_TLE(obj_id_list, UTC_list, tle_dict={}, offline_flag=False,
     if len(tle_dict) == 0:
     
         # Retrieve latest TLE data from space-track.org
-        tle_dict = get_spacetrack_tle_data(obj_id_list, username, password)
+        tle_dict, tle_df = \
+            get_spacetrack_tle_data(obj_id_list, username, password)
         
         # Retreive TLE data from database
         
@@ -859,18 +861,21 @@ if __name__ == '__main__' :
 #    UTC_list = [datetime(2018, 4, 20, 0, 0, 0),
 #                 datetime(2018, 4, 21, 0, 0, 0)]
     
-    obj_id_list = [40940, 39613, 36287, 39487, 40267, 41836]
-    UTC_list = [datetime(2018, 1, 16, 12, 43, 20)]
-    sensor_list = ['RMIT ROO']
+#    obj_id_list = [40940, 39613, 36287, 39487, 40267, 41836]
+#    UTC_list = [datetime(2018, 1, 16, 12, 43, 20)]
+#    sensor_list = ['RMIT ROO']
 #    
 #    
+    obj_id_list = [43013, 43014, 43015, 43016]
+    UTC_list = [datetime(2017, 11, 18, 0, 0, 0),
+                datetime(2017, 11, 25, 0, 0, 0)]
     
 #    
 #    print(output_state)
     
     plt.close('all')
     
-    tle_dict = get_spacetrack_tle_data(obj_id_list, UTC_list)
+#    tle_dict = get_spacetrack_tle_data(obj_id_list, UTC_list)
 #    
 #    UTC_list = [datetime(2018, 4, 20, 8, 0, 0)]
 #    
@@ -887,9 +892,9 @@ if __name__ == '__main__' :
     
     
     
-    plot_tle_radec(tle_dict, UTC_list, sensor_list, display_flag=True)
+#    plot_tle_radec(tle_dict, UTC_list, sensor_list, display_flag=True)
     
-#    plot_all_tle_common_time(obj_id_list, UTC_list)
+    plot_all_tle_common_time(obj_id_list, UTC_list)
     
     
     
