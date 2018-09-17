@@ -32,6 +32,7 @@ from sensors.sensors import generate_sensor_file
 from sensors.brdf_models import lambertian_sphere
 from sensors.brdf_models import ashikhmin_premoze
 from sensors.measurements import compute_measurement
+from sensors.visibility_functions import check_visibility
 from propagation.integration_functions import int_twobody
 from propagation.integration_functions import int_twobody_ukf
 from propagation.integration_functions import int_euler_dynamics_notorque
@@ -49,6 +50,7 @@ from data_processing.errors import compute_ukf_errors
 from data_processing.errors import plot_ukf_errors
 from data_processing.errors import compute_mmae_errors
 from data_processing.errors import plot_mmae_errors
+
 
 from estimation import unscented_kalman_filter
 from multiple_model import multiple_model_filter
@@ -767,20 +769,14 @@ def generate_noisy_meas(true_params_file, truth_file, sensor_file, meas_file,
     print(len(UTC_times))
     print(len(skyfield_times))
     
+    tf_hrs = (UTC_times[-1] - UTC_times[0]).total_seconds()/3600.
+    
+    
     # Load sensor data
     pklFile = open(sensor_file, 'rb')
     data = pickle.load(pklFile)
     sensor_dict = data[0]
-    pklFile.close()
-    
-    # Retrieve sensor parameters
-    sensor_id = list(sensor_dict.keys())[0]
-    sensor = sensor_dict[sensor_id]
-    meas_types = sensor['meas_types']
-    sigs = []
-    for mtype in meas_types:
-        sigs.append(sensor['sigma_dict'][mtype])
-    
+    pklFile.close()    
     
     # Retrieve sun and moon positions for full timespan
     earth = ephemeris['earth']
@@ -789,72 +785,106 @@ def generate_noisy_meas(true_params_file, truth_file, sensor_file, meas_file,
     moon_gcrf_array = earth.at(skyfield_times).observe(moon).position.km
     sun_gcrf_array = earth.at(skyfield_times).observe(sun).position.km
     
-    # Compute visible indicies    
-    vis_inds = check_visibility(state, UTC_times, sun_gcrf_array,
-                                moon_gcrf_array, sensor,
-                                spacecraftConfig, surfaces, eop_alldata,
-                                XYs_df)
-
-    print(vis_inds)
-
-    # Compute measurements
-    meas = np.zeros((len(vis_inds), len(meas_types)))
-    meas_true = np.zeros((len(vis_inds), len(meas_types)))
-    meas_times = []
-    row = 0
-    for ii in vis_inds:
-        
-        # Retrieve time and current sun and object locations in ECI
-        UTC = UTC_times[ii]
-        Xi = state[ii,:]
-        sun_gcrf = sun_gcrf_array[:,ii].reshape(3,1)
+    # Retrieve sensor parameters
+    meas_dict = {}
+    sensor_id_list = sorted(list(sensor_dict.keys()))
+    sensor_access = []
+    for sensor_id in sensor_id_list:
+        sensor = sensor_dict[sensor_id]
+        meas_types = sensor['meas_types']
+        sigs = []
+        for mtype in meas_types:
+            sigs.append(sensor['sigma_dict'][mtype])
+    
+        # Compute visible indicies    
+        vis_inds = check_visibility(state, UTC_times, sun_gcrf_array,
+                                    moon_gcrf_array, sensor,
+                                    spacecraftConfig, surfaces, eop_alldata,
+                                    XYs_df)
+    
+        print(vis_inds)
+    
+        t_hrs = np.asarray([(UTC_times[ii] - UTC_times[0]).total_seconds()/3600. for ii in vis_inds])
+        sensor_access.append(t_hrs)
         
         # Compute measurements
-        EOP_data = get_eop_data(eop_alldata, UTC)
-        Yi = compute_measurement(Xi, sun_gcrf, sensor, spacecraftConfig,
-                                 surfaces, UTC, EOP_data, meas_types, XYs_df)
+#        meas = np.zeros((len(vis_inds), len(meas_types)))
+#        meas_true = np.zeros((len(vis_inds), len(meas_types)))
+#        meas_times = []
+        for ii in vis_inds:
+
+            # Retrieve time and current sun and object locations in ECI
+            UTC = UTC_times[ii]
+            Xi = state[ii,:]
+            sun_gcrf = sun_gcrf_array[:,ii].reshape(3,1)
+                        
+            if UTC not in meas_dict:
+                meas_dict[UTC] = {}
+
+            # Compute measurements
+            EOP_data = get_eop_data(eop_alldata, UTC)
+            Yi = compute_measurement(Xi, sun_gcrf, sensor, spacecraftConfig,
+                                     surfaces, UTC, EOP_data, meas_types, XYs_df)
+            
+            meas = []
+            for jj in range(len(meas_types)):
+                sig = sigs[jj]
+                meas.append(float(Yi[jj]) + sig*np.random.randn())
+
+            meas_dict[UTC][sensor_id] = np.reshape(meas, (len(meas),1))
+
+      
         
-        for jj in range(len(meas_types)):
-            sig = sigs[jj]
-            meas[row,jj] = float(Yi[jj]) + sig*np.random.randn()
-            meas_true[row,jj] = float(Yi[jj])
-        
-        meas_times.append(UTC)
-        row += 1
-        
+    print(meas_dict)
+    
     # Save measurement file
     pklFile = open( meas_file, 'wb' )
-    pickle.dump( [meas_times, meas, meas_true], pklFile, -1 )
+    pickle.dump( [meas_dict], pklFile, -1 )
     pklFile.close()
     
+    plt.figure()
+    for ii in range(len(sensor_id_list)):
+        plt.plot(sensor_access[ii], np.ones(len(sensor_access[ii]))*(ii+1.), 'ks')
+        
+    plt.xlim([0., tf_hrs])
+    plt.xlabel('Time [hours]')
+    plt.yticks([1, 2, 3], ['Arequipa', 'Stromlo', 'Yarragadee'])
+    
+    print(sensor_dict)
+    print(sensor_id_list)
+    print(sensor_access)
+    
+    
     # Plot measurements
-    t_hrs = [(ti - UTC_times[0]).total_seconds()/3600. for ti in meas_times]
+#    t_hrs = [(ti - UTC_times[0]).total_seconds()/3600. for ti in UTC_times]
     
-    plt.figure()
-    plt.subplot(3,1,1)
-    plt.plot(t_hrs, meas_true[:,2], 'k.')
-    plt.ylabel('Apparent Mag')    
-    plt.title('Measurements')
-    plt.subplot(3,1,2)
-    plt.plot(t_hrs, meas_true[:,0]*180/pi, 'k.')
-    plt.ylabel('RA [deg]')
-    plt.subplot(3,1,3)
-    plt.plot(t_hrs, meas_true[:,1]*180/pi, 'k.')
-    plt.ylabel('DEC [deg]')
-    plt.xlabel('Time [hours]')
-    
-    plt.figure()
-    plt.subplot(3,1,1)
-    plt.plot(t_hrs, meas[:,2] - meas_true[:,2], 'k.')
-    plt.ylabel('Apparent Mag')    
-    plt.title('Measurement Noise')
-    plt.subplot(3,1,2)
-    plt.plot(t_hrs, (meas[:,0] - meas_true[:,0])*206265, 'k.')
-    plt.ylabel('RA [arcsec]')
-    plt.subplot(3,1,3)
-    plt.plot(t_hrs, (meas[:,1] - meas_true[:,1])*206265, 'k.')
-    plt.ylabel('DEC [arcsec]')
-    plt.xlabel('Time [hours]')
+#    plt.figure()
+#    plt.subplot(3,1,1)
+#    if 'mapp' in meas_types:
+#        plt.plot(t_hrs, meas_true[:,2], 'k.')
+#        plt.ylabel('Apparent Mag')    
+#    plt.title('Measurements')
+#    plt.subplot(3,1,2)
+#    plt.plot(t_hrs, meas_true[:,0]*180/pi, 'k.')
+#    plt.ylabel('RA [deg]')
+#    plt.subplot(3,1,3)
+#    plt.plot(t_hrs, meas_true[:,1]*180/pi, 'k.')
+#    plt.ylabel('DEC [deg]')
+#    plt.xlabel('Time [hours]')
+#    
+#    plt.figure()
+#    plt.subplot(3,1,1)
+#    if 'mapp' in meas_types:
+#        plt.plot(t_hrs, meas[:,2] - meas_true[:,2], 'k.')
+#        plt.ylabel('Apparent Mag')    
+#    plt.title('Measurement Noise')
+#    plt.subplot(3,1,2)
+#    plt.plot(t_hrs, (meas[:,0] - meas_true[:,0])*206265, 'k.')
+#    plt.ylabel('RA [arcsec]')
+#    plt.subplot(3,1,3)
+#    plt.plot(t_hrs, (meas[:,1] - meas_true[:,1])*206265, 'k.')
+#    plt.ylabel('DEC [arcsec]')
+#    plt.xlabel('Time [hours]')
     
     
     plt.show()
@@ -1438,25 +1468,30 @@ if __name__ == '__main__':
     
     
 #    # Generate initial orbit file
-#    obj_id = 90003
-#    launch_elem_dict = {}
-#    launch_elem_dict[obj_id] = {}
-#    launch_elem_dict[obj_id]['ra'] = Re + 505.
-#    launch_elem_dict[obj_id]['rp'] = Re + 500.
-#    launch_elem_dict[obj_id]['i'] = 97.6
-#    launch_elem_dict[obj_id]['RAAN'] = 318.
-#    launch_elem_dict[obj_id]['w'] = 0.
-#    launch_elem_dict[obj_id]['M'] = 0.
-#    launch_elem_dict[obj_id]['UTC'] = UTC
-#    obj_id_list = [90003]
-#    tle_dict = launch2tle(obj_id_list, launch_elem_dict)
+    obj_id = 90003
+    launch_elem_dict = {}
+    launch_elem_dict[obj_id] = {}
+    launch_elem_dict[obj_id]['ra'] = Re + 505.
+    launch_elem_dict[obj_id]['rp'] = Re + 500.
+    launch_elem_dict[obj_id]['i'] = 97.6
+    launch_elem_dict[obj_id]['RAAN'] = 318.
+    launch_elem_dict[obj_id]['w'] = 0.
+    launch_elem_dict[obj_id]['M'] = 0.
+    launch_elem_dict[obj_id]['UTC'] = UTC
+    obj_id_list = [90003]
+    tle_dict, tle_df = launch2tle(obj_id_list, launch_elem_dict)
+    print(tle_dict)
 #    generate_init_orbit_file(obj_id, UTC, init_orbit_file, tle_dict)
     
     # Generate sensor file
 #    sensor_id_list = ['Stromlo Laser', 'Zimmerwald Laser',
 #                      'Arequipa Laser', 'Haleakala Laser',
 #                      'Yarragadee Laser']
-#    generate_sensor_file(sensor_id_list, sensor_file)
+#    sensor_id_list = ['Stromlo Optical', 'Arequipa Optical', 'Yarragadee Optical']
+#    generate_sensor_file(sensor_file, sensor_id_list)
+    
+    # Visibility Analysis
+    
 
     # Generate true params file
 #    generate_true_params_file(init_orbit_file, obj_id, object_type, true_params_file)
@@ -1469,9 +1504,9 @@ if __name__ == '__main__':
 #    generate_truth_file(true_params_file, truth_file, ephemeris, ts, ndays, dt)
     
 #    # Generate noisy measurements file
-    ndays = 7.
-    generate_noisy_meas(true_params_file, truth_file, sensor_file, meas_file,
-                        ephemeris, ndays)
+    ndays = 3.
+#    generate_noisy_meas(true_params_file, truth_file, sensor_file, meas_file,
+#                        ephemeris, ndays)
     
     # Generate model parameters file
 #    generate_ukf_params(true_params_file, model_params_file)

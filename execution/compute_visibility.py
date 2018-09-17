@@ -8,6 +8,7 @@ from skyfield.api import Loader, utc
 sys.path.append('../')
 
 from utilities.constants import Re
+from utilities.tle_functions import launch2tle
 from visibility_functions import compute_visible_passes
 from visibility_functions import generate_visibility_file
 
@@ -21,15 +22,31 @@ if __name__ == '__main__':
     ts = load.timescale()
             
     
-    obj_id_list = [25544]
-    UTC = datetime(2018, 7, 12, 9, 0, 0)
+#    obj_id_list = [25544]
+#    UTC = datetime(2018, 7, 12, 9, 0, 0)
     
-    sensor_id_list = ['Stromlo Laser', 'Zimmerwald Laser',
-                      'Arequipa Laser', 'Haleakala Laser']
+    obj_id = 90003
+    UTC = datetime(2018, 12, 9, 12, 0, 0)
+    
+    launch_elem_dict = {}
+    launch_elem_dict[obj_id] = {}
+    launch_elem_dict[obj_id]['ra'] = Re + 505.
+    launch_elem_dict[obj_id]['rp'] = Re + 500.
+    launch_elem_dict[obj_id]['i'] = 97.6
+    launch_elem_dict[obj_id]['RAAN'] = 318.
+    launch_elem_dict[obj_id]['w'] = 0.
+    launch_elem_dict[obj_id]['M'] = 0.
+    launch_elem_dict[obj_id]['UTC'] = UTC
+    obj_id_list = [90003]
+    tle_dict = launch2tle(obj_id_list, launch_elem_dict)
+    
+    sensor_id_list = ['Stromlo Optical', 'Zimmerwald Optical',
+                      'Arequipa Optical', 'Haleakala Optical',
+                      'Yarragadee Optical']
     
     
     # Times for visibility check
-    ndays = 3
+    ndays = 7
     dt = 10
     UTC0 = ts.utc(UTC.replace(tzinfo=utc)).utc
     sec_array = list(range(0,86400*ndays,dt))
@@ -37,7 +54,7 @@ if __name__ == '__main__':
                             UTC0[3], UTC0[4], sec_array)
     
     vis_dict = compute_visible_passes(skyfield_times, obj_id_list,
-                                      sensor_id_list, ephemeris)
+                                      sensor_id_list, ephemeris, tle_dict)
     
     
     print(vis_dict)

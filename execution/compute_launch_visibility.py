@@ -9,14 +9,15 @@ sys.path.append('../')
 
 from utilities.tle_functions import launch2tle
 from utilities.constants import Re
-from visibility_functions import compute_visible_passes
-from visibility_functions import generate_visibility_file
+from sensors.visibility_functions import compute_visible_passes
+from sensors.visibility_functions import generate_visibility_file
 
 
 if __name__ == '__main__':
     
     cwd = os.getcwd()
-    metis_dir = cwd[0:-7]
+    metis_ind = cwd.find('metis')
+    metis_dir = cwd[0:metis_ind+6]
     load = Loader(os.path.join(metis_dir, 'skyfield_data'))
     ephemeris = load('de430t.bsp')
     ts = load.timescale()
@@ -61,7 +62,10 @@ if __name__ == '__main__':
     obj_id_list = [90003]
     
     
-    tle_dict = launch2tle(obj_id_list, launch_elem_dict)
+    tle_dict, tle_df = launch2tle(obj_id_list, launch_elem_dict)
+    
+    print(tle_dict)
+    mistake
     
     sensor_id_list = ['Stromlo Optical', 'Zimmerwald Optical',
                       'Arequipa Optical', 'Haleakala Optical',
@@ -72,7 +76,7 @@ if __name__ == '__main__':
     UTC2 = datetime(2018, 12, 9, 12, 0, 0)
     
     # Times for visibility check
-    ndays = 3
+    ndays = 7
     dt = 10
     UTC0 = ts.utc(launch_elem_dict[90003]['UTC'].replace(tzinfo=utc)).utc
     sec_array = list(range(0,86400*ndays,dt))

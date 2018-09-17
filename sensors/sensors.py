@@ -946,12 +946,14 @@ def generate_sensor_file(sensor_file, sensor_id_list=[]):
     
     # Save data
     fname, ext = os.path.splitext(sensor_file) 
-    if ext == 'pkl':
+    print(ext)
+    if ext == '.pkl':
         pklFile = open( sensor_file, 'wb' )
         pickle.dump( [sensor_dict], pklFile, -1 )
         pklFile.close()
+        print(sensor_dict)
     
-    if ext == 'csv':
+    if ext == '.csv':
         sensors = pd.DataFrame.from_dict(sensor_dict).T
         sensors.to_csv('sensors.csv')
     
