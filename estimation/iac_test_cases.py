@@ -39,7 +39,7 @@ from propagation.integration_functions import int_euler_dynamics_notorque
 from propagation.integration_functions import int_twobody_6dof_notorque
 from propagation.integration_functions import ode_twobody
 from propagation.integration_functions import ode_twobody_ukf
-from propagation.integration_functions import ode_twobody_j2_drag_srp
+from propagation.integration_functions import ode_twobody_j2_drag
 from propagation.integration_functions import ode_twobody_j2_drag_srp_ukf
 from propagation.integration_functions import ode_twobody_6dof_notorque
 from propagation.integration_functions import ode_twobody_6dof_notorque_ukf
@@ -93,7 +93,7 @@ def parameter_setup_sphere(orbit_file, obj_id, mass, radius):
     spacecraftConfig['radius'] = radius * 0.001 # km
     spacecraftConfig['time'] = UTC  # UTC in datetime
     spacecraftConfig['brdf_function'] = lambertian_sphere
-    spacecraftConfig['intfcn'] = ode_twobody_j2_drag_srp
+    spacecraftConfig['intfcn'] = ode_twobody_j2_drag
     spacecraftConfig['integrator'] = 'dop853'
     spacecraftConfig['X'] = np.concatenate((pos, vel))  # km, GCRF
     
@@ -910,7 +910,7 @@ def generate_ukf_params(true_params_file, model_params_file):
     if spacecraftConfig['type'] == '3DoF':
         
         # Integration function
-        spacecraftConfig['intfcn'] = ode_twobody_j2_drag_srp_ukf
+        spacecraftConfig['intfcn'] = ode_twobody_j2_drag_ukf
         
         # Initial covariance
         Po = np.diag([1., 1., 1., 1e-6, 1e-6, 1e-6])  # km^2 and km^2/s^2
@@ -1432,22 +1432,22 @@ if __name__ == '__main__':
     
     # Data directory
     datadir = Path('C:/Users/Steve/Documents/data/multiple_model/'
-                   '2018_08_20_imm')
+                   '2018_09_17_imm')
     
     # Filenames
-    init_orbit_file = datadir / '500km_orbit_2018_12_09.pkl'
+    init_orbit_file = datadir / '600km_orbit_2018_12_09.pkl'
     sensor_file = datadir / 'sensors_ilrs_optical.pkl'
     
-    fname = '500km_' + object_type + '_2018_12_09_true_params.pkl'
+    fname = '600km_' + object_type + '_2018_12_09_true_params.pkl'
     true_params_file = datadir / fname
     
-    fname = '500km_' + object_type + '_2018_07_12_truth.pkl'
+    fname = '600km_' + object_type + '_2018_12_09_truth.pkl'
     truth_file = datadir / fname
     
-    fname = '500km_' + object_type + '_2018_07_12_meas.pkl'
+    fname = '600km_' + object_type + '_2018_12_09_meas.pkl'
     meas_file = datadir / fname
     
-    fname = '500km_' + object_type + '_2018_07_12_model_params.pkl'
+    fname = '600km_' + object_type + '_2018_12_09_model_params.pkl'
     model_params_file = datadir / fname
     
 #    fname = 'leo_sphere_med_mmae_2018_07_12_model_params.pkl'
@@ -1468,19 +1468,19 @@ if __name__ == '__main__':
     
     
 #    # Generate initial orbit file
-    obj_id = 90003
-    launch_elem_dict = {}
-    launch_elem_dict[obj_id] = {}
-    launch_elem_dict[obj_id]['ra'] = Re + 505.
-    launch_elem_dict[obj_id]['rp'] = Re + 500.
-    launch_elem_dict[obj_id]['i'] = 97.6
-    launch_elem_dict[obj_id]['RAAN'] = 318.
-    launch_elem_dict[obj_id]['w'] = 0.
-    launch_elem_dict[obj_id]['M'] = 0.
-    launch_elem_dict[obj_id]['UTC'] = UTC
-    obj_id_list = [90003]
-    tle_dict, tle_df = launch2tle(obj_id_list, launch_elem_dict)
-    print(tle_dict)
+#    obj_id = 90003
+#    launch_elem_dict = {}
+#    launch_elem_dict[obj_id] = {}
+#    launch_elem_dict[obj_id]['ra'] = Re + 605.
+#    launch_elem_dict[obj_id]['rp'] = Re + 595.
+#    launch_elem_dict[obj_id]['i'] = 97.6
+#    launch_elem_dict[obj_id]['RAAN'] = 318.
+#    launch_elem_dict[obj_id]['w'] = 0.
+#    launch_elem_dict[obj_id]['M'] = 0.
+#    launch_elem_dict[obj_id]['UTC'] = UTC
+#    obj_id_list = [90003]
+#    tle_dict, tle_df = launch2tle(obj_id_list, launch_elem_dict)
+#    print(tle_dict)
 #    generate_init_orbit_file(obj_id, UTC, init_orbit_file, tle_dict)
     
     # Generate sensor file
@@ -1509,7 +1509,7 @@ if __name__ == '__main__':
 #                        ephemeris, ndays)
     
     # Generate model parameters file
-#    generate_ukf_params(true_params_file, model_params_file)
+    generate_ukf_params(true_params_file, model_params_file)
     
 #    generate_mmae_params(true_params_file, init_orbit_file, mmae_params_file)
     

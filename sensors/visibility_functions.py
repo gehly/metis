@@ -61,7 +61,7 @@ def define_RSOs(obj_id_list, UTC, tle_dict={}, source='spacetrack'):
         if source == 'spacetrack':            
             
             UTC_list = [UTC]
-            tle_dict = get_spacetrack_tle_data(obj_id_list, UTC_list)
+            tle_dict, tle_df = get_spacetrack_tle_data(obj_id_list, UTC_list)
             
         # Retrieve from graph database
         if source == 'database':

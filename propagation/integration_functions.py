@@ -222,10 +222,91 @@ def ode_twobody_ukf(t, X, params):
     return dX
 
 
+def ode_twobody_j2_drag(t, X, params):
+    '''
+    This function works with ode to propagate object assuming
+    J2 and drag perturbations.
+
+    Parameters
+    ------
+    X : 6 element list
+      cartesian state vector (Inertial Frame)
+    t : m element list
+      vector of times when output is desired
+    args : tuple
+        additional arguments
+
+    Returns
+    ------
+    dX : 6 element list
+      state derivative vector
+    '''
+
+    # State Vector
+    x = float(X[0])
+    y = float(X[1])
+    z = float(X[2])
+    dx = float(X[3])
+    dy = float(X[4])
+    dz = float(X[5])
+    
+    # Retrieve object parameters
+    spacecraftConfig = params[0]
+    forcesCoeff = params[1]
+#    surfaces = params[2]
+#    ephemeris = params[3]
+#    ts = params[4]
+#    eop_alldata = params[3]
+    radius = spacecraftConfig['radius']
+    mass = spacecraftConfig['mass']
+    A_m = pi*radius**2./mass
+    Cd = forcesCoeff['dragCoeff']
+
+    # Compute radius
+    r_vect = np.array([[x], [y], [z]])
+    r = np.linalg.norm(r_vect)
+    
+    # Compute drag component
+    # Find vector va of spacecraft relative to atmosphere
+    v_vect = np.array([[dx], [dy], [dz]])
+    w_vect = np.array([[0.], [0.], [wE]])
+    va_vect = v_vect - np.cross(w_vect, r_vect, axis=0)
+    va = np.linalg.norm(va_vect)
+    va_x = float(va_vect[0])
+    va_y = float(va_vect[1])
+    va_z = float(va_vect[2])
+    
+    drag = -0.5*A_m*Cd*stdatm_rho0*exp(-(r-stdatm_ro)/stdatm_H)
+
+    x_drag = drag*va*va_x
+    y_drag = drag*va*va_y
+    z_drag = drag*va*va_z
+    
+    # Compute J2 component
+    x_j2 = - 1.5*J2E*Re**2.*GME*((x/r**5.) - (5.*x*z**2./r**7.))
+    y_j2 = - 1.5*J2E*Re**2.*GME*((y/r**5.) - (5.*y*z**2./r**7.))
+    z_j2 = - 1.5*J2E*Re**2.*GME*((3.*z/r**5.) - (5.*z**3./r**7.)) 
+    
+
+    # Derivative vector
+    dX = [0.]*6
+
+    dX[0] = dx
+    dX[1] = dy
+    dX[2] = dz
+    
+    dX[3] = -GME*x/r**3. + x_j2 + x_drag
+    dX[4] = -GME*y/r**3. + y_j2 + y_drag
+    dX[5] = -GME*z/r**3. + z_j2 + z_drag
+    
+    
+    return dX
+
+
 def ode_twobody_j2_drag_srp(t, X, params):
     '''
     This function works with ode to propagate object assuming
-    simple two-body dynamics.  No perturbations included.
+    J2, drag, and SRP perturbations.
 
     Parameters
     ------
@@ -374,6 +455,92 @@ def ode_twobody_j2_drag_srp(t, X, params):
     dX[5] = -GME*z/r**3. + z_j2 + z_drag + z_srp
     
     
+    return dX
+
+
+def ode_twobody_j2_drag_ukf(t, X, params):
+    '''
+    This function works with ode to propagate object assuming
+    simple including J2 and drag perturbations.
+
+    Parameters
+    ------
+    X : 6 element list
+      cartesian state vector (Inertial Frame)
+    t : m element list
+      vector of times when output is desired
+    args : tuple
+        additional arguments
+
+    Returns
+    ------
+    dX : 6 element list
+      state derivative vector
+    '''
+
+    
+    
+    # Retrieve object parameters
+    spacecraftConfig = params[0]
+    forcesCoeff = params[1]
+#    surfaces = params[2]
+#    ephemeris = params[3]
+#    ts = params[4]
+#    eop_alldata = params[3]
+    radius = spacecraftConfig['radius']
+    mass = spacecraftConfig['mass']
+    A_m = pi*radius**2./mass
+    Cd = forcesCoeff['dragCoeff']    
+    
+    # Initialize
+    dX = [0]*len(X)
+    n = int((-1 + np.sqrt(1. + 8.*len(X)))/4.)
+
+    for ind in range(0, 2*n+1):
+
+        # Pull out relevant values from X
+        x = float(X[ind*n])
+        y = float(X[ind*n + 1])
+        z = float(X[ind*n + 2])
+        dx = float(X[ind*n + 3])
+        dy = float(X[ind*n + 4])
+        dz = float(X[ind*n + 5])
+
+        # Compute radius
+        r_vect = np.array([[x], [y], [z]])
+        r = np.linalg.norm(r_vect)
+        
+        # Compute drag component
+        # Find vector va of spacecraft relative to atmosphere
+        v_vect = np.array([[dx], [dy], [dz]])
+        w_vect = np.array([[0.], [0.], [wE]])
+        va_vect = v_vect - np.cross(w_vect, r_vect, axis=0)
+        va = np.linalg.norm(va_vect)
+        va_x = float(va_vect[0])
+        va_y = float(va_vect[1])
+        va_z = float(va_vect[2])
+        
+        drag = -0.5*A_m*Cd*stdatm_rho0*exp(-(r-stdatm_ro)/stdatm_H)
+    
+        x_drag = drag*va*va_x
+        y_drag = drag*va*va_y
+        z_drag = drag*va*va_z
+
+        # Compute J2 component
+        x_j2 = - 1.5*J2E*Re**2.*GME*((x/r**5.) - (5.*x*z**2./r**7.))
+        y_j2 = - 1.5*J2E*Re**2.*GME*((y/r**5.) - (5.*y*z**2./r**7.))
+        z_j2 = - 1.5*J2E*Re**2.*GME*((3.*z/r**5.) - (5.*z**3./r**7.)) 
+
+        # Derivative vector
+        dX[ind*n] = dx
+        dX[ind*n + 1] = dy
+        dX[ind*n + 2] = dz
+        
+        dX[ind*n + 3] = -GME*x/r**3. + x_j2 + x_drag
+        dX[ind*n + 4] = -GME*y/r**3. + y_j2 + y_drag
+        dX[ind*n + 5] = -GME*z/r**3. + z_j2 + z_drag
+    
+
     return dX
 
 

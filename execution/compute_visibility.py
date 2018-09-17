@@ -8,37 +8,31 @@ from skyfield.api import Loader, utc
 sys.path.append('../')
 
 from utilities.constants import Re
-from utilities.tle_functions import launch2tle
-from visibility_functions import compute_visible_passes
-from visibility_functions import generate_visibility_file
+from utilities.tle_functions import launch2tle, tletime2datetime
+from sensors.visibility_functions import compute_visible_passes
+from sensors.visibility_functions import generate_visibility_file
 
 
 if __name__ == '__main__':
     
     cwd = os.getcwd()
-    metis_dir = cwd[0:-7]
+    metis_ind = cwd.find('metis')
+    metis_dir = cwd[0:metis_ind+6]
     load = Loader(os.path.join(metis_dir, 'skyfield_data'))
     ephemeris = load('de430t.bsp')
     ts = load.timescale()
             
     
-#    obj_id_list = [25544]
-#    UTC = datetime(2018, 7, 12, 9, 0, 0)
+    obj_id_list = [25544]
+#    UTC = datetime(2018, 9, 15, 8, 0, 0)
     
-    obj_id = 90003
-    UTC = datetime(2018, 12, 9, 12, 0, 0)
+    tle_dict = {}
+    tle_dict[25544] = {}
+    tle_dict[25544]['line1_list'] = ['1 25544U 98067A   18260.18078571  .00001804  00000-0  34815-4 0  9992']
+    tle_dict[25544]['line2_list'] = ['2 25544  51.6412 280.2571 0004861 165.0174 287.2188 15.53860328132822']
+    UTC = tletime2datetime(tle_dict[25544]['line1_list'][0])
     
-    launch_elem_dict = {}
-    launch_elem_dict[obj_id] = {}
-    launch_elem_dict[obj_id]['ra'] = Re + 505.
-    launch_elem_dict[obj_id]['rp'] = Re + 500.
-    launch_elem_dict[obj_id]['i'] = 97.6
-    launch_elem_dict[obj_id]['RAAN'] = 318.
-    launch_elem_dict[obj_id]['w'] = 0.
-    launch_elem_dict[obj_id]['M'] = 0.
-    launch_elem_dict[obj_id]['UTC'] = UTC
-    obj_id_list = [90003]
-    tle_dict = launch2tle(obj_id_list, launch_elem_dict)
+
     
     sensor_id_list = ['Stromlo Optical', 'Zimmerwald Optical',
                       'Arequipa Optical', 'Haleakala Optical',
@@ -50,7 +44,7 @@ if __name__ == '__main__':
     dt = 10
     UTC0 = ts.utc(UTC.replace(tzinfo=utc)).utc
     sec_array = list(range(0,86400*ndays,dt))
-    skyfield_times = ts.utc(UTC0[0], UTC0[1], UTC0[2],
+    skyfield_times = ts.utc(UTC0[0], UTC0[1]+2, UTC0[2],
                             UTC0[3], UTC0[4], sec_array)
     
     vis_dict = compute_visible_passes(skyfield_times, obj_id_list,
@@ -63,7 +57,7 @@ if __name__ == '__main__':
     # Generate output file
     vis_file_min_el = 10.
     outdir = os.path.join(metis_dir, 'skyfield_data')
-    vis_file = os.path.join(outdir, 'iac_visible_passes.csv')
+    vis_file = os.path.join(outdir, 'iac_visible_passes2.csv')
     generate_visibility_file(vis_dict, vis_file, vis_file_min_el)
     
     

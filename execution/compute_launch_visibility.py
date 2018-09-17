@@ -50,8 +50,8 @@ if __name__ == '__main__':
     
     obj_id = 90003
     launch_elem_dict[obj_id] = {}
-    launch_elem_dict[obj_id]['ra'] = Re + 505.
-    launch_elem_dict[obj_id]['rp'] = Re + 500.
+    launch_elem_dict[obj_id]['ra'] = Re + 605.
+    launch_elem_dict[obj_id]['rp'] = Re + 600.
     launch_elem_dict[obj_id]['i'] = 97.6
     launch_elem_dict[obj_id]['RAAN'] = 318.
     launch_elem_dict[obj_id]['w'] = 0.
@@ -63,10 +63,7 @@ if __name__ == '__main__':
     
     
     tle_dict, tle_df = launch2tle(obj_id_list, launch_elem_dict)
-    
-    print(tle_dict)
-    mistake
-    
+
     sensor_id_list = ['Stromlo Optical', 'Zimmerwald Optical',
                       'Arequipa Optical', 'Haleakala Optical',
                       'Yarragadee Optical']
