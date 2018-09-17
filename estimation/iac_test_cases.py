@@ -1406,28 +1406,28 @@ if __name__ == '__main__':
     
     # Filenames
     init_orbit_file = datadir / '500km_orbit_2018_12_09.pkl'
-    sensor_file = datadir / 'sensors_ilrs_laser.pkl'
+    sensor_file = datadir / 'sensors_ilrs_optical.pkl'
     
     fname = '500km_' + object_type + '_2018_12_09_true_params.pkl'
     true_params_file = datadir / fname
     
-    fname = 'leo_' + object_type + '_2018_07_12_truth.pkl'
+    fname = '500km_' + object_type + '_2018_07_12_truth.pkl'
     truth_file = datadir / fname
     
-    fname = 'leo_' + object_type + '_2018_07_12_meas.pkl'
+    fname = '500km_' + object_type + '_2018_07_12_meas.pkl'
     meas_file = datadir / fname
     
-    fname = 'leo_' + object_type + '_2018_07_12_model_params.pkl'
+    fname = '500km_' + object_type + '_2018_07_12_model_params.pkl'
     model_params_file = datadir / fname
     
-    fname = 'leo_sphere_med_mmae_2018_07_12_model_params.pkl'
-    mmae_params_file = datadir / fname
-    
-    fname = 'leo_sphere_med_mmae_2018_07_12_filter_output.pkl'
-    filter_output_file = datadir / fname
-    
-    fname = 'leo_sphere_med_mmae_2018_07_12_filter_error.pkl'
-    error_file = datadir / fname
+#    fname = 'leo_sphere_med_mmae_2018_07_12_model_params.pkl'
+#    mmae_params_file = datadir / fname
+#    
+#    fname = 'leo_sphere_med_mmae_2018_07_12_filter_output.pkl'
+#    filter_output_file = datadir / fname
+#    
+#    fname = 'leo_sphere_med_mmae_2018_07_12_filter_error.pkl'
+#    error_file = datadir / fname
     
     
     cwd = os.getcwd()
@@ -1459,14 +1459,14 @@ if __name__ == '__main__':
 #    generate_sensor_file(sensor_id_list, sensor_file)
 
     # Generate true params file
-    generate_true_params_file(init_orbit_file, obj_id, object_type, true_params_file)
+#    generate_true_params_file(init_orbit_file, obj_id, object_type, true_params_file)
     
     
     # Generate truth trajectory and measurements file
-    ndays = 3.
+    ndays = 7.
     dt = 10.
     
-#    generate_truth_file(true_params_file, truth_file, ephemeris, ts, ndays, dt)
+    generate_truth_file(true_params_file, truth_file, ephemeris, ts, ndays, dt)
     
 #    # Generate noisy measurements file
     ndays = 3.
