@@ -164,7 +164,7 @@ def compute_ukf_errors(filter_output_file, truth_file, error_file):
     return
 
 
-def compute_mmae_errors(filter_output_file, truth_file, error_file):
+def compute_mm_errors(filter_output_file, truth_file, error_file):
     
     # Load filter output
     pklFile = open(filter_output_file, 'rb')
@@ -200,7 +200,7 @@ def compute_mmae_errors(filter_output_file, truth_file, error_file):
     Xerr = np.zeros((n+3,L))
     sigs = np.zeros((n+3,L))
     model_weights = np.zeros((m,L))
-    resids = np.zeros((3,L-1))
+    resids = np.zeros((2,L-1))
     for ii in range(L):
         
         # Retrieve filter state
@@ -325,7 +325,7 @@ def plot_ukf_errors(error_file):
     return
 
 
-def plot_mmae_errors(error_file):
+def plot_mm_errors(error_file):
     
     plt.close('all')
     
@@ -406,12 +406,12 @@ def plot_mmae_errors(error_file):
     plt.plot(t_hrs[1:], resids[1,:]*3600., 'k.')
     plt.ylabel('Declination [arcsec]')
     plt.subplot(3,1,3)
-    plt.plot(t_hrs[1:], resids[2,:], 'k.')
-    plt.ylabel('Apparent Mag')
+#    plt.plot(t_hrs[1:], resids[2,:], 'k.')
+#    plt.ylabel('Apparent Mag')
     plt.xlabel('Time [hours]')
     
     
-    legend = ['Sphere LAMRB', 'Sphere MAMRB', 'Sphere LAMRS', 'Sphere MAMRS']
+    legend = ['Low Noise', 'High Noise']
 #              'Cube Nadir', 'Cube Spin', 'Cube Tumble', 'BW Nadir', 'BW Spin',
 #              'BW Tumble']
     
@@ -437,8 +437,8 @@ def plot_mmae_errors(error_file):
     plt.xlabel('Time [hours]', fontsize=14)
     plt.ylabel('Model Weights', fontsize=14)
     plt.ylim([-0.1, 1.1])
-    plt.xlim([-5, 36])
-    plt.xticks([0, 5, 10, 15, 20, 25, 30, 35])
+#    plt.xlim([-5, 36])
+#    plt.xticks([0, 5, 10, 15, 20, 25, 30, 35])
     plt.legend(legend, loc='upper left')
     plt.show()
     

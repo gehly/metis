@@ -256,9 +256,7 @@ def imm_filter(model_params_file, sensor_file, meas_file, filter_output_file,
         print(extracted_model)
         print('model bank')
         print(model_bank)
-        
-        mistake
-        
+
         # Output
         output_dict[UTC_JD] = {}
         output_dict[UTC_JD]['extracted_model'] = copy.deepcopy(extracted_model)
@@ -534,7 +532,7 @@ def multiple_model_weights(wbar, beta_list, method='mmae'):
     
     # Multiple Model Adaptive Estimation
     # Reference 1
-    if method == 'mmae' or method == 'imm_mixcovar':
+    if method == 'mmae' or 'imm' in method:
         
         # Normalize updated weights, muliply by previous
         denom = np.dot(beta_list, wbar)
@@ -615,7 +613,7 @@ def estimate_extractor(model_bank, method='averaged'):
     
     # Traditional MMAE uses weighted average as the best estimate
     # Reference 1
-    elif method == 'mmae' or method == 'imm_mixcovar':
+    elif method == 'mmae' or 'imm' in method:
             
         wbar, mbar, Pbar = merge_model_bank(model_bank)
 

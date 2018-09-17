@@ -48,12 +48,13 @@ from propagation.integration_functions import ode_twobody_j2_drag_srp_notorque_u
 from propagation.propagation_functions import propagate_orbit
 from data_processing.errors import compute_ukf_errors
 from data_processing.errors import plot_ukf_errors
-from data_processing.errors import compute_mmae_errors
-from data_processing.errors import plot_mmae_errors
+from data_processing.errors import compute_mm_errors
+from data_processing.errors import plot_mm_errors
 
 
 from estimation import unscented_kalman_filter
 from multiple_model import multiple_model_filter
+from multiple_model import imm_filter
 
 
 def generate_init_orbit_file(obj_id, UTC, orbit_file, tle_dict={}):
@@ -1238,13 +1239,13 @@ def generate_imm_params(true_params_file, orbit_file, model_params_file):
     # Sphere High Drag
     ###########################################################################
             
-    model_id = 'sphere_low_drag'
+    model_id = 'sphere_high_drag'
     model_bank[model_id] = {}
     model_bank[model_id]['weight'] = 0.5
         
     # Parameter setup
     mass = 5.     # kg        
-    radius = 0.3/np.sqrt(pi)    # m,  gives area = 0.09 m^2
+    radius = 0.1/np.sqrt(pi)    # m,  gives area = 0.09 m^2
     
     spacecraftConfig, forcesCoeff, surfaces = \
         parameter_setup_sphere(orbit_file, obj_id, mass, radius)
@@ -1260,7 +1261,7 @@ def generate_imm_params(true_params_file, orbit_file, model_params_file):
         pert_vect.reshape(spacecraftConfig['X'].shape)
     
     # Alter additional parameters as needed        
-    forcesCoeff['Q'] = np.eye(3) * 1e-12
+    forcesCoeff['Q'] = np.eye(3) * 1e-8
     
     model_bank[model_id]['spacecraftConfig'] = spacecraftConfig
     model_bank[model_id]['forcesCoeff'] = forcesCoeff
@@ -1686,16 +1687,16 @@ def generate_mmae_params(true_params_file, orbit_file, model_params_file):
 def run_filter(model_params_file, sensor_file, meas_file, filter_output_file,
                ephemeris, ts, alpha=1e-4):
     
-    filter_output = \
-        unscented_kalman_filter(model_params_file, sensor_file, meas_file,
-                                ephemeris, ts, alpha)
+#    filter_output = \
+#        unscented_kalman_filter(model_params_file, sensor_file, meas_file,
+#                                ephemeris, ts, alpha)
         
     
-#    method = 'mmae'
-#    filter_output = \
-#        multiple_model_filter(model_params_file, sensor_file, meas_file,
-#                              filter_output_file, ephemeris, ts, method, alpha)
-#        
+    method = 'imm_nomix'
+    filter_output = \
+        imm_filter(model_params_file, sensor_file, meas_file,
+                   filter_output_file, ephemeris, ts, method, alpha)
+        
     
     # Save data
     pklFile = open( filter_output_file, 'wb' )
@@ -1714,7 +1715,7 @@ if __name__ == '__main__':
 #     General parameters
     obj_id = 90003
     UTC = datetime(2018, 12, 9, 12, 0, 0)
-    object_type = 'sphere_high_drag'
+    object_type = 'sphere_low_drag'
     
     # Data directory
     datadir = Path('C:/Users/Steve/Documents/data/multiple_model/'
@@ -1727,13 +1728,13 @@ if __name__ == '__main__':
     fname = '600km_' + object_type + '_2018_12_09_true_params.pkl'
     true_params_file = datadir / fname
     
-    fname = '600km_' + object_type + '_2018_12_09_truth.pkl'
+    fname = '600km_sphere_low_drag_2018_12_09_truth.pkl'
     truth_file = datadir / fname
     
-    fname = '600km_' + object_type + '_2018_12_09_meas.pkl'
+    fname = '600km_sphere_low_drag_2018_12_09_meas.pkl'
     meas_file = datadir / fname
     
-    fname = '600km_' + object_type + '_2018_12_09_model_params.pkl'
+    fname = '600km_imm_2018_12_09_model_params2.pkl'
     model_params_file = datadir / fname
     
     fname = '600km_sphere_low_drag_2018_12_09_true_params.pkl'
@@ -1745,10 +1746,10 @@ if __name__ == '__main__':
 #    fname = 'leo_sphere_med_mmae_2018_07_12_model_params.pkl'
 #    mmae_params_file = datadir / fname
 #    
-    fname = '600km_' + object_type + '_2018_12_09_filter_output.pkl'
+    fname = '600km_sphere_no_maneuver_2018_12_09_filter_output.pkl'
     filter_output_file = datadir / fname
     
-    fname = '600km_' + object_type + '_2018_12_09_filter_error.pkl'
+    fname = '600km_sphere_no_maneuver_2018_12_09_filter_error.pkl'
     error_file = datadir / fname
     
     
@@ -1809,7 +1810,7 @@ if __name__ == '__main__':
     
 #    generate_mmae_params(true_params_file, init_orbit_file, mmae_params_file)
     
-    
+#    generate_imm_params(true_params_file, init_orbit_file, model_params_file)
     
     
     # Run filter
@@ -1820,8 +1821,8 @@ if __name__ == '__main__':
     
     
     # Compute and plot errors
-#    compute_mmae_errors(filter_output_file, truth_file, error_file)
-#    plot_mmae_errors(error_file)
+    compute_mm_errors(filter_output_file, truth_file, error_file)
+    plot_mm_errors(error_file)
     
     
 #    compute_ukf_errors(filter_output_file, truth_file, error_file)
