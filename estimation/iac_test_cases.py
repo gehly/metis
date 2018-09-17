@@ -1466,12 +1466,12 @@ if __name__ == '__main__':
     ndays = 7.
     dt = 10.
     
-    generate_truth_file(true_params_file, truth_file, ephemeris, ts, ndays, dt)
+#    generate_truth_file(true_params_file, truth_file, ephemeris, ts, ndays, dt)
     
 #    # Generate noisy measurements file
-    ndays = 3.
-#    generate_noisy_meas(true_params_file, truth_file, sensor_file, meas_file,
-#                        ephemeris, ndays)
+    ndays = 7.
+    generate_noisy_meas(true_params_file, truth_file, sensor_file, meas_file,
+                        ephemeris, ndays)
     
     # Generate model parameters file
 #    generate_ukf_params(true_params_file, model_params_file)

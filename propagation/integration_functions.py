@@ -357,9 +357,9 @@ def ode_twobody_j2_drag_srp(t, X, params):
     z_srp = float(a_srp[2])
     
     # Compute J2 component
-    x_j2 = - 1.5*J2*Re**2.*GM*((x/r**5.) - (5.*x*z**2./r**7.))
-    y_j2 = - 1.5*J2*Re**2.*GM*((y/r**5.) - (5.*y*z**2./r**7.))
-    z_j2 = - 1.5*J2*Re**2.*GM*((3.*z/r**5.) - (5.*z**3./r**7.)) 
+    x_j2 = - 1.5*J2E*Re**2.*GME*((x/r**5.) - (5.*x*z**2./r**7.))
+    y_j2 = - 1.5*J2E*Re**2.*GME*((y/r**5.) - (5.*y*z**2./r**7.))
+    z_j2 = - 1.5*J2E*Re**2.*GME*((3.*z/r**5.) - (5.*z**3./r**7.)) 
     
 
     # Derivative vector
@@ -369,9 +369,9 @@ def ode_twobody_j2_drag_srp(t, X, params):
     dX[1] = dy
     dX[2] = dz
     
-    dX[3] = -GM*x/r**3. + x_j2 + x_drag + x_srp
-    dX[4] = -GM*y/r**3. + y_j2 + y_drag + y_srp
-    dX[5] = -GM*z/r**3. + z_j2 + z_drag + z_srp
+    dX[3] = -GME*x/r**3. + x_j2 + x_drag + x_srp
+    dX[4] = -GME*y/r**3. + y_j2 + y_drag + y_srp
+    dX[5] = -GME*z/r**3. + z_j2 + z_drag + z_srp
     
     
     return dX
