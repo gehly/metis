@@ -741,6 +741,186 @@ def generate_truth_file(true_params_file, truth_file, ephemeris, ts, ndays, dt):
     return
 
 
+def generate_truth_maneuver(true_params_file1, true_params_file2, truth_file,
+                            ephemeris, ts, tdays_maneuver, ndays, dt):
+
+
+    # Load parameters
+    pklFile = open(true_params_file1, 'rb')
+    data = pickle.load(pklFile)
+    spacecraftConfig = data[0]
+    forcesCoeff = data[1]
+    surfaces = data[2]
+    eop_alldata = data[3]
+    pklFile.close()
+    
+    UTC_times1, state1 = propagate_orbit(spacecraftConfig, forcesCoeff,
+                                       surfaces, eop_alldata, tdays_maneuver, dt)
+    
+    # Load maneuver parameters
+    pklFile = open(true_params_file2, 'rb')
+    data = pickle.load(pklFile)
+    spacecraftConfig = data[0]
+    forcesCoeff = data[1]
+    surfaces = data[2]
+    eop_alldata = data[3]
+    pklFile.close()
+    
+    # Load final state and time and propagate remainder
+    spacecraftConfig['time'] = UTC_times1[-1]  # UTC in datetime
+    spacecraftConfig['X'] = state1[-1,:]
+    
+    UTC_times2, state2 = propagate_orbit(spacecraftConfig, forcesCoeff,
+                                         surfaces, eop_alldata,
+                                         (ndays-tdays_maneuver), dt)
+    
+    UTC_times = UTC_times1 + UTC_times2[1:]
+    state = np.concatenate((state1, state2[1:,:]), axis=0)
+    
+    print(UTC_times1[-1])
+    print(UTC_times2[0])
+    print(state1[-1,:])
+    print(state2[0,:])
+    
+    sec_array = [(UTC - UTC_times[0]).total_seconds() for UTC in UTC_times]
+    
+    UTC0 = ts.utc(UTC_times[0].replace(tzinfo=utc)).utc
+    skyfield_times = ts.utc(UTC0[0], UTC0[1], UTC0[2],
+                            UTC0[3], UTC0[4], sec_array)
+    
+    pklFile = open( truth_file, 'wb' )
+    pickle.dump( [UTC_times, skyfield_times, state], pklFile, -1 )
+    pklFile.close()
+
+
+    # Generate plots
+    t_hrs = [(UTC_times[ii] - UTC_times[0]).total_seconds()/3600. for 
+             ii in range(len(UTC_times))]
+    
+    plt.close('all')
+    
+    plt.figure()
+    plt.subplot(3,1,1)
+    plt.plot(t_hrs, state[:,0], 'k.')
+    plt.ylabel('X [km]')    
+    plt.title('True Position')
+    plt.subplot(3,1,2)
+    plt.plot(t_hrs, state[:,1], 'k.')
+    plt.ylabel('Y [km]')
+    plt.subplot(3,1,3)
+    plt.plot(t_hrs, state[:,2], 'k.')
+    plt.ylabel('Z [km]')
+    plt.xlabel('Time [hours]')
+    
+    plt.figure()
+    plt.subplot(3,1,1)
+    plt.plot(t_hrs, state[:,3], 'k.')
+    plt.ylabel('dX [km/s]')    
+    plt.title('True Velocity')
+    plt.subplot(3,1,2)
+    plt.plot(t_hrs, state[:,4], 'k.')
+    plt.ylabel('dY [km/s]')
+    plt.subplot(3,1,3)
+    plt.plot(t_hrs, state[:,5], 'k.')
+    plt.ylabel('dZ [km/s]')
+    plt.xlabel('Time [hours]')
+    
+    
+    if spacecraftConfig['type'] == '6DoF' or spacecraftConfig['type'] == '3att':
+        
+        roll = []
+        pitch = []
+        yaw = []
+        omega1 = []
+        omega2 = []
+        omega3 = []
+        DCM_OL = lvlh2ric()
+        for ii in range(len(t_hrs)):
+            
+            pos = state[ii,0:3].reshape(3,1)
+            vel = state[ii,3:6].reshape(3,1)
+            q_BN = state[ii,6:10].reshape(4,1)
+            DCM_BN= quat2dcm(q_BN)
+            DCM_NO = ric2eci(pos, vel)
+            DCM_BO = np.dot(DCM_BN, DCM_NO)
+            DCM_BL = np.dot(DCM_BO, DCM_OL)
+            
+            w_BN_B = state[ii,10:13].reshape(3,1)
+            w_ON_O = np.array([[0.], [0.], [np.linalg.norm(vel)/np.linalg.norm(pos)]])  # rad/s
+            w_LO_O = np.zeros((3,1))
+            w_LN_O = w_LO_O + w_ON_O
+            w_LN_B = np.dot(DCM_BO, w_LN_O)
+            w_BL_B = w_BN_B - w_LN_B
+            
+            r, p, y = dcm2euler123(DCM_BL)
+            
+            roll.append(r*180/pi)
+            pitch.append(p*180/pi)
+            yaw.append(y*180/pi)
+            
+            omega1.append(float(w_BL_B[0])*180/pi)
+            omega2.append(float(w_BL_B[1])*180/pi)
+            omega3.append(float(w_BL_B[2])*180/pi)
+    
+        plt.figure()
+        plt.subplot(3,1,1)
+        plt.plot(t_hrs, roll, 'k.')
+        plt.ylim([-180, 180])
+        plt.ylabel('Roll [deg]')    
+        plt.title('True Attitude')
+        plt.subplot(3,1,2)
+        plt.plot(t_hrs, pitch, 'k.')
+        plt.ylim([-90, 90])
+        plt.ylabel('Pitch [deg]')
+        plt.subplot(3,1,3)
+        plt.plot(t_hrs, yaw, 'k.')
+        plt.ylim([-180, 180])
+        plt.ylabel('Yaw [deg]')
+        plt.xlabel('Time [hours]')
+        
+        plt.figure()
+        plt.subplot(3,1,1)
+        plt.plot(t_hrs, omega1, 'k.')
+        plt.ylim([-10, 10])
+        plt.ylabel('Omega1 [deg/s]')    
+        plt.title('True Angular Velocity')
+        plt.subplot(3,1,2)
+        plt.plot(t_hrs, omega2, 'k.')
+        plt.ylim([-10, 10])
+        plt.ylabel('Omega2 [deg/s]')
+        plt.subplot(3,1,3)
+        plt.plot(t_hrs, omega3, 'k.')
+        plt.ylim([-10, 10])
+        plt.ylabel('Omega3 [deg/s]')
+        plt.xlabel('Time [hours]')
+        
+        plt.figure()
+        plt.subplot(4,1,1)
+        plt.plot(t_hrs, state[:,6], 'k.')
+        plt.ylim([-2, 2])
+        plt.ylabel('q1')    
+        plt.title('Quaternion')
+        plt.subplot(4,1,2)
+        plt.plot(t_hrs, state[:,7], 'k.')
+        plt.ylim([-2, 2])
+        plt.ylabel('q2')
+        plt.subplot(4,1,3)
+        plt.plot(t_hrs, state[:,8], 'k.')
+        plt.ylim([-2, 2])
+        plt.ylabel('q3')
+        plt.subplot(4,1,4)
+        plt.plot(t_hrs, state[:,9], 'k.')
+        plt.ylim([-2, 2])
+        plt.ylabel('q4')
+        plt.xlabel('Time [hours]')
+    
+
+    plt.show()
+    
+
+    return
+
+
 def generate_noisy_meas(true_params_file, truth_file, sensor_file, meas_file,
                         ephemeris, ndays=1.):
     
@@ -985,6 +1165,112 @@ def generate_ukf_params(true_params_file, model_params_file):
     pklFile.close()
     
     
+    
+    return
+
+
+def generate_imm_params(true_params_file, orbit_file, model_params_file):
+    
+    # Load parameters
+    pklFile = open(true_params_file, 'rb')
+    data = pickle.load(pklFile)
+    spacecraftConfig = data[0]
+    forcesCoeff = data[1]
+    surfaces = data[2]
+    eop_alldata = data[3]
+    XYs_df = data[4]
+    pklFile.close()
+    
+    
+    # Initial covariance
+    Po = np.diag([1., 1., 1., 1e-6, 1e-6, 1e-6])  # km^2 and km^2/s^2
+    
+    
+    # Perturb initial state
+#    pert_vect = np.multiply(np.sqrt(np.diag(Po)), np.random.randn(6,))
+#    print(pert_vect)
+    
+    pert_vect = np.array([ 3.77146717e-01, -4.92942379e-01,  1.29437936e+00, -1.70821160e-03,
+                          5.60305375e-04,  1.15733694e-03])
+        
+    
+    # Model Bank Setup
+    model_bank = {}
+    
+    TPM = np.array([[0.95, 0.05],
+                    [0.05, 0.95]])
+    
+    
+    ###########################################################################
+    # Sphere Low Drag
+    ###########################################################################
+    
+    model_id = 'sphere_low_drag'
+    model_bank[model_id] = {}
+    model_bank[model_id]['weight'] = 0.5
+        
+    # Parameter setup
+    mass = 5.     # kg
+    radius = 0.1/np.sqrt(pi)    # m,  gives area = 0.01 m^2
+    
+    spacecraftConfig, forcesCoeff, surfaces = \
+        parameter_setup_sphere(orbit_file, obj_id, mass, radius)
+        
+    # Integration function
+    spacecraftConfig['intfcn'] = ode_twobody_j2_drag_ukf
+    
+    # Covariance, initial state, process noise
+    spacecraftConfig['covar'] = Po
+    
+    print(spacecraftConfig['X'])
+    spacecraftConfig['X'] += \
+        pert_vect.reshape(spacecraftConfig['X'].shape)
+    
+    # Alter additional parameters as needed        
+    forcesCoeff['Q'] = np.eye(3) * 1e-12
+    
+    model_bank[model_id]['spacecraftConfig'] = spacecraftConfig
+    model_bank[model_id]['forcesCoeff'] = forcesCoeff
+    model_bank[model_id]['surfaces'] = surfaces         
+    
+    
+    ###########################################################################
+    # Sphere High Drag
+    ###########################################################################
+            
+    model_id = 'sphere_low_drag'
+    model_bank[model_id] = {}
+    model_bank[model_id]['weight'] = 0.5
+        
+    # Parameter setup
+    mass = 5.     # kg        
+    radius = 0.3/np.sqrt(pi)    # m,  gives area = 0.09 m^2
+    
+    spacecraftConfig, forcesCoeff, surfaces = \
+        parameter_setup_sphere(orbit_file, obj_id, mass, radius)
+        
+    # Integration function
+    spacecraftConfig['intfcn'] = ode_twobody_j2_drag_ukf
+    
+    # Covariance, initial state, process noise
+    spacecraftConfig['covar'] = Po
+    
+    print(spacecraftConfig['X'])
+    spacecraftConfig['X'] += \
+        pert_vect.reshape(spacecraftConfig['X'].shape)
+    
+    # Alter additional parameters as needed        
+    forcesCoeff['Q'] = np.eye(3) * 1e-12
+    
+    model_bank[model_id]['spacecraftConfig'] = spacecraftConfig
+    model_bank[model_id]['forcesCoeff'] = forcesCoeff
+    model_bank[model_id]['surfaces'] = surfaces
+    
+    
+    # Save data
+    pklFile = open( model_params_file, 'wb' )
+    pickle.dump( [model_bank, eop_alldata, XYs_df, TPM], pklFile, -1 )
+    pklFile.close()
     
     return
 
@@ -1428,7 +1714,7 @@ if __name__ == '__main__':
 #     General parameters
     obj_id = 90003
     UTC = datetime(2018, 12, 9, 12, 0, 0)
-    object_type = 'sphere_low_drag'
+    object_type = 'sphere_high_drag'
     
     # Data directory
     datadir = Path('C:/Users/Steve/Documents/data/multiple_model/'
@@ -1449,6 +1735,12 @@ if __name__ == '__main__':
     
     fname = '600km_' + object_type + '_2018_12_09_model_params.pkl'
     model_params_file = datadir / fname
+    
+    fname = '600km_sphere_low_drag_2018_12_09_true_params.pkl'
+    true_params_file1 = datadir / fname
+    
+    fname = '600km_sphere_high_drag_2018_12_09_true_params.pkl'
+    true_params_file2 = datadir / fname
     
 #    fname = 'leo_sphere_med_mmae_2018_07_12_model_params.pkl'
 #    mmae_params_file = datadir / fname
@@ -1503,6 +1795,10 @@ if __name__ == '__main__':
     
 #    generate_truth_file(true_params_file, truth_file, ephemeris, ts, ndays, dt)
     
+    tdays_maneuver = 1.25
+#    generate_truth_maneuver(true_params_file1, true_params_file2, truth_file,
+#                            ephemeris, ts, tdays_maneuver, ndays, dt)
+    
 #    # Generate noisy measurements file
     ndays = 3.
 #    generate_noisy_meas(true_params_file, truth_file, sensor_file, meas_file,
@@ -1512,6 +1808,9 @@ if __name__ == '__main__':
 #    generate_ukf_params(true_params_file, model_params_file)
     
 #    generate_mmae_params(true_params_file, init_orbit_file, mmae_params_file)
+    
+    
+    
     
     # Run filter
 #    run_filter(model_params_file, sensor_file, meas_file, filter_output_file,
@@ -1525,8 +1824,8 @@ if __name__ == '__main__':
 #    plot_mmae_errors(error_file)
     
     
-    compute_ukf_errors(filter_output_file, truth_file, error_file)
-    plot_ukf_errors(error_file)
+#    compute_ukf_errors(filter_output_file, truth_file, error_file)
+#    plot_ukf_errors(error_file)
     
     
     
