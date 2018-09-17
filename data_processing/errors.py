@@ -43,7 +43,7 @@ def compute_ukf_errors(filter_output_file, truth_file, error_file):
     resids = np.zeros((3,L))
     resids[0,:] = [filter_output['resids'][ii][0] for ii in range(L)]
     resids[1,:] = [filter_output['resids'][ii][1] for ii in range(L)]
-    resids[2,:] = [filter_output['resids'][ii][2] for ii in range(L)]
+#    resids[2,:] = [filter_output['resids'][ii][2] for ii in range(L)]
     
     roll = []
     pitch = []

@@ -40,7 +40,7 @@ from propagation.integration_functions import int_twobody_6dof_notorque
 from propagation.integration_functions import ode_twobody
 from propagation.integration_functions import ode_twobody_ukf
 from propagation.integration_functions import ode_twobody_j2_drag
-from propagation.integration_functions import ode_twobody_j2_drag_srp_ukf
+from propagation.integration_functions import ode_twobody_j2_drag_ukf
 from propagation.integration_functions import ode_twobody_6dof_notorque
 from propagation.integration_functions import ode_twobody_6dof_notorque_ukf
 from propagation.integration_functions import ode_twobody_j2_drag_srp_notorque
@@ -1400,16 +1400,16 @@ def generate_mmae_params(true_params_file, orbit_file, model_params_file):
 def run_filter(model_params_file, sensor_file, meas_file, filter_output_file,
                ephemeris, ts, alpha=1e-4):
     
-#    filter_output = \
-#        unscented_kalman_filter(model_params_file, sensor_file, meas_file,
-#                                ephemeris, ts, alpha)
+    filter_output = \
+        unscented_kalman_filter(model_params_file, sensor_file, meas_file,
+                                ephemeris, ts, alpha)
         
     
-    method = 'mmae'
-    filter_output = \
-        multiple_model_filter(model_params_file, sensor_file, meas_file,
-                              filter_output_file, ephemeris, ts, method, alpha)
-        
+#    method = 'mmae'
+#    filter_output = \
+#        multiple_model_filter(model_params_file, sensor_file, meas_file,
+#                              filter_output_file, ephemeris, ts, method, alpha)
+#        
     
     # Save data
     pklFile = open( filter_output_file, 'wb' )
@@ -1453,11 +1453,11 @@ if __name__ == '__main__':
 #    fname = 'leo_sphere_med_mmae_2018_07_12_model_params.pkl'
 #    mmae_params_file = datadir / fname
 #    
-#    fname = 'leo_sphere_med_mmae_2018_07_12_filter_output.pkl'
-#    filter_output_file = datadir / fname
-#    
-#    fname = 'leo_sphere_med_mmae_2018_07_12_filter_error.pkl'
-#    error_file = datadir / fname
+    fname = '600km_' + object_type + '_2018_12_09_filter_output.pkl'
+    filter_output_file = datadir / fname
+    
+    fname = '600km_' + object_type + '_2018_12_09_filter_error.pkl'
+    error_file = datadir / fname
     
     
     cwd = os.getcwd()
@@ -1509,14 +1509,14 @@ if __name__ == '__main__':
 #                        ephemeris, ndays)
     
     # Generate model parameters file
-    generate_ukf_params(true_params_file, model_params_file)
+#    generate_ukf_params(true_params_file, model_params_file)
     
 #    generate_mmae_params(true_params_file, init_orbit_file, mmae_params_file)
     
     # Run filter
-#    run_filter(mmae_params_file, sensor_file, meas_file, filter_output_file,
+#    run_filter(model_params_file, sensor_file, meas_file, filter_output_file,
 #               ephemeris, ts, alpha=1e-4)
-#    
+    
     
     
     
@@ -1525,8 +1525,8 @@ if __name__ == '__main__':
 #    plot_mmae_errors(error_file)
     
     
-#    compute_ukf_errors(filter_output_file, truth_file, error_file)
-#    plot_ukf_errors(error_file)
+    compute_ukf_errors(filter_output_file, truth_file, error_file)
+    plot_ukf_errors(error_file)
     
     
     
