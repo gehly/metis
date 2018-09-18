@@ -52,7 +52,6 @@ if __name__ == '__main__':
     
     # Compute TLE dictionary and dataframe at this time
     obj_id = 90001
-    obj_id_list = [obj_id]
 #    ecef_dict = {}
 #    ecef_dict[obj_id] = {}
 #    ecef_dict[obj_id]['UTC'] = UTC
@@ -83,9 +82,34 @@ if __name__ == '__main__':
     kep_dict[obj_id]['w'] = 300.
     kep_dict[obj_id]['M'] = 300.
     
+    
+    # Generate additional objects as random perturbation from this
+    for jj in range(3):
+        obj_id += 1
+        kep_dict[obj_id] = {}
+        kep_dict[obj_id]['UTC'] = UTC
+        kep_dict[obj_id]['a'] = Re + 500. + np.random.randn()*0.001
+        kep_dict[obj_id]['e'] = 0.001 + np.random.randn()*1e-4
+        kep_dict[obj_id]['i'] = 85. + np.random.randn()*1e-5
+        kep_dict[obj_id]['RAAN'] = 280.
+        kep_dict[obj_id]['w'] = 300.
+        kep_dict[obj_id]['M'] = 300. + np.random.randn()*1e-5
+    
+    
+    
+    print(kep_dict)
+    
+    obj_id_list = [90001, 90002, 90003, 90004]
+    
     tle_dict, tle_df = kep2tle(obj_id_list, kep_dict)
     
     print(tle_dict)
+    tle_df.to_csv('rocketlab_tle_data.csv')
+    
+    # Generate next object
+    
+    
+    
     
     # Propagate to November
     
