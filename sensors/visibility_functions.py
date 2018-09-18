@@ -71,8 +71,7 @@ def define_RSOs(obj_id_list, UTC, tle_dict={}, source='spacetrack'):
 
     # Retrieve TLE data and form RSO dictionary using skyfield
     for obj_id in obj_id_list:
-        print(tle_dict)
-        print(obj_id)
+
         line1_list = tle_dict[obj_id]['line1_list']
         line2_list = tle_dict[obj_id]['line2_list']
         
