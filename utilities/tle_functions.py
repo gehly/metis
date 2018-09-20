@@ -127,7 +127,7 @@ def get_spacetrack_tle_data(obj_id_list = [], UTC_list = [], username='',
         tle_dict[obj_id]['line1_list'].append(line1)
         tle_dict[obj_id]['line2_list'].append(line2)
         
-        linelist = [obj_id,line1,line2]
+        linelist = [obj_id,line1,line2,UTC]
         tle_list.append(linelist)  
         
     tle_df = pd.DataFrame(tle_list, columns=['norad','line1','line2'])
