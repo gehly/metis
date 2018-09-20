@@ -33,7 +33,7 @@ from sgp4.earth_gravity import wgs84
 ###############################################################################
 
 
-def get_spacetrack_tle_data(obj_id_list, UTC_list = [], username='',
+def get_spacetrack_tle_data(obj_id_list = [], UTC_list = [], username='',
                             password=''):
     '''
     This function retrieves the two-line element (TLE) data for objects
@@ -41,8 +41,9 @@ def get_spacetrack_tle_data(obj_id_list, UTC_list = [], username='',
     
     Parameters
     ------
-    obj_id_list : list
+    obj_id_list : list, optional
         object NORAD IDs (int)
+        - if empty code will retrieve latest available for entire catalog
     UTC_list : list, optional
         UTC datetime objects to specify desired times for TLEs to retrieve
         - if empty code will retrieve latest available
@@ -67,26 +68,28 @@ def get_spacetrack_tle_data(obj_id_list, UTC_list = [], username='',
     if len(password) == 0:
         password = getpass.getpass('space-track password: ')    
     
-    myString = ",".join(map(str, obj_id_list))
-    
-    # If only one time is given, add 1 day increment to produce window
-    if len(UTC_list) ==  1:
-        UTC_list.append(UTC_list[0] + timedelta(days=1.))
-    
-    # If times are specified, retrieve from window
-    if len(UTC_list) == 2:        
-        UTC0 = UTC_list[0].strftime('%Y-%m-%d')
-        UTC1 = UTC_list[1].strftime('%Y-%m-%d')
-        pageData = ('//www.space-track.org/basicspacedata/query/class/tle/'
-                    'EPOCH/' + UTC0 + '--' + UTC1 + '/NORAD_CAT_ID/' + 
-                    myString + '/orderby/TLE_LINE1 ASC/format/tle')
+    if len(obj_id_list) >= 1:
+        myString = ",".join(map(str, obj_id_list))
         
-    # Otherwise, get latest available
-    else:    
-        pageData = ('//www.space-track.org/basicspacedata/query/class/'
-                    'tle_latest/ORDINAL/1/NORAD_CAT_ID/' + myString + 
-                    '/orderby/TLE_LINE1 ASC/format/tle')
+        # If only one time is given, add 1 day increment to produce window
+        if len(UTC_list) ==  1:
+            UTC_list.append(UTC_list[0] + timedelta(days=1.))
         
+        # If times are specified, retrieve from window
+        if len(UTC_list) == 2:        
+            UTC0 = UTC_list[0].strftime('%Y-%m-%d')
+            UTC1 = UTC_list[1].strftime('%Y-%m-%d')
+            pageData = ('//www.space-track.org/basicspacedata/query/class/tle/'
+                        'EPOCH/' + UTC0 + '--' + UTC1 + '/NORAD_CAT_ID/' + 
+                        myString + '/orderby/TLE_LINE1 ASC/format/tle')
+            
+        # Otherwise, get latest available
+        else:    
+            pageData = ('//www.space-track.org/basicspacedata/query/class/'
+                        'tle_latest/ORDINAL/1/NORAD_CAT_ID/' + myString + 
+                        '/orderby/TLE_LINE1 ASC/format/tle')
+    else:
+        pageData = '//www.space-track.org/basicspacedata/query/class/tle_latest/ORDINAL/1/EPOCH/%3Enow-30/orderby/NORAD_CAT_ID/format/tle'
   
     ST_URL='https://www.space-track.org'
     
