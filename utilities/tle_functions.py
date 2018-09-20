@@ -87,10 +87,11 @@ def get_spacetrack_tle_data(obj_id_list, UTC_list = [], username='',
                     'tle_latest/ORDINAL/1/NORAD_CAT_ID/' + myString + 
                     '/orderby/TLE_LINE1 ASC/format/tle')
         
-    payload = {'identity':username, 'password':password, 'submit':'Login'}
+  
+    ST_URL='https://www.space-track.org'
     
     with requests.Session() as s:
-        s.post("https://www.space-track.org/auth/login", data=payload)
+        s.post(ST_URL+"/ajaxauth/login", json={'identity':username, 'password':password})
         r = s.get('https:' + pageData)
         if r.status_code != requests.codes.ok:
             print("Error: Page data request failed.")
@@ -875,7 +876,8 @@ if __name__ == '__main__' :
     
     plt.close('all')
     
-#    tle_dict = get_spacetrack_tle_data(obj_id_list, UTC_list)
+    tle_dict, tle_df = get_spacetrack_tle_data(obj_id_list, UTC_list)
+    print(tle_dict)
 #    
 #    UTC_list = [datetime(2018, 4, 20, 8, 0, 0)]
 #    
@@ -894,7 +896,7 @@ if __name__ == '__main__' :
     
 #    plot_tle_radec(tle_dict, UTC_list, sensor_list, display_flag=True)
     
-    plot_all_tle_common_time(obj_id_list, UTC_list)
+#    plot_all_tle_common_time(obj_id_list, UTC_list)
     
     
     
