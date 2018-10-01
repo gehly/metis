@@ -201,6 +201,7 @@ def compute_mm_errors(filter_output_file, truth_file, error_file):
     sigs = np.zeros((n+3,L))
     model_weights = np.zeros((m,L))
     est_mode = np.zeros(L,)
+    man_det_n = 3
     resids = np.zeros((2,L-1))
     for ii in range(L):
         
@@ -260,11 +261,51 @@ def compute_mm_errors(filter_output_file, truth_file, error_file):
                 wmax = wj
                 
             jj += 1
+    
+    count = 0
+    mode_prior = est_mode[0]
+    base_prior = None
+    maneuver_ind = []
+    for ii in range(L):
+        mode = est_mode[ii]
+        
+        # If current mode same as prior, increment count
+        if mode == mode_prior:
+            count += 1
+        else:
+            count = 0
+            
+        # If count >= N, set base value
+        if count >= man_det_n:
+            base = mode
+            print('base', base)
+            
+            if base_prior is None:
+                base_prior = base
+                print('base_prior', base_prior)
+            
+            if base != base_prior:
+                maneuver_ind.append(ii-man_det_n)
+                base_prior = base
+                print('maneuver', maneuver_ind)
+        
+        print('\n')
+        print(ii)
+        print(mode)
+        print(count)
+        
+        # Reset prior
+        mode_prior = mode
+
+        
+    print(maneuver_ind)
+    print([t_hrs[ii] for ii in maneuver_ind])
+        
 
     # Save data
     pklFile = open( error_file, 'wb' )
     pickle.dump([t_hrs, Xerr, sigs, resids, model_weights, model_id_list,
-                 est_mode], pklFile, -1 )
+                 est_mode, maneuver_ind], pklFile, -1 )
     pklFile.close()
 
     
