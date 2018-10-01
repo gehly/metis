@@ -200,6 +200,7 @@ def compute_mm_errors(filter_output_file, truth_file, error_file):
     Xerr = np.zeros((n+3,L))
     sigs = np.zeros((n+3,L))
     model_weights = np.zeros((m,L))
+    est_mode = np.zeros(L,)
     resids = np.zeros((2,L-1))
     for ii in range(L):
         
@@ -236,19 +237,34 @@ def compute_mm_errors(filter_output_file, truth_file, error_file):
         for model_id in model_id_list:
             wj = float(model_bank[model_id]['weight'])
             model_weights[jj,ii] = wj
-            jj += 1
             
+#            print(jj)
+#            print(model_id)
+#            print(wj)
+#            
+#            if ii > 0:
+#                mistake
+
             if ii == 0:
+                if wj >= wmax:
+                    est_mode[ii] = jj
+                    wmax = wj
+                    jj += 1
+                
                 continue
             
             resids_ii = model_bank[model_id]['resids']
-            if wj > wmax:
+            if wj >= wmax:
                 resids[:,ii-1] = resids_ii.flatten()
+                est_mode[ii] = jj
+                wmax = wj
+                
+            jj += 1
 
     # Save data
     pklFile = open( error_file, 'wb' )
-    pickle.dump([t_hrs, Xerr, sigs, resids, model_weights, model_id_list], 
-                pklFile, -1 )
+    pickle.dump([t_hrs, Xerr, sigs, resids, model_weights, model_id_list,
+                 est_mode], pklFile, -1 )
     pklFile.close()
 
     
@@ -338,6 +354,7 @@ def plot_mm_errors(error_file):
     resids = data[3]
     model_weights = data[4]
     model_id_list = data[5]
+    est_mode = data[6]
     pklFile.close()    
     
     
@@ -429,17 +446,28 @@ def plot_mm_errors(error_file):
     colors[9] = 'r'
     
     plt.figure()
+    plt.subplot(2,1,1)
     n = len(model_id_list)
     for ii in range(n):
         c=colors[ii]
         plt.plot(t_hrs, model_weights[ii,:], 'o--', c=c, lw=3)
     
-    plt.xlabel('Time [hours]', fontsize=14)
+    
     plt.ylabel('Model Weights', fontsize=14)
     plt.ylim([-0.1, 1.1])
 #    plt.xlim([-5, 36])
 #    plt.xticks([0, 5, 10, 15, 20, 25, 30, 35])
-    plt.legend(legend, loc='upper left')
+    plt.legend(legend, loc='best')
+    
+
+    plt.subplot(2,1,2)
+    plt.plot(t_hrs, est_mode, 'ko', lw=3)
+    plt.yticks([0, 1], legend)
+    plt.ylim([-0.1, 1.1])
+    plt.xlabel('Time [hours]', fontsize=14)
+    
+    
+    
     plt.show()
     
     return
