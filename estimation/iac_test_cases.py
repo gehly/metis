@@ -1746,10 +1746,10 @@ if __name__ == '__main__':
 #    fname = 'leo_sphere_med_mmae_2018_07_12_model_params.pkl'
 #    mmae_params_file = datadir / fname
 #    
-    fname = '600km_sphere_maneuver_2018_12_09_filter_output.pkl'
+    fname = '600km_sphere_no_maneuver_2018_12_09_filter_output.pkl'
     filter_output_file = datadir / fname
     
-    fname = '600km_sphere_maneuver_2018_12_09_filter_error.pkl'
+    fname = '600km_sphere_no_maneuver_2018_12_09_filter_error.pkl'
     error_file = datadir / fname
     
     

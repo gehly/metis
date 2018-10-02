@@ -396,7 +396,11 @@ def plot_mm_errors(error_file):
     model_weights = data[4]
     model_id_list = data[5]
     est_mode = data[6]
+    maneuver_ind = data[7]
     pklFile.close()    
+    
+    maneuver_state = np.zeros(len(t_hrs),)
+    maneuver_state[maneuver_ind] = 1.
     
     
     plt.figure()
@@ -502,9 +506,10 @@ def plot_mm_errors(error_file):
     
 
     plt.subplot(2,1,2)
-    plt.plot(t_hrs, est_mode, 'ko', lw=3)
-    plt.yticks([0, 1], legend)
+    plt.plot(t_hrs, maneuver_state, 'ko', lw=3)
+    plt.yticks([0, 1], ['False', 'True'])
     plt.ylim([-0.1, 1.1])
+    plt.ylabel('Maneuver Det', fontsize=14)
     plt.xlabel('Time [hours]', fontsize=14)
     
     
