@@ -1814,8 +1814,8 @@ if __name__ == '__main__':
     
     
     # Run filter
-#    run_filter(model_params_file, sensor_file, meas_file, filter_output_file,
-#               ephemeris, ts, alpha=1e-4)
+    run_filter(model_params_file, sensor_file, meas_file, filter_output_file,
+               ephemeris, ts, alpha=1e-4)
     
     
     
