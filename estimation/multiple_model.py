@@ -163,7 +163,7 @@ def imm_filter(model_params_file, sensor_file, meas_file, filter_output_file,
     model_bank = data[0]
     eop_alldata = data[1]
     XYs_df = data[2]
-    TPM = data[3]
+    TPM0 = data[3]
     pklFile.close()
     
     print(model_bank)
@@ -208,7 +208,8 @@ def imm_filter(model_params_file, sensor_file, meas_file, filter_output_file,
     output_dict[UTC_JD]['extracted_model'] = copy.deepcopy(extracted_model)
     output_dict[UTC_JD]['model_bank'] = copy.deepcopy(model_bank)
 
-    # Loop over times    
+    # Loop over times
+    TPM = TPM0
     for ii in range(len(meas_times)):
         
         # Retrieve current and previous times
@@ -217,6 +218,15 @@ def imm_filter(model_params_file, sensor_file, meas_file, filter_output_file,
         print('Current time: ', ti)
         
         # Mixing Step
+        if ii > 0:
+            ti_prior = meas_times[ii-1]
+            delta_t = (ti - ti_prior).total_seconds()
+            if delta_t < 100.:
+                TPM = np.eye(len(model_bank))
+                print('TPM', TPM)
+            else:
+                TPM = TPM0
+                print('TPM', TPM)
         model_bank = imm_mixing(model_bank, TPM, method)
         
         # Predictor step

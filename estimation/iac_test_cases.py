@@ -1212,7 +1212,7 @@ def generate_imm_params(true_params_file, orbit_file, model_params_file):
         
     # Parameter setup
     mass = 5.     # kg
-    radius = 0.1/np.sqrt(pi)    # m,  gives area = 0.01 m^2
+    radius = 0.11/np.sqrt(pi)    # m,  gives area = 0.01 m^2
     
     spacecraftConfig, forcesCoeff, surfaces = \
         parameter_setup_sphere(orbit_file, obj_id, mass, radius)
@@ -1245,7 +1245,7 @@ def generate_imm_params(true_params_file, orbit_file, model_params_file):
         
     # Parameter setup
     mass = 5.     # kg        
-    radius = 0.1/np.sqrt(pi)    # m,  gives area = 0.09 m^2
+    radius = 0.11/np.sqrt(pi)    # m,  gives area = 0.09 m^2
     
     spacecraftConfig, forcesCoeff, surfaces = \
         parameter_setup_sphere(orbit_file, obj_id, mass, radius)
@@ -1719,7 +1719,7 @@ if __name__ == '__main__':
     
     # Data directory
     datadir = Path('C:/Users/Steve/Documents/data/multiple_model/'
-                   '2018_09_17_imm')
+                   '2018_10_03_drag')
     
     # Filenames
     init_orbit_file = datadir / '600km_orbit_2018_12_09.pkl'
@@ -1728,13 +1728,13 @@ if __name__ == '__main__':
     fname = '600km_' + object_type + '_2018_12_09_true_params.pkl'
     true_params_file = datadir / fname
     
-    fname = '600km_sphere_low_drag_2018_12_09_truth.pkl'
+    fname = '600km_sphere_maneuver_2018_12_09_truth.pkl'
     truth_file = datadir / fname
     
-    fname = '600km_sphere_low_drag_2018_12_09_meas.pkl'
+    fname = '600km_sphere_maneuver_2018_12_09_meas.pkl'
     meas_file = datadir / fname
     
-    fname = '600km_imm_2018_12_09_model_params2.pkl'
+    fname = '600km_imm_2018_12_09_model_params5.pkl'
     model_params_file = datadir / fname
     
     fname = '600km_sphere_low_drag_2018_12_09_true_params.pkl'
@@ -1746,10 +1746,10 @@ if __name__ == '__main__':
 #    fname = 'leo_sphere_med_mmae_2018_07_12_model_params.pkl'
 #    mmae_params_file = datadir / fname
 #    
-    fname = '600km_sphere_no_maneuver_2018_12_09_filter_output.pkl'
+    fname = '600km_sphere_maneuver_2018_12_09_filter_output.pkl'
     filter_output_file = datadir / fname
     
-    fname = '600km_sphere_no_maneuver_2018_12_09_filter_error.pkl'
+    fname = '600km_sphere_maneuver_2018_12_09_filter_error.pkl'
     error_file = datadir / fname
     
     
