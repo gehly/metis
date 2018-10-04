@@ -441,6 +441,10 @@ def multiple_model_corrector(model_bank_in, Yi, ti, sun_gcrf, sensor, EOP_data,
         Pbar = spacecraftConfig['covar']
         n = len(Xbar)
         
+        print(model_id)
+        print(Pbar)
+        print(np.linalg.eig(Pbar))
+        
         # Corrector
         if spacecraftConfig['type'] == '3DoF':
             X, P, beta = ukf_3dof_corrector(Xbar, Pbar, Yi, ti, n, alpha,

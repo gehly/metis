@@ -15,6 +15,7 @@ from utilities.attitude import quat_inverse
 from utilities.attitude import quat_rotate
 from utilities.constants import GME, Re, wE, J2E, SF, c_light, AU_km
 from utilities.constants import stdatm_rho0, stdatm_ro, stdatm_H
+from utilities.coordinate_systems import ric2eci
 from utilities.eop_functions import get_eop_data
 from utilities.time_systems import jd2cent
 from utilities.time_systems import utcdt2ttjd
@@ -298,6 +299,98 @@ def ode_twobody_j2_drag(t, X, params):
     dX[3] = -GME*x/r**3. + x_j2 + x_drag
     dX[4] = -GME*y/r**3. + y_j2 + y_drag
     dX[5] = -GME*z/r**3. + z_j2 + z_drag
+    
+    
+    return dX
+
+
+def ode_twobody_j2_drag_laser(t, X, params):
+    '''
+    This function works with ode to propagate object assuming
+    J2 and drag perturbations.
+
+    Parameters
+    ------
+    X : 6 element list
+      cartesian state vector (Inertial Frame)
+    t : m element list
+      vector of times when output is desired
+    args : tuple
+        additional arguments
+
+    Returns
+    ------
+    dX : 6 element list
+      state derivative vector
+    '''
+
+    # State Vector
+    x = float(X[0])
+    y = float(X[1])
+    z = float(X[2])
+    dx = float(X[3])
+    dy = float(X[4])
+    dz = float(X[5])
+    
+    # Retrieve object parameters
+    spacecraftConfig = params[0]
+    forcesCoeff = params[1]
+#    surfaces = params[2]
+#    ephemeris = params[3]
+#    ts = params[4]
+#    eop_alldata = params[3]
+    radius = spacecraftConfig['radius']
+    mass = spacecraftConfig['mass']
+    A_m = pi*radius**2./mass
+    Cd = forcesCoeff['dragCoeff']
+
+    # Compute radius
+    r_vect = np.array([[x], [y], [z]])
+    r = np.linalg.norm(r_vect)
+    
+    # Compute drag component
+    # Find vector va of spacecraft relative to atmosphere
+    v_vect = np.array([[dx], [dy], [dz]])
+    w_vect = np.array([[0.], [0.], [wE]])
+    va_vect = v_vect - np.cross(w_vect, r_vect, axis=0)
+    va = np.linalg.norm(va_vect)
+    va_x = float(va_vect[0])
+    va_y = float(va_vect[1])
+    va_z = float(va_vect[2])
+    
+    drag = -0.5*A_m*Cd*stdatm_rho0*exp(-(r-stdatm_ro)/stdatm_H)
+
+    x_drag = drag*va*va_x
+    y_drag = drag*va*va_y
+    z_drag = drag*va*va_z
+    
+    # Compute J2 component
+    x_j2 = - 1.5*J2E*Re**2.*GME*((x/r**5.) - (5.*x*z**2./r**7.))
+    y_j2 = - 1.5*J2E*Re**2.*GME*((y/r**5.) - (5.*y*z**2./r**7.))
+    z_j2 = - 1.5*J2E*Re**2.*GME*((3.*z/r**5.) - (5.*z**3./r**7.))
+    
+    # Laser acceleration
+    # Compute RIC accelerations
+    a_r = 0.
+    a_i = -1e-5*(t/60.) * 1e-3  # km/s^2
+    a_c = 0.
+    
+    rc_vect = np.array([[x], [y], [z]])
+    vc_vect = np.array([[dx], [dy], [dz]])
+    a_ric = np.array([[a_r], [a_i], [a_c]])
+    a_eci = ric2eci(rc_vect, vc_vect, a_ric)
+    
+
+    # Derivative vector
+    dX = [0.]*6
+
+    dX[0] = dx
+    dX[1] = dy
+    dX[2] = dz
+    
+    dX[3] = -GME*x/r**3. + x_j2 + x_drag + float(a_eci[0])
+    dX[4] = -GME*y/r**3. + y_j2 + y_drag + float(a_eci[1])
+    dX[5] = -GME*z/r**3. + z_j2 + z_drag + float(a_eci[2])
     
     
     return dX

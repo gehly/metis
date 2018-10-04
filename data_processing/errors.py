@@ -202,7 +202,7 @@ def compute_mm_errors(filter_output_file, truth_file, error_file):
     model_weights = np.zeros((m,L))
     est_mode = np.zeros(L,)
     man_det_n = 3
-    resids = np.zeros((2,L-1))
+    resids = np.zeros((3,L-1))
     for ii in range(L):
         
         # Retrieve filter state
