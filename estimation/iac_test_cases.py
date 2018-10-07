@@ -1957,6 +1957,24 @@ def generate_mmae_params(true_params_file, orbit_file, model_params_file):
     
     
     return
+
+
+def reduce_meas(meas_file1, meas_file2):
+    
+    # Load measurement data
+    pklFile = open(meas_file1, 'rb')
+    data = pickle.load(pklFile)
+    meas_dict = data[0]
+    pklFile.close()
+    
+    
+    # Save measurement file
+    pklFile = open( meas_file2, 'wb' )
+    pickle.dump( [meas_dict], pklFile, -1 )
+    pklFile.close()
+    
+    
+    return
         
 
 
@@ -1995,7 +2013,7 @@ if __name__ == '__main__':
     
     # Data directory
     datadir = Path('C:/Users/Steve/Documents/data/multiple_model/'
-                   '2018_10_03_laser')
+                   '2018_10_03_drag/imm_man_mismodel')
     
     # Filenames
     init_orbit_file = datadir / '600km_orbit_2018_12_09.pkl'
@@ -2022,10 +2040,10 @@ if __name__ == '__main__':
 #    fname = 'leo_sphere_med_mmae_2018_07_12_model_params.pkl'
 #    mmae_params_file = datadir / fname
 #    
-    fname = '600km_sphere_laser_maneuver_2018_12_09_filter_output.pkl'
+    fname = '600km_sphere_laser_maneuver_2018_12_09_filter_output2.pkl'
     filter_output_file = datadir / fname
     
-    fname = '600km_sphere_laser_maneuver_2018_12_09_filter_error.pkl'
+    fname = '600km_sphere_maneuver_2018_12_09_filter_error.pkl'
     error_file = datadir / fname
     
     
@@ -2081,8 +2099,8 @@ if __name__ == '__main__':
     
 #    # Generate noisy measurements file
     ndays = 3.
-    generate_noisy_meas(true_params_file, truth_file, sensor_file, meas_file,
-                        ephemeris, ndays)
+#    generate_noisy_meas(true_params_file, truth_file, sensor_file, meas_file,
+#                        ephemeris, ndays)
     
     # Generate model parameters file
 #    generate_ukf_params(true_params_file, model_params_file)
@@ -2101,7 +2119,7 @@ if __name__ == '__main__':
     
     # Compute and plot errors
 #    compute_mm_errors(filter_output_file, truth_file, error_file)
-#    plot_mm_errors(error_file)
+    plot_mm_errors(error_file)
     
     
 #    compute_ukf_errors(filter_output_file, truth_file, error_file)

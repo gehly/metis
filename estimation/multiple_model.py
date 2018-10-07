@@ -221,7 +221,7 @@ def imm_filter(model_params_file, sensor_file, meas_file, filter_output_file,
         if ii > 0:
             ti_prior = meas_times[ii-1]
             delta_t = (ti - ti_prior).total_seconds()
-            if delta_t < 1.:
+            if delta_t < 100.:
                 TPM = np.eye(len(model_bank))
                 print('TPM', TPM)
             else:
