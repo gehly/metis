@@ -391,11 +391,11 @@ def check_visibility(state, UTC_times, sun_gcrf_array, moon_gcrf_array, sensor,
     start = time.time()
     
     # Sensor parameters
-    mapp_lim = sensor['mapp_lim']
+#    mapp_lim = sensor['mapp_lim']
     az_lim = sensor['az_lim']
     el_lim = sensor['el_lim']
     rg_lim = sensor['rg_lim']
-    sun_elmask = sensor['sun_elmask']
+#    sun_elmask = sensor['sun_elmask']
 #    moon_angle_lim = sensor['moon_angle_lim']
     geodetic_latlonht = sensor['geodetic_latlonht']
     meas_types = ['rg', 'az', 'el']
@@ -438,14 +438,7 @@ def check_visibility(state, UTC_times, sun_gcrf_array, moon_gcrf_array, sensor,
         az = float(Yi[1])
         el = float(Yi[2])
         
-        # Compute sun elevation angle
-        gcrftime = time.time()
-        sun_itrf, dum = gcrf2itrf(sun_gcrf, np.zeros((3,1)), UTC, EOP_data,
-                                  XYs_df)
         
-#        print('GCRF time', time.time() - gcrftime)
-        
-        sun_az, sun_el, sun_rg = ecef2azelrange_rad(sun_itrf, sensor_itrf)
         
         # Check against constraints
         vis_flag = True
@@ -461,41 +454,56 @@ def check_visibility(state, UTC_times, sun_gcrf_array, moon_gcrf_array, sensor,
             vis_flag = False
         if rg > rg_lim[1]:
             vis_flag = False        
-            
-        if sun_el > sun_elmask:
-            vis_flag = False
-         
-        # If passed constraints, check for eclipse and moon angle
-        if vis_flag:
-            
-            print('visible')
-            print(UTC)
-            
-            # Compute angles
-            rso_gcrf = Xi[0:3].reshape(3,1)
-            moon_gcrf = moon_gcrf_array[:,ii].reshape(3,1)
-            sensor_gcrf, dum = \
-                itrf2gcrf(sensor_itrf, np.zeros((3,1)), UTC, EOP_data,
-                          XYs_df)
-            phase_angle, sun_angle, moon_angle = \
-                compute_angles(rso_gcrf, sun_gcrf, moon_gcrf, sensor_gcrf)
         
-            # Check for eclipse - if sun angle is less than half cone angle
-            # the sun is behind the earth
-            # First check valid orbit - radius greater than Earth radius
-            r = np.linalg.norm(rso_gcrf)
-            if r < Re:
-                vis_flag = False
-            else:
-                half_cone = asin(Re/r)
-                if sun_angle < half_cone:
-                    vis_flag = False                
+        # Optical constraints
+        # Sunlit/station dark constraint
+        if 'sun_elmask' in sensor:
             
-#            # Check too close to moon
-#            if moon_angle < moon_angle_lim:
-#                vis_flag = False
-
-            #TODO Moon Limits based on phase of moon (Meeus algorithm?)
+            sun_elmask = sensor['sun_elmask']
+            
+            # Compute sun elevation angle
+            gcrftime = time.time()
+            sun_itrf, dum = gcrf2itrf(sun_gcrf, np.zeros((3,1)), UTC, EOP_data,
+                                      XYs_df)
+            
+    #        print('GCRF time', time.time() - gcrftime)
+            
+            sun_az, sun_el, sun_rg = ecef2azelrange_rad(sun_itrf, sensor_itrf)
+            
+            if sun_el > sun_elmask:
+                vis_flag = False
+         
+            # If passed constraints, check for eclipse and moon angle
+            if vis_flag:
+                
+                print('visible')
+                print(UTC)
+                
+                # Compute angles
+                rso_gcrf = Xi[0:3].reshape(3,1)
+                moon_gcrf = moon_gcrf_array[:,ii].reshape(3,1)
+                sensor_gcrf, dum = \
+                    itrf2gcrf(sensor_itrf, np.zeros((3,1)), UTC, EOP_data,
+                              XYs_df)
+                phase_angle, sun_angle, moon_angle = \
+                    compute_angles(rso_gcrf, sun_gcrf, moon_gcrf, sensor_gcrf)
+            
+                # Check for eclipse - if sun angle is less than half cone angle
+                # the sun is behind the earth
+                # First check valid orbit - radius greater than Earth radius
+                r = np.linalg.norm(rso_gcrf)
+                if r < Re:
+                    vis_flag = False
+                else:
+                    half_cone = asin(Re/r)
+                    if sun_angle < half_cone:
+                        vis_flag = False                
+                
+    #            # Check too close to moon
+    #            if moon_angle < moon_angle_lim:
+    #                vis_flag = False
+    
+                #TODO Moon Limits based on phase of moon (Meeus algorithm?)
         
         # If still good, compute apparent mag
         if vis_flag:
@@ -507,16 +515,17 @@ def check_visibility(state, UTC_times, sun_gcrf_array, moon_gcrf_array, sensor,
 #            print('sun az', sun_az*180/pi)
 #            print('sun el', sun_el*180/pi)
             
+            if 'mapp_lim' in sensor:
+                mapp_lim = sensor['mapp_lim']
+                meas_types_mapp = ['mapp']
+                Yi = compute_measurement(Xi, sun_gcrf, sensor, spacecraftConfig,
+                                         surfaces, UTC, EOP_data, meas_types_mapp,
+                                         XYs_df)
             
-            meas_types_mapp = ['mapp']
-            Yi = compute_measurement(Xi, sun_gcrf, sensor, spacecraftConfig,
-                                     surfaces, UTC, EOP_data, meas_types_mapp,
-                                     XYs_df)
-            
-            print(Yi)
-            
-            if float(Yi[0]) > mapp_lim:
-                vis_flag = False
+                print(Yi)
+                
+                if float(Yi[0]) > mapp_lim:
+                    vis_flag = False
         
         # If passed all checks, append to list
         if vis_flag:

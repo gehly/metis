@@ -200,7 +200,9 @@ def compute_mm_errors(filter_output_file, truth_file, error_file):
     Xerr = np.zeros((n+3,L))
     sigs = np.zeros((n+3,L))
     model_weights = np.zeros((m,L))
-    resids = np.zeros((2,L-1))
+    est_mode = np.zeros(L,)
+    man_det_n = 3
+    resids = np.zeros((3,L-1))
     for ii in range(L):
         
         # Retrieve filter state
@@ -236,19 +238,74 @@ def compute_mm_errors(filter_output_file, truth_file, error_file):
         for model_id in model_id_list:
             wj = float(model_bank[model_id]['weight'])
             model_weights[jj,ii] = wj
-            jj += 1
             
+#            print(jj)
+#            print(model_id)
+#            print(wj)
+#            
+#            if ii > 0:
+#                mistake
+
             if ii == 0:
+                if wj >= wmax:
+                    est_mode[ii] = jj
+                    wmax = wj
+                    jj += 1
+                
                 continue
             
             resids_ii = model_bank[model_id]['resids']
-            if wj > wmax:
+            if wj >= wmax:
                 resids[:,ii-1] = resids_ii.flatten()
+                est_mode[ii] = jj
+                wmax = wj
+                
+            jj += 1
+    
+    count = 0
+    mode_prior = est_mode[0]
+    base_prior = None
+    maneuver_ind = []
+    for ii in range(L):
+        mode = est_mode[ii]
+        
+        # If current mode same as prior, increment count
+        if mode == mode_prior:
+            count += 1
+        else:
+            count = 0
+            
+        # If count >= N, set base value
+        if count >= man_det_n:
+            base = mode
+            print('base', base)
+            
+            if base_prior is None:
+                base_prior = base
+                print('base_prior', base_prior)
+            
+            if base != base_prior:
+                maneuver_ind.append(ii-man_det_n)
+                base_prior = base
+                print('maneuver', maneuver_ind)
+        
+        print('\n')
+        print(ii)
+        print(mode)
+        print(count)
+        
+        # Reset prior
+        mode_prior = mode
+
+        
+    print(maneuver_ind)
+    print([t_hrs[ii] for ii in maneuver_ind])
+        
 
     # Save data
     pklFile = open( error_file, 'wb' )
-    pickle.dump([t_hrs, Xerr, sigs, resids, model_weights, model_id_list], 
-                pklFile, -1 )
+    pickle.dump([t_hrs, Xerr, sigs, resids, model_weights, model_id_list,
+                 est_mode, maneuver_ind], pklFile, -1 )
     pklFile.close()
 
     
@@ -338,7 +395,12 @@ def plot_mm_errors(error_file):
     resids = data[3]
     model_weights = data[4]
     model_id_list = data[5]
+    est_mode = data[6]
+    maneuver_ind = data[7]
     pklFile.close()    
+    
+    maneuver_state = np.zeros(len(t_hrs),)
+    maneuver_state[maneuver_ind] = 1.
     
     
     plt.figure()
@@ -429,17 +491,29 @@ def plot_mm_errors(error_file):
     colors[9] = 'r'
     
     plt.figure()
+    plt.subplot(2,1,1)
     n = len(model_id_list)
     for ii in range(n):
         c=colors[ii]
         plt.plot(t_hrs, model_weights[ii,:], 'o--', c=c, lw=3)
     
-    plt.xlabel('Time [hours]', fontsize=14)
+    
     plt.ylabel('Model Weights', fontsize=14)
     plt.ylim([-0.1, 1.1])
 #    plt.xlim([-5, 36])
 #    plt.xticks([0, 5, 10, 15, 20, 25, 30, 35])
-    plt.legend(legend, loc='upper left')
+    plt.legend(legend, loc='best')
+    
+
+    plt.subplot(2,1,2)
+    plt.plot(t_hrs, maneuver_state, 'ko', lw=3)
+    plt.yticks([0, 1], ['False', 'True'])
+    plt.ylim([-0.1, 1.1])
+    plt.ylabel('Maneuver Det', fontsize=14)
+    plt.xlabel('Time [hours]', fontsize=14)
+    
+    
+    
     plt.show()
     
     return
