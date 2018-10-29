@@ -146,6 +146,8 @@ def ode_twobody(t, X, params):
       state derivative vector
     '''
     
+    # Inputs
+    GM = params['GM']
 
     # State Vector
     x = float(X[0])
