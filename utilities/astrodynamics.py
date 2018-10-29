@@ -9,9 +9,10 @@ sys.path.append('../')
 
 from utilities.constants import GME, J2E, Re
 
-############################################################################
-# Orbit Stuff
-############################################################################
+
+###############################################################################
+# Compute Orbit Parameters
+###############################################################################
 
 
 def meanmot2sma(n, GM=GME):
@@ -35,6 +36,49 @@ def meanmot2sma(n, GM=GME):
     
     return a
 
+
+def sma2meanmot(a, GM=GME):
+    '''
+    This function computs the mean motion given semi-major axis.
+    
+    Parameters
+    ------
+    a : float
+        semi-major axis [km]    
+    GM : float, optional
+        gravitational parameter, default is earth GME [km^3/s^2]
+    
+    Returns
+    ------
+    n : float
+        mean motion [rad/s]
+    '''
+    
+    n = np.sqrt(GM/a**3.)
+    
+    return n
+
+
+def smaecc2semilatusrectum(a, e):
+    '''
+    This function computs the mean motion given semi-major axis.
+    
+    Parameters
+    ------
+    a : float
+        semi-major axis [km]    
+    e : float
+        eccenticity
+    
+    Returns
+    ------
+    p : float
+        semi-latus rectum
+    '''
+    
+    p = a*(1. - e**2.)
+    
+    return p
 
 def mean2ecc(M, e):
     '''
@@ -186,6 +230,95 @@ def mean2hyp(M, e):
         H = H - f/df
 
     return H
+
+
+def sunsynch_inclination(a, e):
+    '''
+    This function computes the inclination required for a sunsynchronous Earth 
+    orbit at the given altitude.
+    
+    Parameters
+    ------
+    a : float
+        semi-major axis [km]
+    e : float
+        eccentricity
+        
+    Returns
+    ------
+    i : float
+        inclination [deg]
+    
+    Reference
+    ------
+    Vallado, D. "Fundamentals of Astrodynamics and Applications (4th Ed.)"
+        Section 11.4.1
+    
+    
+    '''
+    
+    # Sun-synch condition
+    dRAAN = 360./365.2421897 * pi/180. * 1./86400.  # rad/sec
+    
+    # Compute required inclination
+    n = sma2meanmot(a)
+    p = smaecc2semilatusrectum(a, e)
+    cosi = -(dRAAN*2.*p**2.)/(3.*n*Re**2.*J2E)  # Eq. 9-37
+    i = acos(cosi) * 180./pi  # deg    
+    
+    return i
+
+
+def sunsynch_RAAN(launch_dt, LTAN):
+    '''
+    This function computes the RAAN to achieve a desired sunsynchronous orbit
+    local time of ascending node (LTAN).
+    
+    Parameters
+    ------
+    launch_dt : datetime object
+        launch date and time [UTC]
+    LTAN : float
+        local time of ascending node, decimal hour in range [0, 24) 
+    
+    Returns
+    ------
+    RAAN : float
+        right ascension of ascending node [deg]
+    '''
+    
+    # Change in solar RA
+    dRAAN = 360./365.2421897 * pi/180. * 1./86400.  # rad/sec
+    
+    # Compute solar RA angle at time of launch
+    year = launch_dt.year
+    vernal = datetime(year, 3, 21, 12, 0, 0)
+    delta = (launch_dt - vernal).total_seconds()/86400.
+    solar_RA = dRAAN*delta * 180./pi  # deg
+    
+    # Compute desired RAAN
+    hour_angle = (LTAN - 12.)*15.  # deg
+    RAAN = solar_RA + hour_angle
+    
+    return RAAN
+
+
+
+
+
+
+
+
+
+
+
+
+
+############################################################################
+# Orbit Element Conversions
+############################################################################
+
+
 
 
 def mean2osc(mean_elem):
