@@ -38,7 +38,7 @@ def rk4(intfcn, tin, y0, params):
     N = int(ceil((tf-t0)/h))
     
     # Initial setup
-    yn = y0
+    yn = y0.flatten()
     tn = t0
     yvec = y0.reshape(1, len(y0))
     tvec = np.zeros(N+1,)
@@ -61,7 +61,27 @@ def rk4(intfcn, tin, y0, params):
         yn = yn1
         
         # Store output
-        yvec = np.concatenate((yvec, yn1), axis=0)
+        yvec = np.concatenate((yvec, yn1.reshape(1,len(y0))), axis=0)
         tvec[ii+1] = tn
 
     return tvec, yvec
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
