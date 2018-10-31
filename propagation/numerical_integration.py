@@ -105,12 +105,17 @@ def rkf78(intfcn, tin, y0, params):
     h = params['step']
     rtol = params['rtol']
     atol = params['atol']
-    m = params['m']
+    #m = params['m']
+    m = 0.9
     local_extrap = params['local_extrap']
     
     # Start and end times
     t0 = tin[0]
     tf = tin[-1]
+    
+#    tflag = False
+#    if len(tin) > 2:
+#        tflag = True
     
     # Initial setup
     yn = y0.flatten()
@@ -197,20 +202,22 @@ def rkf78(intfcn, tin, y0, params):
                 yn = y_8            
         
             # Increment current time
-            tn = tn + h
+            tn = tn + h            
+            
+            # Use new time step
+            h = hnew
         
             # Store Output
             yvec = np.concatenate((yvec, yn.reshape(1,len(yn))), axis=0)
             tvec = np.append(tvec, tn)
         
-            # Use new time step
-            h = hnew
+            
         
         # Otherwise, solution is bad, repeat at current time with new h
         else:            
             h = hnew
 
-    return tvec, yvec
+    return tvec, yvec, fcalls
 
 
 
