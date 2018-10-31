@@ -539,7 +539,7 @@ def brouwer_lyddane(a0,e0,i0,RAAN0,w0,M0,gamma0):
     return a1, e1, i1, RAAN1, w1, M1
 
 
-def element_conversion(x_in, iflag, oflag, GM=3.986004e5, dt=0.):
+def element_conversion(x_in, iflag, oflag, GM=GME, dt=0.):
     '''
     This funciton converts between Keplerian orbital elements
     and inertial frame cartesian coordinates.  The script has an
