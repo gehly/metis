@@ -8,7 +8,7 @@ sys.path.append('../')
 
 from utilities.astrodynamics import element_conversion
 from utilities.constants import GME
-from numerical_integration import rk4, rkf78
+from numerical_integration import rk4, rkf78, dopri87
 from integration_functions import ode_twobody
 
 
@@ -16,9 +16,10 @@ def test_twobody():
     
     # Set up initial conditions and integration parameters
 #    x_in = np.reshape([7000., 0.1, 10., 100., 40., 95.], (6,1))
-    x_in = [-1371.563, 2837.540, -7043.244, -6.711557, -2.544285, 0.282073]
-    Xo = element_conversion(x_in, 1, 1)
-    SMA = element_conversion(x_in, 1, 0)[0]
+#    x_in = [-1371.563, 2837.540, -7043.244, -6.711557, -2.544285, 0.282073]
+    x_in = [26311.2, 0.7489727, 63.4, 0., 270., 30.]
+    Xo = element_conversion(x_in, 0, 1)
+    SMA = element_conversion(Xo, 1, 0)[0]
     t_in = [0., 24.*3600.]
     
     intfcn = ode_twobody
@@ -26,11 +27,11 @@ def test_twobody():
     int_tol = 1e-12
     
     params = {}
-    params['step'] = 130.
+    params['step'] = 5.
     params['GM'] = GME
     params['rtol'] = int_tol
     params['atol'] = int_tol
-    params['local_extrap'] = True
+    params['local_extrap'] = False
     
     # Times to integrate to
 #    tvec = np.arange(t_in[0], t_in[1]+0.1, params['step'])
@@ -57,6 +58,7 @@ def test_twobody():
 #        mistake
     
     tvec, X_rkf78, fcalls = rkf78(intfcn, t_in, Xo, params)
+#    tvec, X_rkf78, fcalls = dopri87(intfcn, t_in, Xo, params)
     
     print(fcalls)
     
