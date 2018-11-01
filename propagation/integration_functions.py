@@ -146,6 +146,8 @@ def ode_twobody(t, X, params):
       state derivative vector
     '''
     
+    # Inputs
+    GM = params['GM']
 
     # State Vector
     x = float(X[0])
@@ -159,7 +161,7 @@ def ode_twobody(t, X, params):
     r = np.linalg.norm([x, y, z])
 
     # Derivative vector
-    dX = [0.]*6
+    dX = np.zeros(6)
 
     dX[0] = dx
     dX[1] = dy
@@ -168,7 +170,6 @@ def ode_twobody(t, X, params):
     dX[3] = -GM*x/r**3
     dX[4] = -GM*y/r**3
     dX[5] = -GM*z/r**3
-    
     
     return dX
 
