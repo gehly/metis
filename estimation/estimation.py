@@ -45,9 +45,10 @@ def unscented_kalman_filter(model_params_file, sensor_file, meas_file,
     # Load measurement data
     pklFile = open(meas_file, 'rb')
     data = pickle.load(pklFile)
-    meas_times = data[0]
-    meas = data[1]
+    meas_dict = data[0]
     pklFile.close()
+    
+    meas_times = sorted(list(meas_dict.keys()))
     
 #    # Force model parameters
 #    dragCoeff = forcesCoeff['dragCoeff']
@@ -58,11 +59,7 @@ def unscented_kalman_filter(model_params_file, sensor_file, meas_file,
     # Sun and earth data
     earth = ephemeris['earth']
     sun = ephemeris['sun']
-    
-    # Sensor and measurement parameters
-    sensor_id = list(sensor_dict.keys())[0]
-    sensor = sensor_dict[sensor_id]
-        
+
     #Number of states and observations per epoch
     n = len(spacecraftConfig['X'])    
     
@@ -92,19 +89,13 @@ def unscented_kalman_filter(model_params_file, sensor_file, meas_file,
         
         delta_t = (ti - ti_prior).total_seconds()        
         print('delta_t', delta_t)
-        
-        # Read the next observation
-        Yi = meas[ii,:].reshape(len(meas[ii,:]),1)
-        
-        print('Yi', Yi)
-        
+               
         # Predictor
         if spacecraftConfig['type'] == '3DoF':
             Xbar, Pbar = \
                 ukf_3dof_predictor(X, P, delta_t, n, alpha, 
                                    spacecraftConfig, forcesCoeff, surfaces)
                 
-        # Predictor
         elif spacecraftConfig['type'] == '3att':
             Xbar, Pbar = \
                 ukf_3att_predictor(X, P, delta_t, n, alpha, 
@@ -134,32 +125,42 @@ def unscented_kalman_filter(model_params_file, sensor_file, meas_file,
         # EOPs at current time
         EOP_data = get_eop_data(eop_alldata, ti)
         
-        # Corrector
-        if spacecraftConfig['type'] == '3DoF':
-            X, P, beta = ukf_3dof_corrector(Xbar, Pbar, Yi, ti, n, alpha,
-                                            sun_gcrf, sensor, EOP_data, XYs_df,
-                                            spacecraftConfig, surfaces)
+        # Loop over sensors 
+#        Yi = meas[ii,:].reshape(len(meas[ii,:]),1)
+        sensor_id_list = list(meas_dict[ti].keys())
+        for sensor_id in sensor_id_list:
+            sensor = sensor_dict[sensor_id]
+            Yi = meas_dict[ti][sensor_id]
             
-        elif spacecraftConfig['type'] == '3att':
-            X, P, beta = ukf_3att_corrector(Xbar, Pbar, Yi, ti, n, alpha,
-                                            sun_gcrf, sensor, EOP_data, XYs_df,
-                                            spacecraftConfig, surfaces)
+            print('Yi', Yi)
             
-        elif spacecraftConfig['type'] == '6DoF':
-            X, P, beta = ukf_6dof_corrector(Xbar, Pbar, qmean, Yi, ti, n, alpha,
-                                            sun_gcrf, sensor, EOP_data, XYs_df,
-                                            spacecraftConfig, surfaces)
-        
-        else:
-            print('Spacecraft Type Error')
-            print(spacecraftConfig)
-            break
-        
-        print('\n\n Corrector Step')
-        print(ti)
-        print(X)
-        print(P)
-        print(beta)
+            # Corrector
+            if spacecraftConfig['type'] == '3DoF':
+                X, P, beta = ukf_3dof_corrector(Xbar, Pbar, Yi, ti, n, alpha,
+                                                sun_gcrf, sensor, EOP_data, XYs_df,
+                                                spacecraftConfig, surfaces)
+                
+            elif spacecraftConfig['type'] == '3att':
+                X, P, beta = ukf_3att_corrector(Xbar, Pbar, Yi, ti, n, alpha,
+                                                sun_gcrf, sensor, EOP_data, XYs_df,
+                                                spacecraftConfig, surfaces)
+                
+            elif spacecraftConfig['type'] == '6DoF':
+                X, P, beta = ukf_6dof_corrector(Xbar, Pbar, qmean, Yi, ti, n, alpha,
+                                                sun_gcrf, sensor, EOP_data, XYs_df,
+                                                spacecraftConfig, surfaces)
+            
+            else:
+                print('Spacecraft Type Error')
+                print(spacecraftConfig)
+                break
+            
+            print('\n\n Corrector Step')
+            print(ti)
+            print(sensor_id)
+            print(X)
+            print(P)
+            print(beta)
         
         # Update with post-fit solution
         spacecraftConfig['time'] = ti     

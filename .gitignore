@@ -6,3 +6,5 @@ utilities/deltat\.data
 utilities/deltat\.preds
 
 utilities/Leap_Second\.dat
+
+skyfield_data/de421\.bsp

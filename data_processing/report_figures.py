@@ -5,6 +5,12 @@ import pickle
 from datetime import datetime, timedelta
 from math import pi
 
+from mpl_toolkits.basemap import Basemap
+
+sys.path.append('../')
+
+from sensors.sensors import define_sensors
+
 
 def multiple_model_plot_measurements(measdir):
     
@@ -263,6 +269,24 @@ def multiple_model_plot_measurements(measdir):
     
     
     plt.show()
+    
+    
+    return
+
+
+def plot_sensor_map(sensor_id_list):
+    
+    sensor_dict = define_sensors(sensor_id_list)
+    
+    plt.figure()
+    m = Basemap(projection='cyl',llcrnrlat=-90,urcrnrlat=90,llcrnrlon=-180,urcrnrlon=180,resolution='c')
+    m.drawcoastlines()
+    
+    for sensor_id in sensor_dict:
+        latlonht = sensor_dict[sensor_id]['geodetic_latlonht']
+        
+        plt.plot(latlonht[1], latlonht[0], 'bo', ms=8)
+    
     
     
     return

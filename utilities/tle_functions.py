@@ -5,6 +5,7 @@ import getpass
 from datetime import datetime, timedelta
 import sys
 import matplotlib.pyplot as plt
+import pandas as pd
 
 sys.path.append('../')
 
@@ -32,7 +33,7 @@ from sgp4.earth_gravity import wgs84
 ###############################################################################
 
 
-def get_spacetrack_tle_data(obj_id_list, UTC_list = [], username='',
+def get_spacetrack_tle_data(obj_id_list = [], UTC_list = [], username='',
                             password=''):
     '''
     This function retrieves the two-line element (TLE) data for objects
@@ -40,8 +41,9 @@ def get_spacetrack_tle_data(obj_id_list, UTC_list = [], username='',
     
     Parameters
     ------
-    obj_id_list : list
+    obj_id_list : list, optional
         object NORAD IDs (int)
+        - if empty code will retrieve latest available for entire catalog
     UTC_list : list, optional
         UTC datetime objects to specify desired times for TLEs to retrieve
         - if empty code will retrieve latest available
@@ -57,6 +59,8 @@ def get_spacetrack_tle_data(obj_id_list, UTC_list = [], username='',
     ------
     tle_dict : dictionary
         indexed by object ID, each item has two lists of strings for each line
+    tle_df : pandas dataframe
+        norad, tle line1, tle line2
     '''
     
     if len(username) == 0:    
@@ -64,36 +68,40 @@ def get_spacetrack_tle_data(obj_id_list, UTC_list = [], username='',
     if len(password) == 0:
         password = getpass.getpass('space-track password: ')    
     
-    myString = ",".join(map(str, obj_id_list))
-    
-    # If only one time is given, add 1 day increment to produce window
-    if len(UTC_list) ==  1:
-        UTC_list.append(UTC_list[0] + timedelta(days=1.))
-    
-    # If times are specified, retrieve from window
-    if len(UTC_list) == 2:        
-        UTC0 = UTC_list[0].strftime('%Y-%m-%d')
-        UTC1 = UTC_list[1].strftime('%Y-%m-%d')
-        pageData = ('//www.space-track.org/basicspacedata/query/class/tle/'
-                    'EPOCH/' + UTC0 + '--' + UTC1 + '/NORAD_CAT_ID/' + 
-                    myString + '/orderby/TLE_LINE1 ASC/format/tle')
+    if len(obj_id_list) >= 1:
+        myString = ",".join(map(str, obj_id_list))
         
-    # Otherwise, get latest available
-    else:    
-        pageData = ('//www.space-track.org/basicspacedata/query/class/'
-                    'tle_latest/ORDINAL/1/NORAD_CAT_ID/' + myString + 
-                    '/orderby/TLE_LINE1 ASC/format/tle')
+        # If only one time is given, add 1 day increment to produce window
+        if len(UTC_list) ==  1:
+            UTC_list.append(UTC_list[0] + timedelta(days=1.))
         
-    payload = {'identity':username, 'password':password, 'submit':'Login'}
+        # If times are specified, retrieve from window
+        if len(UTC_list) == 2:        
+            UTC0 = UTC_list[0].strftime('%Y-%m-%d')
+            UTC1 = UTC_list[1].strftime('%Y-%m-%d')
+            pageData = ('//www.space-track.org/basicspacedata/query/class/tle/'
+                        'EPOCH/' + UTC0 + '--' + UTC1 + '/NORAD_CAT_ID/' + 
+                        myString + '/orderby/TLE_LINE1 ASC/format/tle')
+            
+        # Otherwise, get latest available
+        else:    
+            pageData = ('//www.space-track.org/basicspacedata/query/class/'
+                        'tle_latest/ORDINAL/1/NORAD_CAT_ID/' + myString + 
+                        '/orderby/TLE_LINE1 ASC/format/tle')
+    else:
+        pageData = '//www.space-track.org/basicspacedata/query/class/tle_latest/ORDINAL/1/EPOCH/%3Enow-30/orderby/NORAD_CAT_ID/format/tle'
+  
+    ST_URL='https://www.space-track.org'
     
     with requests.Session() as s:
-        s.post("https://www.space-track.org/auth/login", data=payload)
+        s.post(ST_URL+"/ajaxauth/login", json={'identity':username, 'password':password})
         r = s.get('https:' + pageData)
         if r.status_code != requests.codes.ok:
             print("Error: Page data request failed.")
             
     # Parse response and form output
     tle_dict = {}
+    tle_list = []
     nchar = 69
     nskip = 2
     ntle = int(round(len(r.text)/142.))
@@ -114,12 +122,47 @@ def get_spacetrack_tle_data(obj_id_list, UTC_list = [], username='',
             tle_dict[obj_id]['UTC_list'] = []
             tle_dict[obj_id]['line1_list'] = []
             tle_dict[obj_id]['line2_list'] = []
-            
+        
         tle_dict[obj_id]['UTC_list'].append(UTC)
         tle_dict[obj_id]['line1_list'].append(line1)
         tle_dict[obj_id]['line2_list'].append(line2)
+        
+        linelist = [obj_id,line1,line2,UTC]
+        tle_list.append(linelist)  
+        
+    tle_df = pd.DataFrame(tle_list, columns=['norad','line1','line2','utc'])
     
-    return tle_dict
+    return tle_dict, tle_df
+
+
+def tledict2dataframe(tle_dict):
+    '''
+    This function computes a pandas dataframe with TLE data given an input
+    dictionary with TLE data.
+    
+    Parameters
+    ------
+    tle_dict : dictionary
+        indexed by object ID, each item has two lists of strings for each line
+        
+    Returns
+    ------
+    tle_df : pandas dataframe
+        norad, tle line1, tle line2
+        
+    '''
+    
+    tle_list = []
+    for obj_id in tle_dict:
+        for ii in range(len(tle_dict[obj_id]['line1_list'])):
+            line1 = tle_dict[obj_id]['line1_list'][ii]
+            line2 = tle_dict[obj_id]['line2_list'][ii]
+            linelist = [obj_id, line1, line2]
+            tle_list.append(linelist)
+    
+    tle_df = pd.DataFrame(tle_list, columns=['norad','line1','line2'])
+    
+    return tle_df
 
 
 def tletime2datetime(line1):
@@ -153,11 +196,11 @@ def tletime2datetime(line1):
     
     '''
     
-    # Retrieve last 2 digits of year and day of year
+    # Get 2 digit year and day of year
     year2 = line1[18:20]
     doy = float(line1[20:32])  
     
-    # Add correct 2 digit century
+    # Compute century and add to year
     if int(year2) < 50.:
         year = int('20' + year2)
     else:
@@ -168,7 +211,7 @@ def tletime2datetime(line1):
     base = datetime(year, 1, 1, 0, 0, 0)
     UTC = base + timedelta(days=(doy-1.))
     
-    # Check day of year
+    # Compute day of year to check
     doy = UTC.timetuple().tm_yday
     
     return UTC
@@ -196,6 +239,7 @@ def launch2tle(obj_id_list, launch_elem_dict):
 
     # Initialize output
     tle_dict = {}
+    tle_list = []
     
     # Loop over objects
     for obj_id in obj_id_list:
@@ -209,9 +253,7 @@ def launch2tle(obj_id_list, launch_elem_dict):
         w = launch_elem['w']
         M = launch_elem['M']
         UTC = launch_elem['UTC']
-        
-        #TODO compute mean elements and convert to TEME frame
-        
+
         # Compute mean motion in rev/day
         a = (ra + rp)/2.
         n = np.sqrt(GME/a**3.)
@@ -220,33 +262,28 @@ def launch2tle(obj_id_list, launch_elem_dict):
         # Compute eccentricity
         e = 1. - rp/a
         
-        # Compute launch year and day of year
-        year2 = str(UTC.year)[2:4]
-        doy = UTC.timetuple().tm_yday
-        dfrac = UTC.hour/24. + UTC.minute/1440. + \
-            (UTC.second + UTC.microsecond/1e6)/86400.
-        dfrac = '{0:.15f}'.format(dfrac)
+        # Compute GCRF position and velocity
+        x_in = [a,e,i,RAAN,w,M]
+        x_out = element_conversion(x_in, 0, 1)
+        r_GCRF = np.reshape(x_out[0:3], (3,1))
+        v_GCRF = np.reshape(x_out[3:6], (3,1))
         
-        # Format for output
-        line1 = '1 ' + str(obj_id) + 'U ' + year2 + '001A   ' + year2 + \
-            str(doy).zfill(3) + '.' + str(dfrac)[2:10] + \
-            '  .00000000  00000-0  00000-0 0    10'
-            
-        line2 = '2 ' + str(obj_id) + ' ' + '{:8.4f}'.format(i) + ' ' + \
-            '{:8.4f}'.format(RAAN) + ' ' + str(e)[2:9] + ' ' + \
-            '{:8.4f}'.format(w) + ' ' + '{:8.4f}'.format(M) + ' ' + \
-            '{:11.8f}'.format(n) + '    10'
-            
+        # Compute TLE data for this object
+        line1, line2 = gcrf2tle(obj_id, r_GCRF, v_GCRF, UTC)
+    
         # Add to dictionary
         tle_dict[obj_id] = {}
         tle_dict[obj_id]['UTC_list'] = [UTC]
         tle_dict[obj_id]['line1_list'] = [line1]
         tle_dict[obj_id]['line2_list'] = [line2]
         
-        print(line1)
-        print(line2)
+        # Generate dataframe output
+        linelist = [obj_id,line1,line2]
+        tle_list.append(linelist)
+        
+    tle_df = pd.DataFrame(tle_list, columns=['norad','line1','line2'])
 
-    return tle_dict
+    return tle_dict, tle_df
 
 
 def kep2tle(obj_id_list, kep_dict):    
@@ -265,12 +302,15 @@ def kep2tle(obj_id_list, kep_dict):
     Returns
     ------
     tle_dict : dictionary
-        Two Line Element information, indexed by object ID
-    
+        indexed by object ID, each item has two lists of strings for each line
+    tle_df : pandas dataframe
+        norad, tle line1, tle line2
+
     '''
     
     # Initialize output
     tle_dict = {}
+    tle_list = []
     
     # Loop over objects
     for obj_id in obj_id_list:
@@ -285,39 +325,28 @@ def kep2tle(obj_id_list, kep_dict):
         M = kep_elem['M']
         UTC = kep_elem['UTC']
         
-        #TODO compute mean elements and convert to TEME frame
+        # Compute GCRF position/velocity
+        x_in = [a,e,i,RAAN,w,M]
+        x_out = element_conversion(x_in, 0, 1)
+        r_GCRF = np.reshape(x_out[0:3], (3,1))
+        v_GCRF = np.reshape(x_out[3:6], (3,1))
         
-        # Compute mean motion in rev/day
-        n = np.sqrt(GME/a**3.)
-        n *= 86400./(2.*pi)
-
-        # Compute launch year and day of year
-        year2 = str(UTC.year)[2:4]
-        doy = UTC.timetuple().tm_yday
-        dfrac = UTC.hour/24. + UTC.minute/1440. + \
-            (UTC.second + UTC.microsecond/1e6)/86400.
-        
-        # Format for output
-        line1 = '1 ' + str(obj_id) + 'U ' + year2 + '001A   ' + year2 + \
-            str(doy).zfill(3) + '.' + str(dfrac)[2:10] + \
-            '  .00000000  00000-0  00000-0 0    10'
-            
-        line2 = '2 ' + str(obj_id) + ' ' + '{:8.4f}'.format(i) + ' ' + \
-            '{:8.4f}'.format(RAAN) + ' ' + str(e)[2:9] + ' ' + \
-            '{:8.4f}'.format(w) + ' ' + '{:8.4f}'.format(M) + ' ' + \
-            '{:11.8f}'.format(n) + '    10'
-            
+        # Compute TLE data for this object
+        line1, line2 = gcrf2tle(obj_id, r_GCRF, v_GCRF, UTC)
+    
         # Add to dictionary
         tle_dict[obj_id] = {}
         tle_dict[obj_id]['UTC_list'] = [UTC]
         tle_dict[obj_id]['line1_list'] = [line1]
         tle_dict[obj_id]['line2_list'] = [line2]
         
-        print(line1)
-        print(line2)
+        # Generate dataframe output
+        linelist = [obj_id,line1,line2]
+        tle_list.append(linelist)
+        
+    tle_df = pd.DataFrame(tle_list, columns=['norad','line1','line2'])
     
-    
-    return tle_dict
+    return tle_dict, tle_df
 
 
 def launchecef2tle(obj_id_list, ecef_dict, offline_flag=False):
@@ -339,18 +368,21 @@ def launchecef2tle(obj_id_list, ecef_dict, offline_flag=False):
     Returns
     ------
     tle_dict : dictionary
-        Two Line Element information, indexed by object ID
+        indexed by object ID, each item has two lists of strings for each line
+    tle_df : pandas dataframe
+        norad, tle line1, tle line2    
     
     '''
     
      # Initialize output
     tle_dict = {}
+    tle_list = []
     
     # Retrieve latest EOP data from celestrak.com
     eop_alldata = get_celestrak_eop_alldata(offline_flag)
     
     # Retrieve IAU Nutation data from file
-    IAU1980_nutation = get_nutation_data()
+    IAU1980nut = get_nutation_data()
     
     # Loop over objects
     for obj_id in obj_id_list:
@@ -366,55 +398,109 @@ def launchecef2tle(obj_id_list, ecef_dict, offline_flag=False):
         # Convert ITRF to GCRF
         r_GCRF, v_GCRF = itrf2gcrf(r_ITRF, v_ITRF, UTC, EOP_data)
         
-        # Convert GCRF to TEME
-        r_TEME, v_TEME = gcrf2teme(r_GCRF, v_GCRF, UTC, IAU1980_nutation,
-                                   EOP_data)
-        
-        
-        #TODO compute mean elements
-        
-        # Convert TEME to Keplerian elements
-        x_in = np.concatenate((r_TEME, v_TEME), axis=0)
-        x_out = element_conversion(x_in, 1, 0)
-
-        a = float(x_out[0])
-        e = float(x_out[1])
-        i = float(x_out[2])
-        RAAN = float(x_out[3])
-        w = float(x_out[4])
-        M = float(x_out[5])
-        
-        # Compute mean motion in rev/day
-        n = np.sqrt(GME/a**3.)
-        n *= 86400./(2.*pi)
-
-        # Compute launch year and day of year
-        year2 = str(UTC.year)[2:4]
-        doy = UTC.timetuple().tm_yday
-        dfrac = UTC.hour/24. + UTC.minute/1440. + \
-            (UTC.second + UTC.microsecond/1e6)/86400.
-        
-        # Format for output
-        line1 = '1 ' + str(obj_id) + 'U ' + year2 + '001A   ' + year2 + \
-            str(doy).zfill(3) + '.' + str(dfrac)[2:10] + \
-            '  .00000000  00000-0  00000-0 0    10'
-            
-        line2 = '2 ' + str(obj_id) + ' ' + '{:8.4f}'.format(i) + ' ' + \
-            '{:8.4f}'.format(RAAN) + ' ' + str(e)[2:9] + ' ' + \
-            '{:8.4f}'.format(w) + ' ' + '{:8.4f}'.format(M) + ' ' + \
-            '{:11.8f}'.format(n) + '    10'
-            
+        # Compute TLE data for this object
+        line1, line2 = gcrf2tle(obj_id, r_GCRF, v_GCRF, UTC, EOP_data,
+                                    IAU1980nut)
+    
         # Add to dictionary
         tle_dict[obj_id] = {}
         tle_dict[obj_id]['UTC_list'] = [UTC]
         tle_dict[obj_id]['line1_list'] = [line1]
         tle_dict[obj_id]['line2_list'] = [line2]
         
-        print(line1)
-        print(line2)
+        # Generate dataframe output
+        linelist = [obj_id,line1,line2]
+        tle_list.append(linelist)
+        
+    tle_df = pd.DataFrame(tle_list, columns=['norad','line1','line2'])
     
+    return tle_dict, tle_df
+
+
+def gcrf2tle(obj_id, r_GCRF, v_GCRF, UTC, EOP_data=[], IAU1980nut=[],
+             offline_flag=False):
+    '''
+    This function generates Two Line Element (TLE) data in proper format given
+    input position and velocity in ECI (GCRF) coordinates.
     
-    return tle_dict
+    Parameters
+    ------
+    obj_id : int
+        NORAD ID of object
+    r_GCRF : 3x1 numpy array
+        position in GCRF [km]
+    v_GCRF : 3x1 numpy array
+        velocity in GCRF [km/s]
+    UTC : datetime object
+        epoch time of pos/vel state and TLE in UTC
+    EOP_data : list, optional
+        Earth orientation parameters, if empty will download from celestrak
+        (default=[])
+    IAU1980nut : dataframe, optional
+        nutation parameters, if empty will load from file (default=[])
+    offline_flag : boolean, optional
+        flag to indicate internet access, if True will load data from local
+        files (default=False)
+        
+    Returns
+    ------
+    line1 : string
+        first line of TLE
+    line2 : string
+        second line of TLE
+    '''
+    
+    # Retrieve latest EOP data from celestrak.com, if needed
+    if len(EOP_data) == 0:        
+        
+        eop_alldata = get_celestrak_eop_alldata(offline_flag)
+        EOP_data = get_eop_data(eop_alldata, UTC)
+    
+    # Retrieve IAU Nutation data from file, if needed
+    if len(IAU1980nut) == 0:
+        IAU1980nut = get_nutation_data()    
+    
+    # Convert to TEME, recompute osculating elements
+    r_TEME, v_TEME = gcrf2teme(r_GCRF, v_GCRF, UTC, IAU1980nut, EOP_data)
+    x_in = np.concatenate((r_TEME, v_TEME), axis=0)
+    osc_elem = element_conversion(x_in, 1, 0)
+    
+    # Convert to mean elements
+    # TODO currently it appears osculating elements gives more accurate result
+    # Need further investigation of proper computation of TLEs.
+    # Temporary solution, just use osculating elements instead of mean elements
+    mean_elem = list(osc_elem.flatten())
+    
+    # Retrieve elements
+    a = float(mean_elem[0])
+    e = float(mean_elem[1])
+    i = float(mean_elem[2])
+    RAAN = float(mean_elem[3])
+    w = float(mean_elem[4])
+    M = float(mean_elem[5])
+    
+    # Compute mean motion in rev/day
+    n = np.sqrt(GME/a**3.)
+    n *= 86400./(2.*pi)
+    
+    # Compute launch year and day of year
+    year2 = str(UTC.year)[2:4]
+    doy = UTC.timetuple().tm_yday
+    dfrac = UTC.hour/24. + UTC.minute/1440. + \
+        (UTC.second + UTC.microsecond/1e6)/86400.
+    dfrac = '{0:.15f}'.format(dfrac)
+    
+    # Format for output
+    line1 = '1 ' + str(obj_id) + 'U ' + year2 + '001A   ' + year2 + \
+        str(doy).zfill(3) + '.' + str(dfrac)[2:10] + \
+        '  .00000000  00000-0  00000-0 0    10'
+        
+    line2 = '2 ' + str(obj_id) + ' ' + '{:8.4f}'.format(i) + ' ' + \
+        '{:8.4f}'.format(RAAN) + ' ' + str(e)[2:9] + ' ' + \
+        '{:8.4f}'.format(w) + ' ' + '{:8.4f}'.format(M) + ' ' + \
+        '{:11.8f}'.format(n) + '    10'
+
+    return line1, line2
 
 
 def plot_tle_radec(tle_dict, UTC_list=[], sensor_list=[], display_flag=False,
@@ -586,7 +672,7 @@ def plot_tle_radec(tle_dict, UTC_list=[], sensor_list=[], display_flag=False,
     return
 
 
-def plot_all_tle_common_time(obj_id_list, UTC_list):
+def plot_all_tle_common_time(obj_id_list, UTC_list, tle_dict={}):
     '''
     This function retrieves all TLEs for desired objects within the window
     specified by UTC_list. It finds the object with the most TLEs during the 
@@ -603,7 +689,8 @@ def plot_all_tle_common_time(obj_id_list, UTC_list):
     '''
     
     # Retrieve all TLEs in window
-    tle_dict = get_spacetrack_tle_data(obj_id_list, UTC_list)
+    if len(tle_dict) == 0:
+        tle_dict, tle_df = get_spacetrack_tle_data(obj_id_list, UTC_list)
     
     print(tle_dict)
     
@@ -703,7 +790,8 @@ def propagate_TLE(obj_id_list, UTC_list, tle_dict={}, offline_flag=False,
     if len(tle_dict) == 0:
     
         # Retrieve latest TLE data from space-track.org
-        tle_dict = get_spacetrack_tle_data(obj_id_list, username, password)
+        tle_dict, tle_df = \
+            get_spacetrack_tle_data(obj_id_list, username, password)
         
         # Retreive TLE data from database
         
@@ -777,19 +865,21 @@ if __name__ == '__main__' :
 #    UTC_list = [datetime(2018, 4, 20, 0, 0, 0),
 #                 datetime(2018, 4, 21, 0, 0, 0)]
     
-    obj_id_list = [40940, 39613, 36287, 39487, 40267, 41836]
-    UTC_list = [datetime(2018, 1, 16, 12, 43, 20),
-                datetime(2018, 1, 18, 20, 0, 0)]
-    sensor_list = ['RMIT ROO']
+#    obj_id_list = [40940, 39613, 36287, 39487, 40267, 41836]
+#    UTC_list = [datetime(2018, 1, 16, 12, 43, 20)]
+#    sensor_list = ['RMIT ROO']
 #    
 #    
+    obj_id_list = [43013, 43014, 43015, 43016]
+    UTC_list = [datetime(2017, 11, 18, 0, 0, 0),
+                datetime(2017, 11, 25, 0, 0, 0)]
     
 #    
 #    print(output_state)
     
     plt.close('all')
     
-    tle_dict = get_spacetrack_tle_data(obj_id_list, UTC_list)
+    tle_dict, tle_df = get_spacetrack_tle_data(obj_id_list, UTC_list)
     print(tle_dict)
 #    
 #    UTC_list = [datetime(2018, 4, 20, 8, 0, 0)]
