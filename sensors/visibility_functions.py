@@ -124,7 +124,6 @@ def get_database_object_params(rso_dict):
     return rso_dict
 
 
-
 def compute_visible_passes(UTC_array, obj_id_list, sensor_id_list, ephemeris,
                            tle_dict={}, source='spacetrack'):
     '''
@@ -249,6 +248,9 @@ def compute_visible_passes(UTC_array, obj_id_list, sensor_id_list, ephemeris,
             common1 = common_el.intersection(common_az)
             common_pos = common1.intersection(common_rg)
             
+#            print(sensor_id)
+#            print(common_pos)
+            
             # Sunlit/station dark constraint
             if 'sun_elmask' in sensor:
                 sun_elmask = sensor['sun_elmask']
@@ -259,6 +261,7 @@ def compute_visible_passes(UTC_array, obj_id_list, sensor_id_list, ephemeris,
                 
 #                print(sensor_id)
 #                print('sun_elmask', sun_elmask)
+#                print(common_inds)
                 
             # Laser constraints
             if 'laser_output' in sensor and rso['laser_lim'] > 0.:
@@ -301,6 +304,8 @@ def compute_visible_passes(UTC_array, obj_id_list, sensor_id_list, ephemeris,
             vis_array[common_inds] = True
             
             # For remaining indices compute angles and visibility conditions
+            ecclipse_inds = []
+            mapp_inds = []
             for ii in common_inds:
                 rso_gcrf = rso_gcrf_array[:,ii]
                 sensor_gcrf = sensor_gcrf_array[:,ii]
@@ -322,6 +327,7 @@ def compute_visible_passes(UTC_array, obj_id_list, sensor_id_list, ephemeris,
                     half_cone = asin(Re/r)
                     if sun_angle < half_cone:
                         vis_array[ii] = False
+                        ecclipse_inds.append(ii)
 
                 # Check too close to moon
                 if 'moon_angle_lim' in sensor:
@@ -337,11 +343,15 @@ def compute_visible_passes(UTC_array, obj_id_list, sensor_id_list, ephemeris,
                     mapp = compute_mapp(phase_angle, rg_km, radius_km, albedo)
                     if mapp > mapp_lim:
                         vis_array[ii] = False
+                        mapp_inds.append(ii)
             
             vis_inds = np.where(vis_array)[0]
             UTC_vis = UTC_array[vis_inds]
             rg_vis = rg_array.km[vis_inds]
             el_vis = el_array.radians[vis_inds]
+            
+#            print('ecclipse', ecclipse_inds)
+#            print('mapp', mapp_inds)
             
             # Compute pass start and stop times
             start_list, stop_list, TCA_list, TME_list, rg_min_list, el_max_list = \

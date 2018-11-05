@@ -293,7 +293,7 @@ def sunsynch_RAAN(launch_dt, LTAN):
     # Compute solar RA angle at time of launch
     year = launch_dt.year
     vernal = datetime(year, 3, 21, 12, 0, 0)
-    delta = (launch_dt - vernal).total_seconds()/86400.
+    delta = (launch_dt - vernal).total_seconds()
     solar_RA = dRAAN*delta * 180./pi  # deg
     
     # Compute desired RAAN

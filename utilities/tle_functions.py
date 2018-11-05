@@ -465,6 +465,8 @@ def gcrf2tle(obj_id, r_GCRF, v_GCRF, UTC, EOP_data=[], IAU1980nut=[],
     x_in = np.concatenate((r_TEME, v_TEME), axis=0)
     osc_elem = element_conversion(x_in, 1, 0)
     
+    print(osc_elem)
+    
     # Convert to mean elements
     # TODO currently it appears osculating elements gives more accurate result
     # Need further investigation of proper computation of TLEs.
@@ -478,6 +480,8 @@ def gcrf2tle(obj_id, r_GCRF, v_GCRF, UTC, EOP_data=[], IAU1980nut=[],
     RAAN = float(mean_elem[3])
     w = float(mean_elem[4])
     M = float(mean_elem[5])
+    
+    e = '{0:.10f}'.format(e)
     
     # Compute mean motion in rev/day
     n = np.sqrt(GME/a**3.)
@@ -496,7 +500,7 @@ def gcrf2tle(obj_id, r_GCRF, v_GCRF, UTC, EOP_data=[], IAU1980nut=[],
         '  .00000000  00000-0  00000-0 0    10'
         
     line2 = '2 ' + str(obj_id) + ' ' + '{:8.4f}'.format(i) + ' ' + \
-        '{:8.4f}'.format(RAAN) + ' ' + str(e)[2:9] + ' ' + \
+        '{:8.4f}'.format(RAAN) + ' ' + e[2:9] + ' ' + \
         '{:8.4f}'.format(w) + ' ' + '{:8.4f}'.format(M) + ' ' + \
         '{:11.8f}'.format(n) + '    10'
 
