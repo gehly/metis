@@ -373,7 +373,7 @@ def define_sensors(sensor_id_list=[]):
     
     # Constraints/Limits
     az_lim = [0., 2.*pi]  # rad
-    el_lim = [20.*pi/180., 80.*pi/180.]  # rad
+    el_lim = [10.*pi/180., 80.*pi/180.]  # rad
     rg_lim = [0., 1e6]   # km
     mapp_lim = 16.
     sun_el_mask = -10.*pi/180.
