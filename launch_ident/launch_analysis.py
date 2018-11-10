@@ -12,7 +12,7 @@ metis_dir = Path(cwd[0:ind+5])
 
 from skyfield.api import Loader, utc
 
-from utilities.tle_functions import gcrf2tle, launchecef2tle, kep2tle
+from utilities.tle_functions import gcrf2tle, launchecef2tle, kep2tle, tletime2datetime
 from utilities.constants import Re
 from utilities.astrodynamics import sunsynch_RAAN, sunsynch_inclination, element_conversion
 from sensors.visibility_functions import compute_visible_passes
@@ -165,21 +165,32 @@ def pslv_analysis():
 
 def rocketlab_analysis():
     
-    # Using Thomas excel file
-    obj_id = 90000
-    UTC = datetime(2018, 6, 23, 2, 13, 21)   	
+#    # Using Thomas excel file
+#    obj_id = 90000
+#    UTC = datetime(2018, 6, 23, 2, 13, 21)   	
+#    
+#    ecef_dict = {}   
+#    ecef_dict[obj_id] = {}
+#    
+#    r_ITRF = np.array([-3651380.321,	1598487.431,	-5610448.359]) * 0.001
+#    v_ITRF = np.array([5276.523548, 	-3242.081015,	-4349.310553]) * 0.001
+#    
+#    ecef_dict[obj_id]['r_ITRF'] = r_ITRF.reshape(3,1)
+#    ecef_dict[obj_id]['v_ITRF'] = v_ITRF.reshape(3,1)
+#    ecef_dict[obj_id]['UTC'] = UTC
     
-    ecef_dict = {}   
-    ecef_dict[obj_id] = {}
+    # Using Rasit TLE
+    obj_id = 99999
+    line1 = '1 99999U 18999B   18315.16116898 +.00000500 +00000-0 +32002-2 0  9993'
+    line2 = '2 99999 085.0168 090.4036 0012411 292.8392 108.1000 15.20833469601616'
+    UTC = tletime2datetime(line1)
+    tle_dict = {}
+    tle_dict[obj_id] = {}
+    tle_dict[obj_id]['line1_list'] = [line1]
+    tle_dict[obj_id]['line2_list'] = [line2]
+    tle_dict[obj_id]['UTC_list'] = [UTC]
     
-    r_ITRF = np.array([-3651380.321,	1598487.431,	-5610448.359]) * 0.001
-    v_ITRF = np.array([5276.523548, 	-3242.081015,	-4349.310553]) * 0.001
     
-    ecef_dict[obj_id]['r_ITRF'] = r_ITRF.reshape(3,1)
-    ecef_dict[obj_id]['v_ITRF'] = v_ITRF.reshape(3,1)
-    ecef_dict[obj_id]['UTC'] = UTC
-    
-    tle_dict, tle_df = launchecef2tle([obj_id], ecef_dict)
 
     print(tle_dict)
     
@@ -222,7 +233,7 @@ def rocketlab_analysis():
 if __name__ == '__main__':    
     
     
-    pslv_analysis()
+    rocketlab_analysis()
     
     
     
