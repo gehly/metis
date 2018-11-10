@@ -135,6 +135,45 @@ def get_spacetrack_tle_data(obj_id_list = [], UTC_list = [], username='',
     return tle_dict, tle_df
 
 
+def get_tle_range(username='', password='', start_norad='', stop_norad=''):
+    '''
+    This function retrieves the "tle_latest" Class from space-track.org for
+    objects defined by a norad range.
+    
+    Parameters
+    ------
+    username : string, optional
+        space-track.org username (code will prompt for input if not supplied)
+    password : string, optional
+        space-track.org password (code will prompt for input if not supplied)
+    start_norad, stop_norad: used to define the range of NORAD IDs to query
+   
+    Returns
+    ------
+    tle_df : pandas dataframe
+        APOGEE,ARG_OF_PERICENTER,BSTAR, CLASSIFICATION_TYPE, COMMENT,
+        ECCENTRICITY, ELEMENT_SET_NO, EPHEMERIS_TYPE, EPOCH, EPOCH_MICROSECONDS,
+        E, INCLINATION,	INTLDES, MEAN_ANOMALY, MEAN_MOTION, MEAN_MOTION_DDOT,
+        MEAN_MOTION_DOT, NORAD_CAT_ID, OBJECT_ID, OBJECT_NAME, OBJECT_NUMBER,
+        ,OBJECT_TYPE, ORDINAL, ORIGINATOR, PERIGEE, PERIOD, RA_OF_ASC_NODE,
+        REV_AT_EPOCH, SEMIMAJOR_AXIS,	TLE_LINE0, TLE_LINE1, TLE_LINE2
+    '''
+    if len(username) == 0:
+            username = input('space-track username: ')
+    if len(password) == 0:
+            password = getpass.getpass('space-track password: ')
+    url = 'https://www.space-track.org/basicspacedata/query/class/tle_latest/ORDINAL/1/NORAD_CAT_ID/' + start_norad +'--' + stop_norad +'/orderby/NORAD_CAT_ID%20asc/emptyresult/show'
+    login_url ='https://www.space-track.org'
+    with requests.Session() as s:
+            s.post(login_url+"/ajaxauth/login", json={'identity':username, 'password':password})
+            response = s.get(url)
+            response_dict = json.loads(response.text)
+            if response.status_code != requests.codes.ok:
+                print("Error: Page data request failed.")
+            tle_df = pd.DataFrame(response_dict)
+            return tle_df
+
+
 def tledict2dataframe(tle_dict):
     '''
     This function computes a pandas dataframe with TLE data given an input
