@@ -180,21 +180,25 @@ def rocketlab_analysis():
 #    ecef_dict[obj_id]['UTC'] = UTC
     
     # Using Rasit TLE
-    obj_id = 99999
-    line1 = '1 99999U 18999B   18315.16116898 +.00000500 +00000-0 +32002-2 0  9993'
-    line2 = '2 99999 085.0168 090.4036 0012411 292.8392 108.1000 15.20833469601616'
-    UTC = tletime2datetime(line1)
-    tle_dict = {}
-    tle_dict[obj_id] = {}
-    tle_dict[obj_id]['line1_list'] = [line1]
-    tle_dict[obj_id]['line2_list'] = [line2]
-    tle_dict[obj_id]['UTC_list'] = [UTC]
+    obj_id_list = [43690, 43691, 43692, 43693, 43694, 43695, 43164, 43166]
+#    line1 = '1 99999U 18999B   18315.16116898 +.00000500 +00000-0 +32002-2 0  9993'
+#    line2 = '2 99999 085.0168 090.4036 0012411 292.8392 108.1000 15.20833469601616'
+#    
+#    line1 = '1 99999U 18999B   18315.19693718 +.00000500 +00000-0 +60940-2 0  9999'
+#    line2 = '2 99999 085.0165 102.9279 0012642 291.6624 115.0006 15.20806704601617'
+    
+#    line1 = '1 43690U 18088A   18315.20213355  .00000372 -11738-5  00000+0 0  9993'
+#    line2 = '2 43690  85.0339 102.9499 0224293 222.7416 214.1638 15.71130100    06'
+#
+#    UTC = tletime2datetime(line1)
+#    tle_dict = {}
+#    tle_dict[obj_id] = {}
+#    tle_dict[obj_id]['line1_list'] = [line1]
+#    tle_dict[obj_id]['line2_list'] = [line2]
+#    tle_dict[obj_id]['UTC_list'] = [UTC]
     
     
-
-    print(tle_dict)
-    
-    UTC = datetime(2018, 11, 11, 3, 0, 0)
+    UTC = datetime(2018, 11, 11, 4, 0, 0)
     
     load = Loader(os.path.join(metis_dir, 'skyfield_data'))
     ephemeris = load('de430t.bsp')
@@ -204,16 +208,15 @@ def rocketlab_analysis():
                       'FLC Falcon', 'Mamalluca Falcon']
     
     # Times for visibility check
-    ndays = 14
+    ndays = 2
     dt = 10
-    obj_id_list = [obj_id]
     UTC0 = ts.utc(UTC.replace(tzinfo=utc)).utc
     sec_array = list(range(0,86400*ndays,dt))
     skyfield_times = ts.utc(UTC0[0], UTC0[1], UTC0[2],
                             UTC0[3], UTC0[4], sec_array)
     
     vis_dict = compute_visible_passes(skyfield_times, obj_id_list,
-                                      sensor_id_list, ephemeris, tle_dict)
+                                      sensor_id_list, ephemeris)
     
     
     print(vis_dict)
@@ -222,7 +225,7 @@ def rocketlab_analysis():
     # Generate output file
     vis_file_min_el = 0.
     outdir = os.getcwd()
-    vis_file = os.path.join(outdir, 'RocketLab_visible_passes.csv')
+    vis_file = os.path.join(outdir, 'RocketLab_visible_passes_2018_11_!2.csv')
     generate_visibility_file(vis_dict, vis_file, vis_file_min_el)
     
     return 
