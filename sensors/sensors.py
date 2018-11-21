@@ -137,6 +137,35 @@ def define_sensors(sensor_id_list=[]):
     sensor_dict['UNSW Falcon']['obs_gap'] = obs_gap
     sensor_dict['UNSW Falcon']['min_pass'] = min_pass
     sensor_dict['UNSW Falcon']['max_pass'] = max_pass
+
+
+    print('USAFA Falcon')
+    lat_gs = 39.01
+    lon_gs = 255.01
+    ht_gs = 2.805 # km	
+    geodetic_latlonht = [lat_gs, lon_gs, ht_gs]
+    
+    # Location and constraints
+    sensor_dict['USAFA Falcon'] = {}
+    sensor_dict['USAFA Falcon']['geodetic_latlonht'] = geodetic_latlonht
+    sensor_dict['USAFA Falcon']['mapp_lim'] = mapp_lim
+    sensor_dict['USAFA Falcon']['moon_angle_lim'] = moon_angle_lim
+    sensor_dict['USAFA Falcon']['el_lim'] = el_lim
+    sensor_dict['USAFA Falcon']['az_lim'] = az_lim
+    sensor_dict['USAFA Falcon']['rg_lim'] = rg_lim
+    sensor_dict['USAFA Falcon']['FOV_hlim'] = FOV_hlim
+    sensor_dict['USAFA Falcon']['FOV_vlim'] = FOV_vlim
+    sensor_dict['USAFA Falcon']['sun_elmask'] = sun_el_mask
+    
+    # Measurements and noise
+    sensor_dict['USAFA Falcon']['meas_types'] = meas_types
+    sensor_dict['USAFA Falcon']['sigma_dict'] = sigma_dict
+    
+    # Pass parameters
+    sensor_dict['USAFA Falcon']['max_gap'] = max_gap
+    sensor_dict['USAFA Falcon']['obs_gap'] = obs_gap
+    sensor_dict['USAFA Falcon']['min_pass'] = min_pass
+    sensor_dict['USAFA Falcon']['max_pass'] = max_pass
     
     	
     print('FLC Falcon')
