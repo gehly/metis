@@ -551,8 +551,7 @@ def element_conversion(x_in, iflag, oflag, GM=GME, dt=0.):
     x_in : 6x1 numpy array
       vector of elements or cartesian coordinates at t0
     iflag : int
-      input flag (0 = orbital elements, 1 = cartesian coordiantes,
-                  2 = launch elements)
+      input flag (0 = orbital elements, 1 = cartesian coordiantes)
     oflag : int
       output flag (0 = orbital elements, 1 = cartesian coordinates)
     GM : float, optional
@@ -597,25 +596,7 @@ def element_conversion(x_in, iflag, oflag, GM=GME, dt=0.):
       Velocity in y               [km/s]
     x[5] : dz
       Velocity in z               [km/s]
-      
-    Launch Elements
-    ------
-    x[0] : ra
-          Radius of apoapsis        [km]
-    x[1] : rp
-        Radius of periapsis         [km]
-    x[2] : i
-        Inclination                 [deg]
-    x[3] : LTAN
-        Local Time of Asc Node      [h,m,s]
-    x[4] : w
-        Argument of Periapsis       [deg]
-    x[5] : lat
-        Geodetic lat of launch site [deg]
-    x[6] : lon
-        Geodetic lon of launch site [deg]
-    x[7] : t0
-        Time of launch              [UTC_G]
+
     '''
 
     # Get initial orbit elements
@@ -711,6 +692,11 @@ def element_conversion(x_in, iflag, oflag, GM=GME, dt=0.):
 
     # Solve for M(t) = Mo + n*dt
     M = Mo + n*dt   # rad
+    
+    while M < 0:
+        M += 2*pi
+    while M > 2*pi:
+        M -= 2*pi
 
     # Generate output vector x_out
     if oflag == 0:
