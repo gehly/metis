@@ -199,7 +199,7 @@ def rocketlab_analysis():
 #    tle_dict[obj_id]['UTC_list'] = [UTC]
     
     
-    UTC = datetime(2018, 11, 19, 0, 0, 0)
+    UTC = datetime(2018, 11, 29, 0, 0, 0)
     
     load = Loader(os.path.join(metis_dir, 'skyfield_data'))
     ephemeris = load('de430t.bsp')
@@ -225,7 +225,7 @@ def rocketlab_analysis():
     # Generate output file
     vis_file_min_el = 0.
     outdir = os.getcwd()
-    vis_file = os.path.join(outdir, 'RocketLab_visible_passes_2018_11_20.csv')
+    vis_file = os.path.join(outdir, 'RocketLab_visible_passes_2018_11_29.csv')
     generate_visibility_file(vis_dict, vis_file, vis_file_min_el)
     
     return 
