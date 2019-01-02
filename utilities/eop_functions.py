@@ -92,7 +92,8 @@ def get_celestrak_eop_alldata(offline_flag=False):
     else:
     
         # Retrieve data from internet
-        pageData = 'https://celestrak.com/SpaceData/eop19620101.txt'
+#        pageData = 'https://celestrak.com/SpaceData/eop19620101.txt'
+        pageData = 'http://www.celestrak.com/SpaceData/EOP-Last5Years.txt'
     
         r = requests.get(pageData)
         if r.status_code != requests.codes.ok:

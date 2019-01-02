@@ -914,9 +914,8 @@ if __name__ == '__main__' :
 #    sensor_list = ['RMIT ROO']
 #    
 #    
-    obj_id_list = [43013, 43014, 43015, 43016]
-    UTC_list = [datetime(2017, 11, 18, 0, 0, 0),
-                datetime(2017, 11, 25, 0, 0, 0)]
+    obj_id_list = [37158]
+    UTC_list = [datetime(2018, 10, 29, 0, 0, 0)]
     
 #    
 #    print(output_state)
@@ -925,20 +924,35 @@ if __name__ == '__main__' :
     
     tle_dict, tle_df = get_spacetrack_tle_data(obj_id_list, UTC_list)
     print(tle_dict)
-#    
-#    UTC_list = [datetime(2018, 4, 20, 8, 0, 0)]
-#    
-#    output_state = propagate_TLE(obj_id_list, UTC_list, tle_dict)
-#    
-#    for obj_id in obj_id_list:
-#        r_GCRF = output_state[obj_id]['r_GCRF'][0]
-#        v_GCRF = output_state[obj_id]['v_GCRF'][0]
-#        x_in = np.concatenate((r_GCRF, v_GCRF), axis=0)
-#        print(obj_id)
-#        print(x_in)
-#        elem = element_conversion(x_in, 1, 0)
-#        print(elem)
+#
+    GPS_time = datetime(2018, 10, 29, 9, 50, 0)
+    UTC0 = GPS_time - timedelta(seconds=18.)
+    UTC_list = [UTC0]
     
+    output_state = propagate_TLE(obj_id_list, UTC_list, tle_dict, offline_flag=True)
+    
+    for obj_id in obj_id_list:
+        r_GCRF = output_state[obj_id]['r_GCRF'][0]
+        v_GCRF = output_state[obj_id]['v_GCRF'][0]
+        x_in = np.concatenate((r_GCRF, v_GCRF), axis=0)
+        print(obj_id)
+        print(x_in)
+        elem = element_conversion(x_in, 1, 0)
+        print(elem)
+    
+    pos_ecef = np.reshape([-27379.521717,  31685.387589,  10200.667234], (3,1))
+    vel_ecef = np.zeros((3,1))
+    
+    
+    # Comparison
+    eop_alldata = get_celestrak_eop_alldata(offline_flag=True)
+    EOP_data = get_eop_data(eop_alldata, UTC0)
+    
+    r_GCRF_sp3, vdum = itrf2gcrf(pos_ecef, vel_ecef, UTC0, EOP_data)
+    
+    print(r_GCRF_sp3)
+    print(r_GCRF_sp3 - r_GCRF)
+    print(np.linalg.norm(r_GCRF_sp3 - r_GCRF))
     
     
 #    plot_tle_radec(tle_dict, UTC_list, sensor_list, display_flag=True)

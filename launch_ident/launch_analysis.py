@@ -18,80 +18,6 @@ from utilities.astrodynamics import sunsynch_RAAN, sunsynch_inclination, element
 from sensors.visibility_functions import compute_visible_passes
 from sensors.visibility_functions import generate_visibility_file
 
-def ssoa_analysis():
-    
-    # Using Rasit CDF file
-    obj_id = 90000
-    UTC = datetime(2018, 10, 1, 0, 0, 0)
-    r_GCRF = np.array([6769933.4388707110000000, -1448695.6306713857000000,
-                      -649237.4895056644000000]) * 0.001
-    
-    v_GCRF = np.array([471.5769961346095400, -1147.0781790634380000, 
-                       7468.5693688365230000]) * 0.001
-    
-    line1, line2 = gcrf2tle(obj_id, r_GCRF, v_GCRF, UTC)
-    
-    tle_dict = {}
-    tle_dict[obj_id] = {}
-    tle_dict[obj_id]['UTC_list'] = [UTC]
-    tle_dict[obj_id]['line1_list'] = [line1]
-    tle_dict[obj_id]['line2_list'] = [line2]
-    
-    x_in = np.concatenate((r_GCRF, v_GCRF))
-    elem = element_conversion(x_in, 1, 0)
-    print(elem)
-    
-#    # Using Simon orbit parameters
-#    h = 575.
-#    a = Re + h
-#    e = 1e-4
-#    
-#    LTDN = 10.5
-#    LTAN = LTDN + 12.
-#    launch_dt = datetime(2018, 11, 19, 18, 30, 0)
-#    
-#    RAAN = sunsynch_RAAN(launch_dt, LTAN)
-#    i = sunsynch_inclination(a, e)
-#    
-#    w = 0.
-#    M = 180.
-#    
-#    print(tle_dict)
-#    
-#    print(a,e,i,RAAN,w,M)
-    
-    UTC = datetime(2018, 11, 19, 18, 30, 0)
-    
-    load = Loader(os.path.join(metis_dir, 'skyfield_data'))
-    ephemeris = load('de430t.bsp')
-    ts = load.timescale()
-    
-    sensor_id_list = ['Stromlo Optical', 'RMIT ROO', 'UNSW Falcon',
-                      'FLC Falcon', 'Mamalluca Falcon']
-    
-    # Times for visibility check
-    ndays = 14
-    dt = 10
-    obj_id_list = [obj_id]
-    UTC0 = ts.utc(UTC.replace(tzinfo=utc)).utc
-    sec_array = list(range(0,86400*ndays,dt))
-    skyfield_times = ts.utc(UTC0[0], UTC0[1], UTC0[2],
-                            UTC0[3], UTC0[4], sec_array)
-    
-    vis_dict = compute_visible_passes(skyfield_times, obj_id_list,
-                                      sensor_id_list, ephemeris, tle_dict)
-    
-    
-    print(vis_dict)
-    
-    
-    # Generate output file
-    vis_file_min_el = 0.
-    outdir = os.getcwd()
-    vis_file = os.path.join(outdir, 'SSO-A_visible_passes.csv')
-    generate_visibility_file(vis_dict, vis_file, vis_file_min_el)
-    
-    return
 
 
 def pslv_analysis():
@@ -230,13 +156,81 @@ def rocketlab_analysis():
     
     return 
     
+
+def spacex_ssoa_analysis():
+    
+#    # Using Thomas excel file
+#    obj_id = 90000
+#    UTC = datetime(2018, 6, 23, 2, 13, 21)   	
+#    
+#    ecef_dict = {}   
+#    ecef_dict[obj_id] = {}
+#    
+#    r_ITRF = np.array([-3651380.321,	1598487.431,	-5610448.359]) * 0.001
+#    v_ITRF = np.array([5276.523548, 	-3242.081015,	-4349.310553]) * 0.001
+#    
+#    ecef_dict[obj_id]['r_ITRF'] = r_ITRF.reshape(3,1)
+#    ecef_dict[obj_id]['v_ITRF'] = v_ITRF.reshape(3,1)
+#    ecef_dict[obj_id]['UTC'] = UTC
+    
+    # Using Rasit TLE
+#    obj_id_list = [43690, 43691, 43692, 43693, 43694, 43695, 43696, 43697]
+    obj_id_list = [43758, 43763]
+#    line1 = '1 99999U 18999B   18315.16116898 +.00000500 +00000-0 +32002-2 0  9993'
+#    line2 = '2 99999 085.0168 090.4036 0012411 292.8392 108.1000 15.20833469601616'
+#    
+#    line1 = '1 99999U 18999B   18315.19693718 +.00000500 +00000-0 +60940-2 0  9999'
+#    line2 = '2 99999 085.0165 102.9279 0012642 291.6624 115.0006 15.20806704601617'
+    
+#    line1 = '1 43690U 18088A   18315.20213355  .00000372 -11738-5  00000+0 0  9993'
+#    line2 = '2 43690  85.0339 102.9499 0224293 222.7416 214.1638 15.71130100    06'
+#
+#    UTC = tletime2datetime(line1)
+#    tle_dict = {}
+#    tle_dict[obj_id] = {}
+#    tle_dict[obj_id]['line1_list'] = [line1]
+#    tle_dict[obj_id]['line2_list'] = [line2]
+#    tle_dict[obj_id]['UTC_list'] = [UTC]
+    
+    
+    UTC = datetime(2018, 12, 3, 0, 0, 0)
+    
+    load = Loader(os.path.join(metis_dir, 'skyfield_data'))
+    ephemeris = load('de430t.bsp')
+    ts = load.timescale()
+    
+    sensor_id_list = ['RMIT ROO', 'UNSW Falcon', 'USAFA Falcon', 'Mamalluca Falcon']
+    
+    # Times for visibility check
+    ndays = 5
+    dt = 10
+    UTC0 = ts.utc(UTC.replace(tzinfo=utc)).utc
+    sec_array = list(range(0,86400*ndays,dt))
+    skyfield_times = ts.utc(UTC0[0], UTC0[1], UTC0[2],
+                            UTC0[3], UTC0[4], sec_array)
+    
+    vis_dict = compute_visible_passes(skyfield_times, obj_id_list,
+                                      sensor_id_list, ephemeris)
+    
+    
+    print(vis_dict)
+    
+    
+    # Generate output file
+    vis_file_min_el = 0.
+    outdir = os.getcwd()
+    vis_file = os.path.join(outdir, 'SSOA_visible_passes_2018_12_04.csv')
+    generate_visibility_file(vis_dict, vis_file, vis_file_min_el)
+    
+    return 
+    
     
     
     
 if __name__ == '__main__':    
     
     
-    rocketlab_analysis()
+    spacex_ssoa_analysis()
     
     
     
