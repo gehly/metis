@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 from datetime import datetime, timedelta
 import sys
 import os
@@ -17,6 +18,10 @@ from utilities.constants import Re
 from utilities.astrodynamics import sunsynch_RAAN, sunsynch_inclination, element_conversion
 from sensors.visibility_functions import compute_visible_passes
 from sensors.visibility_functions import generate_visibility_file
+
+
+
+
 
 
 
@@ -229,11 +234,12 @@ def spacex_ssoa_analysis():
     
 if __name__ == '__main__':    
     
+    fdir = Path('D:/documents/research/launch_identification/data/'
+                '2018_11_11_RocketLab_ItsBusinessTime/tle_archive')
+    obj_id_list = [43689]
+    tle_dict = animate_launch_tle(fdir, obj_id_list)
     
-    spacex_ssoa_analysis()
-    
-    
-    
+    print(tle_dict)
     
     
     

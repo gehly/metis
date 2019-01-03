@@ -205,6 +205,70 @@ def tledict2dataframe(tle_dict):
     return tle_df
 
 
+def csvstack2tledict(fdir, obj_id_list):
+    '''
+    This function computes a dictionary of unique TLE information given a 
+    stack of CSV files in a directory. The function assumes the directory
+    contains only CSV files with TLE data.
+    
+    Parameters
+    ------
+    fdir : string
+        file directory containing CSV files
+    obj_id_list : list
+        NORAD IDs (int) of objects to collect TLE data
+    
+    Returns
+    ------
+    tle_dict : dictionary
+        indexed by object ID, each item has two lists of strings for each line
+        as well as object name and UTC times
+    
+    '''
+    
+    # Initialize output
+    tle_dict = {}
+    
+    # Loop over each file in directory
+    for fname in os.listdir(fdir):
+        
+        fname = os.path.join(fdir, fname)
+        df = pd.read_csv(fname)
+        
+        # Loop over objects and retrieve TLE data
+        for obj_id in obj_id_list:
+            if obj_id in df['NORAD_CAT_ID'].tolist():
+                name = df[df.NORAD_CAT_ID == obj_id]['OBJECT_NAME'][0]
+                line1 = df[df.NORAD_CAT_ID == obj_id]['TLE_LINE1'][0]
+                line2 = df[df.NORAD_CAT_ID == obj_id]['TLE_LINE2'][0]
+                
+                # Compute UTC time
+                UTC = tletime2datetime(line1)
+                
+                # Initialize output
+                if obj_id not in tle_dict:
+                    tle_dict[obj_id] = {}
+                    tle_dict[obj_id]['name_list'] = [name]
+                    tle_dict[obj_id]['UTC_list'] = [UTC]
+                    tle_dict[obj_id]['line1_list'] = [line1]
+                    tle_dict[obj_id]['line2_list'] = [line2]
+                    
+                # Otherwise, check if different from previous entry
+                # Only add if different
+                else:
+                    if ((name != tle_dict[obj_id]['name_list'][-1]) or 
+                        (line1 != tle_dict[obj_id]['line1_list'][-1]) or 
+                        (line2 != tle_dict[obj_id]['line2_list'][-1])):
+
+                        # Append to output
+                        tle_dict[obj_id]['name_list'].append(name)
+                        tle_dict[obj_id]['UTC_list'].append(UTC)
+                        tle_dict[obj_id]['line1_list'].append(line1)
+                        tle_dict[obj_id]['line2_list'].append(line2)                
+        
+    return tle_dict
+
+
 def tletime2datetime(line1):
     '''
     This function computes a UTC datetime object from the TLE line1 input year,
