@@ -269,6 +269,65 @@ def csvstack2tledict(fdir, obj_id_list):
     return tle_dict
 
 
+def compute_tle_allstate(tle_dict):
+    '''
+    This function computes a dictionary of state vectors at common times for
+    all objects in the input TLE dictionary.
+    
+    Parameters
+    ------
+    tle_dict : dictionary
+        indexed by object ID, each item has two lists of strings for each line
+        as well as object name and UTC times
+        
+    Returns
+    ------
+    output : dictionary
+        indexed by UTC time, each item has a list of object NORAD IDs, names,
+        and pos/vel vectors in GCRF at that time
+    
+    '''
+    
+    # Initialize output
+    output = {}
+    
+    # Get unique list of UTC times in order
+    UTC_list = []
+    for obj_id in tle_dict:
+        UTC_list.extend(tle_dict[obj_id]['UTC_list'])
+    UTC_list = list(set(UTC_list))
+    
+    # For each time in list, propagate all objects with a TLE at or before that
+    # time to current UTC
+    for UTC in UTC_list:
+        
+        # Create reduced obj_id_list with only objects that exist at this time
+        obj_id_red = []
+        for obj_id in tle_dict:
+            if tle_dict[obj_id]['UTC_list'][0] <= UTC:
+                obj_id_red.append(obj_id)
+                
+        # Propagate objects to common time
+        state = propagate_TLE(obj_id_red, [UTC], tle_dict)
+    
+        # Store output
+        output[UTC] = {}
+        output[UTC]['obj_id_list'] = obj_id_red
+        output[UTC]['name_list'] = []
+        output[UTC]['r_GCRF'] = []
+        output[UTC]['v_GCRF'] = []
+        
+        for obj_id in obj_id_red:
+            ind = [ii for ii in range(len(tle_dict[obj_id]['UTC_list'])) if tle_dict[obj_id]['UTC_list'][ii] <= UTC][-1]
+            
+            output[UTC]['name_list'].append(tle_dict[obj_id]['name_list'][ind])
+            output[UTC]['r_GCRF'].append(state[obj_id]['r_GCRF'][0])
+            output[UTC]['v_GCRF'].append(state[obj_id]['v_GCRF'][0])    
+        
+
+    return output
+
+
 def tletime2datetime(line1):
     '''
     This function computes a UTC datetime object from the TLE line1 input year,

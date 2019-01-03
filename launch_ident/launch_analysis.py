@@ -13,11 +13,25 @@ metis_dir = Path(cwd[0:ind+5])
 
 from skyfield.api import Loader, utc
 
-from utilities.tle_functions import gcrf2tle, launchecef2tle, kep2tle, tletime2datetime
+from utilities.tle_functions import gcrf2tle, launchecef2tle, kep2tle
+from utilities.tle_functions import tletime2datetime, csvstack2tledict
+from utilities.tle_functions import propagate_TLE, compute_tle_allstate
 from utilities.constants import Re
 from utilities.astrodynamics import sunsynch_RAAN, sunsynch_inclination, element_conversion
 from sensors.visibility_functions import compute_visible_passes
 from sensors.visibility_functions import generate_visibility_file
+
+
+def animate_launch_tle():
+    
+    # Compute TLE dictionary from stack of CSV files
+    tle_dict = csvstack2tledict(fdir, obj_id_list)
+    
+    # Compute state vectors at common times
+    state = compute_tle_allstate(tle_dict)
+    
+    
+    return
 
 
 
