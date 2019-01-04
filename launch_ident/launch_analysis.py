@@ -5,6 +5,7 @@ import sys
 import os
 from pathlib import Path
 import pickle
+import matplotlib.pyplot as plt
 
 sys.path.append('../')
 
@@ -31,6 +32,96 @@ def animate_launch_tle(state_file):
     state_dict = data[0]
     tle_dict = data[1]
     pklFile.close()
+    
+    # Time of launch
+    t0 = datetime(2018, 11, 11, 3, 50, 0)
+    
+    # Loop over times
+    UTC_list = sorted(state_dict.keys())
+    t_hrs = [(UTC - t0).total_seconds()/3600. for UTC in UTC_list]
+    t_days = [th/24. for th in t_hrs]
+    nobj_list = []
+    nname_list = []
+    object_times = {}
+    name_times = {}
+    for UTC in UTC_list:
+        
+        # Retrieve data for this time
+        obj_id_list = state_dict[UTC]['obj_id_list']
+        name_list = state_dict[UTC]['name_list']
+        r_GCRF_list = state_dict[UTC]['r_GCRF']
+        v_GCRF_list = state_dict[UTC]['v_GCRF']
+        
+        # Loop over objects
+        nobj = len(obj_id_list)
+        nname = 0
+        for ii in range(len(obj_id_list)):
+            
+            # Record timestamp of first occurrence of object ID
+            obj_id = obj_id_list[ii]
+            if obj_id not in object_times:
+                object_times[obj_id] = UTC
+            
+            # Record timestamp of first occurence of real object name            
+            name = name_list[ii]
+            if 'TBA' not in name and 'OBJECT' not in name:
+                nname += 1
+                
+                if obj_id not in name_times:
+                    name_times[obj_id] = UTC
+                    
+            # Retrieve state vector and compute orbit elements
+            r_GCRF = r_GCRF_list[ii]
+            v_GCRF = v_GCRF_list[ii]
+            x_in = np.concatenate((r_GCRF, v_GCRF), 0)
+            elem = element_conversion(x_in, 1, 0)
+            
+            
+                    
+        # Update count information
+        nobj_list.append(nobj)
+        nname_list.append(nname)
+                
+        
+#        print(UTC)
+#        print(obj_id_list)
+#        print(name_list)
+#        print(r_GCRF_list)
+#        print(nobj_list)
+#        print(nname_list)
+#        
+#        if UTC > datetime(2018, 11, 18, 0, 0, 0):
+#            break
+#        
+    
+    # Generate plots
+    plt.figure()
+    plt.plot(t_days, nobj_list, 'k-')
+    plt.plot(t_days, nname_list, 'r-')
+    plt.legend(['# Obj', '# ID'], loc='best')
+    plt.xlabel('Time Since Launch [days]')
+    
+    plt.figure()
+    for ii in range(len(obj_id_list)):
+        obj_id = obj_id_list[ii]
+        tobj = (object_times[obj_id] - t0).total_seconds()/86400.
+        tname = (name_times[obj_id] - t0).total_seconds()/86400.
+        
+        plt.plot(tobj, ii+1, 'ko', ms=6)
+        plt.plot(tname, ii+1, 'kx', ms=6)
+        
+    plt.xlabel('Time Since Launch [days]')
+    plt.yticks([ii + 1 for ii in range(len(name_list))], name_list)
+    plt.legend(['1st TLE', '1st ID'], loc='best')
+        
+    
+    
+    
+    plt.show()
+                
+    
+    
+    
     
     
     
@@ -249,7 +340,9 @@ def spacex_ssoa_analysis():
     
     
     
-if __name__ == '__main__':    
+if __name__ == '__main__':
+    
+    plt.close('all')
     
     fdir = Path('D:/documents/research/launch_identification/data/'
                 '2018_11_11_RocketLab_ItsBusinessTime/tle_archive')
@@ -258,17 +351,17 @@ if __name__ == '__main__':
     
     obj_id_list = [43690, 43691]
     
-    # Compute TLE dictionary from stack of CSV files
-    tle_dict = csvstack2tledict(fdir, obj_id_list)
+#    # Compute TLE dictionary from stack of CSV files
+#    tle_dict = csvstack2tledict(fdir, obj_id_list)
+#    
+#    # Compute state vectors at common times
+#    state_dict = compute_tle_allstate(tle_dict)
+#    
+#    pklFile = open( state_file, 'wb' )
+#    pickle.dump( [state_dict, tle_dict], pklFile, -1 )
+#    pklFile.close()
     
-    # Compute state vectors at common times
-    state_dict = compute_tle_allstate(tle_dict)
-    
-    pklFile = open( state_file, 'wb' )
-    pickle.dump( [state_dict, tle_dict], pklFile, -1 )
-    pklFile.close()
-    
-#    animate_launch_tle(state_file)
+    animate_launch_tle(state_file)
     
     
     
