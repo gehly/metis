@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 import sys
 import os
 from pathlib import Path
+import pickle
 
 sys.path.append('../')
 
@@ -22,13 +23,15 @@ from sensors.visibility_functions import compute_visible_passes
 from sensors.visibility_functions import generate_visibility_file
 
 
-def animate_launch_tle():
+def animate_launch_tle(state_file):
     
-    # Compute TLE dictionary from stack of CSV files
-    tle_dict = csvstack2tledict(fdir, obj_id_list)
+    # Load data
+    pklFile = open(state_file, 'rb')
+    data = pickle.load(pklFile)
+    state_dict = data[0]
+    tle_dict = data[1]
+    pklFile.close()
     
-    # Compute state vectors at common times
-    state = compute_tle_allstate(tle_dict)
     
     
     return
@@ -250,10 +253,22 @@ if __name__ == '__main__':
     
     fdir = Path('D:/documents/research/launch_identification/data/'
                 '2018_11_11_RocketLab_ItsBusinessTime/tle_archive')
-    obj_id_list = [43689]
-    tle_dict = animate_launch_tle(fdir, obj_id_list)
     
-    print(tle_dict)
+    state_file = os.path.join(fdir, 'state_data.pkl')
+    
+    obj_id_list = [43690, 43691]
+    
+    # Compute TLE dictionary from stack of CSV files
+    tle_dict = csvstack2tledict(fdir, obj_id_list)
+    
+    # Compute state vectors at common times
+    state_dict = compute_tle_allstate(tle_dict)
+    
+    pklFile = open( state_file, 'wb' )
+    pickle.dump( [state_dict, tle_dict], pklFile, -1 )
+    pklFile.close()
+    
+#    animate_launch_tle(state_file)
     
     
     

@@ -4,6 +4,7 @@ import requests
 import getpass
 from datetime import datetime, timedelta
 import sys
+import os
 import matplotlib.pyplot as plt
 import pandas as pd
 import json
@@ -234,18 +235,22 @@ def csvstack2tledict(fdir, obj_id_list):
         
         fname = os.path.join(fdir, fname)
         df = pd.read_csv(fname)
-        
+        norad_list = df['NORAD_CAT_ID'].tolist()
+
         # Loop over objects and retrieve TLE data
         for obj_id in obj_id_list:
-            if obj_id in df['NORAD_CAT_ID'].tolist():
-                name = df[df.NORAD_CAT_ID == obj_id]['OBJECT_NAME'][0]
-                line1 = df[df.NORAD_CAT_ID == obj_id]['TLE_LINE1'][0]
-                line2 = df[df.NORAD_CAT_ID == obj_id]['TLE_LINE2'][0]
+            if obj_id in norad_list:
+
+                # Retrieve object name and TLE data
+                ind = norad_list.index(obj_id)
+                name = df.at[ind, 'OBJECT_NAME']
+                line1 = df.at[ind, 'TLE_LINE1']
+                line2 = df.at[ind, 'TLE_LINE2']
                 
                 # Compute UTC time
                 UTC = tletime2datetime(line1)
                 
-                # Initialize output
+                # If first occurence of this object, initialize output
                 if obj_id not in tle_dict:
                     tle_dict[obj_id] = {}
                     tle_dict[obj_id]['name_list'] = [name]
@@ -295,11 +300,14 @@ def compute_tle_allstate(tle_dict):
     UTC_list = []
     for obj_id in tle_dict:
         UTC_list.extend(tle_dict[obj_id]['UTC_list'])
-    UTC_list = list(set(UTC_list))
+    UTC_list = sorted(list(set(UTC_list)))
     
     # For each time in list, propagate all objects with a TLE at or before that
     # time to current UTC
     for UTC in UTC_list:
+        
+        print(UTC)
+        print('Index: ', UTC_list.index(UTC), ' of ', len(UTC_list), '\n')
         
         # Create reduced obj_id_list with only objects that exist at this time
         obj_id_red = []
