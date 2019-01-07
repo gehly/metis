@@ -61,7 +61,7 @@ def define_RSOs(obj_id_list, UTC, tle_dict={}, source='spacetrack'):
         # Download from space-track.org
         if source == 'spacetrack':            
             
-            UTC_list = [UTC - timedelta(days=1.), UTC + timedelta(days=1.)]
+            UTC_list = [UTC - timedelta(days=2.), UTC + timedelta(days=2.)]
             tle_dict, tle_df = get_spacetrack_tle_data(obj_id_list, UTC_list)
             
         # Retrieve from graph database

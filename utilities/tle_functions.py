@@ -4,6 +4,7 @@ import requests
 import getpass
 from datetime import datetime, timedelta
 import sys
+import os
 import matplotlib.pyplot as plt
 import pandas as pd
 import json
@@ -203,6 +204,136 @@ def tledict2dataframe(tle_dict):
     tle_df = pd.DataFrame(tle_list, columns=['norad','line1','line2'])
 
     return tle_df
+
+
+def csvstack2tledict(fdir, obj_id_list):
+    '''
+    This function computes a dictionary of unique TLE information given a 
+    stack of CSV files in a directory. The function assumes the directory
+    contains only CSV files with TLE data.
+    
+    Parameters
+    ------
+    fdir : string
+        file directory containing CSV files
+    obj_id_list : list
+        NORAD IDs (int) of objects to collect TLE data
+    
+    Returns
+    ------
+    tle_dict : dictionary
+        indexed by object ID, each item has two lists of strings for each line
+        as well as object name and UTC times
+    
+    '''
+    
+    # Initialize output
+    tle_dict = {}
+    
+    # Loop over each file in directory
+    for fname in os.listdir(fdir):
+        
+        fname = os.path.join(fdir, fname)
+        df = pd.read_csv(fname)
+        norad_list = df['NORAD_CAT_ID'].tolist()
+
+        # Loop over objects and retrieve TLE data
+        for obj_id in obj_id_list:
+            if obj_id in norad_list:
+
+                # Retrieve object name and TLE data
+                ind = norad_list.index(obj_id)
+                name = df.at[ind, 'OBJECT_NAME']
+                line1 = df.at[ind, 'TLE_LINE1']
+                line2 = df.at[ind, 'TLE_LINE2']
+                
+                # Compute UTC time
+                UTC = tletime2datetime(line1)
+                
+                # If first occurence of this object, initialize output
+                if obj_id not in tle_dict:
+                    tle_dict[obj_id] = {}
+                    tle_dict[obj_id]['name_list'] = [name]
+                    tle_dict[obj_id]['UTC_list'] = [UTC]
+                    tle_dict[obj_id]['line1_list'] = [line1]
+                    tle_dict[obj_id]['line2_list'] = [line2]
+                    
+                # Otherwise, check if different from previous entry
+                # Only add if different
+                else:
+                    if ((name != tle_dict[obj_id]['name_list'][-1]) or 
+                        (line1 != tle_dict[obj_id]['line1_list'][-1]) or 
+                        (line2 != tle_dict[obj_id]['line2_list'][-1])):
+
+                        # Append to output
+                        tle_dict[obj_id]['name_list'].append(name)
+                        tle_dict[obj_id]['UTC_list'].append(UTC)
+                        tle_dict[obj_id]['line1_list'].append(line1)
+                        tle_dict[obj_id]['line2_list'].append(line2)                
+        
+    return tle_dict
+
+
+def compute_tle_allstate(tle_dict):
+    '''
+    This function computes a dictionary of state vectors at common times for
+    all objects in the input TLE dictionary.
+    
+    Parameters
+    ------
+    tle_dict : dictionary
+        indexed by object ID, each item has two lists of strings for each line
+        as well as object name and UTC times
+        
+    Returns
+    ------
+    output : dictionary
+        indexed by UTC time, each item has a list of object NORAD IDs, names,
+        and pos/vel vectors in GCRF at that time
+    
+    '''
+    
+    # Initialize output
+    output = {}
+    
+    # Get unique list of UTC times in order
+    UTC_list = []
+    for obj_id in tle_dict:
+        UTC_list.extend(tle_dict[obj_id]['UTC_list'])
+    UTC_list = sorted(list(set(UTC_list)))
+    
+    # For each time in list, propagate all objects with a TLE at or before that
+    # time to current UTC
+    for UTC in UTC_list:
+        
+        print(UTC)
+        print('Index: ', UTC_list.index(UTC), ' of ', len(UTC_list), '\n')
+        
+        # Create reduced obj_id_list with only objects that exist at this time
+        obj_id_red = []
+        for obj_id in tle_dict:
+            if tle_dict[obj_id]['UTC_list'][0] <= UTC:
+                obj_id_red.append(obj_id)
+                
+        # Propagate objects to common time
+        state = propagate_TLE(obj_id_red, [UTC], tle_dict)
+    
+        # Store output
+        output[UTC] = {}
+        output[UTC]['obj_id_list'] = obj_id_red
+        output[UTC]['name_list'] = []
+        output[UTC]['r_GCRF'] = []
+        output[UTC]['v_GCRF'] = []
+        
+        for obj_id in obj_id_red:
+            ind = [ii for ii in range(len(tle_dict[obj_id]['UTC_list'])) if tle_dict[obj_id]['UTC_list'][ii] <= UTC][-1]
+            
+            output[UTC]['name_list'].append(tle_dict[obj_id]['name_list'][ind])
+            output[UTC]['r_GCRF'].append(state[obj_id]['r_GCRF'][0])
+            output[UTC]['v_GCRF'].append(state[obj_id]['v_GCRF'][0])    
+        
+
+    return output
 
 
 def tletime2datetime(line1):
@@ -929,13 +1060,12 @@ if __name__ == '__main__' :
 #    obj_id_list = [40940, 39613, 36287, 39487, 40267, 41836]
 #    UTC_list = [datetime(2018, 1, 16, 12, 43, 20)]
 #    sensor_list = ['RMIT ROO']
-#
-#
-    obj_id_list = [43013, 43014, 43015, 43016]
-    UTC_list = [datetime(2017, 11, 18, 0, 0, 0),
-                datetime(2017, 11, 25, 0, 0, 0)]
-
-#
+#    
+#    
+    obj_id_list = [37158]
+    UTC_list = [datetime(2018, 10, 29, 0, 0, 0)]
+    
+#    
 #    print(output_state)
 
     plt.close('all')
@@ -943,21 +1073,36 @@ if __name__ == '__main__' :
     tle_dict, tle_df = get_spacetrack_tle_data(obj_id_list, UTC_list)
     print(tle_dict)
 #
-#    UTC_list = [datetime(2018, 4, 20, 8, 0, 0)]
-#
-#    output_state = propagate_TLE(obj_id_list, UTC_list, tle_dict)
-#
-#    for obj_id in obj_id_list:
-#        r_GCRF = output_state[obj_id]['r_GCRF'][0]
-#        v_GCRF = output_state[obj_id]['v_GCRF'][0]
-#        x_in = np.concatenate((r_GCRF, v_GCRF), axis=0)
-#        print(obj_id)
-#        print(x_in)
-#        elem = element_conversion(x_in, 1, 0)
-#        print(elem)
-
-
-
+    GPS_time = datetime(2018, 10, 29, 9, 50, 0)
+    UTC0 = GPS_time - timedelta(seconds=18.)
+    UTC_list = [UTC0]
+    
+    output_state = propagate_TLE(obj_id_list, UTC_list, tle_dict, offline_flag=True)
+    
+    for obj_id in obj_id_list:
+        r_GCRF = output_state[obj_id]['r_GCRF'][0]
+        v_GCRF = output_state[obj_id]['v_GCRF'][0]
+        x_in = np.concatenate((r_GCRF, v_GCRF), axis=0)
+        print(obj_id)
+        print(x_in)
+        elem = element_conversion(x_in, 1, 0)
+        print(elem)
+    
+    pos_ecef = np.reshape([-27379.521717,  31685.387589,  10200.667234], (3,1))
+    vel_ecef = np.zeros((3,1))
+    
+    
+    # Comparison
+    eop_alldata = get_celestrak_eop_alldata(offline_flag=True)
+    EOP_data = get_eop_data(eop_alldata, UTC0)
+    
+    r_GCRF_sp3, vdum = itrf2gcrf(pos_ecef, vel_ecef, UTC0, EOP_data)
+    
+    print(r_GCRF_sp3)
+    print(r_GCRF_sp3 - r_GCRF)
+    print(np.linalg.norm(r_GCRF_sp3 - r_GCRF))
+    
+    
 #    plot_tle_radec(tle_dict, UTC_list, sensor_list, display_flag=True)
 
 #    plot_all_tle_common_time(obj_id_list, UTC_list)
