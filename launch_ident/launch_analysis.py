@@ -115,6 +115,17 @@ def animate_launch_tle(state_file):
                 dRAAN_list.append(RAAN - RAAN0)
                 
             # Compute and store perifocal frame coordinates
+            orbit_x = []
+            orbit_y = []
+            if ii == 0:
+                Mk_array = np.arange(0, 360, 0.1)
+                for Mk in Mk_array:
+                    elem_k = elem.copy()
+                    elem_k[5] = Mk
+                    x, y = osc2perifocal(elem_k)
+                    orbit_x.append(x)
+                    orbit_y.append(y)
+                    
             x, y = osc2perifocal(elem)
             x_list.append(x)
             y_list.append(y)
@@ -124,6 +135,79 @@ def animate_launch_tle(state_file):
             dec = asin(r_GCRF[2]/np.linalg.norm(r_GCRF))*180/pi
             ra_list.append(ra)
             dec_list.append(dec)
+            
+            
+        # Plot perifocal frame coordinates
+        plt.figure()
+        
+        plt.plot(orbit_x, orbit_y, 'k')
+        
+        plt.scatter(x_list, y_list, marker='o', s=50,
+                    c=np.linspace(0,1,len(obj_id_list)),
+                    cmap=plt.get_cmap('nipy_spectral'))
+        
+        for label, x, y in zip(obj_id_list, x_list, y_list):
+            plt.annotate(
+            label,
+            xy=(x, y), xytext=(-20, 20),
+            textcoords='offset points', ha='right', va='bottom',
+            bbox=dict(boxstyle='round,pad=0.5', fc='yellow', alpha=0.5),
+            arrowprops=dict(arrowstyle = '->', connectionstyle='arc3,rad=0'))
+            
+        plt.xlabel('X [km]')
+        plt.ylabel('Y [km]')
+        plt.title('Perifocal Frame Coordinates ' + UTC.strftime("%Y-%m-%d %H:%M:%S"))
+            
+        
+        # Plot orbit element differences
+        plt.figure()
+        
+        plt.scatter(dM_list, dRAAN_list, marker='o', s=50,
+                    c=np.linspace(0,1,len(obj_id_list)),
+                    cmap=plt.get_cmap('nipy_spectral'))
+        
+        for label, x, y in zip(obj_id_list, dM_list, dRAAN_list):
+            plt.annotate(
+            label,
+            xy=(x, y), xytext=(-20, 20),
+            textcoords='offset points', ha='right', va='bottom',
+            bbox=dict(boxstyle='round,pad=0.5', fc='yellow', alpha=0.5),
+            arrowprops=dict(arrowstyle = '->', connectionstyle='arc3,rad=0'))
+            
+        plt.xlabel('Mean Anomaly Difference [deg]')
+        plt.ylabel('RAAN Difference [deg]')
+        plt.title('Orbit Element Differences ' + UTC.strftime("%Y-%m-%d %H:%M:%S"))
+
+        plt.xlim([-180, 180])
+        plt.ylim([-180, 180])
+
+
+            
+        # Plot Geocentric RA/DEC            
+        plt.figure()
+        
+        plt.scatter(ra_list, dec_list, marker='o', s=50,
+                    c=np.linspace(0,1,len(obj_id_list)),
+                    cmap=plt.get_cmap('nipy_spectral'))
+        
+        for label, x, y in zip(obj_id_list, ra_list, dec_list):
+            plt.annotate(
+            label,
+            xy=(x, y), xytext=(-20, 20),
+            textcoords='offset points', ha='right', va='bottom',
+            bbox=dict(boxstyle='round,pad=0.5', fc='yellow', alpha=0.5),
+            arrowprops=dict(arrowstyle = '->', connectionstyle='arc3,rad=0'))
+            
+        plt.xlabel('Geocentric Right Ascension [deg]')
+        plt.ylabel('Geocentric Declination [deg]')
+        plt.title('TLE Measurement Space ' + UTC.strftime("%Y-%m-%d %H:%M:%S"))
+
+        plt.xlim([-180, 180])
+        plt.ylim([-90, 90])
+        
+        plt.show()
+        
+        mistake
             
             
                     
