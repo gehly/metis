@@ -7,6 +7,8 @@ import os
 from pathlib import Path
 import pickle
 import matplotlib.pyplot as plt
+import matplotlib.animation as animation
+#import imageio
 
 sys.path.append('../')
 
@@ -28,6 +30,8 @@ from sensors.visibility_functions import generate_visibility_file
 
 def animate_launch_tle(state_file):
     
+    fig = plt.figure()
+    
     # Load data
     pklFile = open(state_file, 'rb')
     data = pickle.load(pklFile)
@@ -46,6 +50,9 @@ def animate_launch_tle(state_file):
     nname_list = []
     object_times = {}
     name_times = {}
+    perifocal_figs = []
+    radec_figs = []
+    oediff_figs = []
     for UTC in UTC_list:
         
         # Retrieve data for this time
@@ -53,6 +60,7 @@ def animate_launch_tle(state_file):
         name_list = state_dict[UTC]['name_list']
         r_GCRF_list = state_dict[UTC]['r_GCRF']
         v_GCRF_list = state_dict[UTC]['v_GCRF']
+        label_list = []
         
         # Loop over objects
         nobj = len(obj_id_list)
@@ -74,9 +82,13 @@ def animate_launch_tle(state_file):
             name = name_list[ii]
             if 'TBA' not in name and 'OBJECT' not in name:
                 nname += 1
+                label_list.append(name)
                 
                 if obj_id not in name_times:
                     name_times[obj_id] = UTC
+                    
+            else:
+                label_list.append(obj_id)
                     
             # Retrieve state vector and compute orbit elements
             r_GCRF = r_GCRF_list[ii]
@@ -114,10 +126,10 @@ def animate_launch_tle(state_file):
                 dM_list.append(M - M0)
                 dRAAN_list.append(RAAN - RAAN0)
                 
-            # Compute and store perifocal frame coordinates
-            orbit_x = []
-            orbit_y = []
+            # Compute and store perifocal frame coordinates            
             if ii == 0:
+                orbit_x = []
+                orbit_y = []
                 Mk_array = np.arange(0, 360, 0.1)
                 for Mk in Mk_array:
                     elem_k = elem.copy()
@@ -136,17 +148,24 @@ def animate_launch_tle(state_file):
             ra_list.append(ra)
             dec_list.append(dec)
             
+        # Update count information
+        nobj_list.append(nobj)
+        nname_list.append(nname)
+        
+        if UTC < UTC_list[-1]:
+            continue
+            
             
         # Plot perifocal frame coordinates
-        plt.figure()
         
-        plt.plot(orbit_x, orbit_y, 'k')
+        
+        im = plt.plot(orbit_x, orbit_y, 'k')
         
         plt.scatter(x_list, y_list, marker='o', s=50,
                     c=np.linspace(0,1,len(obj_id_list)),
                     cmap=plt.get_cmap('nipy_spectral'))
         
-        for label, x, y in zip(obj_id_list, x_list, y_list):
+        for label, x, y in zip(label_list, x_list, y_list):
             plt.annotate(
             label,
             xy=(x, y), xytext=(-20, 20),
@@ -157,63 +176,58 @@ def animate_launch_tle(state_file):
         plt.xlabel('X [km]')
         plt.ylabel('Y [km]')
         plt.title('Perifocal Frame Coordinates ' + UTC.strftime("%Y-%m-%d %H:%M:%S"))
+        
+        perifocal_figs.append([im])
             
         
-        # Plot orbit element differences
-        plt.figure()
+#        # Plot orbit element differences
+#        plt.figure()
+#        
+#        plt.scatter(dM_list, dRAAN_list, marker='o', s=50,
+#                    c=np.linspace(0,1,len(obj_id_list)),
+#                    cmap=plt.get_cmap('nipy_spectral'))
+#        
+#        for label, x, y in zip(label_list, dM_list, dRAAN_list):
+#            plt.annotate(
+#            label,
+#            xy=(x, y), xytext=(-20, 20),
+#            textcoords='offset points', ha='right', va='bottom',
+#            bbox=dict(boxstyle='round,pad=0.5', fc='yellow', alpha=0.5),
+#            arrowprops=dict(arrowstyle = '->', connectionstyle='arc3,rad=0'))
+#            
+#        plt.xlabel('Mean Anomaly Difference [deg]')
+#        plt.ylabel('RAAN Difference [deg]')
+#        plt.title('Orbit Element Differences ' + UTC.strftime("%Y-%m-%d %H:%M:%S"))
+#
+#        plt.xlim([-180, 180])
+#        plt.ylim([-180, 180])
+#
+#
+#            
+#        # Plot Geocentric RA/DEC            
+#        plt.figure()
+#        
+#        plt.scatter(ra_list, dec_list, marker='o', s=50,
+#                    c=np.linspace(0,1,len(obj_id_list)),
+#                    cmap=plt.get_cmap('nipy_spectral'))
+#        
+#        for label, x, y in zip(label_list, ra_list, dec_list):
+#            plt.annotate(
+#            label,
+#            xy=(x, y), xytext=(-20, 20),
+#            textcoords='offset points', ha='right', va='bottom',
+#            bbox=dict(boxstyle='round,pad=0.5', fc='yellow', alpha=0.5),
+#            arrowprops=dict(arrowstyle = '->', connectionstyle='arc3,rad=0'))
+#            
+#        plt.xlabel('Geocentric Right Ascension [deg]')
+#        plt.ylabel('Geocentric Declination [deg]')
+#        plt.title('TLE Measurement Space ' + UTC.strftime("%Y-%m-%d %H:%M:%S"))
+#
+#        plt.xlim([-180, 180])
+#        plt.ylim([-90, 90])
         
-        plt.scatter(dM_list, dRAAN_list, marker='o', s=50,
-                    c=np.linspace(0,1,len(obj_id_list)),
-                    cmap=plt.get_cmap('nipy_spectral'))
-        
-        for label, x, y in zip(obj_id_list, dM_list, dRAAN_list):
-            plt.annotate(
-            label,
-            xy=(x, y), xytext=(-20, 20),
-            textcoords='offset points', ha='right', va='bottom',
-            bbox=dict(boxstyle='round,pad=0.5', fc='yellow', alpha=0.5),
-            arrowprops=dict(arrowstyle = '->', connectionstyle='arc3,rad=0'))
-            
-        plt.xlabel('Mean Anomaly Difference [deg]')
-        plt.ylabel('RAAN Difference [deg]')
-        plt.title('Orbit Element Differences ' + UTC.strftime("%Y-%m-%d %H:%M:%S"))
-
-        plt.xlim([-180, 180])
-        plt.ylim([-180, 180])
-
-
-            
-        # Plot Geocentric RA/DEC            
-        plt.figure()
-        
-        plt.scatter(ra_list, dec_list, marker='o', s=50,
-                    c=np.linspace(0,1,len(obj_id_list)),
-                    cmap=plt.get_cmap('nipy_spectral'))
-        
-        for label, x, y in zip(obj_id_list, ra_list, dec_list):
-            plt.annotate(
-            label,
-            xy=(x, y), xytext=(-20, 20),
-            textcoords='offset points', ha='right', va='bottom',
-            bbox=dict(boxstyle='round,pad=0.5', fc='yellow', alpha=0.5),
-            arrowprops=dict(arrowstyle = '->', connectionstyle='arc3,rad=0'))
-            
-        plt.xlabel('Geocentric Right Ascension [deg]')
-        plt.ylabel('Geocentric Declination [deg]')
-        plt.title('TLE Measurement Space ' + UTC.strftime("%Y-%m-%d %H:%M:%S"))
-
-        plt.xlim([-180, 180])
-        plt.ylim([-90, 90])
-        
-        plt.show()
-        
-        mistake
-            
-            
                     
-        # Update count information
-        nobj_list.append(nobj)
-        nname_list.append(nname)
+        
                 
         
 #        print(UTC)
@@ -227,28 +241,32 @@ def animate_launch_tle(state_file):
 #            break
 #        
     
-    # Generate plots
-    plt.figure()
-    plt.plot(t_days, nobj_list, 'k-')
-    plt.plot(t_days, nname_list, 'r-')
-    plt.legend(['# Obj', '# ID'], loc='best')
-    plt.xlabel('Time Since Launch [days]')
-    
-    plt.figure()
-    for ii in range(len(obj_id_list)):
-        obj_id = obj_id_list[ii]
-        tobj = (object_times[obj_id] - t0).total_seconds()/86400.
-        tname = (name_times[obj_id] - t0).total_seconds()/86400.
+#    # Generate plots
+#    plt.figure()
+#    plt.plot(t_days, nobj_list, 'k-')
+#    plt.plot(t_days, nname_list, 'r-')
+#    plt.legend(['# Obj', '# ID'], loc='best')
+#    plt.xlabel('Time Since Launch [days]')
+#    
+#    plt.figure()
+#    for ii in range(len(obj_id_list)):
+#        obj_id = obj_id_list[ii]
+#        tobj = (object_times[obj_id] - t0).total_seconds()/86400.
+#        tname = (name_times[obj_id] - t0).total_seconds()/86400.
+#        
+#        plt.plot(tobj, ii+1, 'ko', ms=6)
+#        plt.plot(tname, ii+1, 'kx', ms=6)
+#        
+#    plt.xlabel('Time Since Launch [days]')
+#    plt.yticks([ii + 1 for ii in range(len(name_list))], name_list)
+#    plt.legend(['1st TLE', '1st ID'], loc='best')
         
-        plt.plot(tobj, ii+1, 'ko', ms=6)
-        plt.plot(tname, ii+1, 'kx', ms=6)
-        
-    plt.xlabel('Time Since Launch [days]')
-    plt.yticks([ii + 1 for ii in range(len(name_list))], name_list)
-    plt.legend(['1st TLE', '1st ID'], loc='best')
-        
     
+    ani = animation.ArtistAnimation(fig, perifocal_figs, interval=50, blit=True,
+                                    repeat_delay=1000)
     
+    mywriter = animation.FFMpegWriter()
+    ani.save('dynamic_images.mp4', writer=mywriter)
     
     plt.show()
                 
