@@ -1,4 +1,5 @@
 import numpy as np
+from math import atan2, asin, pi
 import pandas as pd
 from datetime import datetime, timedelta
 import sys
@@ -15,6 +16,7 @@ metis_dir = Path(cwd[0:ind+5])
 
 from skyfield.api import Loader, utc
 
+from utilities.astrodynamics import osc2perifocal
 from utilities.tle_functions import gcrf2tle, launchecef2tle, kep2tle
 from utilities.tle_functions import tletime2datetime, csvstack2tledict
 from utilities.tle_functions import propagate_TLE, compute_tle_allstate
@@ -55,6 +57,12 @@ def animate_launch_tle(state_file):
         # Loop over objects
         nobj = len(obj_id_list)
         nname = 0
+        dM_list = []
+        dRAAN_list = []
+        x_list = []
+        y_list = []
+        ra_list = []
+        dec_list = []
         for ii in range(len(obj_id_list)):
             
             # Record timestamp of first occurrence of object ID
@@ -75,6 +83,47 @@ def animate_launch_tle(state_file):
             v_GCRF = v_GCRF_list[ii]
             x_in = np.concatenate((r_GCRF, v_GCRF), 0)
             elem = element_conversion(x_in, 1, 0)
+            
+            a = float(elem[0])
+            e = float(elem[1])
+            i = float(elem[2])
+            RAAN = float(elem[3])
+            w = float(elem[4])
+            M = float(elem[5])
+            
+            # Compute and store orbit element differences
+            if ii == 0:
+                M0 = float(M)
+                RAAN0 = float(RAAN)
+                dM_list.append(0.)
+                dRAAN_list.append(0.)
+            else:
+                
+                dM = M - M0
+                if dM > 180.:
+                    dM -= 360.
+                if dM < -180.:
+                    dM += 360.
+                    
+                dRAAN = RAAN - RAAN0
+                if dRAAN > 180.:
+                    dRAAN -= 360.
+                if dRAAN < -180.:
+                    dRAAN += 360.
+                    
+                dM_list.append(M - M0)
+                dRAAN_list.append(RAAN - RAAN0)
+                
+            # Compute and store perifocal frame coordinates
+            x, y = osc2perifocal(elem)
+            x_list.append(x)
+            y_list.append(y)
+            
+            # Compute and store geocentric RA/DEC
+            ra = atan2(r_GCRF[1],r_GCRF[0])*180/pi
+            dec = asin(r_GCRF[2]/np.linalg.norm(r_GCRF))*180/pi
+            ra_list.append(ra)
+            dec_list.append(dec)
             
             
                     
@@ -347,9 +396,12 @@ if __name__ == '__main__':
     fdir = Path('D:/documents/research/launch_identification/data/'
                 '2018_11_11_RocketLab_ItsBusinessTime/tle_archive')
     
-    state_file = os.path.join(fdir, 'state_data.pkl')
+    fdir2 = Path('D:/documents/research/launch_identification/data/'
+                '2018_11_11_RocketLab_ItsBusinessTime/analysis')
     
-    obj_id_list = [43690, 43691]
+    state_file = os.path.join(fdir2, 'state_data.pkl')
+    
+    obj_id_list = [43690, 43691, 43692, 43693, 43694, 43695, 43696, 43697]
     
 #    # Compute TLE dictionary from stack of CSV files
 #    tle_dict = csvstack2tledict(fdir, obj_id_list)

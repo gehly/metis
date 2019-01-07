@@ -417,6 +417,47 @@ def osc2mean(osc_elem):
     return mean_elem
 
 
+def osc2perifocal(elem):
+    '''
+    This function computes position coordinates in the perifocal frame given
+    osculating Keplerian elements.
+    
+    Parameters
+    ------
+    elem : 6x1 numpy array
+        osculating Keplerian orbital elements
+    
+    Returns
+    ------
+    x : float
+        perifocal frame x-coordinate
+    y : float
+        perifocal frame y-coordinate
+    '''
+    
+    # Retrieve orbit parameters
+    a = float(elem[0])
+    e = float(elem[1])
+    M = float(elem[5])*pi/180.
+    
+    # Compute true anomaly
+    E = mean2ecc(M, e)
+    f = ecc2true(E, e)
+    
+    # Compute semi-latus rectum
+    p = smaecc2semilatusrectum(a, e)
+    
+    # Compute orbit radius
+    r = p/(1 + e*cos(f))
+    
+    # Compute cartesian coordinates
+    x = r*cos(f)
+    y = r*sin(f)
+    
+    
+    return x, y
+
+
 def brouwer_lyddane(a0,e0,i0,RAAN0,w0,M0,gamma0):
     '''
     This function converts between osculating and mean Keplerian elements
