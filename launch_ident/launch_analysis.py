@@ -28,19 +28,22 @@ from sensors.visibility_functions import compute_visible_passes
 from sensors.visibility_functions import generate_visibility_file
 
 
-def animate_launch_tle(state_file, savedir):
+def animate_launch_tle(state_file, savedir, t0, periodic_flag=True):
     
 #    plt.ioff()
 
     # Load data
     pklFile = open(state_file, 'rb')
     data = pickle.load(pklFile)
-    state_dict = data[0]
-    tle_dict = data[1]
+    tle_dict = data[0]
+    state_tlechange = data[1]
+    state_periodic = data[2]
     pklFile.close()
     
-    # Time of launch
-    t0 = datetime(2018, 11, 11, 3, 50, 0)
+    if periodic_flag:
+        state_dict = state_periodic
+    else:
+        state_dict = state_tlechange
     
     # Loop over times
     UTC_list = sorted(state_dict.keys())
@@ -252,12 +255,13 @@ def animate_launch_tle(state_file, savedir):
     
     plt.figure()
     for ii in range(len(obj_id_list)):
-        obj_id = obj_id_list[ii]
+        obj_id = obj_id_list[ii]        
         tobj = (object_times[obj_id] - t0).total_seconds()/86400.
-        tname = (name_times[obj_id] - t0).total_seconds()/86400.
-        
         plt.plot(tobj, ii+1, 'ko', ms=6)
-        plt.plot(tname, ii+1, 'kx', ms=6)
+        
+        if obj_id in name_times:           
+            tname = (name_times[obj_id] - t0).total_seconds()/86400.
+            plt.plot(tname, ii+1, 'kx', ms=6)
         
     plt.xlabel('Time Since Launch [days]')
     plt.yticks([ii + 1 for ii in range(len(name_list))], name_list)
@@ -498,29 +502,35 @@ if __name__ == '__main__':
     plt.close('all')
     
     fdir = Path('D:/documents/research/launch_identification/data/'
-                '2018_11_11_RocketLab_ItsBusinessTime/tle_archive')
+                'tle_archive_2019_01_09')
     
     fdir2 = Path('D:/documents/research/launch_identification/data/'
-                '2018_11_11_RocketLab_ItsBusinessTime/analysis')
+                '2018_12_03_SpaceX_SSO_A/analysis')
     
     savedir = Path('D:/documents/research/launch_identification/data/'
-                   '2018_11_11_RocketLab_ItsBusinessTime/figs')
+                   '2018_12_03_SpaceX_SSO_A/figs')
     
     state_file = os.path.join(fdir2, 'state_data.pkl')
     
-    obj_id_list = [43690, 43691, 43692, 43693, 43694, 43695, 43696, 43697]
+#    obj_id_list = [43690, 43691, 43692, 43693, 43694, 43695, 43696, 43697]
+
+    # Time of launch
+#    t0 = datetime(2018, 11, 11, 3, 50, 0)
+    t0 = datetime(2018, 12, 3, 18, 34, 14)
+    
+    obj_id_list = list(range(43758, 43823))
     
 #    # Compute TLE dictionary from stack of CSV files
 #    tle_dict = csvstack2tledict(fdir, obj_id_list)
 #    
 #    # Compute state vectors at common times
-#    state_dict = compute_tle_allstate(tle_dict)
+#    state_tlechange, state_periodic = compute_tle_allstate(tle_dict)
 #    
 #    pklFile = open( state_file, 'wb' )
-#    pickle.dump( [state_dict, tle_dict], pklFile, -1 )
+#    pickle.dump( [tle_dict, state_tlechange, state_periodic], pklFile, -1 )
 #    pklFile.close()
     
-    animate_launch_tle(state_file, savedir)
+    animate_launch_tle(state_file, savedir, t0)
     
     
     

@@ -294,7 +294,8 @@ def compute_tle_allstate(tle_dict):
     '''
     
     # Initialize output
-    output = {}
+    output_tlechange = {}
+    output_periodic = {}
     
     # Get unique list of UTC times in order
     UTC_list = []
@@ -316,24 +317,69 @@ def compute_tle_allstate(tle_dict):
                 obj_id_red.append(obj_id)
                 
         # Propagate objects to common time
-        state = propagate_TLE(obj_id_red, [UTC], tle_dict)
+        state = propagate_TLE(obj_id_red, [UTC], tle_dict, offline_flag=True)
     
         # Store output
-        output[UTC] = {}
-        output[UTC]['obj_id_list'] = obj_id_red
-        output[UTC]['name_list'] = []
-        output[UTC]['r_GCRF'] = []
-        output[UTC]['v_GCRF'] = []
+        output_tlechange[UTC] = {}
+        output_tlechange[UTC]['obj_id_list'] = obj_id_red
+        output_tlechange[UTC]['name_list'] = []
+        output_tlechange[UTC]['r_GCRF'] = []
+        output_tlechange[UTC]['v_GCRF'] = []
         
         for obj_id in obj_id_red:
             ind = [ii for ii in range(len(tle_dict[obj_id]['UTC_list'])) if tle_dict[obj_id]['UTC_list'][ii] <= UTC][-1]
             
-            output[UTC]['name_list'].append(tle_dict[obj_id]['name_list'][ind])
-            output[UTC]['r_GCRF'].append(state[obj_id]['r_GCRF'][0])
-            output[UTC]['v_GCRF'].append(state[obj_id]['v_GCRF'][0])    
-        
+            output_tlechange[UTC]['name_list'].append(tle_dict[obj_id]['name_list'][ind])
+            output_tlechange[UTC]['r_GCRF'].append(state[obj_id]['r_GCRF'][0])
+            output_tlechange[UTC]['v_GCRF'].append(state[obj_id]['v_GCRF'][0])    
+    
+    
+    # Get unique list of UTC times in order
+    UTC_list = []
+    obj_id = list(tle_dict.keys())[0]
+    UTC_list0 = tle_dict[obj_id]['UTC_list']
+    line2_list = tle_dict[obj_id]['line2_list']
+    
+    UTC = UTC_list0[0]
+    for ii in range(1, len(UTC_list0)):
+        print(ii)
+        while UTC < UTC_list0[ii]:
+            UTC_list.append(UTC)
+            n_revday = float(line2_list[ii-1][52:63])
+            period = 86400./n_revday
+            UTC += timedelta(seconds=period)
 
-    return output
+    # For each time in list, propagate all objects with a TLE at or before that
+    # time to current UTC
+    for UTC in UTC_list:
+        
+        print(UTC)
+        print('Index: ', UTC_list.index(UTC), ' of ', len(UTC_list), '\n')
+        
+        # Create reduced obj_id_list with only objects that exist at this time
+        obj_id_red = []
+        for obj_id in tle_dict:
+            if tle_dict[obj_id]['UTC_list'][0] <= UTC:
+                obj_id_red.append(obj_id)
+                
+        # Propagate objects to common time
+        state = propagate_TLE(obj_id_red, [UTC], tle_dict, offline_flag=True)
+    
+        # Store output
+        output_periodic[UTC] = {}
+        output_periodic[UTC]['obj_id_list'] = obj_id_red
+        output_periodic[UTC]['name_list'] = []
+        output_periodic[UTC]['r_GCRF'] = []
+        output_periodic[UTC]['v_GCRF'] = []
+        
+        for obj_id in obj_id_red:
+            ind = [ii for ii in range(len(tle_dict[obj_id]['UTC_list'])) if tle_dict[obj_id]['UTC_list'][ii] <= UTC][-1]
+            
+            output_periodic[UTC]['name_list'].append(tle_dict[obj_id]['name_list'][ind])
+            output_periodic[UTC]['r_GCRF'].append(state[obj_id]['r_GCRF'][0])
+            output_periodic[UTC]['v_GCRF'].append(state[obj_id]['v_GCRF'][0])  
+
+    return output_tlechange, output_periodic
 
 
 def tletime2datetime(line1):
