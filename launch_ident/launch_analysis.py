@@ -231,7 +231,13 @@ def animate_launch_tle(state_file, savedir, t0, periodic_flag=True):
         
         plt.savefig(os.path.join(savedir, ('radec_' + str(ind).zfill(3) + '.png')))
         
-        plt.close('all')
+        
+#        if (UTC - t0).total_seconds() > 10.1*86400.:
+#            plt.show()
+#            mistake
+        
+        if UTC_list.index(UTC) < (len(UTC_list)-1):
+            plt.close('all')
         
                 
         
