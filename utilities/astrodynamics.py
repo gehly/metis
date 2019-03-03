@@ -303,6 +303,29 @@ def sunsynch_RAAN(launch_dt, LTAN):
     return RAAN
 
 
+def compute_vc(r, GM=GME):
+    '''
+    This function computes the circular orbital velocity for a given orbit
+    radius and gravitational parameter.
+    
+    Parameters
+    ------
+    r : float
+        orbit radius [km]
+    GM : float, optional
+        gravitational parameter (default=GME) [km^3/s^2]
+        
+    Returns
+    ------
+    vc : float
+        circular orbit velocity [km/s]
+    '''
+    
+    vc = np.sqrt(GM/r)    
+    
+    return vc
+
+
 
 
 
