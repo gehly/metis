@@ -326,7 +326,29 @@ def compute_vc(r, GM=GME):
     return vc
 
 
-
+def compute_visviva(r, a, GM=GME):
+    '''
+    This function computes the orbital velocity for a given orbit radius,
+    semi-major axis and gravitational parameter, using Vis-Viva.
+    
+    Parameters
+    ------
+    r : float
+        orbit radius [km]
+    a : float
+        orbit semi-major axis [km]
+    GM : float, optional
+        gravitational parameter (default=GME) [km^3/s^2]
+        
+    Returns
+    ------
+    v : float
+        orbit velocity [km/s]
+    '''
+    
+    v = np.sqrt(2*GM/r - GM/a)    
+    
+    return v
 
 
 
