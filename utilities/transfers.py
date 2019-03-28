@@ -82,7 +82,7 @@ if __name__ == '__main__':
     dV2_vect = np.array([[0.], [vp], [0.]]) - np.array([[0.], [vp*cos(i1)], [vp*sin(i1)]])
     dV2 = np.linalg.norm(dV2_vect)
     
-    check = np.sqrt(vp**2 + vp**2 - 2*vp*vp*cos(i1))
+    check = 2*vp*sin(i1/2)
     
     print('Method 1 - Apoapsis First')
     print(dV1)
