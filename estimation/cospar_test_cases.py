@@ -31,7 +31,7 @@ from sensors.brdf_models import lambertian_sphere
 from sensors.brdf_models import ashikhmin_premoze
 from sensors.measurements import compute_measurement
 from sensors.measurements import ecef2azelrange_rad
-from sensors.visibility import check_visibility
+from sensors.visibility_functions import check_visibility
 from propagation.integration_functions import int_twobody
 from propagation.integration_functions import int_twobody_ukf
 from propagation.integration_functions import int_euler_dynamics_notorque
@@ -47,8 +47,8 @@ from propagation.integration_functions import ode_twobody_j2_drag_srp_notorque_u
 from propagation.propagation_functions import propagate_orbit
 from data_processing.errors import compute_ukf_errors
 from data_processing.errors import plot_ukf_errors
-from data_processing.errors import compute_mmae_errors
-from data_processing.errors import plot_mmae_errors
+from data_processing.errors import compute_mm_errors
+from data_processing.errors import plot_mm_errors
 
 from estimation import unscented_kalman_filter
 from multiple_model import multiple_model_filter
@@ -1562,10 +1562,10 @@ if __name__ == '__main__':
 #    generate_mmae_params(true_params_file, init_orbit_file, mmae_params_file)
     
     # Run filter
-#    run_filter(mmae_params_file, sensor_file, meas_file, filter_output_file,
-#               ephemeris, ts, alpha=1e-4)
-#    
+    run_filter(mmae_params_file, sensor_file, meas_file, filter_output_file,
+               ephemeris, ts, alpha=1e-4)
     
+#    
     
     
     # Compute and plot errors
