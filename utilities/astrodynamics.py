@@ -80,6 +80,7 @@ def smaecc2semilatusrectum(a, e):
     
     return p
 
+
 def mean2ecc(M, e):
     '''
     This function converts from Mean Anomaly to Eccentric Anomaly
@@ -97,17 +98,10 @@ def mean2ecc(M, e):
       eccentric anomaly [rad]
     '''
 
-    # Ensure M is between 0 and pi
-    while M < 0:
-        M = M + 2*pi
-
-    if M > 2*pi:
-        M = fmod(M, 2*pi)
-
-    flag = 0
-    if M > pi:
-        flag = 1
-        M = 2*pi - M
+    # Ensure M is between 0 and 2*pi
+    M = fmod(M, 2*pi)
+    if M < 0:
+        M += 2*pi
 
     # Starting guess for E
     E = M + e*sin(M)/(1 - sin(M + e) + sin(M))
@@ -121,10 +115,6 @@ def mean2ecc(M, e):
         f = E - e*sin(E) - M
         df = 1 - e*cos(E)
         E = E - f/df
-
-    # Correction for M > pi
-    if flag == 1:
-        E = 2*pi - E
 
     return E
 
@@ -293,7 +283,7 @@ def sunsynch_RAAN(launch_dt, LTAN):
     # Compute solar RA angle at time of launch
     year = launch_dt.year
     vernal = datetime(year, 3, 21, 12, 0, 0)
-    delta = (launch_dt - vernal).total_seconds()/86400.
+    delta = (launch_dt - vernal).total_seconds()
     solar_RA = dRAAN*delta * 180./pi  # deg
     
     # Compute desired RAAN
@@ -303,7 +293,52 @@ def sunsynch_RAAN(launch_dt, LTAN):
     return RAAN
 
 
+def compute_vc(r, GM=GME):
+    '''
+    This function computes the circular orbital velocity for a given orbit
+    radius and gravitational parameter.
+    
+    Parameters
+    ------
+    r : float
+        orbit radius [km]
+    GM : float, optional
+        gravitational parameter (default=GME) [km^3/s^2]
+        
+    Returns
+    ------
+    vc : float
+        circular orbit velocity [km/s]
+    '''
+    
+    vc = np.sqrt(GM/r)    
+    
+    return vc
 
+
+def compute_visviva(r, a, GM=GME):
+    '''
+    This function computes the orbital velocity for a given orbit radius,
+    semi-major axis and gravitational parameter, using Vis-Viva.
+    
+    Parameters
+    ------
+    r : float
+        orbit radius [km]
+    a : float
+        orbit semi-major axis [km]
+    GM : float, optional
+        gravitational parameter (default=GME) [km^3/s^2]
+        
+    Returns
+    ------
+    v : float
+        orbit velocity [km/s]
+    '''
+    
+    v = np.sqrt(2*GM/r - GM/a)    
+    
+    return v
 
 
 
@@ -415,6 +450,47 @@ def osc2mean(osc_elem):
     mean_elem = [a1,e1,i1,RAAN1,w1,M1]    
     
     return mean_elem
+
+
+def osc2perifocal(elem):
+    '''
+    This function computes position coordinates in the perifocal frame given
+    osculating Keplerian elements.
+    
+    Parameters
+    ------
+    elem : 6x1 numpy array
+        osculating Keplerian orbital elements
+    
+    Returns
+    ------
+    x : float
+        perifocal frame x-coordinate
+    y : float
+        perifocal frame y-coordinate
+    '''
+    
+    # Retrieve orbit parameters
+    a = float(elem[0])
+    e = float(elem[1])
+    M = float(elem[5])*pi/180.
+    
+    # Compute true anomaly
+    E = mean2ecc(M, e)
+    f = ecc2true(E, e)
+    
+    # Compute semi-latus rectum
+    p = smaecc2semilatusrectum(a, e)
+    
+    # Compute orbit radius
+    r = p/(1 + e*cos(f))
+    
+    # Compute cartesian coordinates
+    x = r*cos(f)
+    y = r*sin(f)
+    
+    
+    return x, y
 
 
 def brouwer_lyddane(a0,e0,i0,RAAN0,w0,M0,gamma0):
@@ -539,6 +615,194 @@ def brouwer_lyddane(a0,e0,i0,RAAN0,w0,M0,gamma0):
     return a1, e1, i1, RAAN1, w1, M1
 
 
+def cart2kep(cart, GM=GME):
+    '''
+    This function converts a Cartesian state vector in inertial frame to
+    Keplerian orbital elements.
+    
+    Parameters
+    ------
+    cart : 6x1 numpy array
+    
+    Cartesian Coordinates (Inertial Frame)
+    ------
+    cart[0] : x
+      Position in x               [km]
+    cart[1] : y
+      Position in y               [km]
+    cart[2] : z
+      Position in z               [km]
+    cart[3] : dx
+      Velocity in x               [km/s]
+    cart[4] : dy
+      Velocity in y               [km/s]
+    cart[5] : dz
+      Velocity in z               [km/s]
+      
+    Returns
+    ------
+    elem : 6x1 numpy array
+    
+    Keplerian Orbital Elements
+    ------
+    elem[0] : a
+      Semi-Major Axis             [km]
+    elem[1] : e
+      Eccentricity                [unitless]
+    elem[2] : i
+      Inclination                 [deg]
+    elem[3] : RAAN
+      Right Asc Ascending Node    [deg]
+    elem[4] : w
+      Argument of Periapsis       [deg]
+    elem[5] : theta
+      True Anomaly                [deg]    
+      
+    '''
+    
+    # Retrieve input cartesian coordinates
+    r_vect = cart[0:3].reshape(3,1)
+    v_vect = cart[3:6].reshape(3,1)
+
+    # Calculate orbit parameters
+    r = np.linalg.norm(r_vect)
+    ir_vect = r_vect/r
+    v2 = np.linalg.norm(v_vect)**2
+    h_vect = np.cross(r_vect, v_vect, axis=0)
+    h = np.linalg.norm(h_vect)
+
+    # Calculate semi-major axis
+    a = 1./(2./r - v2/GM)     # km
+    
+    # Calculate eccentricity
+    e_vect = np.cross(v_vect, h_vect, axis=0)/GM - ir_vect
+    e = np.linalg.norm(e_vect)
+
+    # Calculate RAAN and inclination
+    ih_vect = h_vect/h
+    RAAN = atan2(ih_vect[0], -ih_vect[1])   # rad
+    i = acos(ih_vect[2])   # rad
+    if RAAN < 0.:
+        RAAN += 2.*pi
+
+    # Apply correction for circular orbit, choose e_vect to point
+    # to ascending node
+    if e != 0:
+        ie_vect = e_vect/e
+    else:
+        ie_vect = np.array([[cos(RAAN)], [sin(RAAN)], [0.]])
+
+    # Find orthogonal unit vector to complete perifocal frame
+    ip_vect = np.cross(ih_vect, ie_vect, axis=0)
+
+    # Form rotation matrix PN
+    PN = np.concatenate((ie_vect, ip_vect, ih_vect), axis=1).T
+
+    # Calculate argument of periapsis
+    w = atan2(PN[0,2], PN[1,2])  # rad
+    if w < 0.:
+        w += 2.*pi
+
+    # Calculate true anomaly
+    cross1 = np.cross(ie_vect, ir_vect, axis=0)
+    tan1 = np.dot(cross1.T, ih_vect)
+    tan2 = np.dot(ie_vect.T, ir_vect)
+    theta = atan2(tan1, tan2)    # rad
+    if theta < 0.:
+        theta += 2.*pi
+    
+    # Convert angles to deg
+    i *= 180./pi
+    RAAN *= 180./pi
+    w *= 180./pi
+    theta *= 180./pi
+    
+    # Form output
+    elem = np.array([[a], [e], [i], [RAAN], [w], [theta]])
+      
+    return elem
+
+
+def kep2cart(elem, GM=GME):
+    '''
+    This function converts a vector of Keplerian orbital elements to a
+    Cartesian state vector in inertial frame.
+    
+    Parameters
+    ------
+    elem : 6x1 numpy array
+    
+    Keplerian Orbital Elements
+    ------
+    elem[0] : a
+      Semi-Major Axis             [km]
+    elem[1] : e
+      Eccentricity                [unitless]
+    elem[2] : i
+      Inclination                 [deg]
+    elem[3] : RAAN
+      Right Asc Ascending Node    [deg]
+    elem[4] : w
+      Argument of Periapsis       [deg]
+    elem[5] : theta
+      True Anomaly                [deg]
+      
+      
+    Returns
+    ------
+    cart : 6x1 numpy array
+    
+    Cartesian Coordinates (Inertial Frame)
+    ------
+    cart[0] : x
+      Position in x               [km]
+    cart[1] : y
+      Position in y               [km]
+    cart[2] : z
+      Position in z               [km]
+    cart[3] : dx
+      Velocity in x               [km/s]
+    cart[4] : dy
+      Velocity in y               [km/s]
+    cart[5] : dz
+      Velocity in z               [km/s]  
+      
+    '''
+    
+    # Retrieve input elements, convert to radians
+    a = float(elem[0])
+    e = float(elem[1])
+    i = float(elem[2]) * pi/180
+    RAAN = float(elem[3]) * pi/180
+    w = float(elem[4]) * pi/180
+    theta = float(elem[5]) * pi/180
+
+    # Calculate h and r
+    p = a*(1 - e**2)
+    h = np.sqrt(GM*p)
+    r = p/(1. + e*cos(theta))
+
+    # Calculate r_vect and v_vect
+    r_vect = r * \
+        np.array([[cos(RAAN)*cos(theta+w) - sin(RAAN)*sin(theta+w)*cos(i)],
+                  [sin(RAAN)*cos(theta+w) + cos(RAAN)*sin(theta+w)*cos(i)],
+                  [sin(theta+w)*sin(i)]])
+
+    vv1 = cos(RAAN)*(sin(theta+w) + e*sin(w)) + \
+          sin(RAAN)*(cos(theta+w) + e*cos(w))*cos(i)
+
+    vv2 = sin(RAAN)*(sin(theta+w) + e*sin(w)) - \
+          cos(RAAN)*(cos(theta+w) + e*cos(w))*cos(i)
+
+    vv3 = -(cos(theta+w) + e*cos(w))*sin(i)
+    
+    v_vect = -GM/h * np.array([[vv1], [vv2], [vv3]])
+
+    cart = np.concatenate([r_vect, v_vect])
+    
+    return cart
+
+
 def element_conversion(x_in, iflag, oflag, GM=GME, dt=0.):
     '''
     This funciton converts between Keplerian orbital elements
@@ -551,8 +815,7 @@ def element_conversion(x_in, iflag, oflag, GM=GME, dt=0.):
     x_in : 6x1 numpy array
       vector of elements or cartesian coordinates at t0
     iflag : int
-      input flag (0 = orbital elements, 1 = cartesian coordiantes,
-                  2 = launch elements)
+      input flag (0 = orbital elements, 1 = cartesian coordiantes)
     oflag : int
       output flag (0 = orbital elements, 1 = cartesian coordinates)
     GM : float, optional
@@ -597,25 +860,7 @@ def element_conversion(x_in, iflag, oflag, GM=GME, dt=0.):
       Velocity in y               [km/s]
     x[5] : dz
       Velocity in z               [km/s]
-      
-    Launch Elements
-    ------
-    x[0] : ra
-          Radius of apoapsis        [km]
-    x[1] : rp
-        Radius of periapsis         [km]
-    x[2] : i
-        Inclination                 [deg]
-    x[3] : LTAN
-        Local Time of Asc Node      [h,m,s]
-    x[4] : w
-        Argument of Periapsis       [deg]
-    x[5] : lat
-        Geodetic lat of launch site [deg]
-    x[6] : lon
-        Geodetic lon of launch site [deg]
-    x[7] : t0
-        Time of launch              [UTC_G]
+
     '''
 
     # Get initial orbit elements
@@ -667,6 +912,9 @@ def element_conversion(x_in, iflag, oflag, GM=GME, dt=0.):
         # Calculate eccentricity
         e_vect = np.cross(v_vect, h_vect, axis=0)/GM - ir_vect
         e = np.linalg.norm(e_vect)
+        
+        k = np.array([[0.], [0.], [1.]])
+        N = np.cross(k, h_vect, axis=0)
 
         # Apply correction for circular orbit, choose e_vect to point
         # to ascending node
@@ -711,6 +959,11 @@ def element_conversion(x_in, iflag, oflag, GM=GME, dt=0.):
 
     # Solve for M(t) = Mo + n*dt
     M = Mo + n*dt   # rad
+    
+    while M < 0:
+        M += 2*pi
+    while M > 2*pi:
+        M -= 2*pi
 
     # Generate output vector x_out
     if oflag == 0:
@@ -759,3 +1012,18 @@ def element_conversion(x_in, iflag, oflag, GM=GME, dt=0.):
         print('Error: Invalid Output Flag!')
 
     return x_out
+
+
+if __name__ == '__main__':
+    
+    e = 0.1
+    theta = 40.
+    
+    kep = [8000., e, 10, 20, 30, theta]
+    
+    cart = kep2cart(kep)
+    
+    kep2 = cart2kep(cart)
+    
+    print(cart)
+    print(kep2)

@@ -137,6 +137,35 @@ def define_sensors(sensor_id_list=[]):
     sensor_dict['UNSW Falcon']['obs_gap'] = obs_gap
     sensor_dict['UNSW Falcon']['min_pass'] = min_pass
     sensor_dict['UNSW Falcon']['max_pass'] = max_pass
+
+
+    print('USAFA Falcon')
+    lat_gs = 39.01
+    lon_gs = 255.01
+    ht_gs = 2.805 # km	
+    geodetic_latlonht = [lat_gs, lon_gs, ht_gs]
+    
+    # Location and constraints
+    sensor_dict['USAFA Falcon'] = {}
+    sensor_dict['USAFA Falcon']['geodetic_latlonht'] = geodetic_latlonht
+    sensor_dict['USAFA Falcon']['mapp_lim'] = mapp_lim
+    sensor_dict['USAFA Falcon']['moon_angle_lim'] = moon_angle_lim
+    sensor_dict['USAFA Falcon']['el_lim'] = el_lim
+    sensor_dict['USAFA Falcon']['az_lim'] = az_lim
+    sensor_dict['USAFA Falcon']['rg_lim'] = rg_lim
+    sensor_dict['USAFA Falcon']['FOV_hlim'] = FOV_hlim
+    sensor_dict['USAFA Falcon']['FOV_vlim'] = FOV_vlim
+    sensor_dict['USAFA Falcon']['sun_elmask'] = sun_el_mask
+    
+    # Measurements and noise
+    sensor_dict['USAFA Falcon']['meas_types'] = meas_types
+    sensor_dict['USAFA Falcon']['sigma_dict'] = sigma_dict
+    
+    # Pass parameters
+    sensor_dict['USAFA Falcon']['max_gap'] = max_gap
+    sensor_dict['USAFA Falcon']['obs_gap'] = obs_gap
+    sensor_dict['USAFA Falcon']['min_pass'] = min_pass
+    sensor_dict['USAFA Falcon']['max_pass'] = max_pass
     
     	
     print('FLC Falcon')
@@ -373,7 +402,7 @@ def define_sensors(sensor_id_list=[]):
     
     # Constraints/Limits
     az_lim = [0., 2.*pi]  # rad
-    el_lim = [20.*pi/180., 80.*pi/180.]  # rad
+    el_lim = [10.*pi/180., 80.*pi/180.]  # rad
     rg_lim = [0., 1e6]   # km
     mapp_lim = 16.
     sun_el_mask = -10.*pi/180.
@@ -946,12 +975,11 @@ def generate_sensor_file(sensor_file, sensor_id_list=[]):
     
     # Save data
     fname, ext = os.path.splitext(sensor_file) 
-    print(ext)
+
     if ext == '.pkl':
         pklFile = open( sensor_file, 'wb' )
         pickle.dump( [sensor_dict], pklFile, -1 )
         pklFile.close()
-        print(sensor_dict)
     
     if ext == '.csv':
         sensors = pd.DataFrame.from_dict(sensor_dict).T
