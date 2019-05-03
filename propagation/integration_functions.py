@@ -30,7 +30,7 @@ from utilities.time_systems import utcdt2ttjd
 # Orbit Propagation Routines
 ###############################################################################
 
-def int_twobody(X, t, spacecraftConfig, forcesCoeff, surfaces):
+def int_twobody(X, t, params, GM=GME):
     '''
     This function works with odeint to propagate object assuming
     simple two-body dynamics.  No perturbations included.
@@ -76,7 +76,7 @@ def int_twobody(X, t, spacecraftConfig, forcesCoeff, surfaces):
     return dX
 
 
-def int_twobody_ukf(X, t, spacecraftConfig, forcesCoeff, surfaces):
+def int_twobody_ukf(X, t, params, GM=GME):
     '''
     This function works with ode to propagate object assuming
     simple two-body dynamics.  No perturbations included.
@@ -126,7 +126,7 @@ def int_twobody_ukf(X, t, spacecraftConfig, forcesCoeff, surfaces):
     return dX
 
 
-def ode_twobody(t, X, params):
+def ode_twobody(t, X, params, GM=GME):
     '''
     This function works with ode to propagate object assuming
     simple two-body dynamics.  No perturbations included.
@@ -145,9 +145,6 @@ def ode_twobody(t, X, params):
     dX : 6 element list
       state derivative vector
     '''
-    
-    # Inputs
-    GM = params['GM']
 
     # State Vector
     x = float(X[0])
@@ -174,7 +171,7 @@ def ode_twobody(t, X, params):
     return dX
 
 
-def ode_twobody_ukf(t, X, params):
+def ode_twobody_ukf(t, X, params, GM=GME):
     '''
     This function works with odeint to propagate object assuming
     simple two-body dynamics.  No perturbations included.
@@ -224,7 +221,7 @@ def ode_twobody_ukf(t, X, params):
     return dX
 
 
-def ode_twobody_j2_drag(t, X, params):
+def ode_twobody_j2_drag(t, X, params, GM=GME, J2=J2E, R=Re):
     '''
     This function works with ode to propagate object assuming
     J2 and drag perturbations.
@@ -285,9 +282,9 @@ def ode_twobody_j2_drag(t, X, params):
     z_drag = drag*va*va_z
     
     # Compute J2 component
-    x_j2 = - 1.5*J2E*Re**2.*GME*((x/r**5.) - (5.*x*z**2./r**7.))
-    y_j2 = - 1.5*J2E*Re**2.*GME*((y/r**5.) - (5.*y*z**2./r**7.))
-    z_j2 = - 1.5*J2E*Re**2.*GME*((3.*z/r**5.) - (5.*z**3./r**7.)) 
+    x_j2 = - 1.5*J2*R**2.*GM*((x/r**5.) - (5.*x*z**2./r**7.))
+    y_j2 = - 1.5*J2*R**2.*GM*((y/r**5.) - (5.*y*z**2./r**7.))
+    z_j2 = - 1.5*J2*R**2.*GM*((3.*z/r**5.) - (5.*z**3./r**7.)) 
     
 
     # Derivative vector
@@ -297,15 +294,15 @@ def ode_twobody_j2_drag(t, X, params):
     dX[1] = dy
     dX[2] = dz
     
-    dX[3] = -GME*x/r**3. + x_j2 + x_drag
-    dX[4] = -GME*y/r**3. + y_j2 + y_drag
-    dX[5] = -GME*z/r**3. + z_j2 + z_drag
+    dX[3] = -GM*x/r**3. + x_j2 + x_drag
+    dX[4] = -GM*y/r**3. + y_j2 + y_drag
+    dX[5] = -GM*z/r**3. + z_j2 + z_drag
     
     
     return dX
 
 
-def ode_twobody_j2_drag_laser(t, X, params):
+def ode_twobody_j2_drag_laser(t, X, params, GM=GME, J2=J2E, R=Re):
     '''
     This function works with ode to propagate object assuming
     J2 and drag perturbations.
@@ -366,9 +363,9 @@ def ode_twobody_j2_drag_laser(t, X, params):
     z_drag = drag*va*va_z
     
     # Compute J2 component
-    x_j2 = - 1.5*J2E*Re**2.*GME*((x/r**5.) - (5.*x*z**2./r**7.))
-    y_j2 = - 1.5*J2E*Re**2.*GME*((y/r**5.) - (5.*y*z**2./r**7.))
-    z_j2 = - 1.5*J2E*Re**2.*GME*((3.*z/r**5.) - (5.*z**3./r**7.))
+    x_j2 = - 1.5*J2*R**2.*GM*((x/r**5.) - (5.*x*z**2./r**7.))
+    y_j2 = - 1.5*J2*R**2.*GM*((y/r**5.) - (5.*y*z**2./r**7.))
+    z_j2 = - 1.5*J2*R**2.*GM*((3.*z/r**5.) - (5.*z**3./r**7.))
     
     # Laser acceleration
     # Compute RIC accelerations
@@ -389,15 +386,15 @@ def ode_twobody_j2_drag_laser(t, X, params):
     dX[1] = dy
     dX[2] = dz
     
-    dX[3] = -GME*x/r**3. + x_j2 + x_drag + float(a_eci[0])
-    dX[4] = -GME*y/r**3. + y_j2 + y_drag + float(a_eci[1])
-    dX[5] = -GME*z/r**3. + z_j2 + z_drag + float(a_eci[2])
+    dX[3] = -GM*x/r**3. + x_j2 + x_drag + float(a_eci[0])
+    dX[4] = -GM*y/r**3. + y_j2 + y_drag + float(a_eci[1])
+    dX[5] = -GM*z/r**3. + z_j2 + z_drag + float(a_eci[2])
     
     
     return dX
 
 
-def ode_twobody_j2_drag_srp(t, X, params):
+def ode_twobody_j2_drag_srp(t, X, params, GM=GME, J2=J2E, R=Re):
     '''
     This function works with ode to propagate object assuming
     J2, drag, and SRP perturbations.
@@ -532,9 +529,9 @@ def ode_twobody_j2_drag_srp(t, X, params):
     z_srp = float(a_srp[2])
     
     # Compute J2 component
-    x_j2 = - 1.5*J2E*Re**2.*GME*((x/r**5.) - (5.*x*z**2./r**7.))
-    y_j2 = - 1.5*J2E*Re**2.*GME*((y/r**5.) - (5.*y*z**2./r**7.))
-    z_j2 = - 1.5*J2E*Re**2.*GME*((3.*z/r**5.) - (5.*z**3./r**7.)) 
+    x_j2 = - 1.5*J2*R**2.*GM*((x/r**5.) - (5.*x*z**2./r**7.))
+    y_j2 = - 1.5*J2*R**2.*GM*((y/r**5.) - (5.*y*z**2./r**7.))
+    z_j2 = - 1.5*J2*R**2.*GM*((3.*z/r**5.) - (5.*z**3./r**7.)) 
     
 
     # Derivative vector
@@ -544,15 +541,15 @@ def ode_twobody_j2_drag_srp(t, X, params):
     dX[1] = dy
     dX[2] = dz
     
-    dX[3] = -GME*x/r**3. + x_j2 + x_drag + x_srp
-    dX[4] = -GME*y/r**3. + y_j2 + y_drag + y_srp
-    dX[5] = -GME*z/r**3. + z_j2 + z_drag + z_srp
+    dX[3] = -GM*x/r**3. + x_j2 + x_drag + x_srp
+    dX[4] = -GM*y/r**3. + y_j2 + y_drag + y_srp
+    dX[5] = -GM*z/r**3. + z_j2 + z_drag + z_srp
     
     
     return dX
 
 
-def ode_twobody_j2_drag_ukf(t, X, params):
+def ode_twobody_j2_drag_ukf(t, X, params, GM=GME, J2=J2E, R=Re):
     '''
     This function works with ode to propagate object assuming
     simple including J2 and drag perturbations.
@@ -621,24 +618,24 @@ def ode_twobody_j2_drag_ukf(t, X, params):
         z_drag = drag*va*va_z
 
         # Compute J2 component
-        x_j2 = - 1.5*J2E*Re**2.*GME*((x/r**5.) - (5.*x*z**2./r**7.))
-        y_j2 = - 1.5*J2E*Re**2.*GME*((y/r**5.) - (5.*y*z**2./r**7.))
-        z_j2 = - 1.5*J2E*Re**2.*GME*((3.*z/r**5.) - (5.*z**3./r**7.)) 
+        x_j2 = - 1.5*J2*R**2.*GM*((x/r**5.) - (5.*x*z**2./r**7.))
+        y_j2 = - 1.5*J2*R**2.*GM*((y/r**5.) - (5.*y*z**2./r**7.))
+        z_j2 = - 1.5*J2*R**2.*GM*((3.*z/r**5.) - (5.*z**3./r**7.)) 
 
         # Derivative vector
         dX[ind*n] = dx
         dX[ind*n + 1] = dy
         dX[ind*n + 2] = dz
         
-        dX[ind*n + 3] = -GME*x/r**3. + x_j2 + x_drag
-        dX[ind*n + 4] = -GME*y/r**3. + y_j2 + y_drag
-        dX[ind*n + 5] = -GME*z/r**3. + z_j2 + z_drag
+        dX[ind*n + 3] = -GM*x/r**3. + x_j2 + x_drag
+        dX[ind*n + 4] = -GM*y/r**3. + y_j2 + y_drag
+        dX[ind*n + 5] = -GM*z/r**3. + z_j2 + z_drag
     
 
     return dX
 
 
-def ode_twobody_j2_drag_srp_ukf(t, X, params):
+def ode_twobody_j2_drag_srp_ukf(t, X, params, GM=GME, J2=J2E, R=Re):
     '''
     This function works with ode to propagate object assuming
     simple two-body dynamics.  No perturbations included.
@@ -769,9 +766,9 @@ def ode_twobody_j2_drag_srp_ukf(t, X, params):
         z_srp = float(a_srp[2])
         
         # Compute J2 component
-        x_j2 = - 1.5*J2*Re**2.*GM*((x/r**5.) - (5.*x*z**2./r**7.))
-        y_j2 = - 1.5*J2*Re**2.*GM*((y/r**5.) - (5.*y*z**2./r**7.))
-        z_j2 = - 1.5*J2*Re**2.*GM*((3.*z/r**5.) - (5.*z**3./r**7.)) 
+        x_j2 = - 1.5*J2*R**2.*GM*((x/r**5.) - (5.*x*z**2./r**7.))
+        y_j2 = - 1.5*J2*R**2.*GM*((y/r**5.) - (5.*y*z**2./r**7.))
+        z_j2 = - 1.5*J2*R**2.*GM*((3.*z/r**5.) - (5.*z**3./r**7.)) 
 
         # Derivative vector
         dX[ind*n] = dx
@@ -817,7 +814,8 @@ def int_euler_dynamics_notorque(X, t, spacecraftConfig, forcesCoeff, surfaces):
     return dX
 
 
-def int_twobody_6dof_notorque(X, t, spacecraftConfig, forcesCoeff, surfaces):
+def int_twobody_6dof_notorque(X, t, spacecraftConfig, forcesCoeff, surfaces,
+                              GM=GME):
     '''
     This function works with odeint to propagate object assuming
     simple two-body dynamics and including attitude states assuming
@@ -883,7 +881,7 @@ def int_twobody_6dof_notorque(X, t, spacecraftConfig, forcesCoeff, surfaces):
     return dX
 
 
-def ode_twobody_6dof_notorque(t, X, params):
+def ode_twobody_6dof_notorque(t, X, params, GM=GME):
     '''
     This function works with ode to propagate object assuming
     simple two-body dynamics and including attitude states assuming
@@ -950,7 +948,7 @@ def ode_twobody_6dof_notorque(t, X, params):
     return dX
 
 
-def ode_twobody_6dof_notorque_ukf(t, X, params):
+def ode_twobody_6dof_notorque_ukf(t, X, params, GM=GME):
     '''
     This function works with ode to propagate object assuming
     simple two-body dynamics and including attitude states assuming
@@ -1023,7 +1021,7 @@ def ode_twobody_6dof_notorque_ukf(t, X, params):
     return dX
 
 
-def ode_twobody_j2_drag_srp_notorque(t, X, params):
+def ode_twobody_j2_drag_srp_notorque(t, X, params, GM=GME, J2=J2E, R=Re):
     '''
     This function works with ode to propagate object assuming
     simple two-body dynamics.  No perturbations included.
@@ -1186,9 +1184,9 @@ def ode_twobody_j2_drag_srp_notorque(t, X, params):
     z_drag = drag*va*va_z
 
     # Compute J2 component
-    x_j2 = - 1.5*J2*Re**2.*GM*((x/r**5.) - (5.*x*z**2./r**7.))
-    y_j2 = - 1.5*J2*Re**2.*GM*((y/r**5.) - (5.*y*z**2./r**7.))
-    z_j2 = - 1.5*J2*Re**2.*GM*((3.*z/r**5.) - (5.*z**3./r**7.)) 
+    x_j2 = - 1.5*J2*R**2.*GM*((x/r**5.) - (5.*x*z**2./r**7.))
+    y_j2 = - 1.5*J2*R**2.*GM*((y/r**5.) - (5.*y*z**2./r**7.))
+    z_j2 = - 1.5*J2*R**2.*GM*((3.*z/r**5.) - (5.*z**3./r**7.)) 
     
     # Derivative vector
     dX = [0.]*len(X)
@@ -1208,7 +1206,7 @@ def ode_twobody_j2_drag_srp_notorque(t, X, params):
     return dX
 
 
-def ode_twobody_j2_drag_srp_notorque_ukf(t, X, params):
+def ode_twobody_j2_drag_srp_notorque_ukf(t, X, params, GM=GME, J2=J2E, R=Re):
     '''
     This function works with ode to propagate object assuming
     simple two-body dynamics.  No perturbations included.
@@ -1385,9 +1383,9 @@ def ode_twobody_j2_drag_srp_notorque_ukf(t, X, params):
         z_drag = drag*va*va_z
     
         # Compute J2 component
-        x_j2 = - 1.5*J2*Re**2.*GM*((x/r**5.) - (5.*x*z**2./r**7.))
-        y_j2 = - 1.5*J2*Re**2.*GM*((y/r**5.) - (5.*y*z**2./r**7.))
-        z_j2 = - 1.5*J2*Re**2.*GM*((3.*z/r**5.) - (5.*z**3./r**7.)) 
+        x_j2 = - 1.5*J2*R**2.*GM*((x/r**5.) - (5.*x*z**2./r**7.))
+        y_j2 = - 1.5*J2*R**2.*GM*((y/r**5.) - (5.*y*z**2./r**7.))
+        z_j2 = - 1.5*J2*R**2.*GM*((3.*z/r**5.) - (5.*z**3./r**7.)) 
     
         
         if kk == 0:
