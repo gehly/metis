@@ -37,7 +37,7 @@ def auction(A) :
 
     Returns
     ------
-    row_index : list
+    row_indices : list
         each entry in list is assigned row index for the corresponding column
         e.g. row_index[0] = assigned row index for column index 0
     score : float
@@ -58,14 +58,14 @@ def auction(A) :
 
     #Check if A still has assignments possible
     Acheck = np.zeros((N,M))
-    for i in range(0,N):
-        for j in range(0,M):
-            if A[i,j] > 0.:
-                Acheck[i,j] = 1.
+    for ii in range(N):
+        for jj in range(M):
+            if A[ii,jj] > 0.:
+                Acheck[ii,jj] = 1.
     sumA = sum(Acheck)
 
-    for i in range(0,len(sumA)):
-        if sumA[i] == 0.:
+    for ii in range(len(sumA)):
+        if sumA[ii] == 0.:
             #print 'No more assignments available'
             flag = 1
                        
@@ -82,40 +82,40 @@ def auction(A) :
 
         #Repeat until all columns have been assigned a row
         while np.sum(assign_mat) < M:
-            for j in range(0,M):
+            for jj in range(M):
 
                 #print 'j',j
                 
                 #Step 2: Check if column j is unassigned
-                if np.sum(assign_mat[:,j]) == 0:
+                if np.sum(assign_mat[:,jj]) == 0:
 
                     #Set cost for unallowed assignments
-                    for row in range(0,N):
-                        if A[row,j] <= 0 and price[row] == 0:                            
+                    for row in range(N):
+                        if A[row,jj] <= 0 and price[row] == 0:                            
                             price[row] = 1e15
 
                             #if row == 0 :
                             #    print 'unallowed cost set'
 
                     #Step 3: Find the best row i for column j                
-                    jvec = np.reshape(A[:,j],(N,1)) - price
-                    i = np.argmax(jvec)
+                    jvec = np.reshape(A[:,jj],(N,1)) - price
+                    ii = np.argmax(jvec)
 
                     #print 'best i',i
 
                     #Check if [i,j] is a valid assignment
-                    if A[i,j] <= 0:
+                    if A[ii,jj] <= 0:
                         flag = 1
                         break
 
                     #Step 4: Assign row i to column j
-                    assign_mat[i,:] = np.zeros((1,M))
-                    assign_mat[i,j] = 1.
+                    assign_mat[ii,:] = np.zeros((1,M))
+                    assign_mat[ii,jj] = 1.
 
                     #Step 5: Compute new price
                     jvec2 = np.sort(list(np.reshape(jvec,(1,N))))
                     yj = jvec2[0][-1] - jvec2[0][-2]                
-                    real_price[i] = real_price[i] + yj + eps
+                    real_price[ii] = real_price[ii] + yj + eps
                     price = copy.copy(real_price)
 
 ##                    print 'yj',yj
@@ -150,31 +150,38 @@ def auction(A) :
             if flag :
                 break            
 
-    #Set the row_index to achieve assignment
-    row_index = []
+    #Set the row indices to achieve assignment
+    row_indices = []
     score = 0.
     #print 'eps',eps
     if not flag :
-        for j in range(0,M) :
-            x = np.nonzero(assign_mat[:,j])       
-            row_index.append(int(x[0]))
-            score += A[int(x[0]),j]
+        for jj in range(M):
+            x = np.nonzero(assign_mat[:,jj])       
+            row_indices.append(int(x[0]))
+            score += A[int(x[0]),jj]
 
-    return row_index, score, eps
+    return row_indices, score, eps
 
 
 
-def murty(d2_table, inputs, pd_list):
+def murty(A, kbest=1):
     '''
-    This function computes the k-best hypotheses for use in MHT/JPDA
+    This function computes the k-best solutions to the 2D assignment problem
+    by repeatedly running auction on reduced forms of the input score matrix.
 
     Parameters
     ------
-    d2_table = table of association distances [col = track, row = meas]
-    inputs = dict of input parameters
+    A : NxM numpy array
+        score table
+    kbest : int
+        number of solutions to return (k highest scoring assignments)
     
     Returns
     ------
+    final_list : list of lists
+        each entry in list is a row_index list
+        each entry in row_indices is assigned row index for the corresponding
+        column, e.g. row_indices[0] = assigned row index for column index 0
     
     
     References
@@ -183,28 +190,12 @@ def murty(d2_table, inputs, pd_list):
 
     '''
 
-    #Break out inputs
-    kbest = inputs['kbest']
-    gate = inputs['gate']
-
     #Form association table
-    N = int(d2_table.shape[1])
-    mk = int(d2_table.shape[0])
-    A0 = np.zeros((N+mk,N))
-
-    for col in xrange(0,N) :
-        pd = pd_list[col]
-        for row in xrange(0,N+mk) :
-            if row < mk :
-                A0[row,col] = gate - np.sqrt(d2_table[row,col])
-            else :
-                A0[row,col] = gate * (1-pd)
-                
-    A = copy.copy(A0)
-
+    N = int(A.shape[0])
+    M = int(A.shape[1])
     
     #Step 1: Solve for the best solution
-    row_indices, score = auction(A)
+    row_indices, score, eps = auction(A)
 
     #print 'A',A
     #print row_indices
@@ -218,7 +209,7 @@ def murty(d2_table, inputs, pd_list):
     row_indices_matrix = []
 
     #Step 4: Loop to find kbest possible solutions
-    for ind in xrange(0,kbest) :
+    for ind in range(kbest):
 
 ##        #Reset A
 ##        A = copy.copy(A0)
@@ -243,7 +234,7 @@ def murty(d2_table, inputs, pd_list):
         #print 'row_indices_matrix',row_indices_matrix
 
         #Step 4.4: Loop through all solution pairs in S
-        for j in xrange(0,len(S)) :
+        for j in range(0,len(S)) :
 
             #Step 4.4.1: Set A2 = A
             A2 = copy.deepcopy(A)
@@ -271,12 +262,12 @@ def murty(d2_table, inputs, pd_list):
 
             #SHOULD BE A2????
             
-            for i1 in xrange(0,N+mk) :
-                if i1 != i :
+            for i1 in range(N+M):
+                if i1 != i:
                     A[i1,j] = 0.
             
-            for j1 in xrange(0,N) :
-                if j1 != j :
+            for j1 in range(M) :
+                if j1 != j:
                     A[i,j1] = 0.
 
 ##            print row_indices
@@ -326,6 +317,26 @@ def unit_test_auction():
         
     if test_sum == 0.:
         print('pass')
+    
+    
+    
+    return
+
+
+def unit_test_murty():
+    '''
+    Example assignment problem from [1] Blackman and Popoli
+    '''
+    
+    # C is cost matrix to minimize
+    C = np.array([[10.,    5.,   8.,   9.],
+                  [7.,   100.,  20., 100.],
+                  [100.,  21., 100., 100.],
+                  [100.,  15.,  17., 100.],
+                  [100., 100.,  16.,  22.]])
+    
+    # A is score matrix to maximize
+    A = 100.*np.ones((5,4)) - C
     
     
     
