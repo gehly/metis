@@ -54,6 +54,7 @@ def auction(A) :
 
     N = int(A.shape[0])
     M = int(A.shape[1])
+    eps = 1./(2.*N)
     flag = 0
 
     #Check if A still has assignments possible
@@ -66,7 +67,7 @@ def auction(A) :
 
     for ii in range(len(sumA)):
         if sumA[ii] == 0.:
-            #print 'No more assignments available'
+            print('No more assignments available')
             flag = 1
                        
     if not flag:
@@ -74,7 +75,7 @@ def auction(A) :
         assign_mat = np.zeros((N,M))
         price = np.zeros((N,1))
         real_price = np.zeros((N,1))
-        eps = 1./(2.*N)
+        
 
 #        eps = 0.5
 
@@ -164,14 +165,14 @@ def auction(A) :
 
 
 
-def murty(A, kbest=1):
+def murty(A0, kbest=1):
     '''
     This function computes the k-best solutions to the 2D assignment problem
     by repeatedly running auction on reduced forms of the input score matrix.
 
     Parameters
     ------
-    A : NxM numpy array
+    A0 : NxM numpy array
         score table
     kbest : int
         number of solutions to return (k highest scoring assignments)
@@ -191,15 +192,15 @@ def murty(A, kbest=1):
     '''
 
     #Form association table
-    N = int(A.shape[0])
-    M = int(A.shape[1])
+    N = int(A0.shape[0])
+    M = int(A0.shape[1])
     
     #Step 1: Solve for the best solution
-    row_indices, score, eps = auction(A)
+    row_indices, score, eps = auction(A0)
 
     #print 'A',A
-    #print row_indices
-    #print score
+    print(row_indices)
+    print(score)
 
     #Step 2: Initialize List of Problem/Solution Pairs
     PS_list = [row_indices]
@@ -211,11 +212,11 @@ def murty(A, kbest=1):
     #Step 4: Loop to find kbest possible solutions
     for ind in range(kbest):
 
-##        #Reset A
-##        A = copy.copy(A0)
-        #print 'ind',ind
-        #print 'PS_list',PS_list
-        #print 'scores',score_list
+        #Reset A
+        A1 = copy.copy(A0)
+        print('ind',ind)
+        print('PS_list',PS_list)
+        print('scores',score_list)
 
         if not PS_list :
             #print 'No more solutions available'
@@ -231,13 +232,15 @@ def murty(A, kbest=1):
 
         #Step 4.3: Add this solution to the final list
         row_indices_matrix.append(S)
-        #print 'row_indices_matrix',row_indices_matrix
+        print('row_indices_matrix', row_indices_matrix)
 
         #Step 4.4: Loop through all solution pairs in S
-        for j in range(0,len(S)) :
+        for j in range(0,len(S)):
+            
+            print(j)
 
-            #Step 4.4.1: Set A2 = A
-            A2 = copy.deepcopy(A)
+            #Step 4.4.1: Set A2 = A1
+            A2 = copy.copy(A1)
 
             #Step 4.4.2: Remove solution [i,j] from A2
             i = S[j]
@@ -248,41 +251,41 @@ def murty(A, kbest=1):
             #print 'A2',A2
 
             #Step 4.4.3: Solve for best remaining solution
-            row_indices, score = auction(A2)
+            row_indices, score, eps = auction(A2)
 
 
             #Step 4.4.4: If solution exists, add to PS_list
-            if row_indices :
+            if row_indices:
                 PS_list.append(row_indices)
                 score_list.append(score)
-            else :
+            else:
                 continue
 
-            #Step 4.4.5: Remove row/col from A except [i,j]
+            #Step 4.4.5: Remove row/col from A1 except [i,j]
 
             #SHOULD BE A2????
             
-            for i1 in range(N+M):
+            for i1 in range(N):
                 if i1 != i:
-                    A[i1,j] = 0.
+                    A1[i1,j] = 0.
             
-            for j1 in range(M) :
+            for j1 in range(M):
                 if j1 != j:
-                    A[i,j1] = 0.
+                    A1[i,j1] = 0.
 
-##            print row_indices
-##            print score
-##            print 'A',A
+            print(row_indices)
+            print(score)
+            print('A1',A1)
                                
 
     #Remove duplicate solutions
     final_list = []    
-    for i in row_indices_matrix :
+    for i in row_indices_matrix:
         flag = 0
-        for j in final_list :
-            if i == j :
+        for j in final_list:
+            if i == j:
                 flag = 1
-        if not flag :
+        if not flag:
             final_list.append(i)
             
     return final_list
@@ -338,6 +341,16 @@ def unit_test_murty():
     # A is score matrix to maximize
     A = 100.*np.ones((5,4)) - C
     
+    # Compute assignment
+    kbest = 3
+    final_list = murty(A, kbest)
+    
+    print(final_list)
+    
+    for row_index in final_list:
+        for ii in range(4):
+            print(C[row_index[ii], ii])
+    
     
     
     return
@@ -347,28 +360,37 @@ def unit_test_murty():
 
 if __name__ == '__main__':
     
-
-    # A is score matrix to maximize
-    A = np.array([[1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-                  [2, 10, 3, 6, 2, 12, 6, 9, 6, 10],
-                  [3, 11, 1, 9, 4, 15, 5, 4, 9, 12],
-                  [4, 6, 5, 4, 0, 3, 4, 6, 10, 11],
-                  [5, 0, 6, 8, 1, 10, 3, 7, 8, 13],
-                  [6, 11, 0, 6, 5, 9, 2, 5, 3, 8],
-                  [7, 9, 2, 5, 6, 5, 1, 3, 6, 6],
-                  [8, 8, 6, 9, 4, 0, 8, 2, 1, 5],
-                  [10, 12, 11, 6, 5, 10, 9, 1, 6, 7],
-                  [9, 10, 4, 8, 0, 9, 1, 0, 5, 9]])
-
     
-    # Compute assignment
-    row_index, score, eps = auction(A)
+#    unit_test_auction()
     
-    print(row_index, score, eps)
+    
+    unit_test_murty()
+    
+    
+    
+    
 
-    for ii in range(10):
-        print(A[row_index[ii],ii])
-    
+#    # A is score matrix to maximize
+#    A = np.array([[1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+#                  [2, 10, 3, 6, 2, 12, 6, 9, 6, 10],
+#                  [3, 11, 1, 9, 4, 15, 5, 4, 9, 12],
+#                  [4, 6, 5, 4, 0, 3, 4, 6, 10, 11],
+#                  [5, 0, 6, 8, 1, 10, 3, 7, 8, 13],
+#                  [6, 11, 0, 6, 5, 9, 2, 5, 3, 8],
+#                  [7, 9, 2, 5, 6, 5, 1, 3, 6, 6],
+#                  [8, 8, 6, 9, 4, 0, 8, 2, 1, 5],
+#                  [10, 12, 11, 6, 5, 10, 9, 1, 6, 7],
+#                  [9, 10, 4, 8, 0, 9, 1, 0, 5, 9]])
+#
+#    
+#    # Compute assignment
+#    row_index, score, eps = auction(A)
+#    
+#    print(row_index, score, eps)
+#
+#    for ii in range(10):
+#        print(A[row_index[ii],ii])
+#    
 
 
 
