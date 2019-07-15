@@ -208,12 +208,14 @@ def murty(A0, kbest=1):
 
     #Step 3: Clear the list of solutions to be returned
     row_indices_matrix = []
+    
+    A1 = copy.copy(A0)
 
     #Step 4: Loop to find kbest possible solutions
     for ind in range(kbest):
 
         #Reset A
-        A1 = copy.copy(A0)
+        
         print('ind',ind)
         print('PS_list',PS_list)
         print('scores',score_list)
@@ -276,6 +278,9 @@ def murty(A0, kbest=1):
             print(row_indices)
             print(score)
             print('A1',A1)
+            
+            print(PS_list)
+            print(score_list)
                                
 
     #Remove duplicate solutions
@@ -342,7 +347,7 @@ def unit_test_murty():
     A = 100.*np.ones((5,4)) - C
     
     # Compute assignment
-    kbest = 3
+    kbest = 4
     final_list = murty(A, kbest)
     
     print(final_list)
