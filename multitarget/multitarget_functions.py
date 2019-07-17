@@ -67,7 +67,7 @@ def auction(A) :
 
     for ii in range(len(sumA)):
         if sumA[ii] == 0.:
-            print('No more assignments available')
+#            print('No more assignments available')
             flag = 1
                        
     if not flag:
@@ -138,7 +138,7 @@ def auction(A) :
 ##                print x[0]
 
             loop_count += 1
-            print('loop', loop_count)
+#            print('loop', loop_count)
             if loop_count > 3*M:
                 eps *= 2.
                 loop_count = 0
@@ -199,47 +199,47 @@ def murty(A0, kbest=1):
     row_indices, score, eps = auction(A0)
 
     #print 'A',A
-    print(row_indices)
-    print(score)
+#    print(row_indices)
+#    print(score)
 
     #Step 2: Initialize List of Problem/Solution Pairs
-    PS_list = [row_indices]
+    candidate_A_list = [A0]
+    candidate_solution_list = [row_indices]
     score_list = [score]
 
     #Step 3: Clear the list of solutions to be returned
-    row_indices_matrix = []
-    
-    A1 = copy.copy(A0)
+    solution_list = []
 
     #Step 4: Loop to find kbest possible solutions
     for ind in range(kbest):
 
-        #Reset A
-        
-        print('ind',ind)
-        print('PS_list',PS_list)
-        print('scores',score_list)
+#        print('ind',ind)
+#        print('A_list',candidate_A_list)
+#        print('cand_list', candidate_solution_list)
+#        print('scores',score_list)
 
-        if not PS_list :
-            #print 'No more solutions available'
+        if not candidate_solution_list :
+            # print('No more solutions available')
             break
 
         #Step 4.1: Find the best solution in PS_list
         best_ind = np.argmax(score_list)
-        S = PS_list[best_ind]
+        A1 = candidate_A_list[best_ind]
+        S = candidate_solution_list[best_ind]
 
         #Step 4.2: Remove this entry from PS_list and score list
-        del PS_list[best_ind]
+        del candidate_A_list[best_ind]
+        del candidate_solution_list[best_ind]
         del score_list[best_ind]
 
         #Step 4.3: Add this solution to the final list
-        row_indices_matrix.append(S)
-        print('row_indices_matrix', row_indices_matrix)
+        solution_list.append(S)
+#        print('solution_list', solution_list)
 
         #Step 4.4: Loop through all solution pairs in S
         for j in range(0,len(S)):
             
-            print(j)
+#            print('\n\n', j)
 
             #Step 4.4.1: Set A2 = A1
             A2 = copy.copy(A1)
@@ -248,9 +248,8 @@ def murty(A0, kbest=1):
             i = S[j]
             A2[i,j] = 0.
 
-            #print 'i',i
-            #print 'j',j
-            #print 'A2',A2
+#            print(A1)
+#            print(A2)
 
             #Step 4.4.3: Solve for best remaining solution
             row_indices, score, eps = auction(A2)
@@ -258,15 +257,13 @@ def murty(A0, kbest=1):
 
             #Step 4.4.4: If solution exists, add to PS_list
             if row_indices:
-                PS_list.append(row_indices)
+                candidate_A_list.append(A2)
+                candidate_solution_list.append(row_indices)
                 score_list.append(score)
             else:
                 continue
 
-            #Step 4.4.5: Remove row/col from A1 except [i,j]
-
-            #SHOULD BE A2????
-            
+            #Step 4.4.5: Remove row/col from A1 except [i,j]           
             for i1 in range(N):
                 if i1 != i:
                     A1[i1,j] = 0.
@@ -275,17 +272,14 @@ def murty(A0, kbest=1):
                 if j1 != j:
                     A1[i,j1] = 0.
 
-            print(row_indices)
-            print(score)
-            print('A1',A1)
-            
-            print(PS_list)
-            print(score_list)
+#            print(row_indices)
+#            print(score)
+#            print('A1',A1)
                                
 
     #Remove duplicate solutions
     final_list = []    
-    for i in row_indices_matrix:
+    for i in solution_list:
         flag = 0
         for j in final_list:
             if i == j:
