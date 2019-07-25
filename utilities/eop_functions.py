@@ -5,14 +5,13 @@ import pandas as pd
 import os
 import sys
 import pickle
-from pathlib import Path
 
 sys.path.append('../')
 
 cwd = os.getcwd()
 ind = cwd.find('metis')
-metis_dir = Path(cwd[0:ind+5])
-input_data_dir = metis_dir / 'input_data'
+metis_dir = cwd[0:ind+5]
+input_data_dir = os.path.join(metis_dir, 'input_data')
 
 from utilities.time_systems import dt2mjd
 from utilities.numerical_methods import interp_lagrange
@@ -92,8 +91,8 @@ def get_celestrak_eop_alldata(offline_flag=False):
     else:
     
         # Retrieve data from internet
-#        pageData = 'https://celestrak.com/SpaceData/eop19620101.txt'
-        pageData = 'http://www.celestrak.com/SpaceData/EOP-Last5Years.txt'
+        pageData = 'https://celestrak.com/SpaceData/eop19620101.txt'
+#        pageData = 'http://www.celestrak.com/SpaceData/EOP-Last5Years.txt'
     
         r = requests.get(pageData)
         if r.status_code != requests.codes.ok:
@@ -785,3 +784,12 @@ def compute_BPN(X, Y, s):
     
     return BPN
 
+
+if __name__ == '__main__':
+    
+    UTC = datetime(2018, 4, 17, 9, 0, 1)
+    
+    eop_alldata = get_celestrak_eop_alldata()
+    EOP_data = get_eop_data(eop_alldata, UTC)
+    
+    print(EOP_data)

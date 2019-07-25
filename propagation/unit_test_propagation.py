@@ -27,7 +27,7 @@ def test_twobody():
     int_tol = 1e-12
     
     params = {}
-    params['step'] = 5.
+    params['step'] = 60.
     params['GM'] = GME
     params['rtol'] = int_tol
     params['atol'] = int_tol
@@ -39,7 +39,7 @@ def test_twobody():
 
         
 #    # Generate RK4 trajectory
-#    t_rk4, X_rk4 = rk4(intfcn, t_in, Xo, params)
+    t_rk4, X_rk4 = rk4(intfcn, t_in, Xo, params)
     
 #    print(t_rk4[1])
 #    print(X_rk4[1])
@@ -105,13 +105,13 @@ def test_twobody():
 #        rk4_dop853[ii] = np.linalg.norm(X_dop853[ii,:] - X_rk4[ii,:])
 #        rkf78_dop853[ii] = np.linalg.norm(X_dop853[ii,:] - X_rkf78[ii,:])
         
-#        err_rk4[ii] = X_rk4[ii,0] - X_true[ii,0]
+        err_rk4[ii] = X_rk4[ii,0] - X_true[ii,0]
         err_rkf78[ii] = X_rkf78[ii,0] - X_true[ii,0]
         err_dop853[ii] = X_dop853[ii,0] - X_true[ii,0]
 #        rk4_dop853[ii] = X_dop853[ii,0] - X_rk4[ii,0]
         rkf78_dop853[ii] = X_dop853[ii,0] - X_rkf78[ii,0]
         
-#        sma_rk4[ii] = element_conversion(X_rk4[ii,:], 1, 0)[0] - SMA
+        sma_rk4[ii] = element_conversion(X_rk4[ii,:], 1, 0)[0] - SMA
         sma_rkf78[ii] = element_conversion(X_rkf78[ii,:], 1, 0)[0] - SMA
         sma_dop853[ii] = element_conversion(X_dop853[ii,:], 1, 0)[0] - SMA
     
