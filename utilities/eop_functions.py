@@ -5,14 +5,13 @@ import pandas as pd
 import os
 import sys
 import pickle
-from pathlib import Path
 
 sys.path.append('../')
 
 cwd = os.getcwd()
 ind = cwd.find('metis')
-metis_dir = Path(cwd[0:ind+5])
-input_data_dir = metis_dir / 'input_data'
+metis_dir = cwd[0:ind+5]
+input_data_dir = os.path.join(metis_dir, 'input_data')
 
 from utilities.time_systems import dt2mjd
 from utilities.numerical_methods import interp_lagrange
