@@ -21,7 +21,7 @@ def dt2mjd(dt):
     
     MJD_datetime = datetime(1858, 11, 17, 0, 0, 0)
     delta = dt - MJD_datetime
-    MJD = delta/timedelta(days=1)
+    MJD = delta.total_seconds()/timedelta(days=1).total_seconds()
     
     return MJD
 
