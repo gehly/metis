@@ -199,6 +199,10 @@ def gcrf2itrf(r_GCRF, v_GCRF, UTC, EOP_data, XYs_df=[]):
         velocity vector in ITRF
     
     '''
+    
+    # Form column vectors
+    r_GCRF = np.reshape(r_GCRF, (3,1))
+    v_GCRF = np.reshape(v_GCRF, (3,1))
         
     # Compute UT1 in JD format
     UT1_JD = utcdt2ut1jd(UTC, EOP_data['UT1_UTC'])
@@ -277,6 +281,10 @@ def itrf2gcrf(r_ITRF, v_ITRF, UTC, EOP_data, XYs_df=[]):
         velocity vector in GCRF
     
     '''
+    
+    # Form column vectors
+    r_ITRF = np.reshape(r_ITRF, (3,1))
+    v_ITRF = np.reshape(v_ITRF, (3,1))
     
     # Compute UT1 in JD format
     UT1_JD = utcdt2ut1jd(UTC, EOP_data['UT1_UTC'])

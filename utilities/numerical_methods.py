@@ -38,7 +38,7 @@ def interp_lagrange(X, Y, xx, p):
         
     # Compute number of elements on either side of middle element to grab
     No2 = 0.5*N
-    nn  = floor(No2)
+    nn  = int(floor(No2))
     
     # Find index such that X[row0] < xx < X[row0+1]
     row0 = list(np.where(X < xx)[0])[-1]
