@@ -248,10 +248,10 @@ def eop_read_line(line):
     028-036	y (arc seconds)
     038-047	UT1-UTC (seconds)
     049-058	Length of Day (seconds)
-    060-068	δΔψ (arc seconds)
-    070-078	δΔε (arc seconds)
-    080-088	δX (arc seconds)
-    090-098	δY (arc seconds)
+    060-068	delta-Delta-psi (arc seconds)
+    070-078	delta-Delta-epsilon (arc seconds)
+    080-088	delta-X (arc seconds)
+    090-098	delta-Y (arc seconds)
     100-102	Delta Atomic Time, TAI-UTC (seconds)
     
     Parameters
