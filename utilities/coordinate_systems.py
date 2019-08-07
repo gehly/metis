@@ -327,10 +327,10 @@ def itrf2gcrf(r_ITRF, v_ITRF, UTC, EOP_data, XYs_df=[]):
     return r_GCRF, v_GCRF
 
 
-def eci2ric(rc_vect, vc_vect, Qin=[]):
+def eci2ric(rc_vect, vc_vect, Q_eci=[]):
     '''
     This function computes the rotation from ECI to RIC and rotates input
-    Qin (vector or matrix) to RIC.
+    Q_eci (vector or matrix) to RIC.
 
     Parameters
     ------
@@ -338,14 +338,18 @@ def eci2ric(rc_vect, vc_vect, Qin=[]):
       position vector of chief (or truth) orbit in ECI
     vc_vect : 3x1 numpy array
       velocity vector of chief (or truth) orbit in ECI
-    Qin : 3x1 or 3x3 numpy array
+    Q_eci : 3x1 or 3x3 numpy array
       vector or matrix in ECI
 
     Returns
     ------
-    Qout : 3x1 or 3x3 numpy array
+    Q_ric : 3x1 or 3x3 numpy array
       vector or matrix in RIC
     '''
+    
+    # Reshape inputs
+    rc_vect = rc_vect.reshape(3,1)
+    vc_vect = vc_vect.reshape(3,1)
 
     # Compute transformation matrix to Hill (RIC) frame
     rc = np.linalg.norm(rc_vect)
@@ -357,21 +361,22 @@ def eci2ric(rc_vect, vc_vect, Qin=[]):
 
     ON = np.concatenate((OR.T, OT.T, OH.T))
 
-    # Rotate Qin as appropriate for vector or matrix
-    if len(Qin) == 0:
-        Qout = ON
-    elif Qin.shape[1] == 1:
-        Qout = np.dot(ON, Qin)
+    # Rotate Q_eci as appropriate for vector or matrix
+    if len(Q_eci) == 0:
+        Q_ric = ON
+    elif np.size(Q_eci) == 3:
+        Q_eci = Q_eci.reshape(3,1)
+        Q_ric = np.dot(ON, Q_eci)
     else:
-        Qout = np.dot(np.dot(ON, Qin), ON.T)
+        Q_ric = np.dot(np.dot(ON, Q_ric), ON.T)
 
-    return Qout
+    return Q_ric
 
 
-def ric2eci(rc_vect, vc_vect, Qin=[]):
+def ric2eci(rc_vect, vc_vect, Q_ric=[]):
     '''
     This function computes the rotation from RIC to ECI and rotates input
-    Qin (vector or matrix) to ECI.
+    Q_ric (vector or matrix) to ECI.
 
     Parameters
     ------
@@ -379,14 +384,18 @@ def ric2eci(rc_vect, vc_vect, Qin=[]):
       position vector of chief (or truth) orbit in ECI
     vc_vect : 3x1 numpy array
       velocity vector of chief (or truth) orbit in ECI
-    Qin : 3x1 or 3x3 numpy array
+    Q_ric : 3x1 or 3x3 numpy array
       vector or matrix in RIC
 
     Returns
     ------
-    Qout : 3x1 or 3x3 numpy array
+    Q_ric : 3x1 or 3x3 numpy array
       vector or matrix in ECI
     '''
+    
+    # Reshape inputs
+    rc_vect = rc_vect.reshape(3,1)
+    vc_vect = vc_vect.reshape(3,1)
 
     # Compute transformation matrix to Hill (RIC) frame
     rc = np.linalg.norm(rc_vect)
@@ -400,14 +409,14 @@ def ric2eci(rc_vect, vc_vect, Qin=[]):
     NO = ON.T
 
     # Rotate Qin as appropriate for vector or matrix
-    if len(Qin) == 0:
-        Qout = NO
-    elif Qin.shape[1] == 1:
-        Qout = np.dot(NO, Qin)
+    if len(Q_ric) == 0:
+        Q_eci = NO
+    elif np.size(Q_ric) == 3:
+        Q_eci = np.dot(NO, Q_ric)
     else:
-        Qout = np.dot(np.dot(NO, Qin), NO.T)
+        Q_eci = np.dot(np.dot(NO, Q_ric), NO.T)
 
-    return Qout
+    return Q_eci
 
 
 def lvlh2ric():
@@ -727,6 +736,16 @@ if __name__ == '__main__':
     print(v_TEME)
     print(r_check - r_GCRF)
     print(v_check - v_GCRF)
+    
+    rc_vect = np.array([7000., 2000., 1000.])
+    vc_vect = np.array([0., -7., -2.])
+    
+    Q_eci = np.random.rand(3,)
+    print(Q_eci)
+    Q_ric = eci2ric(rc_vect, vc_vect, Q_eci)
+    Q_eci2 = ric2eci(rc_vect, vc_vect, Q_ric)
+    print(Q_eci2.flatten())
+    print(Q_eci - Q_eci2.flatten())
     
     
     
