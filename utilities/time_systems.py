@@ -208,7 +208,7 @@ def utcdt2taijd(UTC, TAI_UTC):
 
 def utcdt2gpsjd(UTC, TAI_UTC):
     '''
-    This function converts a UTC time to Terrestrial Time (TT) in Julian Date
+    This function converts a UTC time to GPS time in Julian Date
     (JD) format.
     
     UTC = TAI - TAI_UTC
@@ -233,6 +233,35 @@ def utcdt2gpsjd(UTC, TAI_UTC):
     GPS_JD = UTC_JD + (TAI_UTC - 19.)/86400.
     
     return GPS_JD
+
+
+def gpsdt2utcdt(GPS, TAI_UTC):
+    '''
+    This function converts a GPS time to UTC time as a datetime object
+    
+    UTC = TAI - TAI_UTC
+    GPS = TAI - 19 sec
+    
+    Parameters
+    ------
+    GPS : datetime object
+        time in GPS
+    TAI_UTC : float
+        EOP parameter, time offset between atomic time (TAI) and UTC 
+        (10 + leap seconds)        
+    
+    Returns
+    ------
+    UTC : datetime object
+        time in UTC
+    
+    '''
+    
+    TAI = GPS + timedelta(seconds=19.)
+    UTC = TAI - timedelta(seconds=TAI_UTC)
+    
+    
+    return UTC
 
 
 def utcdt2jedjd(UTC, TAI_UTC):
@@ -361,6 +390,8 @@ if __name__ == '__main__':
     TT_check = jedjd2ttjd(JED_JD)
     TAI_JD = utcdt2taijd(UTC, EOP_data['TAI_UTC'])
     GPS_JD = utcdt2gpsjd(UTC, EOP_data['TAI_UTC'])
+    GPS_dt = jd2dt(GPS_JD)
+    UTC_check = gpsdt2utcdt(GPS_dt, EOP_data['TAI_UTC'])
     
     print('UTC', UTC)
     print('MJD', MJD)
@@ -371,6 +402,8 @@ if __name__ == '__main__':
     print('JED_JD', JED_JD)
     print('TAI_JD', TAI_JD)
     print('GPS_JD', GPS_JD)
+    print('GPS', GPS_dt)
+    print('UTC_check', UTC_check)
     
 
 

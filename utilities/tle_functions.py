@@ -22,6 +22,7 @@ from utilities.coordinate_systems import itrf2gcrf
 from utilities.coordinate_systems import latlonht2ecef
 from utilities.astrodynamics import element_conversion
 from utilities.constants import GME
+from utilities.time_systems import gpsdt2utcdt
 
 from sgp4.io import twoline2rv
 from sgp4.earth_gravity import wgs84
@@ -1110,9 +1111,18 @@ if __name__ == '__main__' :
 #   
     eop_alldata = get_celestrak_eop_alldata()
     
-    start_time = datetime(2019, 6, 11, 2, 0, 0)
-    UTC_list = [start_time] # + timedelta(seconds=ti) for ti in range(0,101,10)]
-    obj_id_list = [20580]
+    gps_time = datetime(2019, 9, 3, 0, 0, 18)
+    
+    EOP_data = get_eop_data(eop_alldata, gps_time)
+    
+    
+    utc_time = gpsdt2utcdt(gps_time, EOP_data['TAI_UTC'])
+    print(utc_time)
+    
+#    start_time = datetime(2019, 9, 23, 0, 0, 0)
+    UTC_list = [utc_time] # + timedelta(seconds=ti) for ti in range(0,101,10)]
+    obj_id = 42917
+    obj_id_list = [obj_id]
     
     output_state = propagate_TLE(obj_id_list, UTC_list)
     
@@ -1121,14 +1131,19 @@ if __name__ == '__main__' :
     for ii in range(len(UTC_list)):
         UTC = UTC_list[ii]
         EOP_data = get_eop_data(eop_alldata, UTC)
-        r_eci = output_state[20580]['r_GCRF'][ii]
-        v_eci = output_state[20580]['v_GCRF'][ii]
+        r_eci = output_state[obj_id]['r_GCRF'][ii]
+        v_eci = output_state[obj_id]['v_GCRF'][ii]
         
         r_ecef, v_ecef = gcrf2itrf(r_eci, v_eci, UTC, EOP_data)
         
         print(UTC)
         print('ECI \n', r_eci)
         print('ECEF \n', r_ecef)
+        
+        test = np.array([[-25353.952565],[33685.678044],[-51.089933]])
+        
+        print(test - r_ecef)
+        print(np.linalg.norm(test - r_ecef))
         
     
     
