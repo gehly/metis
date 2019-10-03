@@ -1013,7 +1013,7 @@ def propagate_TLE(obj_id_list, UTC_list, tle_dict={}, offline_flag=False,
 
         # Retrieve latest TLE data from space-track.org
         tle_dict, tle_df = \
-            get_spacetrack_tle_data(obj_id_list, username, password)
+            get_spacetrack_tle_data(obj_id_list, UTC_list, username, password)
 
         # Retreive TLE data from database
 
@@ -1040,6 +1040,8 @@ def propagate_TLE(obj_id_list, UTC_list, tle_dict={}, offline_flag=False,
 
         # Loop over times
         for UTC in UTC_list:
+            
+            print(UTC)
 
             # Find the closest TLE by epoch
             line1, line2 = find_closest_tle_epoch(line1_list, line2_list, UTC)
@@ -1111,13 +1113,27 @@ if __name__ == '__main__' :
 #   
     eop_alldata = get_celestrak_eop_alldata()
     
-    gps_time = datetime(2019, 9, 3, 0, 0, 18)
+#    gps_time = datetime(2019, 9, 3, 10, 5, 0)
+#    
+#    EOP_data = get_eop_data(eop_alldata, gps_time)
+#    
+#    utc_time = gpsdt2utcdt(gps_time, EOP_data['TAI_UTC'])
+#    print(utc_time)
     
-    EOP_data = get_eop_data(eop_alldata, gps_time)
-    
-    
-    utc_time = gpsdt2utcdt(gps_time, EOP_data['TAI_UTC'])
+    utc_time = datetime(2019, 9, 3, 10, 9, 42)
+
     print(utc_time)
+    
+    
+    sensor_dict = define_sensors(['UNSW Falcon'])
+    latlonht = sensor_dict['UNSW Falcon']['geodetic_latlonht']
+    lat = latlonht[0]
+    lon = latlonht[1]
+    ht = latlonht[2]
+    stat_ecef = latlonht2ecef(lat, lon, ht)
+    
+    
+    
     
 #    start_time = datetime(2019, 9, 23, 0, 0, 0)
     UTC_list = [utc_time] # + timedelta(seconds=ti) for ti in range(0,101,10)]
@@ -1140,10 +1156,43 @@ if __name__ == '__main__' :
         print('ECI \n', r_eci)
         print('ECEF \n', r_ecef)
         
-        test = np.array([[-25353.952565],[33685.678044],[-51.089933]])
+        sp3_ecef = np.array([[-25379.842058],[33676.622067],[51.528803]])
         
-        print(test - r_ecef)
-        print(np.linalg.norm(test - r_ecef))
+        print(sp3_ecef - r_ecef)
+        print(np.linalg.norm(sp3_ecef - r_ecef))
+        
+        stat_eci, dum = itrf2gcrf(stat_ecef, np.zeros((3,1)), UTC, EOP_data)
+        
+        print(stat_eci)
+        print(r_eci)
+        
+        
+        rho_eci = np.reshape(r_eci, (3,1)) - np.reshape(stat_eci, (3,1))
+        
+        print(rho_eci)
+        print(r_eci)
+        print(stat_eci)
+        
+        ra = atan2(rho_eci[1], rho_eci[0]) * 180./pi
+        
+        dec = asin(rho_eci[2]/np.linalg.norm(rho_eci)) * 180./pi
+        
+        print('tle data')
+        print(ra)
+        print(dec)
+        
+        
+        sp3_eci, dum = itrf2gcrf(sp3_ecef, np.zeros((3,1)), UTC, EOP_data)
+        
+        rho_eci2 = sp3_eci - stat_eci
+        
+        ra2 = atan2(rho_eci2[1], rho_eci2[0]) * 180./pi
+        
+        dec2 = asin(rho_eci2[2]/np.linalg.norm(rho_eci2)) * 180./pi
+        
+        print('sp3 data')
+        print(ra2)
+        print(dec2)
         
     
     
