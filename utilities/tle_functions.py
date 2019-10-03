@@ -21,6 +21,7 @@ from utilities.coordinate_systems import gcrf2itrf
 from utilities.coordinate_systems import itrf2gcrf
 from utilities.coordinate_systems import latlonht2ecef
 from utilities.astrodynamics import element_conversion
+from utilities.astrodynamics import meanmot2sma
 from utilities.constants import GME
 from utilities.time_systems import gpsdt2utcdt
 
@@ -381,6 +382,114 @@ def compute_tle_allstate(tle_dict):
             output_periodic[UTC]['v_GCRF'].append(state[obj_id]['v_GCRF'][0])  
 
     return output_tlechange, output_periodic
+
+
+def compute_tle_elements(tle_dict):
+    '''
+    This function computes a dictionary of mean orbit elements at for
+    all objects in the input TLE dictionary.
+    
+    Parameters
+    ------
+    tle_dict : dictionary
+        indexed by object ID, each item has two lists of strings for each line
+        as well as object name and UTC times
+        
+    Returns
+    ------
+    output : dictionary
+        indexed by NORAD ID, each item has a list of UTC times and 
+        corresponding mean elements extracted from the TLEs, including
+        SMA, ECC, INC, RAAN, AoP, M, while retaining the TLE line lists.
+    
+    '''
+    
+    print(tle_dict)
+    
+    for obj_id in tle_dict:
+        UTC_list = tle_dict[obj_id]['UTC_list']
+        line1_list = tle_dict[obj_id]['line1_list']
+        line2_list = tle_dict[obj_id]['line2_list']
+        
+        tle_dict[obj_id]['elem_list'] = []
+        for line2 in line2_list:
+            elem = parse_tle_line2(line2)
+            tle_dict[obj_id]['elem_list'].append(elem)
+
+    
+    return tle_dict
+
+
+def plot_sma_rp_ra(obj_id_list, UTC_list):
+    '''
+    
+    
+    '''
+    
+    
+    # Generate TLE dictionary
+    tle_dict, tle_df = get_spacetrack_tle_data(obj_id_list, UTC_list)
+    
+    # Extract orbit elements
+    tle_dict = compute_tle_elements(tle_dict)
+    print(tle_dict)
+    
+    # Loop over objects and times to generate and plot arrays of SMA, rp, ra
+    
+    
+    
+    
+    return
+
+
+def parse_tle_line1(line1):
+    
+    
+    
+    
+    return
+
+
+def parse_tle_line2(line2):
+    '''
+    This function parses Line 2 of the TLE to extract mean orbit elements.
+    
+    Parameters
+    ------
+    line2 : string
+        second line of TLE
+    
+    Returns
+    ------
+    elem : list
+        elem[0] : a
+          Semi-Major Axis             [km]
+        elem[1] : e
+          Eccentricity                [unitless]
+        elem[2] : i
+          Inclination                 [deg]
+        elem[3] : RAAN
+          Right Asc Ascending Node    [deg]
+        elem[4] : w
+          Argument of Periapsis       [deg]
+        elem[5] : M
+          Mean anomaly                [deg]
+    '''
+    
+    i = float(line2[8:16])
+    RAAN = float(line2[17:25])
+    e = float(line2[26:33])/1e7
+    w = float(line2[34:42])
+    M = float(line2[43:51])
+    n = float(line2[52:63])  # rev/day
+    
+    n *= 2.*pi/86400.  # rad/s
+    
+    a = meanmot2sma(n)
+            
+    elem = [a, e, i, RAAN, w, M]    
+    
+    return elem
 
 
 def tletime2datetime(line1):
@@ -1100,6 +1209,12 @@ def get_planet_ephem():
 ###############################################################################
 
 if __name__ == '__main__' :
+    
+    
+    obj_id_list = [43692]
+    UTC_list = [datetime(2019, 10, 1), datetime(2019, 10, 4)]
+    
+    plot_sma_rp_ra(obj_id_list, UTC_list)
 
 
 #    obj_id_list = [2639, 20777, 28544, 29495, 40146, 42816]
@@ -1111,7 +1226,7 @@ if __name__ == '__main__' :
 #    sensor_list = ['RMIT ROO']
 #    
 #   
-    eop_alldata = get_celestrak_eop_alldata()
+#    eop_alldata = get_celestrak_eop_alldata()
     
 #    gps_time = datetime(2019, 9, 3, 10, 5, 0)
 #    
@@ -1120,79 +1235,79 @@ if __name__ == '__main__' :
 #    utc_time = gpsdt2utcdt(gps_time, EOP_data['TAI_UTC'])
 #    print(utc_time)
     
-    utc_time = datetime(2019, 9, 3, 10, 9, 42)
-
-    print(utc_time)
-    
-    
-    sensor_dict = define_sensors(['UNSW Falcon'])
-    latlonht = sensor_dict['UNSW Falcon']['geodetic_latlonht']
-    lat = latlonht[0]
-    lon = latlonht[1]
-    ht = latlonht[2]
-    stat_ecef = latlonht2ecef(lat, lon, ht)
-    
-    
-    
-    
-#    start_time = datetime(2019, 9, 23, 0, 0, 0)
-    UTC_list = [utc_time] # + timedelta(seconds=ti) for ti in range(0,101,10)]
-    obj_id = 42917
-    obj_id_list = [obj_id]
-    
-    output_state = propagate_TLE(obj_id_list, UTC_list)
-    
-    print(output_state)
-    
-    for ii in range(len(UTC_list)):
-        UTC = UTC_list[ii]
-        EOP_data = get_eop_data(eop_alldata, UTC)
-        r_eci = output_state[obj_id]['r_GCRF'][ii]
-        v_eci = output_state[obj_id]['v_GCRF'][ii]
-        
-        r_ecef, v_ecef = gcrf2itrf(r_eci, v_eci, UTC, EOP_data)
-        
-        print(UTC)
-        print('ECI \n', r_eci)
-        print('ECEF \n', r_ecef)
-        
-        sp3_ecef = np.array([[-25379.842058],[33676.622067],[51.528803]])
-        
-        print(sp3_ecef - r_ecef)
-        print(np.linalg.norm(sp3_ecef - r_ecef))
-        
-        stat_eci, dum = itrf2gcrf(stat_ecef, np.zeros((3,1)), UTC, EOP_data)
-        
-        print(stat_eci)
-        print(r_eci)
-        
-        
-        rho_eci = np.reshape(r_eci, (3,1)) - np.reshape(stat_eci, (3,1))
-        
-        print(rho_eci)
-        print(r_eci)
-        print(stat_eci)
-        
-        ra = atan2(rho_eci[1], rho_eci[0]) * 180./pi
-        
-        dec = asin(rho_eci[2]/np.linalg.norm(rho_eci)) * 180./pi
-        
-        print('tle data')
-        print(ra)
-        print(dec)
-        
-        
-        sp3_eci, dum = itrf2gcrf(sp3_ecef, np.zeros((3,1)), UTC, EOP_data)
-        
-        rho_eci2 = sp3_eci - stat_eci
-        
-        ra2 = atan2(rho_eci2[1], rho_eci2[0]) * 180./pi
-        
-        dec2 = asin(rho_eci2[2]/np.linalg.norm(rho_eci2)) * 180./pi
-        
-        print('sp3 data')
-        print(ra2)
-        print(dec2)
+#    utc_time = datetime(2019, 9, 3, 10, 9, 42)
+#
+#    print(utc_time)
+#    
+#    
+#    sensor_dict = define_sensors(['UNSW Falcon'])
+#    latlonht = sensor_dict['UNSW Falcon']['geodetic_latlonht']
+#    lat = latlonht[0]
+#    lon = latlonht[1]
+#    ht = latlonht[2]
+#    stat_ecef = latlonht2ecef(lat, lon, ht)
+#    
+#    
+#    
+#    
+##    start_time = datetime(2019, 9, 23, 0, 0, 0)
+#    UTC_list = [utc_time] # + timedelta(seconds=ti) for ti in range(0,101,10)]
+#    obj_id = 42917
+#    obj_id_list = [obj_id]
+#    
+#    output_state = propagate_TLE(obj_id_list, UTC_list)
+#    
+#    print(output_state)
+#    
+#    for ii in range(len(UTC_list)):
+#        UTC = UTC_list[ii]
+#        EOP_data = get_eop_data(eop_alldata, UTC)
+#        r_eci = output_state[obj_id]['r_GCRF'][ii]
+#        v_eci = output_state[obj_id]['v_GCRF'][ii]
+#        
+#        r_ecef, v_ecef = gcrf2itrf(r_eci, v_eci, UTC, EOP_data)
+#        
+#        print(UTC)
+#        print('ECI \n', r_eci)
+#        print('ECEF \n', r_ecef)
+#        
+#        sp3_ecef = np.array([[-25379.842058],[33676.622067],[51.528803]])
+#        
+#        print(sp3_ecef - r_ecef)
+#        print(np.linalg.norm(sp3_ecef - r_ecef))
+#        
+#        stat_eci, dum = itrf2gcrf(stat_ecef, np.zeros((3,1)), UTC, EOP_data)
+#        
+#        print(stat_eci)
+#        print(r_eci)
+#        
+#        
+#        rho_eci = np.reshape(r_eci, (3,1)) - np.reshape(stat_eci, (3,1))
+#        
+#        print(rho_eci)
+#        print(r_eci)
+#        print(stat_eci)
+#        
+#        ra = atan2(rho_eci[1], rho_eci[0]) * 180./pi
+#        
+#        dec = asin(rho_eci[2]/np.linalg.norm(rho_eci)) * 180./pi
+#        
+#        print('tle data')
+#        print(ra)
+#        print(dec)
+#        
+#        
+#        sp3_eci, dum = itrf2gcrf(sp3_ecef, np.zeros((3,1)), UTC, EOP_data)
+#        
+#        rho_eci2 = sp3_eci - stat_eci
+#        
+#        ra2 = atan2(rho_eci2[1], rho_eci2[0]) * 180./pi
+#        
+#        dec2 = asin(rho_eci2[2]/np.linalg.norm(rho_eci2)) * 180./pi
+#        
+#        print('sp3 data')
+#        print(ra2)
+#        print(dec2)
         
     
     
