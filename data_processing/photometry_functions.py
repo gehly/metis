@@ -106,7 +106,7 @@ def plot_lightcurve(df_list, label_list=[], color=[], title_text='',
         plt.title(title_text)
 
     
-    return
+    return t_sec, SNR
 
 
 def generate_plots():
@@ -189,18 +189,117 @@ def generate_plots():
 
     
     
-    data_dir = Path('D:/documents/research/sensor_management/reports/2018_asrc_ROO/data')
+#    data_dir = Path('D:/documents/research/sensor_management/reports/2018_asrc_ROO/data')
+#    
+#    data_file = data_dir / 'Sloshsat_ROO_pass1_processed.csv'
+#    ROO_sloshsat_pass1 = csv2dataframe(data_file)
+#    
+#    data_file = data_dir / 'FalconSloshsatPass1.csv'
+#    Falcon_sloshsat_pass1 = csv2dataframe(data_file)
+#    
+#    df_list = [Falcon_sloshsat_pass1, ROO_sloshsat_pass1]
+#    label_list = ['Falcon', 'ROO']
+#    color = iter(['b', 'r'])
+#    plot_lightcurve(df_list, label_list, color, twinx_flag=True)
     
-    data_file = data_dir / 'Sloshsat_ROO_pass1_processed.csv'
-    ROO_sloshsat_pass1 = csv2dataframe(data_file)
     
-    data_file = data_dir / 'FalconSloshsatPass1.csv'
-    Falcon_sloshsat_pass1 = csv2dataframe(data_file)
+    data_dir = Path('D:\documents\\research\launch_identification\\reports\\2019_iac_NABEO\data')
     
-    df_list = [Falcon_sloshsat_pass1, ROO_sloshsat_pass1]
-    label_list = ['Falcon', 'ROO']
-    color = iter(['b', 'r'])
-    plot_lightcurve(df_list, label_list, color, twinx_flag=True)
+    data_file = data_dir / '43164_2018_11_30_main.csv'
+    st_main = csv2dataframe(data_file)
+    
+    data_file = data_dir / '43164_2018_11_30_viewfinder.csv'
+    st_view = csv2dataframe(data_file)
+    
+    df_list = [st_view]
+    label_list = []
+    color = iter(['k'])
+    st_sec, st_SNR = plot_lightcurve(df_list, label_list, color)
+    
+    
+    data_file = data_dir / '43692_2018_11_25_main.csv'
+    nabeo_main = csv2dataframe(data_file)
+    
+    data_file = data_dir / '43692_2018_11_25_viewfinder.csv'
+    nabeo_view = csv2dataframe(data_file)
+    
+    df_list = [nabeo_view]
+    label_list = []
+    color = iter(['k'])
+    nabeo_sec, nabeo_SNR = plot_lightcurve(df_list, label_list, color)
+    
+    
+    fig = plt.figure()
+    ax1 = fig.add_subplot(2,1,1)
+    ax1.plot(nabeo_sec, nabeo_SNR, 'ko--')
+    ax1.set_ylim([0, 700])
+    ax1.set_xlim([0, 225])
+    ax1.set_ylabel('NABEO SNR')
+    
+    ax2 = fig.add_subplot(2,1,2)
+    ax2.plot(st_sec, st_SNR, 'ko--')
+    ax2.set_ylim([0, 700])
+    ax2.set_xlim([0, 225])
+    ax2.set_ylabel('ST SNR')
+    ax2.set_xlabel('Time [sec]')
+    
+    plt.setp(ax1.get_xticklabels(), visible=False)
+    
+    
+    data_file = data_dir / '43692_2019_09_23_main.csv'
+    nabeo_main = csv2dataframe(data_file)
+    
+    data_file = data_dir / '43692_2019_09_23_view.csv'
+    nabeo_view = csv2dataframe(data_file)
+    
+    df_list = [nabeo_view]
+    label_list = []
+    color = iter(['k'])
+    nabeo_sec, nabeo_SNR = plot_lightcurve(df_list, label_list, color)
+    
+    
+    data_file = data_dir / '44372_2019_09_23_pass1_main.csv'
+    mir_main = csv2dataframe(data_file)
+    
+    data_file = data_dir / '44372_2019_09_23_pass1_view.csv'
+    mir_view = csv2dataframe(data_file)
+    
+    df_list = [mir_view]
+    label_list = []
+    color = iter(['k'])
+    mir_sec, mir_SNR = plot_lightcurve(df_list, label_list, color)
+    
+    
+    
+    fig = plt.figure()
+    ax1 = fig.add_subplot(2,1,1)
+    ax1.plot(np.asarray(nabeo_sec[45:-14])-nabeo_sec[45], nabeo_SNR[45:-14], 'ko--')
+#    ax1.set_ylim([0, 1000])
+    ax1.set_xlim([0, 160])
+    ax1.set_ylabel('NABEO SNR')
+    
+    ax2 = fig.add_subplot(2,1,2)
+    ax2.plot(mir_sec, mir_SNR, 'ko--')
+#    ax2.set_ylim([0, 1000])
+    ax2.set_xlim([0, 160])
+    ax2.set_ylabel('MIR SNR')
+    ax2.set_xlabel('Time [sec]')
+    
+    plt.setp(ax1.get_xticklabels(), visible=False)
+    
+    
+    data_file = data_dir / '44372_2019_09_23_pass2_main.csv'
+    mir_main = csv2dataframe(data_file)
+    
+    data_file = data_dir / '44372_2019_09_23_pass2_view.csv'
+    mir_view = csv2dataframe(data_file)
+    
+    df_list = [mir_view]
+    label_list = []
+    color = iter(['k'])
+    mir_sec, mir_SNR = plot_lightcurve(df_list, label_list, color)
+    
+    
     
     
     return

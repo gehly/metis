@@ -1,5 +1,5 @@
 import numpy as np
-from math import pi, asin, atan2
+from math import pi, cos, asin, atan2, floor, exp
 import requests
 import getpass
 from datetime import datetime, timedelta
@@ -22,7 +22,7 @@ from utilities.coordinate_systems import itrf2gcrf
 from utilities.coordinate_systems import latlonht2ecef
 from utilities.astrodynamics import element_conversion
 from utilities.astrodynamics import meanmot2sma
-from utilities.constants import GME
+from utilities.constants import GME, Re, wE
 from utilities.time_systems import gpsdt2utcdt
 
 from sgp4.io import twoline2rv
@@ -404,8 +404,6 @@ def compute_tle_elements(tle_dict):
     
     '''
     
-    print(tle_dict)
-    
     for obj_id in tle_dict:
         UTC_list = tle_dict[obj_id]['UTC_list']
         line1_list = tle_dict[obj_id]['line1_list']
@@ -432,10 +430,210 @@ def plot_sma_rp_ra(obj_id_list, UTC_list):
     
     # Extract orbit elements
     tle_dict = compute_tle_elements(tle_dict)
-    print(tle_dict)
     
     # Loop over objects and times to generate and plot arrays of SMA, rp, ra
+    plot_dict = {}
+    for obj_id in tle_dict:
+        plot_dict[obj_id] = {}
+        plot_dict[obj_id]['UTC_list'] = tle_dict[obj_id]['UTC_list']
+        elem_list = tle_dict[obj_id]['elem_list']
+        a_array = np.array([])
+        rp_array = np.array([])
+        ra_array = np.array([])
+        
+        print(obj_id)
+        inc = elem_list[0][2] * pi/180.
+        print('ecc', elem_list[0][1])
+        print('inc', elem_list[0][2])
+        
+        for elem in elem_list:
+            a = elem[0]
+            e = elem[1]
+            rp = a*(1. - e)
+            ra = a*(1. + e)
+            a_array = np.append(a_array, a)
+            rp_array = np.append(rp_array, rp)
+            ra_array = np.append(ra_array, ra)
+
+            
+        plot_dict[obj_id]['a_array'] = a_array
+        plot_dict[obj_id]['rp_array'] = rp_array
+        plot_dict[obj_id]['ra_array'] = ra_array
+        
+        
+    plt.figure()
+    for obj_id in plot_dict:
+        UTC_list = plot_dict[obj_id]['UTC_list']
+        a_array = plot_dict[obj_id]['a_array']
+        rp_array = plot_dict[obj_id]['rp_array']
+        ra_array = plot_dict[obj_id]['ra_array']
+        
+        if obj_id == 43692:
+            plt.plot(UTC_list, a_array, 'b.')
+        else:
+            plt.plot(UTC_list, a_array, 'k.')
+            
+            
+    label_dict = {}
+    label_dict[43164] = 'ST'
+    label_dict[43692] = 'IBT (NABEO)'
+    label_dict[43851] = 'ELaNa'
+    label_dict[43863] = 'ELaNa'
+    label_dict[44074] = 'DARPA'
+    label_dict[44227] = 'STP-27RD'
+    label_dict[44372] = 'MIR'
+    label_dict[44496] = 'LMNH'
     
+    UTC_start_compare = tle_dict[44227]['UTC_list'][4]
+    
+    # Atmosphere model
+    rho0 = 6.967e-13 * 1e9  # kg/km^3
+    h0 = 500.  # km
+    H = 63.822  # km
+            
+            
+    plt.figure()
+    colors = ['b', 'g', 'k', 'r', 'm', 'c']  
+    ii = 0
+    for obj_id in plot_dict:
+        UTC_list = plot_dict[obj_id]['UTC_list']
+        a_array = plot_dict[obj_id]['a_array']
+        rp_array = plot_dict[obj_id]['rp_array']
+        ra_array = plot_dict[obj_id]['ra_array']
+        
+#        if obj_id == 43692:
+#            plt.plot(UTC_list, a_array-Re, 'b.')
+#        else:
+#            plt.plot(UTC_list, a_array-Re, 'k.')
+        
+#        label_txt = 
+        
+        plt.plot(UTC_list[4:], a_array[4:]-Re, '.',  c=colors[ii], label=label_dict[obj_id])
+        ii += 1
+            
+            
+#        plt.ylim([495., 530.])
+        plt.locator_params(axis='y', nbins=5)
+        plt.ylabel('Mean Altitude [km]')
+            
+            
+        plt.xlim([datetime(2018, 11, 1), datetime(2019, 11, 1)])
+        plt.xlabel('Date')
+        
+        plt.legend()
+        
+        print('\n\nSMA Analysis')
+        print(label_dict[obj_id])
+        ndays = (UTC_list[-1] - UTC_list[4]).total_seconds()/86400.
+        ave_sma = (a_array[-1] - a_array[4])/ndays * 1000.
+        print('Ave SMA change [m/day]', ave_sma)
+        
+        print('Reduced Time SMA Change')
+        UTC_compare = [abs((UTCii - UTC_start_compare).total_seconds()) for UTCii in UTC_list]
+        ind = UTC_compare.index(min(UTC_compare))
+        print(UTC_list[ind])
+        ndays = (UTC_list[-1] - UTC_list[ind]).total_seconds()/86400.
+        ave_sma = (a_array[-1] - a_array[ind])/ndays * 1000.
+        print('Ave SMA change [m/day]', ave_sma)
+        
+        print('\n\nBallistic Coefficient Estimate')
+        print(label_dict[obj_id])
+        
+        # Compute density and ballistic coefficient info
+        ind2 = int(floor((ind+len(UTC_list))/2))
+        print(len(UTC_list))
+        print(len(a_array))
+        print(ind)
+        print(ind2)
+        
+        dadt = ave_sma * (1./1000.) * (1./86400.)   # km/s
+        
+        
+        SMA = a_array[ind2]
+        n = np.sqrt(GME/SMA**3.)
+        h = SMA - Re        
+        rho = rho0*exp(-(h-h0)/H)
+        beta = -dadt/(rho*np.sqrt(GME*a)*(1. - (wE/n)*cos(inc))**2.) * 1e6
+        
+        
+        print('h = ', h)
+        print('rho = ', rho)
+        print('beta = ', beta)
+        
+        
+        
+        
+        
+        
+#        plt.locator_params(axis='x', nbins=3)
+#        plt.xticks([datetime(2018, 11, 1).strftime('%Y-%m-%d'), 
+#                    datetime(2019, 2, 1).strftime('%Y-%m-%d'),
+#                    datetime(2019, 5, 1).strftime('%Y-%m-%d'), 
+#                    datetime(2019, 8, 1).strftime('%Y-%m-%d'),
+#                    datetime(2019, 11, 1).strftime('%Y-%m-%d')])
+    
+    plt.figure()
+    ii = 0    
+    for obj_id in plot_dict:
+        UTC_list = plot_dict[obj_id]['UTC_list']
+        a_array = plot_dict[obj_id]['a_array']
+        rp_array = plot_dict[obj_id]['rp_array']
+        ra_array = plot_dict[obj_id]['ra_array']
+        
+#        if obj_id == 43692:
+#            plt.plot(UTC_list, a_array-Re, 'b.')
+#        else:
+#            plt.plot(UTC_list, a_array-Re, 'k.')
+        
+#        label_txt = 
+        
+        plt.plot(UTC_list[4:], ra_array[4:]-Re, '+', c=colors[ii], label=label_dict[obj_id])
+        plt.plot(UTC_list[4:], rp_array[4:]-Re, 'o', c=colors[ii])
+        ii += 1
+            
+            
+#        plt.ylim([495., 530.])
+        plt.locator_params(axis='y', nbins=5)
+        plt.ylabel('Mean Altitude [km]')
+            
+            
+        plt.xlim([datetime(2018, 11, 1), datetime(2019, 11, 1)])
+        plt.xlabel('Date')
+        
+        plt.legend()
+        
+        
+    plt.figure()
+    
+    ii = 0
+    for obj_id in plot_dict:
+        UTC_list = plot_dict[obj_id]['UTC_list']
+        a_array = plot_dict[obj_id]['a_array']
+        diff_array = np.diff(a_array)
+        
+#        if obj_id == 43692:
+#            plt.plot(UTC_list, a_array-Re, 'b.')
+#        else:
+#            plt.plot(UTC_list, a_array-Re, 'k.')
+        
+        plt.plot(UTC_list[1:], diff_array*1000., '.',  c=colors[ii], label=str(obj_id))
+        ii += 1
+            
+            
+        plt.ylim([-50., 20.])
+        plt.locator_params(axis='y', nbins=5)
+        plt.ylabel('Altitude Diff [km]')
+            
+            
+        plt.xlim([datetime(2018, 11, 1), datetime(2019, 11, 1)])
+        plt.xlabel('Date')
+        
+        plt.legend()
+        
+        
+        
+    plt.show()
+        
     
     
     
@@ -1210,11 +1408,20 @@ def get_planet_ephem():
 
 if __name__ == '__main__' :
     
+    plt.close('all')
     
-    obj_id_list = [43692]
-    UTC_list = [datetime(2019, 10, 1), datetime(2019, 10, 4)]
+    
+    obj_id_list = [43164, 43166, 43691, 43692, 43851, 43863, 44074, 44075,
+                   44227, 44228, 44372, 44496]
+    
+    obj_id_list = [43164, 43692, 43851, 44227, 44074, 44496]
+    
+    obj_id_list = [43164, 43692, 43851, 44227]
+    
+    UTC_list = [datetime(2018, 1, 1), datetime(2019, 10, 4)]
     
     plot_sma_rp_ra(obj_id_list, UTC_list)
+
 
 
 #    obj_id_list = [2639, 20777, 28544, 29495, 40146, 42816]

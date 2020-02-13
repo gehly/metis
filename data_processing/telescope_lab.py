@@ -294,10 +294,63 @@ def generate_meas_file():
     return
 
 
+def generate_sensor_location_file():
+    
+    fdir = 'D:\documents\\teaching\\unsw_ssa_undergrad\lab\\telescope\meas_data'
+    fname = 'meas_data_all3.csv'
+    meas_file_in = os.path.join(fdir, fname)
+    
+    df = pd.read_csv(meas_file_in, header=None)
+    
+    print(df)
+    
+    t0 = datetime(2019, 9, 3, 10, 9, 42)
+    
+    eop_alldata = get_celestrak_eop_alldata()    
+    
+    
+    times = df.iloc[0,:]
+
+    
+    lat_gs = -35.29
+    lon_gs = 149.17
+    ht_gs = 0.606 # km	
+    
+    stat_ecef = latlonht2ecef(lat_gs, lon_gs, ht_gs)
+    
+    output = np.zeros((4,len(times)))    
+    for ii in range(len(times)):
+        
+        print(times[ii])
+        ti = datetime.strptime(times[ii], '%Y-%m-%dT%H:%M:%S.%f')
+        
+        ti_sec = (ti - t0).total_seconds()
+        EOP_data = get_eop_data(eop_alldata, ti)
+        
+        stat_eci, dum = itrf2gcrf(stat_ecef, np.zeros((3,1)), ti, EOP_data)
+        
+        print(stat_eci)
+        
+        output[0,ii] = ti_sec
+        output[1,ii] = float(stat_eci[0])
+        output[2,ii] = float(stat_eci[1])
+        output[3,ii] = float(stat_eci[2])
+        
+    print(output)
+    sensor_df = pd.DataFrame(output)    
+    csv_name = os.path.join(fdir, 'sensor_eci.csv')
+    sensor_df.to_csv(csv_name, index=False)  
+        
+    
+    return
+
+
 
 if __name__ == '__main__':
     
-    generate_meas_file()
+#    generate_meas_file()
+    
+    generate_sensor_location_file()
     
     
 #    truth_vs_tle()

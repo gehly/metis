@@ -748,4 +748,13 @@ if __name__ == '__main__':
     print(Q_eci - Q_eci2.flatten())
     
     
+    lat_gs = -35.29
+    lon_gs = 149.17
+    ht_gs = 0.606 # km	
+    
+    r_ecef = latlonht2ecef(lat_gs, lon_gs, ht_gs)
+    
+    print(r_ecef)
+    
+    
     
