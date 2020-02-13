@@ -5,6 +5,7 @@ import pandas as pd
 import os
 import sys
 import pickle
+from datetime import datetime
 
 sys.path.append('../')
 
@@ -13,7 +14,7 @@ ind = cwd.find('metis')
 metis_dir = cwd[0:ind+5]
 input_data_dir = os.path.join(metis_dir, 'input_data')
 
-from utilities.time_systems import dt2mjd
+from utilities.time_systems import dt2mjd, utcdt2ut1jd
 from utilities.numerical_methods import interp_lagrange
 
 ###############################################################################
@@ -728,6 +729,8 @@ def compute_ERA(UT1_JD):
     ERA = ERA % (2.*pi)
     if ERA < 0.:
         ERA += 2*pi
+        
+#    print(ERA)
     
     # Construct rotation matrix
     # R = ROT3(-ERA)
@@ -787,9 +790,15 @@ def compute_BPN(X, Y, s):
 
 if __name__ == '__main__':
     
-    UTC = datetime(2018, 4, 17, 9, 0, 1)
+    UTC = datetime(2019, 9, 3, 10, 9, 42)
     
     eop_alldata = get_celestrak_eop_alldata()
     EOP_data = get_eop_data(eop_alldata, UTC)
     
     print(EOP_data)
+    
+    UT1_JD = utcdt2ut1jd(UTC, EOP_data['UT1_UTC'])
+    
+    R = compute_ERA(UT1_JD)
+    
+    

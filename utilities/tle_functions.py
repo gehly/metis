@@ -1,5 +1,5 @@
 import numpy as np
-from math import pi, asin, atan2
+from math import pi, cos, asin, atan2, floor, exp
 import requests
 import getpass
 from datetime import datetime, timedelta
@@ -21,7 +21,9 @@ from utilities.coordinate_systems import gcrf2itrf
 from utilities.coordinate_systems import itrf2gcrf
 from utilities.coordinate_systems import latlonht2ecef
 from utilities.astrodynamics import element_conversion
-from utilities.constants import GME
+from utilities.astrodynamics import meanmot2sma
+from utilities.constants import GME, Re, wE
+from utilities.time_systems import gpsdt2utcdt
 
 from sgp4.io import twoline2rv
 from sgp4.earth_gravity import wgs84
@@ -380,6 +382,312 @@ def compute_tle_allstate(tle_dict):
             output_periodic[UTC]['v_GCRF'].append(state[obj_id]['v_GCRF'][0])  
 
     return output_tlechange, output_periodic
+
+
+def compute_tle_elements(tle_dict):
+    '''
+    This function computes a dictionary of mean orbit elements at for
+    all objects in the input TLE dictionary.
+    
+    Parameters
+    ------
+    tle_dict : dictionary
+        indexed by object ID, each item has two lists of strings for each line
+        as well as object name and UTC times
+        
+    Returns
+    ------
+    output : dictionary
+        indexed by NORAD ID, each item has a list of UTC times and 
+        corresponding mean elements extracted from the TLEs, including
+        SMA, ECC, INC, RAAN, AoP, M, while retaining the TLE line lists.
+    
+    '''
+    
+    for obj_id in tle_dict:
+        UTC_list = tle_dict[obj_id]['UTC_list']
+        line1_list = tle_dict[obj_id]['line1_list']
+        line2_list = tle_dict[obj_id]['line2_list']
+        
+        tle_dict[obj_id]['elem_list'] = []
+        for line2 in line2_list:
+            elem = parse_tle_line2(line2)
+            tle_dict[obj_id]['elem_list'].append(elem)
+
+    
+    return tle_dict
+
+
+def plot_sma_rp_ra(obj_id_list, UTC_list):
+    '''
+    
+    
+    '''
+    
+    
+    # Generate TLE dictionary
+    tle_dict, tle_df = get_spacetrack_tle_data(obj_id_list, UTC_list)
+    
+    # Extract orbit elements
+    tle_dict = compute_tle_elements(tle_dict)
+    
+    # Loop over objects and times to generate and plot arrays of SMA, rp, ra
+    plot_dict = {}
+    for obj_id in tle_dict:
+        plot_dict[obj_id] = {}
+        plot_dict[obj_id]['UTC_list'] = tle_dict[obj_id]['UTC_list']
+        elem_list = tle_dict[obj_id]['elem_list']
+        a_array = np.array([])
+        rp_array = np.array([])
+        ra_array = np.array([])
+        
+        print(obj_id)
+        inc = elem_list[0][2] * pi/180.
+        print('ecc', elem_list[0][1])
+        print('inc', elem_list[0][2])
+        
+        for elem in elem_list:
+            a = elem[0]
+            e = elem[1]
+            rp = a*(1. - e)
+            ra = a*(1. + e)
+            a_array = np.append(a_array, a)
+            rp_array = np.append(rp_array, rp)
+            ra_array = np.append(ra_array, ra)
+
+            
+        plot_dict[obj_id]['a_array'] = a_array
+        plot_dict[obj_id]['rp_array'] = rp_array
+        plot_dict[obj_id]['ra_array'] = ra_array
+        
+        
+    plt.figure()
+    for obj_id in plot_dict:
+        UTC_list = plot_dict[obj_id]['UTC_list']
+        a_array = plot_dict[obj_id]['a_array']
+        rp_array = plot_dict[obj_id]['rp_array']
+        ra_array = plot_dict[obj_id]['ra_array']
+        
+        if obj_id == 43692:
+            plt.plot(UTC_list, a_array, 'b.')
+        else:
+            plt.plot(UTC_list, a_array, 'k.')
+            
+            
+    label_dict = {}
+    label_dict[43164] = 'ST'
+    label_dict[43692] = 'IBT (NABEO)'
+    label_dict[43851] = 'ELaNa'
+    label_dict[43863] = 'ELaNa'
+    label_dict[44074] = 'DARPA'
+    label_dict[44227] = 'STP-27RD'
+    label_dict[44372] = 'MIR'
+    label_dict[44496] = 'LMNH'
+    
+    UTC_start_compare = tle_dict[44227]['UTC_list'][4]
+    
+    # Atmosphere model
+    rho0 = 6.967e-13 * 1e9  # kg/km^3
+    h0 = 500.  # km
+    H = 63.822  # km
+            
+            
+    plt.figure()
+    colors = ['b', 'g', 'k', 'r', 'm', 'c']  
+    ii = 0
+    for obj_id in plot_dict:
+        UTC_list = plot_dict[obj_id]['UTC_list']
+        a_array = plot_dict[obj_id]['a_array']
+        rp_array = plot_dict[obj_id]['rp_array']
+        ra_array = plot_dict[obj_id]['ra_array']
+        
+#        if obj_id == 43692:
+#            plt.plot(UTC_list, a_array-Re, 'b.')
+#        else:
+#            plt.plot(UTC_list, a_array-Re, 'k.')
+        
+#        label_txt = 
+        
+        plt.plot(UTC_list[4:], a_array[4:]-Re, '.',  c=colors[ii], label=label_dict[obj_id])
+        ii += 1
+            
+            
+#        plt.ylim([495., 530.])
+        plt.locator_params(axis='y', nbins=5)
+        plt.ylabel('Mean Altitude [km]')
+            
+            
+        plt.xlim([datetime(2018, 11, 1), datetime(2019, 11, 1)])
+        plt.xlabel('Date')
+        
+        plt.legend()
+        
+        print('\n\nSMA Analysis')
+        print(label_dict[obj_id])
+        ndays = (UTC_list[-1] - UTC_list[4]).total_seconds()/86400.
+        ave_sma = (a_array[-1] - a_array[4])/ndays * 1000.
+        print('Ave SMA change [m/day]', ave_sma)
+        
+        print('Reduced Time SMA Change')
+        UTC_compare = [abs((UTCii - UTC_start_compare).total_seconds()) for UTCii in UTC_list]
+        ind = UTC_compare.index(min(UTC_compare))
+        print(UTC_list[ind])
+        ndays = (UTC_list[-1] - UTC_list[ind]).total_seconds()/86400.
+        ave_sma = (a_array[-1] - a_array[ind])/ndays * 1000.
+        print('Ave SMA change [m/day]', ave_sma)
+        
+        print('\n\nBallistic Coefficient Estimate')
+        print(label_dict[obj_id])
+        
+        # Compute density and ballistic coefficient info
+        ind2 = int(floor((ind+len(UTC_list))/2))
+        print(len(UTC_list))
+        print(len(a_array))
+        print(ind)
+        print(ind2)
+        
+        dadt = ave_sma * (1./1000.) * (1./86400.)   # km/s
+        
+        
+        SMA = a_array[ind2]
+        n = np.sqrt(GME/SMA**3.)
+        h = SMA - Re        
+        rho = rho0*exp(-(h-h0)/H)
+        beta = -dadt/(rho*np.sqrt(GME*a)*(1. - (wE/n)*cos(inc))**2.) * 1e6
+        
+        
+        print('h = ', h)
+        print('rho = ', rho)
+        print('beta = ', beta)
+        
+        
+        
+        
+        
+        
+#        plt.locator_params(axis='x', nbins=3)
+#        plt.xticks([datetime(2018, 11, 1).strftime('%Y-%m-%d'), 
+#                    datetime(2019, 2, 1).strftime('%Y-%m-%d'),
+#                    datetime(2019, 5, 1).strftime('%Y-%m-%d'), 
+#                    datetime(2019, 8, 1).strftime('%Y-%m-%d'),
+#                    datetime(2019, 11, 1).strftime('%Y-%m-%d')])
+    
+    plt.figure()
+    ii = 0    
+    for obj_id in plot_dict:
+        UTC_list = plot_dict[obj_id]['UTC_list']
+        a_array = plot_dict[obj_id]['a_array']
+        rp_array = plot_dict[obj_id]['rp_array']
+        ra_array = plot_dict[obj_id]['ra_array']
+        
+#        if obj_id == 43692:
+#            plt.plot(UTC_list, a_array-Re, 'b.')
+#        else:
+#            plt.plot(UTC_list, a_array-Re, 'k.')
+        
+#        label_txt = 
+        
+        plt.plot(UTC_list[4:], ra_array[4:]-Re, '+', c=colors[ii], label=label_dict[obj_id])
+        plt.plot(UTC_list[4:], rp_array[4:]-Re, 'o', c=colors[ii])
+        ii += 1
+            
+            
+#        plt.ylim([495., 530.])
+        plt.locator_params(axis='y', nbins=5)
+        plt.ylabel('Mean Altitude [km]')
+            
+            
+        plt.xlim([datetime(2018, 11, 1), datetime(2019, 11, 1)])
+        plt.xlabel('Date')
+        
+        plt.legend()
+        
+        
+    plt.figure()
+    
+    ii = 0
+    for obj_id in plot_dict:
+        UTC_list = plot_dict[obj_id]['UTC_list']
+        a_array = plot_dict[obj_id]['a_array']
+        diff_array = np.diff(a_array)
+        
+#        if obj_id == 43692:
+#            plt.plot(UTC_list, a_array-Re, 'b.')
+#        else:
+#            plt.plot(UTC_list, a_array-Re, 'k.')
+        
+        plt.plot(UTC_list[1:], diff_array*1000., '.',  c=colors[ii], label=str(obj_id))
+        ii += 1
+            
+            
+        plt.ylim([-50., 20.])
+        plt.locator_params(axis='y', nbins=5)
+        plt.ylabel('Altitude Diff [km]')
+            
+            
+        plt.xlim([datetime(2018, 11, 1), datetime(2019, 11, 1)])
+        plt.xlabel('Date')
+        
+        plt.legend()
+        
+        
+        
+    plt.show()
+        
+    
+    
+    
+    return
+
+
+def parse_tle_line1(line1):
+    
+    
+    
+    
+    return
+
+
+def parse_tle_line2(line2):
+    '''
+    This function parses Line 2 of the TLE to extract mean orbit elements.
+    
+    Parameters
+    ------
+    line2 : string
+        second line of TLE
+    
+    Returns
+    ------
+    elem : list
+        elem[0] : a
+          Semi-Major Axis             [km]
+        elem[1] : e
+          Eccentricity                [unitless]
+        elem[2] : i
+          Inclination                 [deg]
+        elem[3] : RAAN
+          Right Asc Ascending Node    [deg]
+        elem[4] : w
+          Argument of Periapsis       [deg]
+        elem[5] : M
+          Mean anomaly                [deg]
+    '''
+    
+    i = float(line2[8:16])
+    RAAN = float(line2[17:25])
+    e = float(line2[26:33])/1e7
+    w = float(line2[34:42])
+    M = float(line2[43:51])
+    n = float(line2[52:63])  # rev/day
+    
+    n *= 2.*pi/86400.  # rad/s
+    
+    a = meanmot2sma(n)
+            
+    elem = [a, e, i, RAAN, w, M]    
+    
+    return elem
 
 
 def tletime2datetime(line1):
@@ -1012,7 +1320,7 @@ def propagate_TLE(obj_id_list, UTC_list, tle_dict={}, offline_flag=False,
 
         # Retrieve latest TLE data from space-track.org
         tle_dict, tle_df = \
-            get_spacetrack_tle_data(obj_id_list, username, password)
+            get_spacetrack_tle_data(obj_id_list, UTC_list, username, password)
 
         # Retreive TLE data from database
 
@@ -1039,6 +1347,8 @@ def propagate_TLE(obj_id_list, UTC_list, tle_dict={}, offline_flag=False,
 
         # Loop over times
         for UTC in UTC_list:
+            
+            print(UTC)
 
             # Find the closest TLE by epoch
             line1, line2 = find_closest_tle_epoch(line1_list, line2_list, UTC)
@@ -1097,6 +1407,21 @@ def get_planet_ephem():
 ###############################################################################
 
 if __name__ == '__main__' :
+    
+    plt.close('all')
+    
+    
+    obj_id_list = [43164, 43166, 43691, 43692, 43851, 43863, 44074, 44075,
+                   44227, 44228, 44372, 44496]
+    
+    obj_id_list = [43164, 43692, 43851, 44227, 44074, 44496]
+    
+    obj_id_list = [43164, 43692, 43851, 44227]
+    
+    UTC_list = [datetime(2018, 1, 1), datetime(2019, 10, 4)]
+    
+    plot_sma_rp_ra(obj_id_list, UTC_list)
+
 
 
 #    obj_id_list = [2639, 20777, 28544, 29495, 40146, 42816]
@@ -1108,27 +1433,88 @@ if __name__ == '__main__' :
 #    sensor_list = ['RMIT ROO']
 #    
 #   
-    eop_alldata = get_celestrak_eop_alldata()
+#    eop_alldata = get_celestrak_eop_alldata()
     
-    start_time = datetime(2019, 6, 11, 2, 0, 0)
-    UTC_list = [start_time] # + timedelta(seconds=ti) for ti in range(0,101,10)]
-    obj_id_list = [20580]
+#    gps_time = datetime(2019, 9, 3, 10, 5, 0)
+#    
+#    EOP_data = get_eop_data(eop_alldata, gps_time)
+#    
+#    utc_time = gpsdt2utcdt(gps_time, EOP_data['TAI_UTC'])
+#    print(utc_time)
     
-    output_state = propagate_TLE(obj_id_list, UTC_list)
-    
-    print(output_state)
-    
-    for ii in range(len(UTC_list)):
-        UTC = UTC_list[ii]
-        EOP_data = get_eop_data(eop_alldata, UTC)
-        r_eci = output_state[20580]['r_GCRF'][ii]
-        v_eci = output_state[20580]['v_GCRF'][ii]
-        
-        r_ecef, v_ecef = gcrf2itrf(r_eci, v_eci, UTC, EOP_data)
-        
-        print(UTC)
-        print('ECI \n', r_eci)
-        print('ECEF \n', r_ecef)
+#    utc_time = datetime(2019, 9, 3, 10, 9, 42)
+#
+#    print(utc_time)
+#    
+#    
+#    sensor_dict = define_sensors(['UNSW Falcon'])
+#    latlonht = sensor_dict['UNSW Falcon']['geodetic_latlonht']
+#    lat = latlonht[0]
+#    lon = latlonht[1]
+#    ht = latlonht[2]
+#    stat_ecef = latlonht2ecef(lat, lon, ht)
+#    
+#    
+#    
+#    
+##    start_time = datetime(2019, 9, 23, 0, 0, 0)
+#    UTC_list = [utc_time] # + timedelta(seconds=ti) for ti in range(0,101,10)]
+#    obj_id = 42917
+#    obj_id_list = [obj_id]
+#    
+#    output_state = propagate_TLE(obj_id_list, UTC_list)
+#    
+#    print(output_state)
+#    
+#    for ii in range(len(UTC_list)):
+#        UTC = UTC_list[ii]
+#        EOP_data = get_eop_data(eop_alldata, UTC)
+#        r_eci = output_state[obj_id]['r_GCRF'][ii]
+#        v_eci = output_state[obj_id]['v_GCRF'][ii]
+#        
+#        r_ecef, v_ecef = gcrf2itrf(r_eci, v_eci, UTC, EOP_data)
+#        
+#        print(UTC)
+#        print('ECI \n', r_eci)
+#        print('ECEF \n', r_ecef)
+#        
+#        sp3_ecef = np.array([[-25379.842058],[33676.622067],[51.528803]])
+#        
+#        print(sp3_ecef - r_ecef)
+#        print(np.linalg.norm(sp3_ecef - r_ecef))
+#        
+#        stat_eci, dum = itrf2gcrf(stat_ecef, np.zeros((3,1)), UTC, EOP_data)
+#        
+#        print(stat_eci)
+#        print(r_eci)
+#        
+#        
+#        rho_eci = np.reshape(r_eci, (3,1)) - np.reshape(stat_eci, (3,1))
+#        
+#        print(rho_eci)
+#        print(r_eci)
+#        print(stat_eci)
+#        
+#        ra = atan2(rho_eci[1], rho_eci[0]) * 180./pi
+#        
+#        dec = asin(rho_eci[2]/np.linalg.norm(rho_eci)) * 180./pi
+#        
+#        print('tle data')
+#        print(ra)
+#        print(dec)
+#        
+#        
+#        sp3_eci, dum = itrf2gcrf(sp3_ecef, np.zeros((3,1)), UTC, EOP_data)
+#        
+#        rho_eci2 = sp3_eci - stat_eci
+#        
+#        ra2 = atan2(rho_eci2[1], rho_eci2[0]) * 180./pi
+#        
+#        dec2 = asin(rho_eci2[2]/np.linalg.norm(rho_eci2)) * 180./pi
+#        
+#        print('sp3 data')
+#        print(ra2)
+#        print(dec2)
         
     
     
