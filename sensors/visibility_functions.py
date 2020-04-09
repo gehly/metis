@@ -395,6 +395,19 @@ def compute_visible_passes(UTC_array, obj_id_list, sensor_id_list, ephemeris,
     return vis_dict
 
 
+def compute_transits(UTC_list, obj_id_list, sensor_data_file, tle_dict={},
+                     source='spacetrack'):
+    '''
+
+    '''
+    
+    # 
+    
+    
+
+    return transit_dict
+
+
 def check_visibility(state, UTC_times, sun_gcrf_array, moon_gcrf_array, sensor,
                      spacecraftConfig, surfaces, eop_alldata, XYs_df=[]):
     
