@@ -6,7 +6,7 @@ import os
 sys.path.append('../')
 
 from utilities.constants import Re
-from sensors.visibility_functions import compute_transits
+from sensors.visibility_functions import compute_transit_dict
 from sensors.sensors import define_sites_from_file
 
 
@@ -26,13 +26,13 @@ if __name__ == '__main__':
     UTC_window = [UTC0, UTCf]
     
     # Site data
-    site_data_file = '../input_data/5grid-sites.json' 
+    site_data_file = '../input_data/test_sites.json' 
     site_dict = define_sites_from_file(site_data_file)
     
     # print(site_dict)
     
     # Generate transit dictionary
-    transit_dict = compute_transits(UTC_window, obj_id_list, site_dict)
+    transit_dict = compute_transit_dict(UTC_window, obj_id_list, site_dict)
     
     
     # print(transit_dict)

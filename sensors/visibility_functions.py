@@ -398,8 +398,8 @@ def compute_visible_passes(UTC_array, obj_id_list, sensor_id_list, ephemeris,
     return vis_dict
 
 
-def compute_transits(UTC_window, obj_id_list, site_dict, increment=86400.,
-                     source='spacetrack', username='', password=''):
+def compute_transit_dict(UTC_window, obj_id_list, site_dict, increment=86400.,
+                         source='spacetrack', username='', password=''):
     '''
 
     '''
@@ -418,11 +418,11 @@ def compute_transits(UTC_window, obj_id_list, site_dict, increment=86400.,
     # Download from space-track.org
     if source == 'spacetrack':            
         
-        UTC_list = [UTC0 - timedelta(days=2.), UTCf + timedelta(days=2.)]
-        tle_dict, tle_df = get_spacetrack_tle_data(obj_id_list, UTC_list,
+        UTC_window_more = [UTC0 - timedelta(days=2.), UTCf + timedelta(days=2.)]
+        tle_dict, tle_df = get_spacetrack_tle_data(obj_id_list, UTC_window_more,
                                                     username, password)
     
-    # Propagate TLEs for all times in window, using increment
+    # Propagate TLEs for all times in actual window, using increment
     window_seconds = (UTCf - UTC0).total_seconds()
     delta_seconds = np.arange(0., window_seconds + 1., increment)
     UTC_list_full = [UTC0 + timedelta(seconds=ti) for ti in delta_seconds]
@@ -436,6 +436,7 @@ def compute_transits(UTC_window, obj_id_list, site_dict, increment=86400.,
     
    
     # Loop over objects
+    transit_dict = {}
     for obj_id in obj_id_list:
         
         # Retrieve spacecraft ITRF (ECEF) positions
@@ -449,6 +450,10 @@ def compute_transits(UTC_window, obj_id_list, site_dict, increment=86400.,
             site_ecef = latlonht2ecef(latlonht[0], latlonht[1], latlonht[2])
             
             # Loop over times
+            az_list = []
+            el_list = []
+            rg_list = []
+            UTC_list = []
             for ii in range(len(UTC_list_full)):
                 
                 # Current time and position vector in ECEF
@@ -457,10 +462,122 @@ def compute_transits(UTC_window, obj_id_list, site_dict, increment=86400.,
                 # Compute az, el, range
                 az, el, rg = ecef2azelrange(r_ecef, site_ecef)
                 
-    
-    
-    transit_dict = {}
+                if el > 0.:
+                    az_list.append(az)
+                    el_list.append(el)
+                    rg_list.append(rg)
+                    UTC_list.append(UTC_list_full[ii])
+            
+            # Compile data into transits
+            transit_dict = compile_transit_data(transit_dict, site,
+                                                UTC_list, az_list, el_list,
+                                                rg_list, increment)
+                
 
+    return transit_dict
+
+
+def compile_transit_data(transit_dict, site, UTC_list, az_list, el_list,
+                         rg_list, increment):
+    
+    # Number of unique digits in transit IDs
+    zfill_count = 10
+    
+    # Only process if needed
+    if len(UTC_list) > 0 :
+        
+        # Initialze output
+        if site not in transit_dict:
+            transit_dict[site] = {}
+            transit_id = site + '_' + str(1).zfill(zfill_count)
+        else:
+            transit_list = sorted(transit_dict[site].keys())
+            last_id = int(transit_list[0][-zfill_count:])
+            transit_id = site + '_' + str(last_id+1).zfill(zfill_count)
+        
+        # Loop over times
+        rg_min = 1e12
+        el_max = -1.
+        ti_prior = UTC_list[0]
+        start = UTC_list[0]
+        stop = UTC_list[0]
+        TCA = UTC_list[0]
+        TME = UTC_list[0]
+        UTC_transit = []
+        az_transit = []
+        el_transit = []
+        rg_transit = []
+        for ii in range(len(UTC_list)):
+            
+            ti = UTC_list[ii]
+            rg_km = rg_list[ii]
+            el_deg = el_list[ii]
+            
+            # If current time is close to previous, pass continues
+            if (ti - ti_prior).total_seconds() < (increment + 1.):
+    
+                # Update pass stop time and ti_prior for next iteration
+                stop = ti
+                ti_prior = ti
+                
+                # Check if this is pass time of closest approach (TCA)
+                if rg_km < rg_min:
+                    TCA = ti
+                    rg_min = float(rg_km)
+                
+                # Check if this is pass time of maximum elevation (TME)
+                if el_deg > el_max:
+                    TME = ti
+                    el_max = float(el_deg)
+                    
+                # Store current time and measurement values for output
+                UTC_transit.append(ti)
+                az_transit.append(ti)
+                el_transit.append(ti)
+                rg_transit.append(ti)
+                
+    
+            # If current time is far from previous or if we reached
+            # the end of UTC list, transit has ended
+            if (ti - ti_prior).total_seconds >= (increment + 1.) or ii == (len(UTC_list)-1)):
+    
+                if ii == (len(UTC_list)-1)):
+                    stop = ti
+                    UTC_transit.append(ti)
+                    az_transit.append(ti)
+                    el_transit.append(ti)
+                    rg_transit.append(ti)
+                    
+                duration = (stop - start).total_seconds()
+                
+                # Store output
+                transit_dict[site][transit_id] = {}
+                transit_dict[site][transit_id]['start'] = start
+                transit_dict[site][transit_id]['stop'] = stop
+                transit_dict[site][transit_id]['duration'] = duration
+                transit_dict[site][transit_id]['TCA'] = TCA
+                transit_dict[site][transit_id]['TME'] = TME
+                transit_dict[site][transit_id]['rg_min'] = rg_min
+                transit_dict[site][transit_id]['el_max'] = el_max
+                transit_dict[site][transit_id]['UTC_transit'] = UTC_transit
+                transit_dict[site][transit_id]['az_transit'] = az_transit
+                transit_dict[site][transit_id]['el_transit'] = el_transit
+                transit_dict[site][transit_id]['rg_transit'] = rg_transit
+                
+
+                # Reset for new transit next round
+                start = ti
+                TCA = ti
+                TME = ti
+                stop = ti
+                ti_prior = ti
+                rg_min = 1e12
+                el_max = -1
+                UTC_transit = []
+                az_transit = []
+                el_transit = []
+                rg_transit = []    
+    
     return transit_dict
 
 
@@ -701,6 +818,11 @@ def compute_pass(UTC_vis, rg_vis, el_vis, sensor):
             # the end of UTC list, pass has ended
             if ((ti.tdb - ti_prior.tdb)*86400. >= (max_gap+1.) or ii == (len(UTC_vis)-1)):
                 
+                # TODO - LOGIC ERROR
+                # Test this code for stop time if reached the end of UTC_vis
+                if ii == (len(UTC_vis)-1)):
+                    stop = ti
+                
                 # Store output
                 start_list.append(start)
                 stop_list.append(stop)
@@ -715,8 +837,11 @@ def compute_pass(UTC_vis, rg_vis, el_vis, sensor):
                 TME = ti
                 stop = ti
                 ti_prior = ti
-                rg_min = float(rg_km)
-                el_max = float(el_rad)
+                
+                # TODO - LOGIC ERROR
+                # Test this code to reset these params
+                rg_min = 1e12
+                el_max = -1
                         
     return start_list, stop_list, TCA_list, TME_list, rg_min_list, el_max_list
 
