@@ -4,7 +4,8 @@ import os
 import sys
 import csv
 import time
-from datetime import timedelta
+from datetime import datetime, timedelta
+import getpass
 
 sys.path.append('../')
 
@@ -14,6 +15,7 @@ sys.path.append('../')
 from sensors.sensors import define_sensors
 from utilities.tle_functions import get_spacetrack_tle_data
 from utilities.tle_functions import find_closest_tle_epoch
+from utilities.tle_functions import propagate_TLE
 
 from utilities.eop_functions import get_eop_data
 from utilities.coordinate_systems import latlonht2ecef
@@ -395,11 +397,16 @@ def compute_visible_passes(UTC_array, obj_id_list, sensor_id_list, ephemeris,
     return vis_dict
 
 
-def compute_transits(UTC_window, obj_id_list, sensor_data_file, increment=10.,
-                     source='spacetrack'):
+def compute_transits(UTC_window, obj_id_list, sensor_data_file, increment=86400.,
+                     source='spacetrack', username='', password=''):
     '''
 
     '''
+    
+    if len(username) == 0:
+        username = input('space-track username: ')
+    if len(password) == 0:
+        password = getpass.getpass('space-track password: ')
     
     # Generate TLE dictionary
     # Retrieve all TLEs from the given time window, including 2 days before
@@ -411,10 +418,28 @@ def compute_transits(UTC_window, obj_id_list, sensor_data_file, increment=10.,
     if source == 'spacetrack':            
         
         UTC_list = [UTC0 - timedelta(days=2.), UTCf + timedelta(days=2.)]
-        tle_dict, tle_df = get_spacetrack_tle_data(obj_id_list, UTC_list)
+        tle_dict, tle_df = get_spacetrack_tle_data(obj_id_list, UTC_list,
+                                                    username, password)
     
     
-    print(tle_dict)
+    # print(tle_dict)
+    
+    # Generate sensor dictionary
+    
+    
+    
+    # Propagate TLEs for all times in window, using increment
+    window_seconds = (UTCf - UTC0).total_seconds()
+    delta_seconds = np.arange(0., window_seconds + 1., increment)
+    UTC_list_full = [UTC0 + timedelta(seconds=ti) for ti in delta_seconds]
+    print(UTC_list_full)
+    
+    state_dict = propagate_TLE(obj_id_list, UTC_list_full, tle_dict, username,
+                                password)
+    
+    
+    print(state_dict)
+    
     
     transit_dict = {}
 
