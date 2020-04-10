@@ -23,6 +23,7 @@ from utilities.coordinate_systems import gcrf2itrf
 from utilities.coordinate_systems import itrf2gcrf
 from utilities.constants import Re
 from sensors.measurements import compute_measurement
+from sensors.measurements import ecef2azelrange
 from sensors.measurements import ecef2azelrange_rad
 
 
@@ -397,7 +398,7 @@ def compute_visible_passes(UTC_array, obj_id_list, sensor_id_list, ephemeris,
     return vis_dict
 
 
-def compute_transits(UTC_window, obj_id_list, sensor_data_file, increment=86400.,
+def compute_transits(UTC_window, obj_id_list, site_dict, increment=86400.,
                      source='spacetrack', username='', password=''):
     '''
 
@@ -421,13 +422,6 @@ def compute_transits(UTC_window, obj_id_list, sensor_data_file, increment=86400.
         tle_dict, tle_df = get_spacetrack_tle_data(obj_id_list, UTC_list,
                                                     username, password)
     
-    
-    # print(tle_dict)
-    
-    # Generate sensor dictionary
-    
-    
-    
     # Propagate TLEs for all times in window, using increment
     window_seconds = (UTCf - UTC0).total_seconds()
     delta_seconds = np.arange(0., window_seconds + 1., increment)
@@ -438,7 +432,31 @@ def compute_transits(UTC_window, obj_id_list, sensor_data_file, increment=86400.
                                 password)
     
     
-    print(state_dict)
+    # print(state_dict)
+    
+   
+    # Loop over objects
+    for obj_id in obj_id_list:
+        
+        # Retrieve spacecraft ITRF (ECEF) positions
+        ITRF_list = state_dict[obj_id]['r_ITRF']
+        
+        # Loop over sites
+        for site in site_dict:
+            
+            # Compute ECEF site location
+            latlonht = site_dict[site]['geodetic_latlonht']
+            site_ecef = latlonht2ecef(latlonht[0], latlonht[1], latlonht[2])
+            
+            # Loop over times
+            for ii in range(len(UTC_list_full)):
+                
+                # Current time and position vector in ECEF
+                r_ecef = ITRF_list[ii]
+                
+                # Compute az, el, range
+                az, el, rg = ecef2azelrange(r_ecef, site_ecef)
+                
     
     
     transit_dict = {}

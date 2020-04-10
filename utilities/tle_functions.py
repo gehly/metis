@@ -1342,13 +1342,13 @@ def propagate_TLE(obj_id_list, UTC_list, tle_dict={}, offline_flag=False,
         output_state[obj_id]['UTC'] = []
         output_state[obj_id]['r_GCRF'] = []
         output_state[obj_id]['v_GCRF'] = []
+        output_state[obj_id]['r_ITRF'] = []
+        output_state[obj_id]['v_ITRF'] = []
         output_state[obj_id]['r_TEME'] = []
         output_state[obj_id]['v_TEME'] = []
 
         # Loop over times
         for UTC in UTC_list:
-            
-            print(UTC)
 
             # Find the closest TLE by epoch
             line1, line2 = find_closest_tle_epoch(line1_list, line2_list, UTC)
@@ -1369,12 +1369,17 @@ def propagate_TLE(obj_id_list, UTC_list, tle_dict={}, offline_flag=False,
             # Convert from TEME to GCRF (ECI)
             r_GCRF, v_GCRF = teme2gcrf(r_TEME, v_TEME, UTC, IAU1980_nutation,
                                        EOP_data)
+            
+            # Convert from GCRF to ITRF (ECEF)
+            r_ITRF, v_ITRF = gcrf2itrf(r_GCRF, v_GCRF, UTC, EOP_data)
 
 
             # Store output
             output_state[obj_id]['UTC'].append(UTC)
             output_state[obj_id]['r_GCRF'].append(r_GCRF)
             output_state[obj_id]['v_GCRF'].append(v_GCRF)
+            output_state[obj_id]['r_ITRF'].append(r_ITRF)
+            output_state[obj_id]['v_ITRF'].append(v_ITRF)
             output_state[obj_id]['r_TEME'].append(r_TEME)
             output_state[obj_id]['v_TEME'].append(v_TEME)
 
