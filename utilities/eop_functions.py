@@ -90,7 +90,7 @@ def get_celestrak_eop_alldata(offline_flag=False):
         pklFile.close() 
         
     else:
-    
+        
         # Retrieve data from internet
         pageData = 'https://celestrak.com/SpaceData/eop19620101.txt'
 #        pageData = 'http://www.celestrak.com/SpaceData/EOP-Last5Years.txt'
