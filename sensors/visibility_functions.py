@@ -8,8 +8,8 @@ from datetime import timedelta
 
 sys.path.append('../')
 
-from skyfield.constants import ERAD
-from skyfield.api import Topos, EarthSatellite, Loader
+# from skyfield.constants import ERAD
+# from skyfield.api import Topos, EarthSatellite, Loader
 
 from sensors.sensors import define_sensors
 from utilities.tle_functions import get_spacetrack_tle_data
@@ -395,15 +395,28 @@ def compute_visible_passes(UTC_array, obj_id_list, sensor_id_list, ephemeris,
     return vis_dict
 
 
-def compute_transits(UTC_list, obj_id_list, sensor_data_file, tle_dict={},
+def compute_transits(UTC_window, obj_id_list, sensor_data_file, increment=10.,
                      source='spacetrack'):
     '''
 
     '''
     
-    # 
+    # Generate TLE dictionary
+    # Retrieve all TLEs from the given time window, including 2 days before
+    # and after the given start and end times
+    UTC0 = UTC_window[0]
+    UTCf = UTC_window[-1]
+    
+    # Download from space-track.org
+    if source == 'spacetrack':            
+        
+        UTC_list = [UTC0 - timedelta(days=2.), UTCf + timedelta(days=2.)]
+        tle_dict, tle_df = get_spacetrack_tle_data(obj_id_list, UTC_list)
     
     
+    print(tle_dict)
+    
+    transit_dict = {}
 
     return transit_dict
 
