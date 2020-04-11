@@ -399,7 +399,7 @@ def compute_visible_passes(UTC_array, obj_id_list, sensor_id_list, ephemeris,
 
 
 def compute_transit_dict(UTC_window, obj_id_list, site_dict, increment=10.,
-                         source='spacetrack', offline_flag=False,
+                         offline_flag=False, source='spacetrack',
                          username='', password=''):
     '''
 
@@ -494,6 +494,12 @@ def compute_transit_dict(UTC_window, obj_id_list, site_dict, increment=10.,
 def compile_transit_data(transit_dict, site, obj_id, UTC_list, az_list,
                          el_list, rg_list, increment):
     
+    
+    print('\n\n compile transit')
+    print(obj_id)
+    print(site)
+#    print(transit_dict)
+    
     # Number of unique digits in transit IDs
     zfill_count = 10
     
@@ -506,8 +512,15 @@ def compile_transit_data(transit_dict, site, obj_id, UTC_list, az_list,
             transit_id = site + '_' + str(1).zfill(zfill_count)
         else:
             transit_list = sorted(transit_dict[site].keys())
-            last_id = int(transit_list[0][-zfill_count:])
+            last_id = int(transit_list[-1][-zfill_count:])
             transit_id = site + '_' + str(last_id+1).zfill(zfill_count)
+            print('new id')
+            print(transit_list)
+            print(last_id)
+            
+            
+#        print(transit_id)
+        
         
         # Loop over times
         rg_min = 1e12
@@ -591,7 +604,9 @@ def compile_transit_data(transit_dict, site, obj_id, UTC_list, az_list,
                 UTC_transit = []
                 az_transit = []
                 el_transit = []
-                rg_transit = []    
+                rg_transit = []
+                transit_int = int(transit_id[-zfill_count:])
+                transit_id = site + '_' + str(transit_int+1).zfill(zfill_count)
     
     return transit_dict
 

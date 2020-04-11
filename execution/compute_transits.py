@@ -3,6 +3,7 @@ from datetime import datetime
 import sys
 import os
 import csv
+import pickle
 
 sys.path.append('../')
 
@@ -19,11 +20,11 @@ if __name__ == '__main__':
     
             
     # Object list
-    obj_id_list = [25544, 40146]
+    obj_id_list = [25544, 43014]
     
     # Time window
-    UTC0 = datetime(2020, 4, 11, 21, 24, 0)
-    UTCf = datetime(2020, 4, 11, 21, 40, 0)
+    UTC0 = datetime(2020, 4, 11, 11, 43, 0)
+    UTCf = datetime(2020, 4, 11, 20, 5, 0)
     UTC_window = [UTC0, UTCf]
     
     increment = 10.  # seconds
@@ -36,7 +37,7 @@ if __name__ == '__main__':
     
     # Generate transit dictionary
     transit_dict = compute_transit_dict(UTC_window, obj_id_list, site_dict,
-                                        increment)
+                                        increment, offline_flag=True)
     
     
 #    print(transit_dict)

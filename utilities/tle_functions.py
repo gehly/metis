@@ -1416,17 +1416,31 @@ if __name__ == '__main__' :
     plt.close('all')
     
     
-    obj_id_list = [43164, 43166, 43691, 43692, 43851, 43863, 44074, 44075,
-                   44227, 44228, 44372, 44496]
+#    obj_id_list = [43164, 43166, 43691, 43692, 43851, 43863, 44074, 44075,
+#                   44227, 44228, 44372, 44496]
+#    
+#    obj_id_list = [43164, 43692, 43851, 44227, 44074, 44496]
+#    
+#    obj_id_list = [43164, 43692, 43851, 44227]
+#    
+#    UTC_list = [datetime(2018, 1, 1), datetime(2019, 10, 4)]
+#    
+#    plot_sma_rp_ra(obj_id_list, UTC_list)
     
-    obj_id_list = [43164, 43692, 43851, 44227, 44074, 44496]
     
-    obj_id_list = [43164, 43692, 43851, 44227]
+    obj_id_list = [25544]
+    UTC_window = [datetime(2020, 4, 1, 0, 0, 0), datetime(2020, 4, 11, 0, 0)]
+    tle_dict, tle_df = get_spacetrack_tle_data(obj_id_list, UTC_window)
     
-    UTC_list = [datetime(2018, 1, 1), datetime(2019, 10, 4)]
     
-    plot_sma_rp_ra(obj_id_list, UTC_list)
+    
+    UTC_list = [datetime(2020, 4, 11, 19, 30, 5)]
+    
+    output_state = propagate_TLE(obj_id_list, UTC_list, tle_dict)
+    print(output_state)
 
+    r_eci = output_state[25544]['r_GCRF'][0]
+    
 
 
 #    obj_id_list = [2639, 20777, 28544, 29495, 40146, 42816]
