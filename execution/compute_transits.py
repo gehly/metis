@@ -20,17 +20,17 @@ if __name__ == '__main__':
     
             
     # Object list
-    obj_id_list = [25544, 43014]
+    obj_id_list = list(np.arange(43010, 43020))
     
     # Time window
-    UTC0 = datetime(2020, 4, 11, 11, 43, 0)
-    UTCf = datetime(2020, 4, 11, 20, 5, 0)
+    UTC0 = datetime(2019, 1, 1, 0, 0, 0)
+    UTCf = datetime(2019, 1, 10, 0, 0, 0)
     UTC_window = [UTC0, UTCf]
     
     increment = 10.  # seconds
     
     # Site data
-    site_data_file = '../input_data/test_sites.json' 
+    site_data_file = '../input_data/5grid-sites.json' 
     site_dict = define_sites_from_file(site_data_file)
     
 

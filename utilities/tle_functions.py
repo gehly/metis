@@ -8,6 +8,7 @@ import os
 import matplotlib.pyplot as plt
 import pandas as pd
 import json
+import time
 
 sys.path.append('../')
 
@@ -15,6 +16,7 @@ from sensors.sensors import define_sensors
 from utilities.eop_functions import get_celestrak_eop_alldata
 from utilities.eop_functions import get_nutation_data
 from utilities.eop_functions import get_eop_data
+from utilities.eop_functions import get_XYs2006_alldata
 from utilities.coordinate_systems import teme2gcrf
 from utilities.coordinate_systems import gcrf2teme
 from utilities.coordinate_systems import gcrf2itrf
@@ -1314,6 +1316,13 @@ def propagate_TLE(obj_id_list, UTC_list, tle_dict={}, offline_flag=False,
         position/velocity in TEME and GCRF
 
     '''
+    
+    start = time.time()
+    total_prop = 0.
+    total_teme2gcrf = 0.
+    total_gcrf2itrf = 0.
+    tle_epoch_time = 0.
+    total_eop_time = 0.
 
     # If no TLE information is provided, retrieve from sources as needed
     if len(tle_dict) == 0:
@@ -1330,6 +1339,9 @@ def propagate_TLE(obj_id_list, UTC_list, tle_dict={}, offline_flag=False,
 
     # Retrieve IAU Nutation data from file
     IAU1980_nutation = get_nutation_data()
+    
+    # Retrieve polar motion data from file
+    XYs_df = get_XYs2006_alldata()
 
     # Loop over objects
     output_state = {}
@@ -1349,11 +1361,17 @@ def propagate_TLE(obj_id_list, UTC_list, tle_dict={}, offline_flag=False,
 
         # Loop over times
         for UTC in UTC_list:
+            
+#            print(UTC)
 
             # Find the closest TLE by epoch
+            epoch_start = time.time()
             line1, line2 = find_closest_tle_epoch(line1_list, line2_list, UTC)
+            
+            tle_epoch_time += time.time() - epoch_start
 
             # Propagate TLE using SGP4
+            prop_start = time.time()
             satellite = twoline2rv(line1, line2, wgs84)
             r_TEME, v_TEME = satellite.propagate(UTC.year, UTC.month, UTC.day,
                                                  UTC.hour, UTC.minute,
@@ -1362,16 +1380,27 @@ def propagate_TLE(obj_id_list, UTC_list, tle_dict={}, offline_flag=False,
 
             r_TEME = np.reshape(r_TEME, (3,1))
             v_TEME = np.reshape(v_TEME, (3,1))
+            
+            total_prop += time.time() - prop_start
 
             # Get EOP data for this time
+            eop_start = time.time()
             EOP_data = get_eop_data(eop_alldata, UTC)
+            
+            total_eop_time += time.time() - eop_start
 
             # Convert from TEME to GCRF (ECI)
+            teme_start = time.time()
             r_GCRF, v_GCRF = teme2gcrf(r_TEME, v_TEME, UTC, IAU1980_nutation,
                                        EOP_data)
             
+            total_teme2gcrf += time.time() - teme_start
+            
             # Convert from GCRF to ITRF (ECEF)
-            r_ITRF, v_ITRF = gcrf2itrf(r_GCRF, v_GCRF, UTC, EOP_data)
+            itrf_start = time.time()
+            r_ITRF, v_ITRF = gcrf2itrf(r_GCRF, v_GCRF, UTC, EOP_data, XYs_df)
+            
+            total_gcrf2itrf += time.time() - itrf_start
 
 
             # Store output
@@ -1382,6 +1411,14 @@ def propagate_TLE(obj_id_list, UTC_list, tle_dict={}, offline_flag=False,
             output_state[obj_id]['v_ITRF'].append(v_ITRF)
             output_state[obj_id]['r_TEME'].append(r_TEME)
             output_state[obj_id]['v_TEME'].append(v_TEME)
+            
+        print(obj_id)
+        print('TLE epoch find: ', tle_epoch_time)
+        print('Prop: ', total_prop)
+        print('EOP: ', total_eop_time)
+        print('TEME: ', total_teme2gcrf)
+        print('ITRF: ', total_gcrf2itrf)
+        
 
 
     return output_state

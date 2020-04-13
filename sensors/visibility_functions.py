@@ -405,13 +405,15 @@ def compute_transit_dict(UTC_window, obj_id_list, site_dict, increment=10.,
 
     '''
     
+    start = time.time()
+    
     if len(username) == 0:
         username = input('space-track username: ')
     if len(password) == 0:
         password = getpass.getpass('space-track password: ')
     
     # Generate TLE dictionary
-    # Retrieve all TLEs from the given time window, including 2 days before
+    # Retrieve all TLEs from the given time window, including 3 days before
     # and after the given start and end times
     UTC0 = UTC_window[0]
     UTCf = UTC_window[-1]
@@ -419,7 +421,7 @@ def compute_transit_dict(UTC_window, obj_id_list, site_dict, increment=10.,
     # Download from space-track.org
     if source == 'spacetrack':            
         
-        UTC_window_more = [UTC0 - timedelta(days=2.), UTCf + timedelta(days=2.)]
+        UTC_window_more = [UTC0 - timedelta(days=3.), UTCf + timedelta(days=3.)]
         tle_dict, tle_df = get_spacetrack_tle_data(obj_id_list, UTC_window_more,
                                                     username, password)
     
@@ -427,18 +429,26 @@ def compute_transit_dict(UTC_window, obj_id_list, site_dict, increment=10.,
     window_seconds = (UTCf - UTC0).total_seconds()
     delta_seconds = np.arange(0., window_seconds + 1., increment)
     UTC_list_full = [UTC0 + timedelta(seconds=ti) for ti in delta_seconds]
+    
 #    print(UTC_list_full)
+    
+#    print(tle_dict)
+    
+    
+     
+    print('\nGet TLE Time: ', time.time()-start)
     
     state_dict = propagate_TLE(obj_id_list, UTC_list_full, tle_dict,
                                offline_flag, username, password)
     
     
+    print('nPropagate Time: ', time.time() - start)
+    
 #    print(state_dict)
     
 #    mistake
      
-     
-    
+    site_time = time.time()
    
     # Loop over objects
     transit_dict = {}
@@ -487,6 +497,9 @@ def compute_transit_dict(UTC_window, obj_id_list, site_dict, increment=10.,
                                                 UTC_list, az_list, el_list,
                                                 rg_list, increment)
                 
+    print('\nSite Time: ', time.time() - site_time)
+    
+    print('Total Time: ', time.time() - start)
 
     return transit_dict
 
@@ -495,9 +508,9 @@ def compile_transit_data(transit_dict, site, obj_id, UTC_list, az_list,
                          el_list, rg_list, increment):
     
     
-    print('\n\n compile transit')
-    print(obj_id)
-    print(site)
+#    print('\n\n compile transit')
+#    print(obj_id)
+#    print(site)
 #    print(transit_dict)
     
     # Number of unique digits in transit IDs
@@ -514,9 +527,9 @@ def compile_transit_data(transit_dict, site, obj_id, UTC_list, az_list,
             transit_list = sorted(transit_dict[site].keys())
             last_id = int(transit_list[-1][-zfill_count:])
             transit_id = site + '_' + str(last_id+1).zfill(zfill_count)
-            print('new id')
-            print(transit_list)
-            print(last_id)
+#            print('new id')
+#            print(transit_list)
+#            print(last_id)
             
             
 #        print(transit_id)

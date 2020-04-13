@@ -12,3 +12,5 @@ skyfield_data/de421\.bsp
 launch_ident/launch_analysis\.py
 
 launch_ident/tle_archiver\.py
+
+execution/transits.csv
