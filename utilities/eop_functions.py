@@ -785,7 +785,19 @@ def compute_BPN(X, Y, s):
     
     BPN = np.dot(f, R3)
     
-    return BPN
+    return 
+
+
+def batch_eop_rotation_matrices(UTC_start, UTC_stop, increment=10.):
+    
+    # Initialize Output
+    GCRF_TEME_list = []
+    ITRF_GCRF_list = []
+    
+    
+    
+    
+    return GCRF_TEME_list, ITRF_GCRF_list
 
 
 if __name__ == '__main__':
