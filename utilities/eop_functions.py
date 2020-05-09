@@ -790,9 +790,14 @@ def compute_BPN(X, Y, s):
 
 
 def batch_eop_rotation_matrices(UTC_start, UTC_stop, eop_alldata_text,
-                                increment=10., eop_flag='linear'):
+                                increment=10., eop_flag='linear',
+                                GMST_only_flag=False):
     '''
-    This function 
+    This function generates a list of rotation matrices between TEME/GCRF and
+    GCRF/ITRF for use in coordinate transformations.  The function can process
+    a large array of times and has flags to control the level of fidelity of
+    the transformation, in order to facilitate good computational performance
+    for a large number of transforms.
     
     Parameters
     ------
@@ -805,10 +810,27 @@ def batch_eop_rotation_matrices(UTC_start, UTC_stop, eop_alldata_text,
         information
     increment : float, optional
         time increment between desired frame rotations [sec] (default=10.)
-
+    eop_flag : string, optional
+        flag to determine how to determine EOP parameters from input text data
+        'zeros' = set all EOP values to zero (~2km error)
+        'nearest' = set EOP values to nearest whole day (~3m error)
+        'linear' = linearly interpolate EOP values between 2 nearest days (~20cm error)
+        (default = 'linear')
+    GMST_only_flag : boolean, optional
+        flag to determine whether to apply only the Earth rotation angle for
+        the GCRF/ITRF transformation (i.e., no precession, nutation, polar motion)
+        True = apply GMST Earth rotation angle only (no P, N, W)
+        False = apply full transformation including P, N, W
+        (default = False)
     
     Returns
     ------
+    GCRF_TEME_list : list of 3x3 numpy arrays
+        transformation matrix at each time for GCRF/TEME
+        r_GCRF = GCRF_TEME * r_TEME
+    ITRF_GCRF_list : list of 3x3 numpy arrays
+        transformation matrix at each time for GCRF/TEME
+        r_ITRF = ITRF_GCRF * r_GCRF
     
     '''    
     
@@ -959,37 +981,41 @@ def batch_eop_rotation_matrices(UTC_start, UTC_stop, eop_alldata_text,
                 dY = interp[7]*arcsec2rad
                 
         
+        
+        
         # Compute rotation matrices for transform
-        # Compute UT1 in JD format
+        # Compute current times
         UT1_JD = utcdt2ut1jd(UTC_kk, UT1_UTC)
-        
-        # Compute TT in JD format
         TT_JD = utcdt2ttjd(UTC_kk, TAI_UTC)
-        
-        # Compute TT in centuries since J2000 epoch
         TT_cent = jd2cent(TT_JD)
         
-        # Construct polar motion matrix (ITRS to TIRS)
-        W = compute_polarmotion(xp, yp, TT_cent)
-        
+        # GCRF/ITRF Transformation
         # Contruct Earth rotaion angle matrix (TIRS to CIRS)
-        R = compute_ERA(UT1_JD)
+        R_CIRS = compute_ERA(UT1_JD)
         
-        # Construct Bias-Precessino-Nutation matrix (CIRS to GCRS/ICRS)
-        XYs_data = init_XYs2006(UTC_kk, UTC_kk, XYs_df)
+        if GMST_only_flag:
+            ITRF_GCRF = R_CIRS.T
+            
+        else:            
+            # Construct polar motion matrix (ITRS to TIRS)
+            W = compute_polarmotion(xp, yp, TT_cent)
+            
+            # Construct Bias-Precessino-Nutation matrix (CIRS to GCRS/ICRS)
+            XYs_data = init_XYs2006(UTC_kk, UTC_kk, XYs_df)
+            
+            X, Y, s = get_XYs(XYs_data, TT_JD)
+            
+            # Add in Free Core Nutation (FCN) correction
+            X = dX + X  # rad
+            Y = dY + Y  # rad
+            
+            # Compute Bias-Precssion-Nutation (BPN) matrix
+            BPN = compute_BPN(X, Y, s)
+            
+            # Transform position vector
+            ITRF_GCRF = np.dot(W.T, np.dot(R_CIRS.T, BPN.T))
         
-        X, Y, s = get_XYs(XYs_data, TT_JD)
-        
-        # Add in Free Core Nutation (FCN) correction
-        X = dX + X  # rad
-        Y = dY + Y  # rad
-        
-        # Compute Bias-Precssion-Nutation (BPN) matrix
-        BPN = compute_BPN(X, Y, s)
-        
-        # Transform position vector
-        ITRF_GCRF = np.dot(W.T, np.dot(R.T, BPN.T))
-        
+        # TEME/GCRF Transformation
         # IAU 1976 Precession
         P = compute_precession_IAU1976(TT_cent)
         
@@ -998,10 +1024,10 @@ def batch_eop_rotation_matrices(UTC_start, UTC_stop, eop_alldata_text,
             compute_nutation_IAU1980(IAU1980_nut, TT_cent, ddPsi, ddEps)
     
         # Equation of the Equinonx 1982
-        R = eqnequinox_IAU1982_simple(dPsi, Eps_A)
+        R_1982 = eqnequinox_IAU1982_simple(dPsi, Eps_A)
         
         # Compute transformation matrix and output
-        GCRF_TEME = np.dot(P, np.dot(N, R))
+        GCRF_TEME = np.dot(P, np.dot(N, R_1982))
         
         # Store output
         GCRF_TEME_list.append(GCRF_TEME)
