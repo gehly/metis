@@ -5,6 +5,7 @@ import pandas as pd
 import os
 import sys
 import pickle
+import copy
 from datetime import datetime
 
 sys.path.append('../')
@@ -14,7 +15,7 @@ ind = cwd.find('metis')
 metis_dir = cwd[0:ind+5]
 input_data_dir = os.path.join(metis_dir, 'input_data')
 
-from utilities.time_systems import dt2mjd, utcdt2ut1jd
+from utilities.time_systems import dt2mjd, mjd2dt, utcdt2ut1jd, utcdt2ttjd, jd2cent
 from utilities.numerical_methods import interp_lagrange
 
 ###############################################################################
@@ -785,17 +786,226 @@ def compute_BPN(X, Y, s):
     
     BPN = np.dot(f, R3)
     
-    return 
+    return BPN
 
 
-def batch_eop_rotation_matrices(UTC_start, UTC_stop, increment=10.):
+def batch_eop_rotation_matrices(UTC_start, UTC_stop, eop_alldata_text,
+                                increment=10., eop_flag='linear'):
+    '''
+    This function 
+    
+    Parameters
+    ------
+    UTC_start : datetime object
+        start time in UTC
+    UTC_stop : datetime object
+        stop time in UTC
+    eop_alldata_text : string
+        string containing observed and predicted EOP data, no header
+        information
+    increment : float, optional
+        time increment between desired frame rotations [sec] (default=10.)
+
+    
+    Returns
+    ------
+    
+    '''    
     
     # Initialize Output
     GCRF_TEME_list = []
     ITRF_GCRF_list = []
     
+    # Constants    
+    arcsec2rad = (1./3600.) * pi/180.
     
+    # Retrieve IAU Nutation data from file
+    IAU1980_nut = get_nutation_data()
     
+    # Retrieve polar motion data from file
+    XYs_df = get_XYs2006_alldata()
+    
+    # MJD Array
+    MJD0 = dt2mjd(UTC_start)
+    MJDf = dt2mjd(UTC_stop)
+    MJD_array = np.arange(MJD0, MJDf+(increment/(86400.*2.)), increment/86400.)
+    
+    # Loop over times
+    for kk in range(len(MJD_array)):
+        
+        MJD_kk = MJD_array[kk]
+        UTC_kk = mjd2dt(MJD_kk)
+        
+        # Compute the appropriate EOP values for this time using the input
+        # text data.  Per Reference 4 Table 2-3, the following error levels are
+        # expected for different levels of fidelity in the approximation
+        
+        # Set all EOPs to zero
+        # Expected error level ~2km in GEO
+        if eop_flag == 'zeros':
+            
+            xp = 0.
+            yp = 0.
+            UT1_UTC = 0.
+            LOD = 0.
+            ddPsi = 0.
+            ddEps = 0.
+            dX = 0.
+            dY = 0.
+            TAI_UTC = 0.
+        
+        # Read EOP text data for higher level approximations
+        else:
+            nchar = 102
+            nskip = 1
+            nlines = 0
+            MJD_int = int(MJD_kk)
+            
+            # Get closest lines from EOP text data
+            # First index have to search text data
+            if kk == 0:
+                
+                MJD_prior = copy.copy(MJD_int)
+                
+                # Find EOP data lines around time of interest                
+                for ii in range(len(eop_alldata_text)):
+                    start = ii + nlines*(nchar+nskip)
+                    stop = ii + nlines*(nchar+nskip) + nchar
+                    line = eop_alldata_text[start:stop]
+                    nlines += 1
+                    
+                    MJD_line = int(line[11:16])
+                    
+                    if MJD_line == MJD_int:
+                        line0 = line
+                    if MJD_line == MJD_int+1:
+                        line1 = line
+                        break
+                
+            # Otherwise, we can use previous knowledge
+            else:
+                
+                # If it's the same day as last time we can just reuse line0
+                # and line1.  Otherwise, we have to increment nlines to get
+                # the new line1                
+                if MJD_int == MJD_prior + 1:
+                    line0 = copy.copy(line1)
+                    nlines += 1
+                    start = ii + nlines*(nchar+nskip)
+                    stop = ii + nlines*(nchar+nskip) + nchar
+                    line1 = eop_alldata_text[start:stop]
+                    
+                    MJD_line = int(line[11:16])
+                    if MJD_line != MJD_int:
+                        print(MJD_line)
+                        print(MJD_int)
+                        sys.exit('Wrong MJD value encountered!')
+                    
+                    MJD_prior = MJD_int
+                
+                # Read the EOP values for each line
+                line0_array = eop_read_line(line0)
+                line1_array = eop_read_line(line1)
+            
+            # Set all EOPs to values for nearest day
+            # Expected error level ~3.6m max (0.8m RMS) in GEO
+            if eop_flag == 'nearest':
+                if (MJD_kk - MJD_int) < 0.5:
+                    xp = line0_array[1]*arcsec2rad
+                    yp = line0_array[2]*arcsec2rad
+                    UT1_UTC = line0_array[3]
+                    LOD = line0_array[4]
+                    ddPsi = line0_array[5]*arcsec2rad
+                    ddEps = line0_array[6]*arcsec2rad
+                    dX = line0_array[7]*arcsec2rad
+                    dY = line0_array[8]*arcsec2rad
+                    TAI_UTC = line0_array[9]
+                    
+                else:
+                    xp = line1_array[1]*arcsec2rad
+                    yp = line1_array[2]*arcsec2rad
+                    UT1_UTC = line1_array[3]
+                    LOD = line1_array[4]
+                    ddPsi = line1_array[5]*arcsec2rad
+                    ddEps = line1_array[6]*arcsec2rad
+                    dX = line1_array[7]*arcsec2rad
+                    dY = line1_array[8]*arcsec2rad
+                    TAI_UTC = line1_array[9]
+            
+            # Linear interpolation of values between two nearest days
+            # Expected error level ~22cm max (4cm RMS) in GEO
+            if eop_flag == 'linear':
+                                
+                # Adjust UT1-UTC column in case leap second occurs between lines
+                line0_array[3] -= line0_array[9]
+                line1_array[3] -= line1_array[9]
+                
+                # Leap seconds do not interpolate
+                TAI_UTC = line0_array[9]
+            
+                # Linear interpolation
+                dt = MJD_kk - line0_array[0]
+                interp = (line1_array[1:] - line0_array[1:])/ \
+                    (line1_array[0] - line0_array[0]) * dt + line0_array[1:]
+            
+                # Convert final output
+                xp = interp[0]*arcsec2rad
+                yp = interp[1]*arcsec2rad
+                UT1_UTC = interp[2] + TAI_UTC
+                LOD = interp[3]
+                ddPsi = interp[4]*arcsec2rad
+                ddEps = interp[5]*arcsec2rad
+                dX = interp[6]*arcsec2rad
+                dY = interp[7]*arcsec2rad
+                
+        
+        # Compute rotation matrices for transform
+        # Compute UT1 in JD format
+        UT1_JD = utcdt2ut1jd(UTC_kk, UT1_UTC)
+        
+        # Compute TT in JD format
+        TT_JD = utcdt2ttjd(UTC_kk, TAI_UTC)
+        
+        # Compute TT in centuries since J2000 epoch
+        TT_cent = jd2cent(TT_JD)
+        
+        # Construct polar motion matrix (ITRS to TIRS)
+        W = compute_polarmotion(xp, yp, TT_cent)
+        
+        # Contruct Earth rotaion angle matrix (TIRS to CIRS)
+        R = compute_ERA(UT1_JD)
+        
+        # Construct Bias-Precessino-Nutation matrix (CIRS to GCRS/ICRS)
+        XYs_data = init_XYs2006(UTC_kk, UTC_kk, XYs_df)
+        
+        X, Y, s = get_XYs(XYs_data, TT_JD)
+        
+        # Add in Free Core Nutation (FCN) correction
+        X = dX + X  # rad
+        Y = dY + Y  # rad
+        
+        # Compute Bias-Precssion-Nutation (BPN) matrix
+        BPN = compute_BPN(X, Y, s)
+        
+        # Transform position vector
+        ITRF_GCRF = np.dot(W.T, np.dot(R.T, BPN.T))
+        
+        # IAU 1976 Precession
+        P = compute_precession_IAU1976(TT_cent)
+        
+        # IAU 1980 Nutation
+        N, FA, Eps_A, Eps_true, dPsi, dEps = \
+            compute_nutation_IAU1980(IAU1980_nut, TT_cent, ddPsi, ddEps)
+    
+        # Equation of the Equinonx 1982
+        R = eqnequinox_IAU1982_simple(dPsi, Eps_A)
+        
+        # Compute transformation matrix and output
+        GCRF_TEME = np.dot(P, np.dot(N, R))
+        
+        # Store output
+        GCRF_TEME_list.append(GCRF_TEME)
+        ITRF_GCRF_list.append(ITRF_GCRF)
     
     return GCRF_TEME_list, ITRF_GCRF_list
 

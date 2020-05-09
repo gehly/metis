@@ -21,9 +21,12 @@ if __name__ == '__main__':
             
     # Object list
     obj_id_list = list(np.arange(43010, 43020))
+    obj_id_list.append(40146)
+    obj_id_list.append(40148)
     
     # Time window
     UTC0 = datetime(2019, 1, 1, 0, 0, 0)
+#    UTCf = datetime(2019, 1, 1, 4, 0, 0)
     UTCf = datetime(2019, 1, 10, 0, 0, 0)
     UTC_window = [UTC0, UTCf]
     
@@ -44,14 +47,14 @@ if __name__ == '__main__':
     
     
     # Generate output file
-    output_file = 'transits.csv'
+    output_file = 'transits2.csv'
     with open(output_file, 'w', newline='') as csvfile:
         filewriter = csv.writer(csvfile)
-        filewriter.writerow(['Site ID', 'Transit ID', 'Object ID', 'Start [UTC]',
-                             'Stop [UTC]', 'Duration [sec]', 'TCA [UTC]', 'TME [UTC]',
-                             'Minumum Range [km]', 'Maximum Elevation [deg]',
-                             'UTC Times', 'Azimuth [deg]', 'Elevation [deg]',
-                             'Range [km]'])
+        filewriter.writerow(['Site_ID', 'Transit_ID', 'Object_ID', 'Start_UTC',
+                             'Stop_UTC', 'Duration_sec', 'TCA_UTC', 'TME_UTC',
+                             'Minumum_Range_km', 'Maximum_Elevation_deg'])
+                             #'UTC_Times', 'Azimuth [deg]', 'Elevation [deg]',
+                             #'Range [km]'])
     
         for site in transit_dict:
             for transit_id in transit_dict[site]:
@@ -64,14 +67,14 @@ if __name__ == '__main__':
                 TME = transit_dict[site][transit_id]['TME']
                 rg_min = transit_dict[site][transit_id]['rg_min']
                 el_max = transit_dict[site][transit_id]['el_max']
-                UTC_transit = transit_dict[site][transit_id]['UTC_transit']
-                az_transit = transit_dict[site][transit_id]['az_transit']
-                el_transit = transit_dict[site][transit_id]['el_transit']
-                rg_transit = transit_dict[site][transit_id]['rg_transit']
+#                UTC_transit = transit_dict[site][transit_id]['UTC_transit']
+#                az_transit = transit_dict[site][transit_id]['az_transit']
+#                el_transit = transit_dict[site][transit_id]['el_transit']
+#                rg_transit = transit_dict[site][transit_id]['rg_transit']
                 
                 output_row = [site, transit_id, obj_id, start, stop, duration,
-                              TCA, TME, rg_min, el_max, UTC_transit,
-                              az_transit, el_transit, rg_transit]
+                              TCA, TME, rg_min, el_max,] # UTC_transit,
+                              # az_transit, el_transit, rg_transit]
                 
                 filewriter.writerow(output_row)
     

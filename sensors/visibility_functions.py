@@ -571,7 +571,7 @@ def compile_transit_data(transit_dict, site, obj_id, UTC_list, az_list,
                     el_max = float(el_deg)
                     
                 # Store current time and measurement values for output
-                UTC_transit.append(ti.strftime('%Y-%m-%d %H:%M:%S'))
+                UTC_transit.append(ti.strftime('%Y-%m-%dT%H:%M:%S'))
                 az_transit.append(az_list[ii])
                 el_transit.append(el_list[ii])
                 rg_transit.append(rg_list[ii])
@@ -583,7 +583,7 @@ def compile_transit_data(transit_dict, site, obj_id, UTC_list, az_list,
     
                 if ii == (len(UTC_list)-1):
                     stop = ti
-                    UTC_transit.append(ti.strftime('%Y-%m-%d %H:%M:%S'))
+                    UTC_transit.append(ti.strftime('%Y-%m-%dT%H:%M:%S'))
                     az_transit.append(az_list[ii])
                     el_transit.append(el_list[ii])
                     rg_transit.append(rg_list[ii])
@@ -593,17 +593,17 @@ def compile_transit_data(transit_dict, site, obj_id, UTC_list, az_list,
                 # Store output
                 transit_dict[site][transit_id] = {}
                 transit_dict[site][transit_id]['NORAD_ID'] = obj_id
-                transit_dict[site][transit_id]['start'] = start.strftime('%Y-%m-%d %H:%M:%S')
-                transit_dict[site][transit_id]['stop'] = stop.strftime('%Y-%m-%d %H:%M:%S')
+                transit_dict[site][transit_id]['start'] = start.strftime('%Y-%m-%dT%H:%M:%S')
+                transit_dict[site][transit_id]['stop'] = stop.strftime('%Y-%m-%dT%H:%M:%S')
                 transit_dict[site][transit_id]['duration'] = duration
-                transit_dict[site][transit_id]['TCA'] = TCA.strftime('%Y-%m-%d %H:%M:%S')
-                transit_dict[site][transit_id]['TME'] = TME.strftime('%Y-%m-%d %H:%M:%S')
+                transit_dict[site][transit_id]['TCA'] = TCA.strftime('%Y-%m-%dT%H:%M:%S')
+                transit_dict[site][transit_id]['TME'] = TME.strftime('%Y-%m-%dT%H:%M:%S')
                 transit_dict[site][transit_id]['rg_min'] = rg_min
                 transit_dict[site][transit_id]['el_max'] = el_max
-                transit_dict[site][transit_id]['UTC_transit'] = UTC_transit
-                transit_dict[site][transit_id]['az_transit'] = az_transit
-                transit_dict[site][transit_id]['el_transit'] = el_transit
-                transit_dict[site][transit_id]['rg_transit'] = rg_transit
+#                transit_dict[site][transit_id]['UTC_transit'] = UTC_transit
+#                transit_dict[site][transit_id]['az_transit'] = az_transit
+#                transit_dict[site][transit_id]['el_transit'] = el_transit
+#                transit_dict[site][transit_id]['rg_transit'] = rg_transit
                 
 
                 # Reset for new transit next round
