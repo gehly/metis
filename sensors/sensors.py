@@ -969,6 +969,33 @@ def define_sensors(sensor_id_list=[]):
     return sensor_dict
 
 
+def define_sites_from_file(site_data_file):
+    
+    # Determine file type
+    fname, ext = os.path.splitext(site_data_file)
+    
+    if ext == '.json':
+        site_df = pd.read_json(site_data_file)
+
+        site_list = site_df['site'].tolist()
+        lat_list = site_df['lat'].tolist()
+        lon_list = site_df['lon'].tolist()
+
+        # Form dictionary output
+        site_dict = {}
+        for ii in range(len(site_list)):
+            site = site_list[ii]
+            lat = float(lat_list[ii])
+            lon = float(lon_list[ii])
+            ht = 0.
+            
+            site_dict[site] = {}
+            site_dict[site]['geodetic_latlonht'] = [lat, lon, ht]
+
+    
+    return site_dict
+
+
 def generate_sensor_file(sensor_file, sensor_id_list=[]):
     
     sensor_dict = define_sensors(sensor_id_list)

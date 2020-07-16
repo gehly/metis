@@ -657,104 +657,107 @@ def latlonht2ecef(lat, lon, ht):
 
 if __name__ == '__main__':
 
-    obj_id_list = [43014]
-    UTC = datetime(2018, 6, 23, 0, 0, 0)   
-    
-    r_GCRF = np.array([[ 1970.55034496],
-                       [-5808.61407296],
-                       [ 3477.84103265]])
-    v_GCRF = np.array([[ 0.01631311],
-                       [-3.68975479],
-                       [-6.53041229]])
-    
-    eop_alldata = get_celestrak_eop_alldata()    
-    EOP_data = get_eop_data(eop_alldata, UTC)
-    
-    print(EOP_data)
-    
-    r_ITRF, v_ITRF = gcrf2itrf(r_GCRF, v_GCRF, UTC, EOP_data)
-    
-    print(r_ITRF)
-    print(v_ITRF)
-    
-    UTC = datetime(2018, 6, 23, 2, 13, 21)
-    r_GCRF = np.array([[-7.47620899e+02],
-                       [ 3.91726014e+03],
-                       [-5.60901124e+03]])
-    
-    v_GCRF = np.array([[ 2.71877455e-03],
-                       [-6.23954021e+00],
-                       [-4.34951830e+00]])
-    
-    r_ITRF = np.array([[-3651.380321],
-                       [ 1598.487431],
-                       [-5610.448359]])
-    
-    v_ITRF = np.array([[ 5.276523548],
-                       [-3.242081015],
-                       [-4.349310553]])
-    
-    EOP_data = get_eop_data(eop_alldata, UTC)
-    r_check, v_check = gcrf2itrf(r_GCRF, v_GCRF, UTC, EOP_data)
-    
-    print(r_check)
-    print(v_check)
-    
-    print(r_check - r_ITRF)
-    print(v_check - v_ITRF)
-    
-    r_check2, v_check2 = itrf2gcrf(r_check, v_check, UTC, EOP_data)
-    
-    print(r_check2)
-    print(v_check2)
-    
-    print(r_check2 - r_GCRF)
-    print(v_check2 - v_GCRF)
-    
-    
-    r_GCRF = np.array([[10000.], [5000.], [3000.]])
-    v_GCRF = np.array([[-2.], [-3.], [4.]])
-    
-    UTC = datetime(2018, 6, 25, 6, 30, 10)
-    EOP_data = get_eop_data(eop_alldata, UTC)
-    print(EOP_data)
-    
-    r_ITRF, v_ITRF = gcrf2itrf(r_GCRF, v_GCRF, UTC, EOP_data)
-    r_check, v_check = itrf2gcrf(r_ITRF, v_ITRF, UTC, EOP_data)
-    
-    print(r_ITRF)
-    print(v_ITRF)
-    print(r_GCRF - r_check)
-    print(v_GCRF - v_check)
-    
-    
-    IAU1980nut = get_nutation_data()
-    r_TEME, v_TEME = gcrf2teme(r_GCRF, v_GCRF, UTC, IAU1980nut, EOP_data)
-    r_check, v_check = teme2gcrf(r_TEME, v_TEME, UTC, IAU1980nut, EOP_data)
-    
-    print(r_TEME)
-    print(v_TEME)
-    print(r_check - r_GCRF)
-    print(v_check - v_GCRF)
-    
-    rc_vect = np.array([7000., 2000., 1000.])
-    vc_vect = np.array([0., -7., -2.])
-    
-    Q_eci = np.random.rand(3,)
-    print(Q_eci)
-    Q_ric = eci2ric(rc_vect, vc_vect, Q_eci)
-    Q_eci2 = ric2eci(rc_vect, vc_vect, Q_ric)
-    print(Q_eci2.flatten())
-    print(Q_eci - Q_eci2.flatten())
+#    obj_id_list = [43014]
+#    UTC = datetime(2018, 6, 23, 0, 0, 0)   
+#    
+#    r_GCRF = np.array([[ 1970.55034496],
+#                       [-5808.61407296],
+#                       [ 3477.84103265]])
+#    v_GCRF = np.array([[ 0.01631311],
+#                       [-3.68975479],
+#                       [-6.53041229]])
+#    
+#    eop_alldata = get_celestrak_eop_alldata()    
+#    EOP_data = get_eop_data(eop_alldata, UTC)
+#    
+#    print(EOP_data)
+#    
+#    r_ITRF, v_ITRF = gcrf2itrf(r_GCRF, v_GCRF, UTC, EOP_data)
+#    
+#    print(r_ITRF)
+#    print(v_ITRF)
+#    
+#    UTC = datetime(2018, 6, 23, 2, 13, 21)
+#    r_GCRF = np.array([[-7.47620899e+02],
+#                       [ 3.91726014e+03],
+#                       [-5.60901124e+03]])
+#    
+#    v_GCRF = np.array([[ 2.71877455e-03],
+#                       [-6.23954021e+00],
+#                       [-4.34951830e+00]])
+#    
+#    r_ITRF = np.array([[-3651.380321],
+#                       [ 1598.487431],
+#                       [-5610.448359]])
+#    
+#    v_ITRF = np.array([[ 5.276523548],
+#                       [-3.242081015],
+#                       [-4.349310553]])
+#    
+#    EOP_data = get_eop_data(eop_alldata, UTC)
+#    r_check, v_check = gcrf2itrf(r_GCRF, v_GCRF, UTC, EOP_data)
+#    
+#    print(r_check)
+#    print(v_check)
+#    
+#    print(r_check - r_ITRF)
+#    print(v_check - v_ITRF)
+#    
+#    r_check2, v_check2 = itrf2gcrf(r_check, v_check, UTC, EOP_data)
+#    
+#    print(r_check2)
+#    print(v_check2)
+#    
+#    print(r_check2 - r_GCRF)
+#    print(v_check2 - v_GCRF)
+#    
+#    
+#    r_GCRF = np.array([[10000.], [5000.], [3000.]])
+#    v_GCRF = np.array([[-2.], [-3.], [4.]])
+#    
+#    UTC = datetime(2018, 6, 25, 6, 30, 10)
+#    EOP_data = get_eop_data(eop_alldata, UTC)
+#    print(EOP_data)
+#    
+#    r_ITRF, v_ITRF = gcrf2itrf(r_GCRF, v_GCRF, UTC, EOP_data)
+#    r_check, v_check = itrf2gcrf(r_ITRF, v_ITRF, UTC, EOP_data)
+#    
+#    print(r_ITRF)
+#    print(v_ITRF)
+#    print(r_GCRF - r_check)
+#    print(v_GCRF - v_check)
+#    
+#    
+#    IAU1980nut = get_nutation_data()
+#    r_TEME, v_TEME = gcrf2teme(r_GCRF, v_GCRF, UTC, IAU1980nut, EOP_data)
+#    r_check, v_check = teme2gcrf(r_TEME, v_TEME, UTC, IAU1980nut, EOP_data)
+#    
+#    print(r_TEME)
+#    print(v_TEME)
+#    print(r_check - r_GCRF)
+#    print(v_check - v_GCRF)
+#    
+#    rc_vect = np.array([7000., 2000., 1000.])
+#    vc_vect = np.array([0., -7., -2.])
+#    
+#    Q_eci = np.random.rand(3,)
+#    print(Q_eci)
+#    Q_ric = eci2ric(rc_vect, vc_vect, Q_eci)
+#    Q_eci2 = ric2eci(rc_vect, vc_vect, Q_ric)
+#    print(Q_eci2.flatten())
+#    print(Q_eci - Q_eci2.flatten())
     
     
     lat_gs = -35.29
     lon_gs = 149.17
     ht_gs = 0.606 # km	
     
-    r_ecef = latlonht2ecef(lat_gs, lon_gs, ht_gs)
+    r_site = latlonht2ecef(lat_gs, lon_gs, ht_gs)
     
-    print(r_ecef)
+    print(r_site)
     
+    r_enu = ecef2enu(r_site, r_site)    
+    
+    print(r_enu)
     
     

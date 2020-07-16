@@ -1016,14 +1016,43 @@ def element_conversion(x_in, iflag, oflag, GM=GME, dt=0.):
 
 if __name__ == '__main__':
     
-    e = 0.1
-    theta = 40.
+#    e = 0.1
+#    theta = 40.
+#    
+#    kep = [8000., e, 10, 20, 30, theta]
+#    
+#    cart = kep2cart(kep)
+#    
+#    kep2 = cart2kep(cart)
+#    
+#    print(cart)
+#    print(kep2)
     
-    kep = [8000., e, 10, 20, 30, theta]
+    GM = 3.986e5
+    Re = 6378
+
+    # Test case orbit elements
+    P = 86164.1/2
+    a = ((P/(2*pi))**2*GM)**(1./3.)
+    rp = Re+300.
+    e = 1. - (rp/a)
+    i = 63.4
+    RAAN = 75.
+    w = -90
+    theta = 0.
     
-    cart = kep2cart(kep)
-    
-    kep2 = cart2kep(cart)
-    
+    # Cartesian coordinates for class assignment
+    kep = [a, e, i, RAAN, w, theta]
+    cart = kep2cart(kep, GM)
+    kep_check = cart2kep(cart, GM)
+    print(kep)
+    print(kep_check)
     print(cart)
-    print(kep2)
+    
+    kep_check2 = element_conversion(cart, 1, 0, GM, dt=0.)
+    
+    print(kep_check2)
+    
+    
+    
+    

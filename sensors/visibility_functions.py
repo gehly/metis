@@ -4,16 +4,18 @@ import os
 import sys
 import csv
 import time
-from datetime import timedelta
+from datetime import datetime, timedelta
+import getpass
 
 sys.path.append('../')
 
-from skyfield.constants import ERAD
-from skyfield.api import Topos, EarthSatellite, Loader
+# from skyfield.constants import ERAD
+# from skyfield.api import Topos, EarthSatellite, Loader
 
 from sensors.sensors import define_sensors
 from utilities.tle_functions import get_spacetrack_tle_data
 from utilities.tle_functions import find_closest_tle_epoch
+from utilities.tle_functions import propagate_TLE
 
 from utilities.eop_functions import get_eop_data
 from utilities.coordinate_systems import latlonht2ecef
@@ -21,6 +23,7 @@ from utilities.coordinate_systems import gcrf2itrf
 from utilities.coordinate_systems import itrf2gcrf
 from utilities.constants import Re
 from sensors.measurements import compute_measurement
+from sensors.measurements import ecef2azelrange
 from sensors.measurements import ecef2azelrange_rad
 
 
@@ -395,6 +398,232 @@ def compute_visible_passes(UTC_array, obj_id_list, sensor_id_list, ephemeris,
     return vis_dict
 
 
+def compute_transit_dict(UTC_window, obj_id_list, site_dict, increment=10.,
+                         offline_flag=False, source='spacetrack',
+                         username='', password=''):
+    '''
+
+    '''
+    
+    start = time.time()
+    
+    if len(username) == 0:
+        username = input('space-track username: ')
+    if len(password) == 0:
+        password = getpass.getpass('space-track password: ')
+    
+    # Generate TLE dictionary
+    # Retrieve all TLEs from the given time window, including 3 days before
+    # and after the given start and end times
+    UTC0 = UTC_window[0]
+    UTCf = UTC_window[-1]
+    
+    # Download from space-track.org
+    if source == 'spacetrack':            
+        
+        UTC_window_more = [UTC0 - timedelta(days=3.), UTCf + timedelta(days=3.)]
+        tle_dict, tle_df = get_spacetrack_tle_data(obj_id_list, UTC_window_more,
+                                                    username, password)
+    
+    # Propagate TLEs for all times in actual window, using increment
+    window_seconds = (UTCf - UTC0).total_seconds()
+    delta_seconds = np.arange(0., window_seconds + 1., increment)
+    UTC_list_full = [UTC0 + timedelta(seconds=ti) for ti in delta_seconds]
+    
+#    print(UTC_list_full)
+    
+#    print(tle_dict)
+    
+    
+     
+    print('\nGet TLE Time: ', time.time()-start)
+    
+    state_dict = propagate_TLE(obj_id_list, UTC_list_full, tle_dict,
+                               offline_flag, username, password)
+    
+    
+    print('nPropagate Time: ', time.time() - start)
+    
+#    print(state_dict)
+    
+#    mistake
+     
+    site_time = time.time()
+   
+    # Loop over objects
+    transit_dict = {}
+    for obj_id in obj_id_list:
+        
+        # Retrieve spacecraft ITRF (ECEF) positions
+        ITRF_list = state_dict[obj_id]['r_ITRF']
+        
+        # Loop over sites
+        for site in site_dict:
+            
+            # Compute ECEF site location
+            latlonht = site_dict[site]['geodetic_latlonht']
+            site_ecef = latlonht2ecef(latlonht[0], latlonht[1], latlonht[2])
+            
+            # Loop over times
+            az_list = []
+            el_list = []
+            rg_list = []
+            UTC_list = []
+            for ii in range(len(UTC_list_full)):
+                
+                # Current time and position vector in ECEF
+                r_ecef = ITRF_list[ii]
+                
+                # Compute az, el, range
+                az, el, rg = ecef2azelrange(r_ecef, site_ecef)
+                
+                if el > 0.:
+                    az_list.append(az)
+                    el_list.append(el)
+                    rg_list.append(rg)
+                    UTC_list.append(UTC_list_full[ii])
+                    
+                    
+            
+            # Compile data into transits
+            
+#            print(obj_id)
+#            print(site)
+#            print(UTC_list)
+#            print(el_list)
+#            print(rg_list)
+            
+            transit_dict = compile_transit_data(transit_dict, site, obj_id,
+                                                UTC_list, az_list, el_list,
+                                                rg_list, increment)
+                
+    print('\nSite Time: ', time.time() - site_time)
+    
+    print('Total Time: ', time.time() - start)
+
+    return transit_dict
+
+
+def compile_transit_data(transit_dict, site, obj_id, UTC_list, az_list,
+                         el_list, rg_list, increment):
+    
+    
+#    print('\n\n compile transit')
+#    print(obj_id)
+#    print(site)
+#    print(transit_dict)
+    
+    # Number of unique digits in transit IDs
+    zfill_count = 10
+    
+    # Only process if needed
+    if len(UTC_list) > 0 :
+        
+        # Initialze output
+        if site not in transit_dict:
+            transit_dict[site] = {}
+            transit_id = site + '_' + str(1).zfill(zfill_count)
+        else:
+            transit_list = sorted(transit_dict[site].keys())
+            last_id = int(transit_list[-1][-zfill_count:])
+            transit_id = site + '_' + str(last_id+1).zfill(zfill_count)
+#            print('new id')
+#            print(transit_list)
+#            print(last_id)
+            
+            
+#        print(transit_id)
+        
+        
+        # Loop over times
+        rg_min = 1e12
+        el_max = -1.
+        ti_prior = UTC_list[0]
+        start = UTC_list[0]
+        stop = UTC_list[0]
+        TCA = UTC_list[0]
+        TME = UTC_list[0]
+        UTC_transit = []
+        az_transit = []
+        el_transit = []
+        rg_transit = []
+        for ii in range(len(UTC_list)):
+            
+            ti = UTC_list[ii]
+            rg_km = rg_list[ii]
+            el_deg = el_list[ii]
+            
+            # If current time is close to previous, pass continues
+            if (ti - ti_prior).total_seconds() < (increment + 1.):
+    
+                # Update pass stop time and ti_prior for next iteration
+                stop = ti
+                ti_prior = ti
+                
+                # Check if this is pass time of closest approach (TCA)
+                if rg_km < rg_min:
+                    TCA = ti
+                    rg_min = float(rg_km)
+                
+                # Check if this is pass time of maximum elevation (TME)
+                if el_deg > el_max:
+                    TME = ti
+                    el_max = float(el_deg)
+                    
+                # Store current time and measurement values for output
+                UTC_transit.append(ti.strftime('%Y-%m-%dT%H:%M:%S'))
+                az_transit.append(az_list[ii])
+                el_transit.append(el_list[ii])
+                rg_transit.append(rg_list[ii])
+                
+    
+            # If current time is far from previous or if we reached
+            # the end of UTC list, transit has ended
+            if ((ti - ti_prior).total_seconds() >= (increment + 1.) or ii == (len(UTC_list)-1)):
+    
+                if ii == (len(UTC_list)-1):
+                    stop = ti
+                    UTC_transit.append(ti.strftime('%Y-%m-%dT%H:%M:%S'))
+                    az_transit.append(az_list[ii])
+                    el_transit.append(el_list[ii])
+                    rg_transit.append(rg_list[ii])
+                    
+                duration = (stop - start).total_seconds()
+                
+                # Store output
+                transit_dict[site][transit_id] = {}
+                transit_dict[site][transit_id]['NORAD_ID'] = obj_id
+                transit_dict[site][transit_id]['start'] = start.strftime('%Y-%m-%dT%H:%M:%S')
+                transit_dict[site][transit_id]['stop'] = stop.strftime('%Y-%m-%dT%H:%M:%S')
+                transit_dict[site][transit_id]['duration'] = duration
+                transit_dict[site][transit_id]['TCA'] = TCA.strftime('%Y-%m-%dT%H:%M:%S')
+                transit_dict[site][transit_id]['TME'] = TME.strftime('%Y-%m-%dT%H:%M:%S')
+                transit_dict[site][transit_id]['rg_min'] = rg_min
+                transit_dict[site][transit_id]['el_max'] = el_max
+#                transit_dict[site][transit_id]['UTC_transit'] = UTC_transit
+#                transit_dict[site][transit_id]['az_transit'] = az_transit
+#                transit_dict[site][transit_id]['el_transit'] = el_transit
+#                transit_dict[site][transit_id]['rg_transit'] = rg_transit
+                
+
+                # Reset for new transit next round
+                start = ti
+                TCA = ti
+                TME = ti
+                stop = ti
+                ti_prior = ti
+                rg_min = 1e12
+                el_max = -1
+                UTC_transit = []
+                az_transit = []
+                el_transit = []
+                rg_transit = []
+                transit_int = int(transit_id[-zfill_count:])
+                transit_id = site + '_' + str(transit_int+1).zfill(zfill_count)
+    
+    return transit_dict
+
+
 def check_visibility(state, UTC_times, sun_gcrf_array, moon_gcrf_array, sensor,
                      spacecraftConfig, surfaces, eop_alldata, XYs_df=[]):
     
@@ -632,6 +861,11 @@ def compute_pass(UTC_vis, rg_vis, el_vis, sensor):
             # the end of UTC list, pass has ended
             if ((ti.tdb - ti_prior.tdb)*86400. >= (max_gap+1.) or ii == (len(UTC_vis)-1)):
                 
+                # TODO - LOGIC ERROR
+                # Test this code for stop time if reached the end of UTC_vis
+                if ii == (len(UTC_vis)-1):
+                    stop = ti
+                
                 # Store output
                 start_list.append(start)
                 stop_list.append(stop)
@@ -646,8 +880,11 @@ def compute_pass(UTC_vis, rg_vis, el_vis, sensor):
                 TME = ti
                 stop = ti
                 ti_prior = ti
-                rg_min = float(rg_km)
-                el_max = float(el_rad)
+                
+                # TODO - LOGIC ERROR
+                # Test this code to reset these params
+                rg_min = 1e12
+                el_max = -1
                         
     return start_list, stop_list, TCA_list, TME_list, rg_min_list, el_max_list
 
