@@ -23,7 +23,7 @@ if __name__ == '__main__':
     ts = load.timescale()
             
     
-    obj_id_list = [39120, 42662, 43874, 44307, 38992, 27424, 33749, 41848, 43804, 43914, 44484, 44485, 43643, 44835]
+    obj_id_list = [24870, 24871, 24873]
     
 #    tle_dict = {}
 #    tle_dict[25544] = {}
@@ -31,10 +31,9 @@ if __name__ == '__main__':
 #    tle_dict[25544]['line2_list'] = ['2 25544  51.6412 280.2571 0004861 165.0174 287.2188 15.53860328132822']
 #    UTC = tletime2datetime(tle_dict[25544]['line1_list'][0])
     
-    UTC = datetime(2020, 4, 21, 7, 0, 0)
+    UTC = datetime(2021, 3, 23, 12, 0, 0)
     
-    sensor_id_list = ['UNSW Falcon', 'FLC Falcon',
-                      'PSU Falcon']
+    sensor_id_list = ['UNSW Falcon', 'NJC Falcon', 'CMU Falcon', 'RMIT ROO']
     
     
     # Times for visibility check
