@@ -1038,17 +1038,19 @@ def batch_eop_rotation_matrices(UTC_start, UTC_stop, eop_alldata_text,
 
 if __name__ == '__main__':
     
-    save_celestrak_eop_alldata()
+#    save_celestrak_eop_alldata()
     
-#    UTC = datetime(2019, 9, 3, 10, 9, 42)
-#    
-#    eop_alldata = get_celestrak_eop_alldata()
-#    EOP_data = get_eop_data(eop_alldata, UTC)
-#    
+    UTC = datetime(2020, 8, 10, 0, 0, 0)
+    
+    eop_alldata = get_celestrak_eop_alldata()
+    EOP_data = get_eop_data(eop_alldata, UTC)
+    
 #    print(EOP_data)
-#    
-#    UT1_JD = utcdt2ut1jd(UTC, EOP_data['UT1_UTC'])
-#    
-#    R = compute_ERA(UT1_JD)
+    
+    UT1_JD = utcdt2ut1jd(UTC, EOP_data['UT1_UTC'])
+    
+    R = compute_ERA(UT1_JD)
+    
+    print(R)
     
     
