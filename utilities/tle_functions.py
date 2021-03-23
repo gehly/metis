@@ -1674,7 +1674,7 @@ def plot_all_tle_common_time(obj_id_list, UTC_list, tle_dict={}):
     return
 
 
-def find_closest_tle_epoch(line1_list, line2_list, UTC):
+def find_closest_tle_epoch(line1_list, line2_list, UTC, prev_flag=False):
     '''
     This function finds the TLE with the epoch closest to the given UTC time.
 
@@ -1686,6 +1686,9 @@ def find_closest_tle_epoch(line1_list, line2_list, UTC):
         list of TLE line2 strings
     UTC : datetime object
         UTC time for which closest TLE is desired
+    prev_flag : boolean, optional
+        only consider TLEs with epochs previous to UTC (true) or consider all
+        TLEs (false) (default=false)
 
     Returns
     ------
@@ -1700,10 +1703,17 @@ def find_closest_tle_epoch(line1_list, line2_list, UTC):
     for ii in range(len(line1_list)):
         line1 = line1_list[ii]
         tle_epoch = tletime2datetime(line1)
-        dt_sec = abs((UTC - tle_epoch).total_seconds())
-        if dt_sec < minimum:
-            ind = ii
-            minimum = dt_sec
+        dt_sec = (UTC - tle_epoch).total_seconds()
+        
+        if prev_flag:
+            if dt_sec > 0 and abs(dt_sec) < minimum:
+                ind = ii
+                minimum = dt_sec
+                        
+        else:        
+            if abs(dt_sec) < minimum:
+                ind = ii
+                minimum = dt_sec
 
     line1 = line1_list[ind]
     line2 = line2_list[ind]
@@ -1790,7 +1800,7 @@ def propagate_TLE(obj_id_list, UTC_list, tle_dict={}, offline_flag=False,
 
             # Find the closest TLE by epoch
             epoch_start = time.time()
-            line1, line2 = find_closest_tle_epoch(line1_list, line2_list, UTC)
+            line1, line2 = find_closest_tle_epoch(line1_list, line2_list, UTC, prev_flag=True)
             
             tle_epoch_time += time.time() - epoch_start
 
@@ -1905,17 +1915,23 @@ if __name__ == '__main__' :
 #    filename = os.path.join('D:\documents\\research\sensor_management\site_location', 'tle_data_2020.txt')
 
     
-    num_obj = 1000
-    UTC_list = [datetime(2020, 1, 1, 0, 0, 0), datetime(2020, 1, 10, 0, 0, 0)]
-    max_obj_id = 40000
-    username = 'steve.gehly@gmail.com'
-    password = 'SpaceTrackPword!'
+#    num_obj = 1000
+#    UTC_list = [datetime(2020, 1, 1, 0, 0, 0), datetime(2020, 1, 10, 0, 0, 0)]
+#    max_obj_id = 40000
+    
+    obj_id_list = [28358]
+    UTC_window = [datetime(2020, 8, 10), datetime(2020, 8, 25)]
+    tle_dict, tle_df = get_spacetrack_tle_data(obj_id_list, UTC_window)
+    
+    print(tle_dict)
+    
+    
     
 #    obj_id_list = generate_tle_list(num_obj, UTC_list, max_obj_id, filename, username, password)
 #    print(obj_id_list)
 #    
 #    # Save data
-    tle_list_file =  os.path.join( 'D:\documents\\research\sensor_management\site_location','tle_obj_file.pkl' )
+#    tle_list_file =  os.path.join( 'D:\documents\\research\sensor_management\site_location','tle_obj_file.pkl' )
 #    pklFile = open( filename, 'wb' )
 #    pickle.dump( [obj_id_list], pklFile, -1 )
 #    pklFile.close()
@@ -1923,7 +1939,7 @@ if __name__ == '__main__' :
 #    gen_tle_textfiles(filename, username, password)
     
     
-    check_category(tle_list_file, username, password)
+#    check_category(tle_list_file, username, password)
     
 
 
