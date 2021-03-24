@@ -31,18 +31,22 @@ if __name__ == '__main__':
 #    tle_dict[25544]['line2_list'] = ['2 25544  51.6412 280.2571 0004861 165.0174 287.2188 15.53860328132822']
 #    UTC = tletime2datetime(tle_dict[25544]['line1_list'][0])
     
-    UTC = datetime(2021, 3, 23, 12, 0, 0)
+    UTC = datetime(2021, 3, 20, 12, 0, 0)
     
-    sensor_id_list = ['UNSW Falcon', 'NJC Falcon', 'CMU Falcon', 'RMIT ROO']
+    sensor_id_list = ['UNSW Falcon', 'UNSW Viper', 'NJC Falcon', 'CMU Falcon', 'RMIT ROO']
     
     
     # Times for visibility check
     ndays = 3
     dt = 10
     UTC0 = ts.utc(UTC.replace(tzinfo=utc)).utc
+    print(UTC0)
     sec_array = list(range(0,86400*ndays,dt))
     skyfield_times = ts.utc(UTC0[0], UTC0[1]+2, UTC0[2],
                             UTC0[3], UTC0[4], sec_array)
+    
+    print(skyfield_times[0])
+    mistake
     
     vis_dict = compute_visible_passes(skyfield_times, obj_id_list,
                                       sensor_id_list, ephemeris)
@@ -54,7 +58,7 @@ if __name__ == '__main__':
     # Generate output file
     vis_file_min_el = 10.
     outdir = os.path.join(metis_dir, 'skyfield_data')
-    vis_file = os.path.join(outdir, 'sact_visible_passes.csv')
+    vis_file = os.path.join(outdir, 'test_visible_passes.csv')
     generate_visibility_file(vis_dict, vis_file, vis_file_min_el)
     
     

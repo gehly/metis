@@ -74,6 +74,8 @@ def get_spacetrack_tle_data(obj_id_list = [], UTC_list = [], username='',
     
     tle_dict = {}
     tle_df = []
+    
+    print(UTC_list)
 
     if len(username) == 0:
         username = input('space-track username: ')
@@ -91,17 +93,21 @@ def get_spacetrack_tle_data(obj_id_list = [], UTC_list = [], username='',
         if len(UTC_list) == 2:
             UTC0 = UTC_list[0].strftime('%Y-%m-%d')
             UTC1 = UTC_list[1].strftime('%Y-%m-%d')
-            pageData = ('//www.space-track.org/basicspacedata/query/class/tle/'
+            pageData = ('//www.space-track.org/basicspacedata/query/class/gp/'
                         'EPOCH/' + UTC0 + '--' + UTC1 + '/NORAD_CAT_ID/' +
-                        myString + '/orderby/TLE_LINE1 ASC/format/tle')
+                        myString + '/orderby/NORAD_CAT_ID/format/tle')
 
         # Otherwise, get latest available
         else:
-            pageData = ('//www.space-track.org/basicspacedata/query/class/'
-                        'tle_latest/ORDINAL/1/NORAD_CAT_ID/' + myString +
-                        '/orderby/TLE_LINE1 ASC/format/tle')
+            pageData = ('//www.space-track.org/basicspacedata/query/class/gp/'
+                        'NORAD_CAT_ID/' + myString +
+                        '/orderby/NORAD_CAT_ID/format/tle')
+    
+    # If no objects specified, retrieve latest for full catalog
+    # DEPRECATED - now print error message
     else:
-        pageData = '//www.space-track.org/basicspacedata/query/class/tle_latest/ORDINAL/1/EPOCH/%3Enow-30/orderby/NORAD_CAT_ID/format/tle'
+#        pageData = '//www.space-track.org/basicspacedata/query/class/tle_latest/ORDINAL/1/EPOCH/%3Enow-30/orderby/NORAD_CAT_ID/format/tle'
+        print('Error: No Objects Specified!')
 
     ST_URL='https://www.space-track.org'
 
@@ -1899,14 +1905,17 @@ if __name__ == '__main__' :
 #    plot_sma_rp_ra(obj_id_list, UTC_list)
     
     
-#    obj_id_list = [25544]
-#    UTC_window = [datetime(2020, 4, 1, 0, 0, 0), datetime(2020, 4, 11, 0, 0)]
-#    tle_dict, tle_df = get_spacetrack_tle_data(obj_id_list, UTC_window)
+    obj_id_list = [47967]
+    obj_id_list = []
+    UTC_window = [datetime(2021, 3, 20), datetime(2021, 3, 24)]
+    UTC_window = []
+    tle_dict, tle_df = get_spacetrack_tle_data(obj_id_list, UTC_window)
+    print(len(tle_dict))
+    
+    
 #    
-#    
-#    
-#    UTC_list = [datetime(2020, 4, 11, 19, 30, 5)]
-#    
+#    UTC_list = [datetime(2021, 3, 24, 0, 0, 0)]
+#   
 #    output_state = propagate_TLE(obj_id_list, UTC_list, tle_dict)
 #    print(output_state)
 #
@@ -1919,11 +1928,11 @@ if __name__ == '__main__' :
 #    UTC_list = [datetime(2020, 1, 1, 0, 0, 0), datetime(2020, 1, 10, 0, 0, 0)]
 #    max_obj_id = 40000
     
-    obj_id_list = [28358]
-    UTC_window = [datetime(2020, 8, 10), datetime(2020, 8, 25)]
-    tle_dict, tle_df = get_spacetrack_tle_data(obj_id_list, UTC_window)
-    
-    print(tle_dict)
+#    obj_id_list = [47967]
+#    UTC_window = [datetime(2021, 3, 21), datetime(2021, 3, 24)]
+#    tle_dict, tle_df = get_spacetrack_tle_data(obj_id_list, UTC_window)
+#    
+#    print(tle_dict)
     
     
     

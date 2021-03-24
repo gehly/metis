@@ -9,8 +9,8 @@ import getpass
 
 sys.path.append('../')
 
-# from skyfield.constants import ERAD
-# from skyfield.api import Topos, EarthSatellite, Loader
+from skyfield.constants import ERAD
+from skyfield.api import Topos, EarthSatellite, Loader
 
 from sensors.sensors import define_sensors
 from utilities.tle_functions import get_spacetrack_tle_data
@@ -163,7 +163,11 @@ def compute_visible_passes(UTC_array, obj_id_list, sensor_id_list, ephemeris,
     
     # Generate resident space object dictionary
     UTC0 = UTC_array[0].utc_datetime()
+    print(UTC0)
+    print(UTC_array[0])
     UTC0 = UTC0.replace(tzinfo=None)
+    print(UTC0)
+    mistake
     rso_dict = define_RSOs(obj_id_list, UTC0, tle_dict, source)
     
     # Load sensor data
