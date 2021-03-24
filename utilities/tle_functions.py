@@ -52,7 +52,8 @@ def get_spacetrack_tle_data(obj_id_list = [], UTC_list = [], username='',
     ------
     obj_id_list : list, optional
         object NORAD IDs (int)
-        - if empty code will retrieve latest available for entire catalog
+        - if empty code will retrieve latest available for entire catalog 
+          (TLE epochs within last 30 days only)
     UTC_list : list, optional
         UTC datetime objects to specify desired times for TLEs to retrieve
         - if empty code will retrieve latest available
@@ -104,10 +105,12 @@ def get_spacetrack_tle_data(obj_id_list = [], UTC_list = [], username='',
                         '/orderby/NORAD_CAT_ID/format/tle')
     
     # If no objects specified, retrieve latest for full catalog
-    # DEPRECATED - now print error message
+    # Note this query will only return data for TLEs with epochs in the last
+    # 30 days
     else:
-#        pageData = '//www.space-track.org/basicspacedata/query/class/tle_latest/ORDINAL/1/EPOCH/%3Enow-30/orderby/NORAD_CAT_ID/format/tle'
-        print('Error: No Objects Specified!')
+        pageData = ('//www.space-track.org/basicspacedata/query/class/gp/'
+                    '/EPOCH/>now-30/orderby/NORAD_CAT_ID/format/tle')
+#        print('Error: No Objects Specified!')
 
     ST_URL='https://www.space-track.org'
 
@@ -131,7 +134,10 @@ def get_spacetrack_tle_data(obj_id_list = [], UTC_list = [], username='',
                 line2 = r.text[line2_start:line2_stop]
                 UTC = tletime2datetime(line1)
         
-                obj_id = int(line1[2:7])
+                try:
+                    obj_id = int(line1[2:7])
+                except:
+                    continue
         
                 if obj_id not in tle_dict:
                     tle_dict[obj_id] = {}
