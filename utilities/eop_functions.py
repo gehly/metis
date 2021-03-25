@@ -583,7 +583,7 @@ def compute_fundarg_IAU1980(TT_cent):
     Returns
     ------
     DA_vec : 5x1 numpy array
-        fundamental arguments of nutation (Delauney arguments)
+        fundamental arguments of nutation (Delauney arguments) [rad]
     
     '''
     

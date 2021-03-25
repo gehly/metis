@@ -20,51 +20,57 @@ sys.path.append('../')
 
 
 from utilities.constants import AU_km
+from utilities.eop_functions import compute_fundarg_IAU1980
 
 
-def compute_solar_coords(JED_JD):
+def compute_sun_coords(TT_cent):
     '''
-    This function computes solar coordinates using the simplified model in
-    Meeus Ch 25.
+    This function computes sun coordinates using the simplified model in
+    Meeus Ch 25.  The results here follow the "low accuracy" model and are
+    expected to have an accuracy within 0.01 deg.
     
     Parameters
     ------
-    JED_JD : float
-        Julian Ephemeris Date (TDB) in JD format
+    TT_cent : float
+        Julian centuries since J2000 TT
         
     Returns
     ------
-    ra : float
-        apparent geocentric right ascension of sun
-    dec : float
-        apparent geocentric declinaion of sun
+    sun_eci_geom : 3x1 numpy array
+        geometric position vector of sun in ECI [km]
+    sun_eci_app : 3x1 numpy array
+        apparent position vector of sun in ECI [km]
         
     Reference
     ------
     [1] Meeus, J., "Astronomical Algorithms," 2nd ed., 1998, Ch 25.
     
+    Note that Meeus Ch 7 and Ch 10 describe time systems TDT and TDB as 
+    essentially the same for the purpose of these calculations (they will
+    be within 0.0017 seconds of one another).  The time system TT = TDT is 
+    chosen for consistency with the IAU Nutation calculations which are
+    explicitly given in terms of TT.
+    
     '''
     
+    # Conversion
     deg2rad = pi/180.
     
-    # Compute T in centuries from J2000
-    T = (JED_JD - 2451545.)/36525.
-    
     # Geometric Mean Longitude of the Sun (Mean Equinox of Date)
-    Lo = 280.46646 + (36000.76983 + 0.0003032*T)*T  # deg
+    Lo = 280.46646 + (36000.76983 + 0.0003032*TT_cent)*TT_cent   # deg
     Lo = Lo % 360.
     
     # Mean Anomaly of the Sun
-    M = 357.52911 + (35999.05028 - 0.0001537*T)*T   # deg
+    M = 357.52911 + (35999.05028 - 0.0001537*TT_cent)*TT_cent    # deg
     M = M % 360.
-    Mrad = M*deg2rad                                # rad
+    Mrad = M*deg2rad                                             # rad
     
     # Eccentricity of Earth's orbit
-    ecc = 0.016708634 + (-0.000042037 - 0.0000001267*T)*T
+    ecc = 0.016708634 + (-0.000042037 - 0.0000001267*TT_cent)*TT_cent
     
     # Sun's Equation of Center
-    C = (1.914602 - 0.004817*T - 0.000014*T*T)*sin(Mrad) + \
-        (0.019993 - 0.000101*T)*sin(2.*Mrad) + 0.000289*sin(3.*Mrad)  # deg
+    C = (1.914602 - 0.004817*TT_cent - 0.000014*TT_cent*TT_cent)*sin(Mrad) + \
+        (0.019993 - 0.000101*TT_cent)*sin(2.*Mrad) + 0.000289*sin(3.*Mrad)  # deg
         
     # Sun True Longitude and True Anomaly
     true_long = Lo + C  # deg
@@ -73,112 +79,145 @@ def compute_solar_coords(JED_JD):
     true_anom_rad = true_anom*deg2rad
     
     # Sun radius (distance from Earth)
-    R_AU = 1.000001018*(1. - ecc**2)/(1 + ecc*cos(true_anom_rad))   # AU
+    R_AU = 1.000001018*(1. - ecc**2)/(1 + ecc*cos(true_anom_rad))       # AU
     R_km = R_AU*AU_km                                                   # km
     
     # Compute Sun Apparent Longitude
-    Omega = 125.04 - 1934.136*T                                         # deg
+    Omega = 125.04 - 1934.136*TT_cent                                   # deg
     Omega_rad = Omega*deg2rad                                           # rad
     apparent_long = true_long - 0.00569 - 0.00478*sin(Omega_rad)        # deg
     apparent_long_rad = apparent_long*deg2rad                           # rad
     
     # Obliquity of the Ecliptic (Eq 22.2)
-    Eps0 = (((0.001813*T - 0.00059)*T - 46.8150)*T + 84381.448)/3600.   # deg
+    Eps0 = (((0.001813*TT_cent - 0.00059)*TT_cent - 46.8150)*TT_cent 
+              + 84381.448)/3600.                                        # deg
     Eps0_rad = Eps0*deg2rad                                             # rad
+    cEps0 = cos(Eps0_rad)
+    sEps0 = sin(Eps0_rad)
     
     # Geometric Coordinates
-    ra_geom = atan2(cos(Eps0_rad)*sin(true_long_rad), cos(true_long_rad)) # rad
-    dec_geom = asin(sin(Eps0_rad)*sin(true_long_rad))                     # rad
-    sun_eci_geom = R_km*np.array([[cos(ra_geom)*cos(dec_geom)],
-                                  [sin(ra_geom)*cos(dec_geom)],
-                                  [sin(dec_geom)]])
+    sun_ecliptic_geom = R_km*np.array([[cos(true_long_rad)],
+                                       [sin(true_long_rad)],
+                                       [                0.]])
+
+    # r_Equator = R1(-Eps) * r_Ecliptic
+    R1 = np.array([[1.,       0.,       0.],
+                   [0.,    cEps0,   -sEps0],
+                   [0.,    sEps0,    cEps0]])
+    
+    sun_eci_geom = np.dot(R1, sun_ecliptic_geom)
     
     # Apparent Coordinates
     EpsA = Eps0 + 0.00256*cos(Omega_rad)    # deg
     EpsA_rad = EpsA*deg2rad 
+    cEpsA = cos(EpsA_rad)
+    sEpsA = sin(EpsA_rad) 
     
-    ra_app = atan2(cos(EpsA_rad)*sin(apparent_long_rad), cos(apparent_long_rad)) # rad
-    dec_app = asin(sin(EpsA_rad)*sin(apparent_long_rad))                         # rad
-    sun_eci_app = R_km*np.array([[cos(ra_app)*cos(dec_app)],
-                                 [sin(ra_app)*cos(dec_app)],
-                                 [sin(dec_app)]])
+    sun_ecliptic_app = R_km*np.array([[cos(apparent_long_rad)],
+                                      [sin(apparent_long_rad)],
+                                      [                    0.]])
+    
+    # r_Equator = R1(-Eps) * r_Ecliptic 
+    R1 = np.array([[1.,       0.,       0.],
+                   [0.,    cEpsA,   -sEpsA],
+                   [0.,    sEpsA,    cEpsA]])
+    
+    sun_eci_app = np.dot(R1, sun_ecliptic_app)
+
 
     
-    
-#    print(T)
-#    print(Lo)
-#    print(M)
-#    print(ecc)
-#    print(C)
-#    print(true_long)
-#    print(R_AU)
-#    print(Omega)
-#    print(apparent_long)
-#    print(Eps0)
-#    print(EpsA)
-#    print(ra_app*180./pi)
-#    print(dec_app*180./pi)
+#    # Computations of RA/DEC
+#    ra_geom = atan2(cos(Eps0_rad)*sin(true_long_rad), cos(true_long_rad)) # rad
+#    dec_geom = asin(sin(Eps0_rad)*sin(true_long_rad))                     # rad
+#    sun_eci_geom = R_km*np.array([[cos(ra_geom)*cos(dec_geom)],
+#                                  [sin(ra_geom)*cos(dec_geom)],
+#                                  [sin(dec_geom)]])
+#    
+#    ra_app = atan2(cos(EpsA_rad)*sin(apparent_long_rad), cos(apparent_long_rad)) # rad
+#    dec_app = asin(sin(EpsA_rad)*sin(apparent_long_rad))                         # rad
+#    sun_eci_app = R_km*np.array([[cos(ra_app)*cos(dec_app)],
+#                                 [sin(ra_app)*cos(dec_app)],
+#                                 [sin(dec_app)]])
     
     
     return sun_eci_geom, sun_eci_app
 
 
-def compute_lunar_coords():
+def compute_moon_coords(TT_cent):
+    '''
+    This function computes moon coordinates using the simplified model in
+    Meeus Ch 47.
     
+    Parameters
+    ------
+    TT_cent : float
+        Julian centuries since J2000 TT
+        
+    Returns
+    ------
     
+        
+    Reference
+    ------
+    [1] Meeus, J., "Astronomical Algorithms," 2nd ed., 1998, Ch 47.
     
-    moon_mean_longitude = (218.3164477 + 481267.88123421*jce -
-                           0.0015786*jce**2. + (jce**3.)/538841. -
-                           (jce**4.)/65194000.) * pi/180.
-
-    moon_mean_elongation = (297.8501921 + 445267.1114034*jce -
-                            0.0018819*jce**2. + (jce**3.)/545868. -
-                            (jce**4.)/113065000.) * pi/180.
-
-    sun_mean_anomaly = (357.5291092 + 35999.0502909*jce - 0.0001536*jce**2. +
-                        (jce**3.)/24490000.) * pi/180.
-
-    moon_mean_anomaly = (134.9633964 + 477198.8675055*jce + 0.0087414*jce**2. +
-                         (jce**3.)/69699. - (jce**4.)/14712000.) * pi/180.
-
-    moon_arg_lat = (93.2720950 + 483202.0175233*jce - 0.0036539*jce**2. -
-                    (jce**3.)/3526000. + (jce**4.)/863310000.) * pi/180.
-
-    moon_loan = (125.04452 - 1934.136261*jce + 0.0020708*jce**2. +
-                 (jce**3.)/450000)*pi/180.
-
-    sun_mean_longitude = (280.4665 + 36000.7689*jce)*pi/180.
-
-    obliquity0 = (23.*3600. + 26.*60. + 21.448 - 46.8150*jce -
-                  0.00059*jce**2. + 0.001813*jce**3)
-    obliquity0 *= (1./206265.)
-
-    nut_longitude = (-17.2*sin(moon_loan) - 1.32*sin(2*sun_mean_longitude) -
-                     0.23*sin(2*moon_mean_longitude) + 0.21*sin(2*moon_loan))
-    nut_longitude *= (1./206265.)
-
-    nut_obliquity = (9.20*cos(moon_loan) + 0.57*cos(2*sun_mean_longitude) +
-                     0.1*cos(2*moon_mean_longitude) - 0.09*cos(2*moon_loan))
-    nut_obliquity *= (1./206265.)
-
-    A1 = (119.75 + 131.849*jce) * pi/180.
-    A2 = (53.09 + 479264.290*jce) * pi/180.
-    A3 = (313.45 + 481266.484*jce) * pi/180.
-
-    E = 1. - 0.002516*jce - 0.0000074*jce**2.
-
-#    print 'jce', jce
-#    print 'Lp', (moon_mean_longitude*180./pi)%360
-#    print 'D', (moon_mean_elongation*180./pi)%360
-#    print 'M', (sun_mean_anomaly*180./pi)%360
-#    print 'Mp', (moon_mean_anomaly*180./pi)%360
-#    print 'F', (moon_arg_lat*180./pi)%360
-#    print 'A1', (A1*180./pi)%360
-#    print 'A2', (A2*180./pi)%360
-#    print 'A3', (A3*180./pi)%360
-#    print 'E', E
+    Note that Meeus Ch 7 and Ch 10 describe time systems TDT and TDB as 
+    essentially the same for the purpose of these calculations (they will
+    be within 0.0017 seconds of one another).  The time system TT = TDT is 
+    chosen for consistency with the IAU Nutation calculations which are
+    explicitly given in terms of TT.
     
+    '''
+    
+    # Conversion
+    deg2rad = pi/180.
+    arcsec2rad  = (1./3600.) * (pi/180.)
+    
+    # Compute fundamental arguments of nutation    
+    DA_vec = compute_fundarg_IAU1980(TT_cent)
+    
+    moon_mean_longitude = (218.3164477 + 481267.88123421*TT_cent -
+                           0.0015786*TT_cent**2. + (TT_cent**3.)/538841. -
+                           (TT_cent**4.)/65194000.) * deg2rad
 
+    moon_mean_elongation = (297.8501921 + 445267.1114034*TT_cent -
+                            0.0018819*TT_cent**2. + (TT_cent**3.)/545868. -
+                            (TT_cent**4.)/113065000.) * deg2rad
+
+    sun_mean_anomaly = (357.5291092 + 35999.0502909*TT_cent - 0.0001536*TT_cent**2. +
+                        (TT_cent**3.)/24490000.) * deg2rad
+
+    moon_mean_anomaly = (134.9633964 + 477198.8675055*TT_cent + 0.0087414*TT_cent**2. +
+                         (TT_cent**3.)/69699. - (TT_cent**4.)/14712000.) * deg2rad
+
+    moon_arg_lat = (93.2720950 + 483202.0175233*TT_cent - 0.0036539*TT_cent**2. -
+                    (TT_cent**3.)/3526000. + (TT_cent**4.)/863310000.) * deg2rad
+
+    moon_loan = (125.04452 - 1934.136261*TT_cent + 0.0020708*TT_cent**2. +
+                 (TT_cent**3.)/450000) * deg2rad
+                 
+    
+    print('DA_vec')
+    print(DA_vec)
+    print('\n\n')
+    print('moon_mean_anomaly Mprime', moon_mean_anomaly % (2*pi) * 180/pi)
+    print('sun_mean_anomaly M', np.mod(sun_mean_anomaly, 2*pi) * 180/pi)
+    print('moon_arg_lat F', moon_arg_lat % (2*pi) * 180/pi)
+    print('moon_mean_elongation D', moon_mean_elongation % (2*pi) * 180/pi)
+    print('moon_loan', moon_loan % (2*pi) * 180/pi)
+    print('\n\n')
+    
+    print('moon_mean_long Lprime', moon_mean_longitude % (2*pi) * 180/pi)
+
+    # Additioanl Arguments
+    A1 = (119.75 + 131.849*TT_cent) * deg2rad
+    A2 = (53.09 + 479264.290*TT_cent) * deg2rad
+    A3 = (313.45 + 481266.484*TT_cent) * deg2rad
+    
+    # Correction term for changing Earth eccentricity
+    E = 1. - 0.002516*TT_cent - 0.0000074*TT_cent**2.
+    
+    # Coefficient lists for longitude (L) and distance (R) (Table 47.A) 
     D_list1 = [0,2,2,0,0,0,2,2,2,2,0,1,0,2,0,0,4,0,4,2,2,1,1,2,2,4,2,0,2,2,1,2,
                0,0,2,2,2,4,0,3,2,4,0,2,2,2,4,0,4,1,2,0,1,3,4,2,0,1,2,2]
 
@@ -207,6 +246,7 @@ def compute_lunar_coords():
                2616,-1897,-2117,2354,0,0,-1423,-1117,-1571,-1739,0,-4421,0,0,0,
                0,1165,0,0,8752]
     
+    # Coefficient lists for latitude (B) (Table 47.B) 
     D_list2 = [0,0,0,2,2,2,2,0,2,0,2,2,2,2,2,2,2,0,4,0,0,0,1,0,0,0,1,0,4,4,0,4,
                2,2,2,2,0,2,2,2,2,4,2,2,0,2,1,1,0,2,1,2,0,4,4,1,4,1,4,2]
     
@@ -227,11 +267,22 @@ def compute_lunar_coords():
                -1565,-1491,-1475,-1410,-1344,-1335,1107,1021,833,777,671,607,
                596,491,-451,439,422,421,-366,-351,331,315,302,-283,-229,223,
                223,-220,-220,-185,181,-177,176,166,-164,132,-119,115,107]
+
+
+    # Update amplitude of sin/cos terms to correct for changing eccentricity 
+    # of Earth orbit
+    E_list1 = [E**abs(Mcoeff) for Mcoeff in M_list1]
+    E_list2 = [E**abs(Mcoeff) for Mcoeff in M_list2]
     
+    L_coeff = list(np.multiply(E_list1, L_coeff))    
+    R_coeff = list(np.multiply(E_list1, R_coeff))
+    B_coeff = list(np.multiply(E_list2, B_coeff))
+
+    # Accumulate sums for longitude, latitude, distance
     L_sum = 0.
     R_sum = 0.
     B_sum = 0.
-    for ii in xrange(len(D_list1)):
+    for ii in range(len(D_list1)):
         D1 = D_list1[ii]
         M1 = M_list1[ii]
         Mp1 = Mp_list1[ii]
@@ -244,16 +295,16 @@ def compute_lunar_coords():
         R = R_coeff[ii]
         B = B_coeff[ii]
 
-        if abs(M1) == 1.:
-            L *= E
-            R *= E
-        if abs(M1) == 2.:
-            L *= E**2.
-            R *= E**2.
-        if abs(M2) == 1.:
-            B *= E
-        if abs(M2) == 2.:
-            B *= E**2.
+#        if abs(M1) == 1.:
+#            L *= E
+#            R *= E
+#        if abs(M1) == 2.:
+#            L *= E**2.
+#            R *= E**2.
+#        if abs(M2) == 1.:
+#            B *= E
+#        if abs(M2) == 2.:
+#            B *= E**2.
 
         L_sum += L*sin(D1*moon_mean_elongation + M1*sun_mean_anomaly +
                        Mp1*moon_mean_anomaly + F1*moon_arg_lat)
@@ -264,6 +315,10 @@ def compute_lunar_coords():
         B_sum += B*sin(D2*moon_mean_elongation + M2*sun_mean_anomaly +
                        Mp2*moon_mean_anomaly + F2*moon_arg_lat)
 
+
+    # Additional corrections due to Venus (A1), Jupiter (A2), and flattening
+    # of Earth (moon_mean_longitude)
+    # Units of L_sum and B_sum are 1e-6 deg
     L_sum += 3958.*sin(A1) + 1962.*sin(moon_mean_longitude - moon_arg_lat) \
         + 318.*sin(A2)
 
@@ -272,52 +327,183 @@ def compute_lunar_coords():
         + 127.*sin(moon_mean_longitude - moon_mean_anomaly) \
         - 115.*sin(moon_mean_longitude + moon_mean_anomaly)
 
-    lon_rad = moon_mean_longitude + (L_sum/1e6)*pi/180.
-    lon_deg = (lon_rad*180./pi) % 360.
-    lat_deg = (B_sum/1e6)
-    r = 385000.56 + R_sum/1000.
+    # Calculation moon coordinates
+    print('moon_mean_longitude', moon_mean_longitude)
     
-#    print 'lon deg', lon_deg
-#    print 'nut_long', nut_longitude*180./pi
-#    print 'obl0', obliquity0*180./pi
-#    print 'nut ob', nut_obliquity*180./pi
-
-    lon_deg += nut_longitude
-    obliquity_rad = obliquity0 + nut_obliquity
-    lon_rad = lon_deg * pi/180.
-    lat_rad = lat_deg * pi/180.
-
-#    print 'L_sum', L_sum
-#    print 'R_sum', R_sum
-#    print 'B_sum', B_sum
+    lon_rad = moon_mean_longitude + (L_sum/1e6) * deg2rad
+    lat_rad = (B_sum/1e6) * deg2rad
+    r_km = 385000.56 + R_sum/1000.
+    
+    print('TT_cent', TT_cent)
+    print('A1', A1 * 180/pi % 360.)
+    print('A2', A2 * 180/pi % 360.)
+    print('A3', A3 * 180/pi % 360.)
+    print('E', E)
+    print('L_sum', L_sum)
+    print('B_sum', B_sum)
+    print('R_sum', R_sum)
+    
+    print('lon_deg', lon_rad * 180/pi % 360.)
+    print('lat_deg', lat_rad * 180/pi)
+    print('r_km', r_km)
+    
+    
+    # Obliquity of the Ecliptic (Eq 22.2)
+    Eps0 = (((0.001813*TT_cent - 0.00059)*TT_cent - 46.8150)*TT_cent + 84381.448)/3600.   # deg
+    Eps0_rad = Eps0*deg2rad   
+    cEps0 = cos(Eps0_rad)
+    sEps0 = sin(Eps0_rad)
+    
+    # Geometric coordinates
+    moon_ecliptic_geom = r_km * np.array([[cos(lon_rad)*cos(lat_rad)],
+                                          [sin(lon_rad)*cos(lat_rad)],
+                                          [sin(lat_rad)]])
+    
+    # r_Equator = R1(-Eps0) * r_Ecliptic
+    R1 = np.array([[1.,       0.,       0.],
+                   [0.,    cEps0,   -sEps0],
+                   [0.,    sEps0,    cEps0]])
+    
+    moon_eci_geom = np.dot(R1, moon_ecliptic_geom)
+    
+    
+    # Apparent coordinates
+    sun_mean_longitude = (280.4665 + 36000.7689*TT_cent)*deg2rad
+    dPsi = (-17.2*sin(moon_loan) - 1.32*sin(2*sun_mean_longitude) 
+            - 0.23*sin(2*moon_mean_longitude) + 0.21*sin(2*moon_loan))*arcsec2rad
+    dEps = (9.2*cos(moon_loan) + 0.57*cos(2*sun_mean_longitude) 
+            + 0.1*cos(2*moon_mean_longitude) - 0.09*cos(2*moon_loan))*arcsec2rad
+    
+    EpsA_rad = Eps0_rad + dEps   # rad
+    cEpsA = cos(EpsA_rad)
+    sEpsA = sin(EpsA_rad)
+    
+    
+    
+    lon_app_rad = lon_rad + dPsi
+    
+    moon_ecliptic_app = r_km * np.array([[cos(lon_app_rad)*cos(lat_rad)],
+                                         [sin(lon_app_rad)*cos(lat_rad)],
+                                         [sin(lat_rad)]])
+    
+    # r_Equator = R1(-EpsA) * r_Ecliptic
+    R1 = np.array([[1.,       0.,       0.],
+                   [0.,    cEpsA,   -sEpsA],
+                   [0.,    sEpsA,    cEpsA]])
+    
+    moon_eci_app = np.dot(R1, moon_ecliptic_app)
+    
+    
+    ra_app = atan2(moon_eci_app[1], moon_eci_app[0])
+    dec_app = asin(moon_eci_app[2]/r_km)
+    
+    print('\n\nApparent Coords')
+    print('apparent long', lon_app_rad*180/pi % 360.)
+    print('dPsi', dPsi*180/pi)
+    print('EpsA', EpsA_rad*180/pi)
+    print('ra app', ra_app*180/pi)
+    print('dec app', dec_app*180/pi)
+    
+    
+    
+#    
+##    print 'lon deg', lon_deg
+##    print 'nut_long', nut_longitude*180./pi
+##    print 'obl0', obliquity0*180./pi
+##    print 'nut ob', nut_obliquity*180./pi
 #
-#    print 'gc lon', lon_deg
-#    print 'gc lat', lat_deg
-#    print 'r', r
-#    print 'obliquity', obliquity_rad*180./pi
-
-    ra = atan2(sin(lon_rad)*cos(obliquity_rad) -
-               tan(lat_rad)*sin(obliquity_rad), cos(lon_rad))
-    dec = asin(sin(lat_rad)*cos(obliquity_rad) +
-               cos(lat_rad)*sin(obliquity_rad)*sin(lon_rad))
-
-    moon_hat_eci = np.array([[cos(ra)*cos(dec)],
-                             [sin(ra)*cos(dec)],
-                             [sin(dec)]])
-                             
-    moon_eci = r * moon_hat_eci
-
-#    print 'ra', atan2(moon_hat_eci[1], moon_hat_eci[0])*180./pi
-#    print 'dec', asin(moon_hat_eci[2])*180./pi
+#    lon_deg += nut_longitude
+#    obliquity_rad = obliquity0 + nut_obliquity
+#    lon_rad = lon_deg * pi/180.
+#    lat_rad = lat_deg * pi/180.
+#
+##    print 'L_sum', L_sum
+##    print 'R_sum', R_sum
+##    print 'B_sum', B_sum
+##
+##    print 'gc lon', lon_deg
+##    print 'gc lat', lat_deg
+##    print 'r', r
+##    print 'obliquity', obliquity_rad*180./pi
+#
+#    ra = atan2(sin(lon_rad)*cos(obliquity_rad) -
+#               tan(lat_rad)*sin(obliquity_rad), cos(lon_rad))
+#    dec = asin(sin(lat_rad)*cos(obliquity_rad) +
+#               cos(lat_rad)*sin(obliquity_rad)*sin(lon_rad))
+#
+#    moon_hat_eci = np.array([[cos(ra)*cos(dec)],
+#                             [sin(ra)*cos(dec)],
+#                             [sin(dec)]])
+#                             
+#    moon_eci = r * moon_hat_eci
+#
+##    print 'ra', atan2(moon_hat_eci[1], moon_hat_eci[0])*180./pi
+##    print 'dec', asin(moon_hat_eci[2])*180./pi
     
-    return
+    return moon_eci_geom, moon_eci_app
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
+
+#    sun_mean_longitude = (280.4665 + 36000.7689*jce)*pi/180.
+#
+#    obliquity0 = (23.*3600. + 26.*60. + 21.448 - 46.8150*jce -
+#                  0.00059*jce**2. + 0.001813*jce**3)
+#    obliquity0 *= (1./206265.)
+#
+#    nut_longitude = (-17.2*sin(moon_loan) - 1.32*sin(2*sun_mean_longitude) -
+#                     0.23*sin(2*moon_mean_longitude) + 0.21*sin(2*moon_loan))
+#    nut_longitude *= (1./206265.)
+#
+#    nut_obliquity = (9.20*cos(moon_loan) + 0.57*cos(2*sun_mean_longitude) +
+#                     0.1*cos(2*moon_mean_longitude) - 0.09*cos(2*moon_loan))
+#    nut_obliquity *= (1./206265.)
+#
+
+#
+#    
+#
+##    print 'jce', jce
+##    print 'Lp', (moon_mean_longitude*180./pi)%360
+##    print 'D', (moon_mean_elongation*180./pi)%360
+##    print 'M', (sun_mean_anomaly*180./pi)%360
+##    print 'Mp', (moon_mean_anomaly*180./pi)%360
+##    print 'F', (moon_arg_lat*180./pi)%360
+##    print 'A1', (A1*180./pi)%360
+##    print 'A2', (A2*180./pi)%360
+##    print 'A3', (A3*180./pi)%360
+##    print 'E', E
+#    
+#
 
 
 if __name__ == '__main__':
     
-    JED_JD = 2448908.5
-    compute_solar_coords(JED_JD)
+    TT_JD = 2448724.5
+    
+    
+    # Compute T in centuries from J2000
+    TT_cent = (TT_JD - 2451545.)/36525.
+    
+#    dum1, dum2 = compute_sun_coords(TT_cent)
+    dum1, dum2 = compute_moon_coords(TT_cent)
     
 
 
