@@ -108,10 +108,10 @@ def compute_sun_coords(TT_cent):
     sun_eci_geom = np.dot(R1, sun_ecliptic_geom)
     
     # Apparent Coordinates
-    EpsA = Eps0 + 0.00256*cos(Omega_rad)    # deg
-    EpsA_rad = EpsA*deg2rad 
-    cEpsA = cos(EpsA_rad)
-    sEpsA = sin(EpsA_rad) 
+    Eps_true = Eps0 + 0.00256*cos(Omega_rad)    # deg
+    Eps_true_rad = Eps_true*deg2rad 
+    cEpsA = cos(Eps_true_rad)
+    sEpsA = sin(Eps_true_rad) 
     
     sun_ecliptic_app = R_km*np.array([[cos(apparent_long_rad)],
                                       [sin(apparent_long_rad)],
@@ -218,18 +218,19 @@ def compute_moon_coords(TT_cent):
     E = 1. - 0.002516*TT_cent - 0.0000074*TT_cent**2.
     
     # Coefficient lists for longitude (L) and distance (R) (Table 47.A) 
-    D_list1 = [0,2,2,0,0,0,2,2,2,2,0,1,0,2,0,0,4,0,4,2,2,1,1,2,2,4,2,0,2,2,1,2,
-               0,0,2,2,2,4,0,3,2,4,0,2,2,2,4,0,4,1,2,0,1,3,4,2,0,1,2,2]
+    mat1 = np.zeros((60,4))
+    mat1[:,0] = [0,2,2,0,0,0,2,2,2,2,0,1,0,2,0,0,4,0,4,2,2,1,1,2,2,4,2,0,2,2,1,2,
+                 0,0,2,2,2,4,0,3,2,4,0,2,2,2,4,0,4,1,2,0,1,3,4,2,0,1,2,2]
 
-    M_list1 = [0,0,0,0,1,0,0,-1,0,-1,1,0,1,0,0,0,0,0,0,1,1,0,1,-1,0,0,0,1,0,-1,
-               0,-2,1,2,-2,0,0,-1,0,0,1,-1,2,2,1,-1,0,0,-1,0,1,0,1,0,0,-1,2,1,
-               0,0]
+    mat1[:,1] = [0,0,0,0,1,0,0,-1,0,-1,1,0,1,0,0,0,0,0,0,1,1,0,1,-1,0,0,0,1,0,-1,
+                 0,-2,1,2,-2,0,0,-1,0,0,1,-1,2,2,1,-1,0,0,-1,0,1,0,1,0,0,-1,2,1,
+                 0,0]
 
-    Mp_list1 = [1,-1,0,2,0,0,-2,-1,1,0,-1,0,1,0,1,1,-1,3,-2,-1,0,-1,0,1,2,0,-3,
+    mat1[:,2] = [1,-1,0,2,0,0,-2,-1,1,0,-1,0,1,0,1,1,-1,3,-2,-1,0,-1,0,1,2,0,-3,
                 -2,-1,-2,1,0,2,0,-1,1,0,-1,2,-1,1,-2,-1,-1,-2,0,1,4,0,-2,0,2,1,
                 -2,-3,2,1,-1,3,-1]
 
-    F_list1 = [0,0,0,0,0,2,0,0,0,0,0,0,0,-2,2,-2,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,
+    mat1[:,3] = [0,0,0,0,0,2,0,0,0,0,0,0,0,-2,2,-2,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,
                0,0,0,0,-2,2,0,2,0,0,0,0,0,0,-2,0,0,0,0,-2,-2,0,0,0,0,0,0,0,-2]
     
     L_coeff = [6288774,1274027,658314,213618,-185116,-114332,58793,57066,53322,
@@ -247,18 +248,19 @@ def compute_moon_coords(TT_cent):
                0,1165,0,0,8752]
     
     # Coefficient lists for latitude (B) (Table 47.B) 
-    D_list2 = [0,0,0,2,2,2,2,0,2,0,2,2,2,2,2,2,2,0,4,0,0,0,1,0,0,0,1,0,4,4,0,4,
+    mat2 = np.zeros((60, 4))
+    mat2[:,0] = [0,0,0,2,2,2,2,0,2,0,2,2,2,2,2,2,2,0,4,0,0,0,1,0,0,0,1,0,4,4,0,4,
                2,2,2,2,0,2,2,2,2,4,2,2,0,2,1,1,0,2,1,2,0,4,4,1,4,1,4,2]
     
-    M_list2 = [0,0,0,0,0,0,0,0,0,0,-1,0,0,1,-1,-1,-1,1,0,1,0,1,0,1,1,1,0,0,0,0,
+    mat2[:,1] = [0,0,0,0,0,0,0,0,0,0,-1,0,0,1,-1,-1,-1,1,0,1,0,1,0,1,1,1,0,0,0,0,
                0,0,0,0,-1,0,0,0,0,1,1,0,-1,-2,0,1,1,1,1,1,0,-1,1,0,-1,0,0,0,-1,
                -2]
     
-    Mp_list2 = [0,1,1,0,-1,-1,0,2,1,2,0,-2,1,0,-1,0,-1,-1,-1,0,0,-1,0,1,1,0,0,
+    mat2[:,2] = [0,1,1,0,-1,-1,0,2,1,2,0,-2,1,0,-1,0,-1,-1,-1,0,0,-1,0,1,1,0,0,
                 3,0,-1,1,-2,0,2,1,-2,3,2,-3,-1,0,0,1,0,1,1,0,0,-2,-1,1,-2,2,-2,
                 -1,1,1,-1,0,0]
     
-    F_list2 = [1,1,-1,-1,1,-1,1,1,-1,-1,-1,-1,1,-1,1,1,-1,-1,-1,1,3,1,1,1,-1,
+    mat2[:,3] = [1,1,-1,-1,1,-1,1,1,-1,-1,-1,-1,1,-1,1,1,-1,-1,-1,1,3,1,1,1,-1,
                -1,-1,1,-1,1,-3,1,-3,-1,-1,1,-1,1,-1,1,1,1,1,-1,3,-1,-1,1,-1,-1,
                1,-1,1,-1,-1,-1,-1,-1,-1,1]
     
@@ -271,49 +273,58 @@ def compute_moon_coords(TT_cent):
 
     # Update amplitude of sin/cos terms to correct for changing eccentricity 
     # of Earth orbit
-    E_list1 = [E**abs(Mcoeff) for Mcoeff in M_list1]
-    E_list2 = [E**abs(Mcoeff) for Mcoeff in M_list2]
+    E_list1 = [E**abs(Mcoeff) for Mcoeff in mat1[:,1]]
+    E_list2 = [E**abs(Mcoeff) for Mcoeff in mat1[:,1]]
     
     L_coeff = list(np.multiply(E_list1, L_coeff))    
     R_coeff = list(np.multiply(E_list1, R_coeff))
     B_coeff = list(np.multiply(E_list2, B_coeff))
+    
+    # Vectorize accumulation of sums of longitude, latitude, distance
+    args_vec = np.reshape([moon_mean_elongation, sun_mean_anomaly,
+                           moon_mean_anomaly, moon_arg_lat], (4,1))
+    arg1 = np.dot(mat1, args_vec)
+    arg2 = np.dot(mat2, args_vec)
+    L_sum = np.dot(L_coeff, np.sin(arg1))
+    R_sum = np.dot(R_coeff, np.cos(arg1))
+    B_sum = np.dot(B_coeff, np.sin(arg2)) 
 
-    # Accumulate sums for longitude, latitude, distance
-    L_sum = 0.
-    R_sum = 0.
-    B_sum = 0.
-    for ii in range(len(D_list1)):
-        D1 = D_list1[ii]
-        M1 = M_list1[ii]
-        Mp1 = Mp_list1[ii]
-        F1 = F_list1[ii]
-        D2 = D_list2[ii]
-        M2 = M_list2[ii]
-        Mp2 = Mp_list2[ii]
-        F2 = F_list2[ii]
-        L = L_coeff[ii]
-        R = R_coeff[ii]
-        B = B_coeff[ii]
-
-#        if abs(M1) == 1.:
-#            L *= E
-#            R *= E
-#        if abs(M1) == 2.:
-#            L *= E**2.
-#            R *= E**2.
-#        if abs(M2) == 1.:
-#            B *= E
-#        if abs(M2) == 2.:
-#            B *= E**2.
-
-        L_sum += L*sin(D1*moon_mean_elongation + M1*sun_mean_anomaly +
-                       Mp1*moon_mean_anomaly + F1*moon_arg_lat)
-
-        R_sum += R*cos(D1*moon_mean_elongation + M1*sun_mean_anomaly +
-                       Mp1*moon_mean_anomaly + F1*moon_arg_lat)
-
-        B_sum += B*sin(D2*moon_mean_elongation + M2*sun_mean_anomaly +
-                       Mp2*moon_mean_anomaly + F2*moon_arg_lat)
+#    # Accumulate sums for longitude, latitude, distance
+#    L_sum = 0.
+#    R_sum = 0.
+#    B_sum = 0.
+#    for ii in range(len(D_list1)):
+#        D1 = D_list1[ii]
+#        M1 = M_list1[ii]
+#        Mp1 = Mp_list1[ii]
+#        F1 = F_list1[ii]
+#        D2 = D_list2[ii]
+#        M2 = M_list2[ii]
+#        Mp2 = Mp_list2[ii]
+#        F2 = F_list2[ii]
+#        L = L_coeff[ii]
+#        R = R_coeff[ii]
+#        B = B_coeff[ii]
+#
+##        if abs(M1) == 1.:
+##            L *= E
+##            R *= E
+##        if abs(M1) == 2.:
+##            L *= E**2.
+##            R *= E**2.
+##        if abs(M2) == 1.:
+##            B *= E
+##        if abs(M2) == 2.:
+##            B *= E**2.
+#
+#        L_sum += L*sin(D1*moon_mean_elongation + M1*sun_mean_anomaly +
+#                       Mp1*moon_mean_anomaly + F1*moon_arg_lat)
+#
+#        R_sum += R*cos(D1*moon_mean_elongation + M1*sun_mean_anomaly +
+#                       Mp1*moon_mean_anomaly + F1*moon_arg_lat)
+#
+#        B_sum += B*sin(D2*moon_mean_elongation + M2*sun_mean_anomaly +
+#                       Mp2*moon_mean_anomaly + F2*moon_arg_lat)
 
 
     # Additional corrections due to Venus (A1), Jupiter (A2), and flattening
@@ -374,9 +385,9 @@ def compute_moon_coords(TT_cent):
     dEps = (9.2*cos(moon_loan) + 0.57*cos(2*sun_mean_longitude) 
             + 0.1*cos(2*moon_mean_longitude) - 0.09*cos(2*moon_loan))*arcsec2rad
     
-    EpsA_rad = Eps0_rad + dEps   # rad
-    cEpsA = cos(EpsA_rad)
-    sEpsA = sin(EpsA_rad)
+    Eps_true_rad = Eps0_rad + dEps   # rad
+    cEpsA = cos(Eps_true_rad)
+    sEpsA = sin(Eps_true_rad)
     
     
     

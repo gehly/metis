@@ -97,12 +97,12 @@ def teme2gcrf(r_TEME, v_TEME, UTC, IAU1980nut, EOP_data):
     P = compute_precession_IAU1976(TT_cent)
     
     # IAU 1980 Nutation
-    N, FA, Eps_A, Eps_true, dPsi, dEps = \
+    N, FA, Eps0, Eps_true, dPsi, dEps = \
         compute_nutation_IAU1980(IAU1980nut, TT_cent, EOP_data['ddPsi'],
                                  EOP_data['ddEps'])
 
     # Equation of the Equinonx 1982
-    R = eqnequinox_IAU1982_simple(dPsi, Eps_A)
+    R = eqnequinox_IAU1982_simple(dPsi, Eps0)
     
     # Compute transformation matrix and output
     GCRF_TEME = np.dot(P, np.dot(N, R))
@@ -150,12 +150,12 @@ def gcrf2teme(r_GCRF, v_GCRF, UTC, IAU1980nut, EOP_data):
     P = compute_precession_IAU1976(TT_cent)
     
     # IAU 1980 Nutation
-    N, FA, Eps_A, Eps_true, dPsi, dEps = \
+    N, FA, Eps0, Eps_true, dPsi, dEps = \
         compute_nutation_IAU1980(IAU1980nut, TT_cent, EOP_data['ddPsi'],
                                  EOP_data['ddEps'])
 
     # Equation of the Equinonx 1982
-    R = eqnequinox_IAU1982_simple(dPsi, Eps_A)
+    R = eqnequinox_IAU1982_simple(dPsi, Eps0)
     
     # Compute transformation matrix and output
     GCRF_TEME = np.dot(P, np.dot(N, R))

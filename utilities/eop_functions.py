@@ -515,7 +515,7 @@ def compute_nutation_IAU1980(IAU1980nut, TT_cent, ddPsi, ddEps):
         nutation matrix to compute frame rotation
     FA : 5x1 numpy array
         fundamental arguments of nutation (Delauney arguments)
-    Eps_A : float
+    Eps0 : float
         mean obliquity of the ecliptic [rad]
     Eps_true : float
         true obliquity of the ecliptic [rad]
@@ -547,16 +547,16 @@ def compute_nutation_IAU1980(IAU1980nut, TT_cent, ddPsi, ddEps):
     dEps = ddEps + dEps_sum*0.0001*arcsec2rad
         
     # Mean Obliquity of the Ecliptic, rad
-    Eps_A = (((0.001813*TT_cent - 0.00059)*TT_cent - 46.8150)*TT_cent + 
+    Eps0 = (((0.001813*TT_cent - 0.00059)*TT_cent - 46.8150)*TT_cent + 
              84381.448)*arcsec2rad
     
     # True Obliquity of the Ecliptic, rad
-    Eps_true = Eps_A + dEps
+    Eps_true = Eps0 + dEps
     
     # Construct Nutation matrix
-    # N = ROT1(-Eps_A) * ROT3(dPsi) * ROT1(Eps_true)
-    cep  = cos(Eps_A)
-    sep  = sin(Eps_A)
+    # N = ROT1(-Eps_0 * ROT3(dPsi) * ROT1(Eps_true)
+    cep  = cos(Eps0)
+    sep  = sin(Eps0)
     cPsi = cos(dPsi)
     sPsi = sin(dPsi)
     cept = cos(Eps_true)
@@ -567,7 +567,7 @@ def compute_nutation_IAU1980(IAU1980nut, TT_cent, ddPsi, ddEps):
                   [-sPsi*cep, cept*cPsi*cep+sept*sep, sept*cPsi*cep-sep*cept],
                   [-sPsi*sep, sep*cept*cPsi-sept*cep, sept*sep*cPsi+cept*cep]])
     
-    return N80, FA, Eps_A, Eps_true, dPsi, dEps
+    return N80, FA, Eps0, Eps_true, dPsi, dEps
 
 
 def compute_fundarg_IAU1980(TT_cent):
@@ -615,7 +615,7 @@ def compute_fundarg_IAU1980(TT_cent):
     return DA_vec
 
 
-def eqnequinox_IAU1982_simple(dPsi, Eps_A):
+def eqnequinox_IAU1982_simple(dPsi, Eps0):
     '''
     This function computes the IAU1982 equation of the equinoxes matrix 
     required for the frame transformation between True of Date (TOD) and
@@ -627,7 +627,7 @@ def eqnequinox_IAU1982_simple(dPsi, Eps_A):
     ------
     dPsi : float
         nutation in longitude [rad]
-    Eps_A : float
+    Eps0 : float
         mean obliquity of the ecliptic [rad]
     
     Returns
@@ -637,7 +637,7 @@ def eqnequinox_IAU1982_simple(dPsi, Eps_A):
     '''
     
     # Equation of the Equinoxes (simple form for use with TEME) (see [1])
-    Eq1982 = dPsi*cos(Eps_A) # rad
+    Eq1982 = dPsi*cos(Eps0) # rad
     
     # Construct Rotation matrix
     # R  = ROT3(-Eq1982) (Eq. 3-80 in [1])
@@ -1020,11 +1020,11 @@ def batch_eop_rotation_matrices(UTC_start, UTC_stop, eop_alldata_text,
         P = compute_precession_IAU1976(TT_cent)
         
         # IAU 1980 Nutation
-        N, FA, Eps_A, Eps_true, dPsi, dEps = \
+        N, FA, Eps0, Eps_true, dPsi, dEps = \
             compute_nutation_IAU1980(IAU1980_nut, TT_cent, ddPsi, ddEps)
     
         # Equation of the Equinonx 1982
-        R_1982 = eqnequinox_IAU1982_simple(dPsi, Eps_A)
+        R_1982 = eqnequinox_IAU1982_simple(dPsi, Eps0)
         
         # Compute transformation matrix and output
         GCRF_TEME = np.dot(P, np.dot(N, R_1982))
