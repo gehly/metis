@@ -15,12 +15,14 @@
 import numpy as np
 from math import pi, sin, cos, asin, atan2
 import sys
+from datetime import datetime, timedelta
 
 sys.path.append('../')
 
 
 from utilities.constants import AU_km
 from utilities.eop_functions import compute_fundarg_IAU1980
+from utilities.time_systems import dt2jd
 
 
 def compute_sun_coords(TT_cent):
@@ -127,17 +129,25 @@ def compute_sun_coords(TT_cent):
 
     
 #    # Computations of RA/DEC
-#    ra_geom = atan2(cos(Eps0_rad)*sin(true_long_rad), cos(true_long_rad)) # rad
-#    dec_geom = asin(sin(Eps0_rad)*sin(true_long_rad))                     # rad
+    ra_geom = atan2(cos(Eps0_rad)*sin(true_long_rad), cos(true_long_rad)) # rad
+    dec_geom = asin(sin(Eps0_rad)*sin(true_long_rad))                     # rad
 #    sun_eci_geom = R_km*np.array([[cos(ra_geom)*cos(dec_geom)],
 #                                  [sin(ra_geom)*cos(dec_geom)],
 #                                  [sin(dec_geom)]])
 #    
-#    ra_app = atan2(cos(EpsA_rad)*sin(apparent_long_rad), cos(apparent_long_rad)) # rad
-#    dec_app = asin(sin(EpsA_rad)*sin(apparent_long_rad))                         # rad
+    ra_app = atan2(cos(Eps_true_rad)*sin(apparent_long_rad), cos(apparent_long_rad)) # rad
+    dec_app = asin(sin(Eps_true_rad)*sin(apparent_long_rad))                         # rad
 #    sun_eci_app = R_km*np.array([[cos(ra_app)*cos(dec_app)],
 #                                 [sin(ra_app)*cos(dec_app)],
 #                                 [sin(dec_app)]])
+    
+    
+    
+    print('ra_geom', ra_geom*180/pi)
+    print('dec_geom', dec_geom*180/pi)
+    print('ra_app', ra_app*180/pi)
+    print('dec_app', dec_app*180/pi)
+    print('range', R_km)
     
     
     return sun_eci_geom, sun_eci_app
@@ -155,6 +165,10 @@ def compute_moon_coords(TT_cent):
         
     Returns
     ------
+    moon_eci_geom : 3x1 numpy array
+        geometric position vector of sun in ECI [km]
+    moon_eci_app : 3x1 numpy array
+        apparent position vector of sun in ECI [km]
     
         
     Reference
@@ -411,7 +425,7 @@ def compute_moon_coords(TT_cent):
     print('\n\nApparent Coords')
     print('apparent long', lon_app_rad*180/pi % 360.)
     print('dPsi', dPsi*180/pi)
-    print('EpsA', EpsA_rad*180/pi)
+    print('Eps_true', Eps_true_rad*180/pi)
     print('ra app', ra_app*180/pi)
     print('dec app', dec_app*180/pi)
     
@@ -507,15 +521,23 @@ def compute_moon_coords(TT_cent):
 
 if __name__ == '__main__':
     
-    TT_JD = 2448724.5
+    
+    TT_dt = datetime(2021, 3, 21)
+    TT_JD = dt2jd(TT_dt)
+    
+#    TT_JD = 2448724.5
     
     
     # Compute T in centuries from J2000
     TT_cent = (TT_JD - 2451545.)/36525.
     
-#    dum1, dum2 = compute_sun_coords(TT_cent)
-    dum1, dum2 = compute_moon_coords(TT_cent)
+    sun_eci_geom, sun_eci_app = compute_sun_coords(TT_cent)
+    moon_eci_geom, moon_eci_app = compute_moon_coords(TT_cent)
     
+    print(sun_eci_geom)
+    print(sun_eci_app)
+    print(moon_eci_geom)
+    print(moon_eci_app)
 
 
 
