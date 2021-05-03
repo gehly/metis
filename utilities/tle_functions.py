@@ -75,9 +75,8 @@ def get_spacetrack_tle_data(obj_id_list = [], UTC_list = [], username='',
     
     tle_dict = {}
     tle_df = []
+    UTC_list = copy.copy(UTC_list)
     
-    print(UTC_list)
-
     if len(username) == 0:
         username = input('space-track username: ')
     if len(password) == 0:
@@ -1716,6 +1715,7 @@ def find_closest_tle_epoch(line1_list, line2_list, UTC, prev_flag=False):
         line1 = line1_list[ii]
         tle_epoch = tletime2datetime(line1)
         dt_sec = (UTC - tle_epoch).total_seconds()
+
         
         if prev_flag:
             if dt_sec > 0 and abs(dt_sec) < minimum:
@@ -1769,6 +1769,7 @@ def propagate_TLE(obj_id_list, UTC_list, tle_dict={}, offline_flag=False,
     total_gcrf2itrf = 0.
     tle_epoch_time = 0.
     total_eop_time = 0.
+    
 
     # If no TLE information is provided, retrieve from sources as needed
     if len(tle_dict) == 0:
@@ -1778,8 +1779,7 @@ def propagate_TLE(obj_id_list, UTC_list, tle_dict={}, offline_flag=False,
             get_spacetrack_tle_data(obj_id_list, UTC_list, username, password)
 
         # Retreive TLE data from database
-
-
+        
     # Retrieve latest EOP data from celestrak.com
     eop_alldata = get_celestrak_eop_alldata(offline_flag)
 
@@ -1808,11 +1808,9 @@ def propagate_TLE(obj_id_list, UTC_list, tle_dict={}, offline_flag=False,
         # Loop over times
         for UTC in UTC_list:
             
-#            print(UTC)
-
             # Find the closest TLE by epoch
             epoch_start = time.time()
-            line1, line2 = find_closest_tle_epoch(line1_list, line2_list, UTC, prev_flag=True)
+            line1, line2 = find_closest_tle_epoch(line1_list, line2_list, UTC)
             
             tle_epoch_time += time.time() - epoch_start
 

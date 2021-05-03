@@ -10,10 +10,17 @@ from datetime import datetime
 
 sys.path.append('../')
 
+
 cwd = os.getcwd()
 ind = cwd.find('metis')
-metis_dir = cwd[0:ind+5]
+    
+if ind > -1:
+    metis_dir = cwd[0:ind+5]
+else:
+    metis_dir = r'C:\Users\Steve\Documents\code\metis'
+        
 input_data_dir = os.path.join(metis_dir, 'input_data')
+
 
 from utilities.time_systems import dt2mjd, mjd2dt, utcdt2ut1jd, utcdt2ttjd, jd2cent
 from utilities.numerical_methods import interp_lagrange
@@ -493,7 +500,7 @@ def compute_precession_IAU1976(TT_cent):
 
 def compute_nutation_IAU1980(IAU1980nut, TT_cent, ddPsi, ddEps):
     '''
-    This function computes the IAU1976 precession matrix required for the 
+    This function computes the IAU1980 nutation matrix required for the 
     frame transformation between Mean of Date (MOD) and True of Date (TOD).
     
     r_MOD = N80 * r_TOD

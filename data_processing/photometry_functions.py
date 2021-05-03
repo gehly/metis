@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
-from pathlib import Path
+import os
 
 
 
@@ -203,104 +203,116 @@ def generate_plots():
 #    plot_lightcurve(df_list, label_list, color, twinx_flag=True)
     
     
-    data_dir = Path('D:\documents\\research\launch_identification\\reports\\2019_iac_NABEO\data')
+#    data_dir = Path('D:\documents\\research\launch_identification\\reports\\2019_iac_NABEO\data')
+#    
+#    data_file = data_dir / '43164_2018_11_30_main.csv'
+#    st_main = csv2dataframe(data_file)
+#    
+#    data_file = data_dir / '43164_2018_11_30_viewfinder.csv'
+#    st_view = csv2dataframe(data_file)
+#    
+#    df_list = [st_view]
+#    label_list = []
+#    color = iter(['k'])
+#    st_sec, st_SNR = plot_lightcurve(df_list, label_list, color)
+#    
+#    
+#    data_file = data_dir / '43692_2018_11_25_main.csv'
+#    nabeo_main = csv2dataframe(data_file)
+#    
+#    data_file = data_dir / '43692_2018_11_25_viewfinder.csv'
+#    nabeo_view = csv2dataframe(data_file)
+#    
+#    df_list = [nabeo_view]
+#    label_list = []
+#    color = iter(['k'])
+#    nabeo_sec, nabeo_SNR = plot_lightcurve(df_list, label_list, color)
+#    
+#    
+#    fig = plt.figure()
+#    ax1 = fig.add_subplot(2,1,1)
+#    ax1.plot(nabeo_sec, nabeo_SNR, 'ko--')
+#    ax1.set_ylim([0, 700])
+#    ax1.set_xlim([0, 225])
+#    ax1.set_ylabel('NABEO SNR')
+#    
+#    ax2 = fig.add_subplot(2,1,2)
+#    ax2.plot(st_sec, st_SNR, 'ko--')
+#    ax2.set_ylim([0, 700])
+#    ax2.set_xlim([0, 225])
+#    ax2.set_ylabel('ST SNR')
+#    ax2.set_xlabel('Time [sec]')
+#    
+#    plt.setp(ax1.get_xticklabels(), visible=False)
+#    
+#    
+#    data_file = data_dir / '43692_2019_09_23_main.csv'
+#    nabeo_main = csv2dataframe(data_file)
+#    
+#    data_file = data_dir / '43692_2019_09_23_view.csv'
+#    nabeo_view = csv2dataframe(data_file)
+#    
+#    df_list = [nabeo_view]
+#    label_list = []
+#    color = iter(['k'])
+#    nabeo_sec, nabeo_SNR = plot_lightcurve(df_list, label_list, color)
+#    
+#    
+#    data_file = data_dir / '44372_2019_09_23_pass1_main.csv'
+#    mir_main = csv2dataframe(data_file)
+#    
+#    data_file = data_dir / '44372_2019_09_23_pass1_view.csv'
+#    mir_view = csv2dataframe(data_file)
+#    
+#    df_list = [mir_view]
+#    label_list = []
+#    color = iter(['k'])
+#    mir_sec, mir_SNR = plot_lightcurve(df_list, label_list, color)
+#    
+#    
+#    
+#    fig = plt.figure()
+#    ax1 = fig.add_subplot(2,1,1)
+#    ax1.plot(np.asarray(nabeo_sec[45:-14])-nabeo_sec[45], nabeo_SNR[45:-14], 'ko--')
+##    ax1.set_ylim([0, 1000])
+#    ax1.set_xlim([0, 160])
+#    ax1.set_ylabel('NABEO SNR')
+#    
+#    ax2 = fig.add_subplot(2,1,2)
+#    ax2.plot(mir_sec, mir_SNR, 'ko--')
+##    ax2.set_ylim([0, 1000])
+#    ax2.set_xlim([0, 160])
+#    ax2.set_ylabel('MIR SNR')
+#    ax2.set_xlabel('Time [sec]')
+#    
+#    plt.setp(ax1.get_xticklabels(), visible=False)
+#    
+#    
+#    data_file = data_dir / '44372_2019_09_23_pass2_main.csv'
+#    mir_main = csv2dataframe(data_file)
+#    
+#    data_file = data_dir / '44372_2019_09_23_pass2_view.csv'
+#    mir_view = csv2dataframe(data_file)
+#    
+#    df_list = [mir_view]
+#    label_list = []
+#    color = iter(['k'])
+#    mir_sec, mir_SNR = plot_lightcurve(df_list, label_list, color)
     
-    data_file = data_dir / '43164_2018_11_30_main.csv'
-    st_main = csv2dataframe(data_file)
+
+    # Load all data
+    data_dir = 'D:\documents\\research\cubesats\M2\data'
+  
+    data_file = os.path.join(data_dir, 'NJC_2021_04_08_pass2_main.csv')
+    CMU_main = csv2dataframe(data_file)
     
-    data_file = data_dir / '43164_2018_11_30_viewfinder.csv'
-    st_view = csv2dataframe(data_file)
+#    data_file = os.path.join(data_dir, 'CMU_2021_03_29_view.csv')
+#    CMU_view = csv2dataframe(data_file)
     
-    df_list = [st_view]
-    label_list = []
-    color = iter(['k'])
-    st_sec, st_SNR = plot_lightcurve(df_list, label_list, color)
-    
-    
-    data_file = data_dir / '43692_2018_11_25_main.csv'
-    nabeo_main = csv2dataframe(data_file)
-    
-    data_file = data_dir / '43692_2018_11_25_viewfinder.csv'
-    nabeo_view = csv2dataframe(data_file)
-    
-    df_list = [nabeo_view]
-    label_list = []
-    color = iter(['k'])
-    nabeo_sec, nabeo_SNR = plot_lightcurve(df_list, label_list, color)
-    
-    
-    fig = plt.figure()
-    ax1 = fig.add_subplot(2,1,1)
-    ax1.plot(nabeo_sec, nabeo_SNR, 'ko--')
-    ax1.set_ylim([0, 700])
-    ax1.set_xlim([0, 225])
-    ax1.set_ylabel('NABEO SNR')
-    
-    ax2 = fig.add_subplot(2,1,2)
-    ax2.plot(st_sec, st_SNR, 'ko--')
-    ax2.set_ylim([0, 700])
-    ax2.set_xlim([0, 225])
-    ax2.set_ylabel('ST SNR')
-    ax2.set_xlabel('Time [sec]')
-    
-    plt.setp(ax1.get_xticklabels(), visible=False)
-    
-    
-    data_file = data_dir / '43692_2019_09_23_main.csv'
-    nabeo_main = csv2dataframe(data_file)
-    
-    data_file = data_dir / '43692_2019_09_23_view.csv'
-    nabeo_view = csv2dataframe(data_file)
-    
-    df_list = [nabeo_view]
-    label_list = []
-    color = iter(['k'])
-    nabeo_sec, nabeo_SNR = plot_lightcurve(df_list, label_list, color)
-    
-    
-    data_file = data_dir / '44372_2019_09_23_pass1_main.csv'
-    mir_main = csv2dataframe(data_file)
-    
-    data_file = data_dir / '44372_2019_09_23_pass1_view.csv'
-    mir_view = csv2dataframe(data_file)
-    
-    df_list = [mir_view]
-    label_list = []
-    color = iter(['k'])
-    mir_sec, mir_SNR = plot_lightcurve(df_list, label_list, color)
-    
-    
-    
-    fig = plt.figure()
-    ax1 = fig.add_subplot(2,1,1)
-    ax1.plot(np.asarray(nabeo_sec[45:-14])-nabeo_sec[45], nabeo_SNR[45:-14], 'ko--')
-#    ax1.set_ylim([0, 1000])
-    ax1.set_xlim([0, 160])
-    ax1.set_ylabel('NABEO SNR')
-    
-    ax2 = fig.add_subplot(2,1,2)
-    ax2.plot(mir_sec, mir_SNR, 'ko--')
-#    ax2.set_ylim([0, 1000])
-    ax2.set_xlim([0, 160])
-    ax2.set_ylabel('MIR SNR')
-    ax2.set_xlabel('Time [sec]')
-    
-    plt.setp(ax1.get_xticklabels(), visible=False)
-    
-    
-    data_file = data_dir / '44372_2019_09_23_pass2_main.csv'
-    mir_main = csv2dataframe(data_file)
-    
-    data_file = data_dir / '44372_2019_09_23_pass2_view.csv'
-    mir_view = csv2dataframe(data_file)
-    
-    df_list = [mir_view]
-    label_list = []
-    color = iter(['k'])
-    mir_sec, mir_SNR = plot_lightcurve(df_list, label_list, color)
-    
-    
-    
+    df_list = [CMU_main]
+    label_list = ['Main']
+    color = iter(['b'])
+    plot_lightcurve(df_list, label_list, color, 'NORAD 47967 2021-04-08 Pass 2 NJC-Falcon')
     
     return
 
