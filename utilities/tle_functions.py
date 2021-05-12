@@ -85,17 +85,18 @@ def get_spacetrack_tle_data(obj_id_list = [], UTC_list = [], username='',
     if len(obj_id_list) >= 1:
         myString = ",".join(map(str, obj_id_list))
 
-        # If only one time is given, add 1 day increment to produce window
+        # If only one time is given, add 2 day increment to produce window
         if len(UTC_list) ==  1:
-            UTC_list.append(UTC_list[0] + timedelta(days=1.))
+            UTC_list.append(UTC_list[0] + timedelta(days=2.))
 
         # If times are specified, retrieve from window
         if len(UTC_list) == 2:
             UTC0 = UTC_list[0].strftime('%Y-%m-%d')
             UTC1 = UTC_list[1].strftime('%Y-%m-%d')
-            pageData = ('//www.space-track.org/basicspacedata/query/class/gp/'
-                        'EPOCH/' + UTC0 + '--' + UTC1 + '/NORAD_CAT_ID/' +
-                        myString + '/orderby/NORAD_CAT_ID/format/tle')
+            pageData = ('//www.space-track.org/basicspacedata/query/class/' +
+                        'gp_history/NORAD_CAT_ID/' + myString + '/orderby/' +
+                        'TLE_LINE1 ASC/EPOCH/' + UTC0 + '--' + UTC1 + 
+                        '/format/tle')
 
         # Otherwise, get latest available
         else:
@@ -1908,14 +1909,7 @@ if __name__ == '__main__' :
 #    
 #    plot_sma_rp_ra(obj_id_list, UTC_list)
     
-    
-    obj_id_list = [47967]
-    obj_id_list = []
-    UTC_window = [datetime(2021, 3, 20), datetime(2021, 3, 24)]
-    UTC_window = []
-    tle_dict, tle_df = get_spacetrack_tle_data(obj_id_list, UTC_window)
-    print(len(tle_dict))
-    
+
     
 #    
 #    UTC_list = [datetime(2021, 3, 24, 0, 0, 0)]
