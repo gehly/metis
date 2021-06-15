@@ -129,25 +129,25 @@ def compute_sun_coords(TT_cent):
 
     
 #    # Computations of RA/DEC
-    ra_geom = atan2(cos(Eps0_rad)*sin(true_long_rad), cos(true_long_rad)) # rad
-    dec_geom = asin(sin(Eps0_rad)*sin(true_long_rad))                     # rad
+#    ra_geom = atan2(cos(Eps0_rad)*sin(true_long_rad), cos(true_long_rad)) # rad
+#    dec_geom = asin(sin(Eps0_rad)*sin(true_long_rad))                     # rad
 #    sun_eci_geom = R_km*np.array([[cos(ra_geom)*cos(dec_geom)],
 #                                  [sin(ra_geom)*cos(dec_geom)],
 #                                  [sin(dec_geom)]])
 #    
-    ra_app = atan2(cos(Eps_true_rad)*sin(apparent_long_rad), cos(apparent_long_rad)) # rad
-    dec_app = asin(sin(Eps_true_rad)*sin(apparent_long_rad))                         # rad
+#    ra_app = atan2(cos(Eps_true_rad)*sin(apparent_long_rad), cos(apparent_long_rad)) # rad
+#    dec_app = asin(sin(Eps_true_rad)*sin(apparent_long_rad))                         # rad
 #    sun_eci_app = R_km*np.array([[cos(ra_app)*cos(dec_app)],
 #                                 [sin(ra_app)*cos(dec_app)],
 #                                 [sin(dec_app)]])
     
     
     
-    print('ra_geom', ra_geom*180/pi)
-    print('dec_geom', dec_geom*180/pi)
-    print('ra_app', ra_app*180/pi)
-    print('dec_app', dec_app*180/pi)
-    print('range', R_km)
+#    print('ra_geom', ra_geom*180/pi)
+#    print('dec_geom', dec_geom*180/pi)
+#    print('ra_app', ra_app*180/pi)
+#    print('dec_app', dec_app*180/pi)
+#    print('range', R_km)
     
     
     return sun_eci_geom, sun_eci_app

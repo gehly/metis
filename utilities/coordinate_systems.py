@@ -650,12 +650,278 @@ def latlonht2ecef(lat, lon, ht):
     return r_ecef
 
 
+def latlon2dist(lat1, lon1, lat2, lon2):
+    '''
+    This function computes the distance in km between two points on the WGS-84
+    ellipsoid, given by geodetic latitude and longitude.
+    
+    Parameters
+    ------
+    lat1 : float
+        geodetic latitude of first location [deg]
+    lon1 : float
+        longitude of first location [deg]
+    lat2 : float
+        geodetic latitude of second location [deg]
+    lon2 : float
+        longitude of second location [deg]
+        
+    Returns
+    ------
+    s : float
+        ellipsoidal distance between the two points [km]
+    alpha1 : float
+        forward azimuth at location 1 [deg]
+    alpha2 : float
+        forward azimuth at location 2 [deg]
+    
+    
+    Reference
+    ------
+    Vincenty, T., "Direct and Inverse Solutions of Geodesics on the Ellipsoid
+    with Application of Nested Equations," Survey Review No 176, 1975.
+    
+    '''
+    
+    # Convert angles to rad
+    lat1 = lat1*pi/180.
+    lon1 = lon1*pi/180.
+    lat2 = lat2*pi/180.
+    lon2 = lon2*pi/180.
+    
+    # Earth Parameters - WGS84 
+    a = Re
+    f = 1/rec_f
+    b = (1-f)*a
+    
+    # Compute U1, U2, L
+    U1 = atan((1-f) * tan(lat1))
+    U2 = atan((1-f) * tan(lat2))
+    L = lon2 - lon1
+    
+    # Iterate to convergence
+    lam = L
+    diff = 1.
+    tol = 1e-10
+    count = 0
+    max_iters = 100
+    while diff > tol:
+        
+        # Loop parameters
+        count += 1
+        lam_prev = float(lam)
+                
+        sin_sigma = np.sqrt( (cos(U2)*sin(lam))**2. + (cos(U1)*sin(U2) - sin(U1)*cos(U2)*cos(lam))**2. )
+        cos_sigma = sin(U1)*sin(U2) + cos(U1)*cos(U2)*cos(lam)
+        sigma = atan2(sin_sigma, cos_sigma)
+        sin_alpha = cos(U1)*cos(U2)*sin(lam)/sin(sigma)
+        cos_2sigm = cos(sigma) - (2.*sin(U1)*sin(U2))/(1. - sin_alpha**2.)
+        C = (f/16.) * (1. - sin_alpha**2.) * (4. + f*(4. - 3.*(1 - sin_alpha**2.)))
+        
+        lam = L + (1.-C)*f*sin_alpha*(sigma + C*sin_sigma*(cos_2sigm + C*cos_sigma*(-1. + 2.*cos_2sigm**2.)))
+        diff = abs(lam - lam_prev)
+        
+        if count > max_iters:
+            print(count)
+            print(diff)
+            break
+    
+        
+    u2 = (1. - sin_alpha**2.) * ((a**2. - b**2.)/b**2.)
+    A = 1. + (u2/16384.)*(4096. + u2*(-768. + u2*(320. - 175.*u2)))
+    B = (u2/1024.)*(256. + u2*(-128. + u2*(74. - 47.*u2)))
+    delta_sigma = B*sin_sigma*(cos_2sigm + 0.25*B*(cos_sigma*(-1. + 2.*cos_2sigm**2.) - (B/6.)*cos_2sigm*(-3. + 4.*sin_sigma**2.)*(-3. + 4.*cos_2sigm**2.)))
+    s = b*A*(sigma - delta_sigma)
+    alpha1 = atan2((cos(U2)*sin(lam)), (cos(U1)*sin(U2) - sin(U1)*cos(U2)*cos(lam))) * 180./pi
+    alpha2 = atan2((cos(U1)*sin(lam)), (-sin(U1)*cos(U2) + cos(U1)*sin(U2)*cos(lam))) * 180./pi
+    
+    alpha1 = alpha1 % 360.
+    alpha2 = alpha2 % 360.
+        
+    return s, alpha1, alpha2
+
+
+def dist2latlon(lat1, lon1, s, alpha1):
+    '''
+    This function computes the latitude and longitude of a point a given
+    distance and azimuth angle from an initial latitude/longitude.
+    
+    Parameters
+    ------
+    lat1 : float
+        geodetic latitude of first location [deg]
+    lon1 : float
+        longitude of first location [deg]
+    s : float
+        ellipsoidal distance between the two points [km]
+    alpha1 : float
+        forward azimuth at location 1 [deg]    
+        
+    Returns
+    ------
+    lat2 : float
+        geodetic latitude of second location [deg]
+    lon2 : float
+        longitude of second location [deg]    
+    alpha2 : float
+        forward azimuth at location 2 [deg]
+    
+    
+    Reference
+    ------
+    Vincenty, T., "Direct and Inverse Solutions of Geodesics on the Ellipsoid
+    with Application of Nested Equations," Survey Review No 176, 1975.
+    
+    '''
+    
+    # Convert to radians
+    lat1 = lat1*pi/180.
+    lon1 = lon1*pi/180.
+    alpha1 = alpha1*pi/180.
+    
+    # Earth Parameters - WGS84 
+    a = Re
+    f = 1/rec_f
+    b = (1-f)*a
+    
+    # Compute values
+    U1 = atan((1-f) * tan(lat1))
+    sigma1 = atan2(tan(U1), cos(alpha1))
+    sin_alpha = cos(U1)*sin(alpha1)
+    u2 = (1. - sin_alpha**2.) * ((a**2. - b**2.)/b**2.)
+    A = 1. + (u2/16384.)*(4096. + u2*(-768. + u2*(320. - 175.*u2)))
+    B = (u2/1024.)*(256. + u2*(-128. + u2*(74. - 47.*u2)))
+    
+    # Iterate to convergence
+    sigma = s/(b*A)
+    diff = 1.
+    tol = 1e-10
+    count = 0
+    max_iters = 100
+    while diff > tol:
+        
+        sigma_prev = float(sigma)
+        
+        sin_sigma = sin(sigma)
+        cos_sigma = cos(sigma)
+        cos_2sigm = cos(2.*sigma1 + sigma)
+        delta_sigma = B*sin_sigma*(cos_2sigm + 0.25*B*(cos_sigma*(-1. + 2.*cos_2sigm**2.) - (B/6.)*cos_2sigm*(-3. + 4.*sin_sigma**2.)*(-3. + 4.*cos_2sigm**2.)))
+        
+        sigma = s/(b*A) + delta_sigma
+        diff = abs(sigma - sigma_prev)
+
+        count += 1
+        if count > max_iters:
+            print(count)
+            print(diff)
+            break
+        
+    sin_sigma = sin(sigma)
+    cos_sigma = cos(sigma)
+    cos_2sigm = cos(2.*sigma1 + sigma)
+        
+    lat2 = atan2( (sin(U1)*cos_sigma + cos(U1)*sin_sigma*cos(alpha1)), (1.-f)*np.sqrt(sin_alpha**2. + (sin(U1)*sin_sigma - cos(U1)*cos_sigma*cos(alpha1))**2.) )
+    lam = atan2( sin_sigma*sin(alpha1), (cos(U1)*cos_sigma - sin(U1)*sin_sigma*cos(alpha1)) )
+    C = (f/16.) * (1. - sin_alpha**2.) * (4. + f*(4. - 3.*(1 - sin_alpha**2.)))
+    L = lam - (1.-C)*f*sin_alpha*(sigma + C*sin_sigma*(cos_2sigm + C*cos_sigma*(-1. + 2.*cos_2sigm**2.)))
+    lon2 = L + lon1
+    alpha2 = atan2(sin_alpha, (-sin(U1)*sin_sigma + cos(U1)*cos_sigma*cos(alpha1)))
+    
+    # Convert to deg
+    lat2 = lat2 * 180./pi
+    lon2 = lon2 * 180./pi
+    alpha2 = alpha2 * 180./pi    
+    
+    alpha2 = alpha2 % 360.
+    
+    return lat2, lon2, alpha2
+
+
+def inc2az(lat, inc):
+    '''
+    This function computes the aziumth of an orbit given for a given location
+    given inclination and latitude of a point on the ground
+    
+    Parameters
+    ------
+    lat : float
+        geodetic latitude [deg]
+    inc : float
+        inclination [deg]
+        
+    Returns
+    ------
+    az : float
+        azimuth [deg]
+        
+    
+    '''
+    
+    # Conver to rad
+    lat = lat * pi/180.
+    inc = inc * pi/180.
+        
+    # Compute azimuth in deg for both ascending and descending passage
+    if cos(inc)/cos(lat) > 1.:
+        az_asc = 90.
+    elif cos(inc)/cos(lat) < -1.:
+        az_asc = 270.
+    else:    
+        az_asc = asin(cos(inc)/cos(lat)) * 180./pi   
+        
+    az_desc = 180. - az_asc
+    
+    # Wrap to 360
+    az_asc = az_asc % 360.
+    az_desc = az_desc % 360.
+    
+    return az_asc, az_desc
+
+
 ###############################################################################
 # Unit Test
 ###############################################################################
+    
+
+def unit_test_latlondist():
+    
+    lat1 = -20
+    lon1 = 15.
+    lat2 = -30.
+    lon2 = 18.
+    
+    s, alpha1, alpha2 = latlon2dist(lat1, lon1, lat2, lon2)
+    
+    print(s, alpha1, alpha2)
+    
+    lat2, lon2, alpha2 = dist2latlon(lat1, lon1, s, alpha1)
+    
+    print(lat2, lon2, alpha2)
+    
+    
+    return
+
+
+def unit_test_inc2az():
+    
+    lat = -82.
+    inc = 98.
+    
+    az_asc, az_desc = inc2az(lat, inc)
+    
+    print(az_asc, az_desc)
+    
+    return
 
 
 if __name__ == '__main__':
+    
+    
+#    unit_test_latlondist()
+    
+    unit_test_inc2az()
+    
+    
 
 #    obj_id_list = [43014]
 #    UTC = datetime(2018, 6, 23, 0, 0, 0)   
@@ -748,16 +1014,16 @@ if __name__ == '__main__':
 #    print(Q_eci - Q_eci2.flatten())
     
     
-    lat_gs = -35.29
-    lon_gs = 149.17
-    ht_gs = 0.606 # km	
-    
-    r_site = latlonht2ecef(lat_gs, lon_gs, ht_gs)
-    
-    print(r_site)
-    
-    r_enu = ecef2enu(r_site, r_site)    
-    
-    print(r_enu)
+#    lat_gs = -35.29
+#    lon_gs = 149.17
+#    ht_gs = 0.606 # km	
+#    
+#    r_site = latlonht2ecef(lat_gs, lon_gs, ht_gs)
+#    
+#    print(r_site)
+#    
+#    r_enu = ecef2enu(r_site, r_site)    
+#    
+#    print(r_enu)
     
     

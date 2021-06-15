@@ -1719,7 +1719,7 @@ def find_closest_tle_epoch(line1_list, line2_list, UTC, prev_flag=False):
 
         
         if prev_flag:
-            if dt_sec > 0 and abs(dt_sec) < minimum:
+            if dt_sec >= 0 and abs(dt_sec) < minimum:
                 ind = ii
                 minimum = dt_sec
                         
@@ -1734,8 +1734,8 @@ def find_closest_tle_epoch(line1_list, line2_list, UTC, prev_flag=False):
     return line1, line2
 
 
-def propagate_TLE(obj_id_list, UTC_list, tle_dict={}, offline_flag=False,
-                  username='', password=''):
+def propagate_TLE(obj_id_list, UTC_list, tle_dict={}, prev_flag=False,
+                  offline_flag=False, username='', password=''):
     '''
     This function retrieves TLE data for the objects in the input list from
     space-track.org and propagates them to the times given in UTC_list.  The
@@ -1811,7 +1811,8 @@ def propagate_TLE(obj_id_list, UTC_list, tle_dict={}, offline_flag=False,
             
             # Find the closest TLE by epoch
             epoch_start = time.time()
-            line1, line2 = find_closest_tle_epoch(line1_list, line2_list, UTC)
+            line1, line2 = find_closest_tle_epoch(line1_list, line2_list, UTC,
+                                                  prev_flag)
             
             tle_epoch_time += time.time() - epoch_start
 
@@ -1909,7 +1910,37 @@ if __name__ == '__main__' :
 #    
 #    plot_sma_rp_ra(obj_id_list, UTC_list)
     
-
+    # Landsat-8 Data
+    landsat8_norad = 39084
+    
+    # Sentinel 2 Data
+    sentinel_2a_norad = 40697
+    sentinel_2b_norad = 42063
+    
+    # Retrieve TLE and print state vectors
+    obj_id_list = [landsat8_norad, sentinel_2a_norad, sentinel_2b_norad]
+    UTC_start = datetime(2020, 6, 29, 0, 0, 0)
+    UTC_stop = datetime(2020, 7, 1, 0, 0, 0)
+    dt = 10.
+    
+    delta_t = (UTC_stop - UTC_start).total_seconds()
+    UTC_list = [UTC_start + timedelta(seconds=ti) for ti in list(np.arange(0, delta_t, dt))]
+    
+    print(UTC_list[0], UTC_list[-1])
+    
+    # Retrieve TLE 
+    retrieve_list = [UTC_list[0] - timedelta(days=1), UTC_list[-1] + timedelta(days=1)]
+    tle_dict, dum = get_spacetrack_tle_data(obj_id_list, retrieve_list, 
+                                            username='steve.gehly@gmail.com', 
+                                            password='SpaceTrackPword!')
+    
+    output_state = propagate_TLE(obj_id_list, UTC_list, tle_dict, prev_flag=True)
+    
+    # Save output
+    fname = os.path.join(r'D:\documents\research\cubesats\GeoscienceAustralia\data\check_tle_propagation.pkl')
+    pklFile = open( fname, 'wb' )
+    pickle.dump( [output_state], pklFile, -1 )
+    pklFile.close()
     
 #    
 #    UTC_list = [datetime(2021, 3, 24, 0, 0, 0)]

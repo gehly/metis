@@ -796,7 +796,7 @@ def compute_BPN(X, Y, s):
     return BPN
 
 
-def batch_eop_rotation_matrices(UTC_start, UTC_stop, eop_alldata_text,
+def batch_eop_rotation_matrices(UTC_list, eop_alldata_text,
                                 increment=10., eop_flag='linear',
                                 GMST_only_flag=False):
     '''
@@ -808,10 +808,8 @@ def batch_eop_rotation_matrices(UTC_start, UTC_stop, eop_alldata_text,
     
     Parameters
     ------
-    UTC_start : datetime object
-        start time in UTC
-    UTC_stop : datetime object
-        stop time in UTC
+    UTC_list : list
+        list of datetime object to compute Frame Rotation matrices for
     eop_alldata_text : string
         string containing observed and predicted EOP data, no header
         information
@@ -854,16 +852,15 @@ def batch_eop_rotation_matrices(UTC_start, UTC_stop, eop_alldata_text,
     # Retrieve polar motion data from file
     XYs_df = get_XYs2006_alldata()
     
-    # MJD Array
-    MJD0 = dt2mjd(UTC_start)
-    MJDf = dt2mjd(UTC_stop)
-    MJD_array = np.arange(MJD0, MJDf+(increment/(86400.*2.)), increment/86400.)
+    # Generate MJD list
+    MJD_list = [dt2mjd(UTC) for UTC in UTC_list]
     
     # Loop over times
-    for kk in range(len(MJD_array)):
+    for kk in range(len(MJD_list)):
         
-        MJD_kk = MJD_array[kk]
-        UTC_kk = mjd2dt(MJD_kk)
+        MJD_kk = MJD_list[kk]
+        UTC_kk = UTC_list[kk]
+#        UTC_kk = mjd2dt(MJD_kk)
         
         # Compute the appropriate EOP values for this time using the input
         # text data.  Per Reference 4 Table 2-3, the following error levels are
@@ -918,23 +915,56 @@ def batch_eop_rotation_matrices(UTC_start, UTC_stop, eop_alldata_text,
                 # and line1.  Otherwise, we have to increment nlines to get
                 # the new line1                
                 if MJD_int == MJD_prior + 1:
-                    line0 = copy.copy(line1)
-                    nlines += 1
-                    start = ii + nlines*(nchar+nskip)
-                    stop = ii + nlines*(nchar+nskip) + nchar
-                    line1 = eop_alldata_text[start:stop]
                     
-                    MJD_line = int(line[11:16])
-                    if MJD_line != MJD_int:
-                        print(MJD_line)
-                        print(MJD_int)
-                        sys.exit('Wrong MJD value encountered!')
+                    print(MJD_int)
+                    print(MJD_prior)
+                    print(line0)
+                    print(line1)
+                    
+                    # Find EOP data lines around time of interest                
+                    for ii in range(len(eop_alldata_text)):
+                        start = ii + nlines*(nchar+nskip)
+                        stop = ii + nlines*(nchar+nskip) + nchar
+                        line = eop_alldata_text[start:stop]
+                        nlines += 1
+                        
+                        MJD_line = int(line[11:16])
+
+                        
+                        if MJD_line == MJD_int:
+                            line0 = line
+                        if MJD_line == MJD_int+1:
+                            line1 = line
+                            break
+                    
+                    
+                    
+#                    line0 = copy.copy(line1)
+#                    nlines += 1
+#                    start = ii + nlines*(nchar+nskip)
+#                    stop = ii + nlines*(nchar+nskip) + nchar
+#                    line1 = eop_alldata_text[start:stop]
+#                    
+#                    MJD_line = int(line[11:16])
+#                    if MJD_line != MJD_int:
+#                        print(MJD_line)
+#                        print(MJD_int)
+#                        sys.exit('Wrong MJD value encountered!')
                     
                     MJD_prior = MJD_int
+                    
+#                    print('\n')
+#                    print(nlines)
+#                    print(start)
+#                    print(stop)
+#                    print(line0)
+#                    print(line1)
+#                    
+#                    mistake
                 
-                # Read the EOP values for each line
-                line0_array = eop_read_line(line0)
-                line1_array = eop_read_line(line1)
+            # Read the EOP values for each line
+            line0_array = eop_read_line(line0)
+            line1_array = eop_read_line(line1)
             
             # Set all EOPs to values for nearest day
             # Expected error level ~3.6m max (0.8m RMS) in GEO
