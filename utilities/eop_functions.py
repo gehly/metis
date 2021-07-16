@@ -797,7 +797,7 @@ def compute_BPN(X, Y, s):
 
 
 def batch_eop_rotation_matrices(UTC_list, eop_alldata_text,
-                                increment=10., eop_flag='linear',
+                                eop_flag='linear',
                                 GMST_only_flag=False):
     '''
     This function generates a list of rotation matrices between TEME/GCRF and

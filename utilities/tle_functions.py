@@ -1735,7 +1735,7 @@ def find_closest_tle_epoch(line1_list, line2_list, UTC, prev_flag=False):
 
 
 def propagate_TLE(obj_id_list, UTC_list, tle_dict={}, prev_flag=False,
-                  offline_flag=False, username='', password=''):
+                  offline_flag=False, frame_flag=True, username='', password=''):
     '''
     This function retrieves TLE data for the objects in the input list from
     space-track.org and propagates them to the times given in UTC_list.  The
@@ -1751,6 +1751,9 @@ def propagate_TLE(obj_id_list, UTC_list, tle_dict={}, prev_flag=False,
     offline_flag : boolean, optional
         flag to determine whether to retrieve EOP data from internet or from
         a locally saved file (default = False)
+    frame_flag : boolean, optional
+        flag to determine whether to rotate state vector to GCRF and ITRF to 
+        include with output along with state vector in TEME (default = True)
     username : string, optional
         space-track.org username (code will prompt for input if not supplied)
     password : string, optional
@@ -1764,7 +1767,6 @@ def propagate_TLE(obj_id_list, UTC_list, tle_dict={}, prev_flag=False,
 
     '''
     
-    start = time.time()
     total_prop = 0.
     total_teme2gcrf = 0.
     total_gcrf2itrf = 0.
@@ -1780,15 +1782,20 @@ def propagate_TLE(obj_id_list, UTC_list, tle_dict={}, prev_flag=False,
             get_spacetrack_tle_data(obj_id_list, UTC_list, username, password)
 
         # Retreive TLE data from database
-        
-    # Retrieve latest EOP data from celestrak.com
-    eop_alldata = get_celestrak_eop_alldata(offline_flag)
-
-    # Retrieve IAU Nutation data from file
-    IAU1980_nutation = get_nutation_data()
     
-    # Retrieve polar motion data from file
-    XYs_df = get_XYs2006_alldata()
+    
+    # If frame rotations to GCRF and ITRF are desired, retrieve EOP data
+    if frame_flag:  
+        
+        # Retrieve latest EOP data from celestrak.com
+        eop_alldata = get_celestrak_eop_alldata(offline_flag)
+    
+        # Retrieve IAU Nutation data from file
+        IAU1980_nutation = get_nutation_data()
+        
+        # Retrieve polar motion data from file
+        XYs_df = get_XYs2006_alldata()
+
 
     # Loop over objects
     output_state = {}
@@ -1828,35 +1835,41 @@ def propagate_TLE(obj_id_list, UTC_list, tle_dict={}, prev_flag=False,
             v_TEME = np.reshape(v_TEME, (3,1))
             
             total_prop += time.time() - prop_start
-
-            # Get EOP data for this time
-            eop_start = time.time()
-            EOP_data = get_eop_data(eop_alldata, UTC)
             
-            total_eop_time += time.time() - eop_start
-
-            # Convert from TEME to GCRF (ECI)
-            teme_start = time.time()
-            r_GCRF, v_GCRF = teme2gcrf(r_TEME, v_TEME, UTC, IAU1980_nutation,
-                                       EOP_data)
-            
-            total_teme2gcrf += time.time() - teme_start
-            
-            # Convert from GCRF to ITRF (ECEF)
-            itrf_start = time.time()
-            r_ITRF, v_ITRF = gcrf2itrf(r_GCRF, v_GCRF, UTC, EOP_data, XYs_df)
-            
-            total_gcrf2itrf += time.time() - itrf_start
-
-
             # Store output
             output_state[obj_id]['UTC'].append(UTC)
-            output_state[obj_id]['r_GCRF'].append(r_GCRF)
-            output_state[obj_id]['v_GCRF'].append(v_GCRF)
-            output_state[obj_id]['r_ITRF'].append(r_ITRF)
-            output_state[obj_id]['v_ITRF'].append(v_ITRF)
             output_state[obj_id]['r_TEME'].append(r_TEME)
             output_state[obj_id]['v_TEME'].append(v_TEME)
+
+            # If desired, compute state vector in GCRF and ITRF
+            # Note this will be slow for large datasets - use batch processing
+            if frame_flag:
+                
+                # Get EOP data for this time
+                eop_start = time.time()
+                EOP_data = get_eop_data(eop_alldata, UTC)
+                
+                total_eop_time += time.time() - eop_start
+    
+                # Convert from TEME to GCRF (ECI)
+                teme_start = time.time()
+                r_GCRF, v_GCRF = teme2gcrf(r_TEME, v_TEME, UTC, IAU1980_nutation,
+                                           EOP_data)
+                
+                total_teme2gcrf += time.time() - teme_start
+                
+                # Convert from GCRF to ITRF (ECEF)
+                itrf_start = time.time()
+                r_ITRF, v_ITRF = gcrf2itrf(r_GCRF, v_GCRF, UTC, EOP_data, XYs_df)
+                
+                total_gcrf2itrf += time.time() - itrf_start
+
+                # Store output
+                output_state[obj_id]['r_GCRF'].append(r_GCRF)
+                output_state[obj_id]['v_GCRF'].append(v_GCRF)
+                output_state[obj_id]['r_ITRF'].append(r_ITRF)
+                output_state[obj_id]['v_ITRF'].append(v_ITRF)
+            
             
         print(obj_id)
         print('TLE epoch find: ', tle_epoch_time)
@@ -1864,10 +1877,10 @@ def propagate_TLE(obj_id_list, UTC_list, tle_dict={}, prev_flag=False,
         print('EOP: ', total_eop_time)
         print('TEME: ', total_teme2gcrf)
         print('ITRF: ', total_gcrf2itrf)
-        
 
 
     return output_state
+
 
 def get_planet_ephem():
     '''
