@@ -138,6 +138,50 @@ def save_celestrak_eop_alldata():
     return
 
 
+def get_TAI_UTC(data_text, UTC):
+    '''
+    This function retrieves the TAI_UTC offset seconds for a specific time 
+    from the EOP data
+    
+    
+    Parameters
+    ------
+    data_text : string
+        string containing observed and predicted EOP data, no header
+        information
+    UTC : datetime object
+        time in UTC
+    
+    Returns
+    ------
+    TAI_UTC : dictionary
+        Delta Atomic Time, TAI-UTC (seconds)
+    '''
+    
+    # Compute MJD for desired time
+    MJD = dt2mjd(UTC)
+    MJD_int = int(MJD)
+    
+    # Find EOP data lines around time of interest
+    nchar = 102
+    nskip = 1
+    nlines = 0
+    for ii in range(len(data_text)):
+        start = ii + nlines*(nchar+nskip)
+        stop = ii + nlines*(nchar+nskip) + nchar
+        line = data_text[start:stop]
+        nlines += 1
+        
+        MJD_line = int(line[11:16])
+        
+        if MJD_line == MJD_int:
+            line0 = line
+            TAI_UTC = int(line0[99:102])        
+            break
+
+    return TAI_UTC
+
+
 def get_eop_data(data_text, UTC):
     '''
     This function retrieves the EOP data for a specific time by computing

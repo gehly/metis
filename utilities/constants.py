@@ -21,3 +21,4 @@ C_sunvis = 455.   # W/m^2 = kg/s^3
 # Length of year
 dRAAN_sun = 1.99099299e-7       # rad/sec
 Ntro = 365.242190402            # days in tropical year
+

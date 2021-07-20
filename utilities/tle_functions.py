@@ -76,7 +76,7 @@ def get_spacetrack_tle_data(obj_id_list = [], UTC_list = [], username='',
     tle_dict = {}
     tle_df = []
     UTC_list = copy.copy(UTC_list)
-    
+
     if len(username) == 0:
         username = input('space-track username: ')
     if len(password) == 0:
@@ -90,13 +90,19 @@ def get_spacetrack_tle_data(obj_id_list = [], UTC_list = [], username='',
             UTC_list.append(UTC_list[0] + timedelta(days=2.))
 
         # If times are specified, retrieve from window
-        if len(UTC_list) == 2:
+        if len(UTC_list) >= 2:
+            
+            if (UTC_list[-1]-UTC_list[0]).total_seconds() < 86400.*2.:
+                UTC_list[-1] = UTC_list[0] + timedelta(days=2.)
+            
             UTC0 = UTC_list[0].strftime('%Y-%m-%d')
-            UTC1 = UTC_list[1].strftime('%Y-%m-%d')
+            UTC1 = UTC_list[-1].strftime('%Y-%m-%d')
             pageData = ('//www.space-track.org/basicspacedata/query/class/' +
                         'gp_history/NORAD_CAT_ID/' + myString + '/orderby/' +
                         'TLE_LINE1 ASC/EPOCH/' + UTC0 + '--' + UTC1 + 
                         '/format/tle')
+            
+        
 
         # Otherwise, get latest available
         else:
@@ -1772,7 +1778,6 @@ def propagate_TLE(obj_id_list, UTC_list, tle_dict={}, prev_flag=False,
     total_gcrf2itrf = 0.
     tle_epoch_time = 0.
     total_eop_time = 0.
-    
 
     # If no TLE information is provided, retrieve from sources as needed
     if len(tle_dict) == 0:

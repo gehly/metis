@@ -20,6 +20,7 @@ from utilities.tle_functions import propagate_TLE
 from utilities.eop_functions import get_eop_data
 from utilities.eop_functions import get_celestrak_eop_alldata
 from utilities.eop_functions import batch_eop_rotation_matrices
+from utilities.eop_functions import get_TAI_UTC
 from utilities.coordinate_systems import latlonht2ecef
 from utilities.coordinate_systems import gcrf2itrf
 from utilities.coordinate_systems import itrf2gcrf
@@ -32,9 +33,9 @@ from sensors.measurements import ecef2azelrange
 from sensors.measurements import ecef2azelrange_rad
 
 
-def define_RSOs(obj_id_list, UTC_list, tle_dict={}, offline_flag=False,
-                frame_flag=False, source='spacetrack', username='', 
-                password=''):
+def define_RSOs(obj_id_list, UTC_list, tle_dict={}, prev_flag=False,
+                offline_flag=False, frame_flag=False,
+                source='spacetrack', username='', password=''):
     '''
     This function generates the resident space object (RSO) dictionary by 
     retrieving data about RSOs including recent position/velocity states
@@ -68,7 +69,7 @@ def define_RSOs(obj_id_list, UTC_list, tle_dict={}, offline_flag=False,
         if source == 'spacetrack':            
             
             rso_dict = propagate_TLE(obj_id_list, UTC_list, tle_dict,
-                                     offline_flag, frame_flag,
+                                     prev_flag, offline_flag, frame_flag,
                                      username, password)
             
         # Retrieve from graph database
@@ -118,7 +119,7 @@ def get_database_object_params(rso_dict):
 
 
 def compute_visible_passes(UTC_list, obj_id_list, sensor_id_list, tle_dict={},
-                           offline_flag=False, source='spacetrack',
+                           TAI_UTC=37., offline_flag=False, source='spacetrack',
                            username='', password=''):
     '''
     This function computes the visible passes for a given list of 
@@ -151,10 +152,17 @@ def compute_visible_passes(UTC_list, obj_id_list, sensor_id_list, tle_dict={},
 
     '''
     
+    start = time.time()
+    
+    
     # Generate resident space object dictionary
+    prev_flag = False
     frame_flag = False
-    rso_dict = define_RSOs(obj_id_list, UTC_list, tle_dict, offline_flag,
-                           frame_flag, source, username, password)
+    rso_dict = define_RSOs(obj_id_list, UTC_list, tle_dict, prev_flag,
+                           offline_flag, frame_flag, source, username,
+                           password)
+    
+    print('RSO Time: ', time.time() - start)
     
     # Load sensor data
     # Include options here to load from file, URL, graph database, ...
@@ -171,34 +179,57 @@ def compute_visible_passes(UTC_list, obj_id_list, sensor_id_list, tle_dict={},
         lat, lon, ht = sensor_dict[sensor_id]['geodetic_latlonht']
         sensor_dict[sensor_id]['r_ITRF'] = latlonht2ecef(lat, lon, ht)
         
+        
+    eop_start = time.time()
+        
     # Generate coordinate frame rotation matrices
     eop_alldata = get_celestrak_eop_alldata(offline_flag)    
     GCRF_TEME_list, ITRF_GCRF_list = \
         batch_eop_rotation_matrices(UTC_list, eop_alldata)
+        
+    print('Frame Rotation Time: ', time.time() - eop_start)
+    
+    for_loop_start = time.time()
 
     # Loop over times to generate data for visibility calculations
     sun_gcrf_list = []
     sun_itrf_list = []
     moon_gcrf_list = []  
+    sun_calc_time = 0.
+    moon_calc_time = 0.
+    obj_loop_time = 0.
+    sensor_loop_time = 0.
+
+    
     for ii in range(len(UTC_list)):
         
+
         # Retrieve current values
         UTC = UTC_list[ii]
         GCRF_TEME = GCRF_TEME_list[ii]
         ITRF_GCRF = ITRF_GCRF_list[ii]
 
-        # Compute sun/moon position
-        EOP_data = get_eop_data(eop_alldata, UTC)
-        TT_JD = utcdt2ttjd(UTC, EOP_data['TAI_UTC'])
+        # Compute sun/moon position     
+        TT_JD = utcdt2ttjd(UTC, TAI_UTC)
         TT_cent = jd2cent(TT_JD)
+
+        start = time.time()
         sun_eci_geom, sun_eci_app = compute_sun_coords(TT_cent)
+        sun_calc_time += time.time() - start
+        
+        start = time.time()
         moon_eci_geom, moon_eci_app = compute_moon_coords(TT_cent)
+        moon_calc_time += time.time() - start
         
         # Store output
+        start = time.time()
         sun_gcrf_list.append(sun_eci_app)
         sun_itrf_list.append(np.dot(ITRF_GCRF, sun_eci_app))
         moon_gcrf_list.append(moon_eci_app)
         
+#        other_time += time.time() - start
+        
+        start = time.time()
         # Loop over objects
         for obj_id in rso_dict:
             rso_teme_list = rso_dict[obj_id]['r_TEME']
@@ -213,15 +244,34 @@ def compute_visible_passes(UTC_list, obj_id_list, sensor_id_list, tle_dict={},
             rso_dict[obj_id]['r_GCRF'].append(r_GCRF)
             rso_dict[obj_id]['r_ITRF'].append(r_ITRF)
             
+        obj_loop_time += time.time() - start
+            
+        
+        start = time.time()
+        
         # Loop over sensors
         for sensor_id in sensor_dict:
-            sensor_itrf = sensor['r_ITRF']
+            sensor_itrf = sensor_dict[sensor_id]['r_ITRF']
             sensor_gcrf = np.dot(ITRF_GCRF.T, sensor_itrf)
             
             if 'r_GCRF' not in sensor_dict[sensor_id]:
                 sensor_dict[sensor_id]['r_GCRF'] = []
                 
             sensor_dict[sensor_id]['r_GCRF'].append(sensor_gcrf)
+            
+        sensor_loop_time += time.time() - start
+            
+            
+            
+    print('Sun/Moon Calc Time: ', time.time() - for_loop_start)
+    print('sun_calc_time', sun_calc_time)
+    print('moon_calc_time', moon_calc_time)
+    print('obj_loop_time', obj_loop_time)
+    print('sensor_loop_time', sensor_loop_time)
+
+    
+#    print(rso_dict)
+    
 
     # Initialize output
     start_list_all = []
@@ -252,18 +302,17 @@ def compute_visible_passes(UTC_list, obj_id_list, sensor_id_list, tle_dict={},
             
             # Compute topocentric RSO measurements
             difference = [r_itrf - sensor_itrf for r_itrf in rso_itrf_list]
-            diff_enu = [ecef2enu(diff_ecef) for diff_ecef in difference]
+            diff_enu = [ecef2enu(diff_ecef, sensor_itrf) for diff_ecef in difference]
             
             az_list = []
             el_list = []
             rg_list = []
             for enu in diff_enu:
                 rg = np.linalg.norm(enu)
-                az_list.append(atan2(enu[0], enu[1]))
+                az_list.append(atan2(enu[0], enu[1]) % (2*pi))
                 el_list.append(asin(enu[2]/rg))
                 rg_list.append(rg)
             
-
             
             # Compute topocentric sun position
             # Need both sun and sensor positions referenced from solar
@@ -278,12 +327,12 @@ def compute_visible_passes(UTC_list, obj_id_list, sensor_id_list, tle_dict={},
             rg_lim = sensor['rg_lim']
             
             # Find indices where az/el/range constraints are met
-            el_inds0 = np.where(el_list > el_lim[0])[0]
-            el_inds1 = np.where(el_list < el_lim[1])[0]
-            az_inds0 = np.where(az_list > az_lim[0])[0]
-            az_inds1 = np.where(az_list < az_lim[1])[0]
-            rg_inds0 = np.where(rg_list > rg_lim[0])[0]
-            rg_inds1 = np.where(rg_list < rg_lim[1])[0]            
+            el_inds0 = np.where(np.asarray(el_list) > el_lim[0])[0]
+            el_inds1 = np.where(np.asarray(el_list) < el_lim[1])[0]
+            az_inds0 = np.where(np.asarray(az_list) > az_lim[0])[0]
+            az_inds1 = np.where(np.asarray(az_list) < az_lim[1])[0]
+            rg_inds0 = np.where(np.asarray(rg_list) > rg_lim[0])[0]
+            rg_inds1 = np.where(np.asarray(rg_list) < rg_lim[1])[0]            
             
             # Find all common elements to create candidate visible index list
             # based on position constraints
@@ -294,7 +343,7 @@ def compute_visible_passes(UTC_list, obj_id_list, sensor_id_list, tle_dict={},
             common_pos = common1.intersection(common_rg)
             
 #            print(sensor_id)
-#            print(common_pos)
+            print(common_pos)
             
             # Sunlit/station dark constraint
             if 'sun_elmask' in sensor:
@@ -302,16 +351,16 @@ def compute_visible_passes(UTC_list, obj_id_list, sensor_id_list, tle_dict={},
                 
                 # Compute sun elevation angle                
                 sun_diff = [sun_itrf - sensor_itrf for sun_itrf in sun_itrf_list]
-                sun_enu = [ecef2enu(diff_ecef) for diff_ecef in sun_diff]
+                sun_enu = [ecef2enu(diff_ecef, sensor_itrf) for diff_ecef in sun_diff]
                 sun_el_list = [asin(enu[2]/np.linalg.norm(enu)) for enu in sun_enu]
                 
                 # Check sun constraint (ensures station is dark if needed)
-                sun_el_inds = np.where(sun_el_list < sun_elmask)[0]                
+                sun_el_inds = np.where(np.asarray(sun_el_list) < sun_elmask)[0]                
                 common_inds = list(common_pos.intersection(set(sun_el_inds)))
                 
 #                print(sensor_id)
 #                print('sun_elmask', sun_elmask)
-#                print(common_inds)
+                print(common_inds)
                 
             # Laser constraints
             if 'laser_output' in sensor and rso['laser_lim'] > 0.:
@@ -354,9 +403,17 @@ def compute_visible_passes(UTC_list, obj_id_list, sensor_id_list, tle_dict={},
             vis_array = np.zeros(len(UTC_list),)
             vis_array[common_inds] = True
             
+            
+#            print('sun_el_list', sun_el_list)
+#            print('sun_el_mask', sun_elmask)
+#            print('common_pos', common_pos)
+#            print('sun_el_inds', sun_el_inds)
+#            print('common_inds', common_inds)
+            
             # For remaining indices compute angles and visibility conditions
             ecclipse_inds = []
             mapp_inds = []
+            moon_inds = []
             for ii in common_inds:
                 rso_gcrf = rso_gcrf_list[ii]
                 sensor_gcrf = sensor_gcrf_list[ii]
@@ -373,7 +430,7 @@ def compute_visible_passes(UTC_list, obj_id_list, sensor_id_list, tle_dict={},
                 # First check valid orbit - radius greater than Earth radius
                 r = np.linalg.norm(rso_gcrf)
                 if r < Re:
-                    vis_array[ii] = False
+                    vis_array[ii] = False                    
                 else:
                     half_cone = asin(Re/r)
                     if sun_angle < half_cone:
@@ -385,6 +442,7 @@ def compute_visible_passes(UTC_list, obj_id_list, sensor_id_list, tle_dict={},
                     moon_angle_lim = sensor['moon_angle_lim']
                     if moon_angle < moon_angle_lim:
                         vis_array[ii] = False
+                        moon_inds.append(ii)
                                 
                 # Check apparent magnitude
                 # Optional input for albedo could be retrieved for each object
@@ -406,8 +464,10 @@ def compute_visible_passes(UTC_list, obj_id_list, sensor_id_list, tle_dict={},
             el_vis = [el_list[ii] for ii in vis_inds]
             
             
-#            print('ecclipse', ecclipse_inds)
-#            print('mapp', mapp_inds)
+            print('vis_inds', vis_inds)
+            print('ecclipse', ecclipse_inds)
+            print('mapp', mapp_inds)
+            print('moon_inds', moon_inds)
             
             # Compute pass start and stop times
             start_list, stop_list, TCA_list, TME_list, rg_min_list, el_max_list = \
@@ -425,8 +485,9 @@ def compute_visible_passes(UTC_list, obj_id_list, sensor_id_list, tle_dict={},
             sensor_id_list_all.extend([sensor_id]*npass)
 
     # Sort results
-    start_list_JD = [ti.tdb for ti in start_list_all]
-    sort_ind = np.argsort(start_list_JD)
+#    start_list_JD = [ti for ti in start_list_all]
+#    sort_ind = np.argsort(start_list_JD)
+    sort_ind = np.argsort(start_list_all)
     sorted_start = [start_list_all[ii] for ii in sort_ind]
     sorted_stop = [stop_list_all[ii] for ii in sort_ind]
     sorted_TCA = [TCA_list_all[ii] for ii in sort_ind]
@@ -835,10 +896,8 @@ def compute_pass(UTC_vis, rg_vis, el_vis, sensor):
     
     Parameters
     ------
-    UTC_vis : 1D numpy array
-        times when object is visible to this sensor
-        stored as skyfield time objects that can be extracted in multiple
-        time systems or representations
+    UTC_vis : list
+        datetime object times when object is visible to this sensor         
     rg_vis : 1D numpy array
         range values when object is visible to this sensor [km]
     el_vis : 1D numpy array
@@ -893,7 +952,7 @@ def compute_pass(UTC_vis, rg_vis, el_vis, sensor):
             el_rad = el_vis[ii]
             
             # If current time is close to previous, pass continues
-            if (ti.tdb - ti_prior.tdb)*86400. < (max_gap+1.):
+            if (ti - ti_prior).total_seconds() < (max_gap+1.):
     
                 # Update pass stop time and JD_prior for next iteration
                 stop = ti
@@ -911,7 +970,7 @@ def compute_pass(UTC_vis, rg_vis, el_vis, sensor):
     
             # If current time is far from previous or if we reached
             # the end of UTC list, pass has ended
-            if ((ti.tdb - ti_prior.tdb)*86400. >= (max_gap+1.) or ii == (len(UTC_vis)-1)):
+            if ((ti - ti_prior).total_seconds() >= (max_gap+1.) or ii == (len(UTC_vis)-1)):
                 
                 # TODO - LOGIC ERROR
                 # Test this code for stop time if reached the end of UTC_vis
@@ -1407,10 +1466,10 @@ def generate_visibility_file(vis_dict, vis_file, vis_file_min_el):
                          'Max Elevation [deg]'])
     
         for ii in range(len(start_list)):
-            UTC_start = start_list[ii].utc_iso()
-            UTC_stop = stop_list[ii].utc_iso()
-            UTC_TCA = TCA_list[ii].utc_iso()
-            UTC_TME = TME_list[ii].utc_iso()
+            UTC_start = start_list[ii].strftime('%Y-%m-%d %H:%M:%S')
+            UTC_stop = stop_list[ii].strftime('%Y-%m-%d %H:%M:%S')
+            UTC_TCA = TCA_list[ii].strftime('%Y-%m-%d %H:%M:%S')
+            UTC_TME = TME_list[ii].strftime('%Y-%m-%d %H:%M:%S')
             rg_min = str(int(round(rg_min_list[ii])))
             el_max = str(int(round(el_max_list[ii]*180./pi)))
             obj_id = str(obj_id_list[ii])

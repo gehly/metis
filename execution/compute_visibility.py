@@ -1,9 +1,9 @@
 import numpy as np
-from datetime import datetime
+from datetime import datetime, timedelta
 import sys
 import os
 
-from skyfield.api import Loader, utc
+#from skyfield.api import Loader, utc
 
 sys.path.append('../')
 
@@ -18,12 +18,12 @@ if __name__ == '__main__':
     cwd = os.getcwd()
     metis_ind = cwd.find('metis')
     metis_dir = cwd[0:metis_ind+6]
-    load = Loader(os.path.join(metis_dir, 'skyfield_data'))
-    ephemeris = load('de430t.bsp')
-    ts = load.timescale()
+#    load = Loader(os.path.join(metis_dir, 'skyfield_data'))
+#    ephemeris = load('de430t.bsp')
+#    ts = load.timescale()
             
     
-    obj_id_list = [24870, 24871, 24873]
+#    obj_id_list = [24870, 24871, 24873]
     
 #    tle_dict = {}
 #    tle_dict[25544] = {}
@@ -31,34 +31,45 @@ if __name__ == '__main__':
 #    tle_dict[25544]['line2_list'] = ['2 25544  51.6412 280.2571 0004861 165.0174 287.2188 15.53860328132822']
 #    UTC = tletime2datetime(tle_dict[25544]['line1_list'][0])
     
-    UTC = datetime(2021, 3, 20, 12, 0, 0)
+#    UTC = datetime(2021, 3, 20, 12, 0, 0)
     
-    sensor_id_list = ['UNSW Falcon', 'UNSW Viper', 'NJC Falcon', 'CMU Falcon', 'RMIT ROO']
+#    sensor_id_list = ['UNSW Falcon', 'UNSW Viper', 'NJC Falcon', 'CMU Falcon', 'RMIT ROO']
     
     
     # Times for visibility check
-    ndays = 3
-    dt = 10
-    UTC0 = ts.utc(UTC.replace(tzinfo=utc)).utc
-    print(UTC0)
-    sec_array = list(range(0,86400*ndays,dt))
-    skyfield_times = ts.utc(UTC0[0], UTC0[1]+2, UTC0[2],
-                            UTC0[3], UTC0[4], sec_array)
+#    ndays = 3
+#    dt = 10
+#    UTC0 = ts.utc(UTC.replace(tzinfo=utc)).utc
+#    print(UTC0)
+#    sec_array = list(range(0,86400*ndays,dt))
+#    skyfield_times = ts.utc(UTC0[0], UTC0[1]+2, UTC0[2],
+#                            UTC0[3], UTC0[4], sec_array)
+#    
+#    print(skyfield_times[0])
+#    mistake
     
-    print(skyfield_times[0])
-    mistake
     
-    vis_dict = compute_visible_passes(skyfield_times, obj_id_list,
-                                      sensor_id_list, ephemeris)
+    obj_id_list = [45727, 47967]
+    sensor_id_list = ['UNSW Falcon', 'NJC Falcon']
+    
+    UTC0 = datetime(2021, 7, 19, 2, 30, 0)
+    delta_t = 3600.
+    dt = 10.
+    UTC_list = [UTC0 + timedelta(seconds=ti) for ti in list(np.arange(0, delta_t, dt))]
+    
+    vis_dict = compute_visible_passes(UTC_list, obj_id_list, sensor_id_list, tle_dict={},
+                                      TAI_UTC=37., offline_flag=False, source='spacetrack',
+                                      username='', password='')
     
     
     print(vis_dict)
-    
+
     
     # Generate output file
     vis_file_min_el = 10.
-    outdir = os.path.join(metis_dir, 'skyfield_data')
-    vis_file = os.path.join(outdir, 'test_visible_passes.csv')
+#    outdir = os.path.join(metis_dir, 'skyfield_data')
+#    vis_file = os.path.join(outdir, 'test_visible_passes.csv')
+    vis_file = 'test_visible_passes3.csv'
     generate_visibility_file(vis_dict, vis_file, vis_file_min_el)
     
     
