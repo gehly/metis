@@ -85,15 +85,20 @@ def get_spacetrack_tle_data(obj_id_list = [], UTC_list = [], username='',
     if len(obj_id_list) >= 1:
         myString = ",".join(map(str, obj_id_list))
 
-        # If only one time is given, add 2 day increment to produce window
+        # If only one time is given, add/subtract 2 day increment to produce window
         if len(UTC_list) ==  1:
             UTC_list.append(UTC_list[0] + timedelta(days=2.))
+            UTC_list[0] = UTC_list[0] - timedelta(days=2.)
 
         # If times are specified, retrieve from window
         if len(UTC_list) >= 2:
             
-            if (UTC_list[-1]-UTC_list[0]).total_seconds() < 86400.*2.:
-                UTC_list[-1] = UTC_list[0] + timedelta(days=2.)
+#            if (UTC_list[-1]-UTC_list[0]).total_seconds() < 86400.*2.:
+#                UTC_list[-1] = UTC_list[0] + timedelta(days=2.)
+            
+            # Create expanded window
+            UTC_list[0] = UTC_list[0] - timedelta(days=2.)
+            UTC_list[-1] = UTC_list[-1] + timedelta(days=2.)
             
             UTC0 = UTC_list[0].strftime('%Y-%m-%d')
             UTC1 = UTC_list[-1].strftime('%Y-%m-%d')

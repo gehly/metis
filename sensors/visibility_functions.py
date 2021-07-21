@@ -343,7 +343,7 @@ def compute_visible_passes(UTC_list, obj_id_list, sensor_id_list, tle_dict={},
             common_pos = common1.intersection(common_rg)
             
 #            print(sensor_id)
-            print(common_pos)
+#            print(common_pos)
             
             # Sunlit/station dark constraint
             if 'sun_elmask' in sensor:
@@ -360,7 +360,7 @@ def compute_visible_passes(UTC_list, obj_id_list, sensor_id_list, tle_dict={},
                 
 #                print(sensor_id)
 #                print('sun_elmask', sun_elmask)
-                print(common_inds)
+#                print(common_inds)
                 
             # Laser constraints
             if 'laser_output' in sensor and rso['laser_lim'] > 0.:
@@ -464,10 +464,10 @@ def compute_visible_passes(UTC_list, obj_id_list, sensor_id_list, tle_dict={},
             el_vis = [el_list[ii] for ii in vis_inds]
             
             
-            print('vis_inds', vis_inds)
-            print('ecclipse', ecclipse_inds)
-            print('mapp', mapp_inds)
-            print('moon_inds', moon_inds)
+#            print('vis_inds', vis_inds)
+#            print('ecclipse', ecclipse_inds)
+#            print('mapp', mapp_inds)
+#            print('moon_inds', moon_inds)
             
             # Compute pass start and stop times
             start_list, stop_list, TCA_list, TME_list, rg_min_list, el_max_list = \

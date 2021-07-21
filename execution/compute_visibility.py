@@ -49,20 +49,18 @@ if __name__ == '__main__':
 #    mistake
     
     
-    obj_id_list = [45727, 47967]
-    sensor_id_list = ['UNSW Falcon', 'NJC Falcon']
+    obj_id_list = [45727, 47967, 29648, 46113, 24846, 23528, 26624, 35491]
+    sensor_id_list = ['UNSW Falcon', 'NJC Falcon', 'OJC Falcon', 'PSU Falcon', 'CMU Falcon']
     
-    UTC0 = datetime(2021, 7, 19, 2, 30, 0)
-    delta_t = 3600.
+    UTC0 = datetime(2021, 7, 21, 0, 0, 0)
+    delta_t = 3.*86400.
     dt = 10.
     UTC_list = [UTC0 + timedelta(seconds=ti) for ti in list(np.arange(0, delta_t, dt))]
     
-    vis_dict = compute_visible_passes(UTC_list, obj_id_list, sensor_id_list, tle_dict={},
-                                      TAI_UTC=37., offline_flag=False, source='spacetrack',
-                                      username='', password='')
+    vis_dict = compute_visible_passes(UTC_list, obj_id_list, sensor_id_list)
     
     
-    print(vis_dict)
+#    print(vis_dict)
 
     
     # Generate output file

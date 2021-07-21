@@ -29,7 +29,7 @@ def define_sensors(sensor_id_list=[]):
     rg_lim = [0., 1e6]   # km
     mapp_lim = 16.
     moon_angle_lim = 0.32  # rad
-    sun_el_mask = -5.*pi/180.  # rad
+    sun_el_mask = -10.*pi/180.  # rad
     
     # Measurement types and noise
     meas_types = ['ra', 'dec', 'mapp']
@@ -91,7 +91,7 @@ def define_sensors(sensor_id_list=[]):
     rg_lim = [0., 1e6]   # km
     mapp_lim = 16.
     moon_angle_lim = 0.32  # rad
-    sun_el_mask = -5.*pi/180.  # rad
+    sun_el_mask = -10.*pi/180.  # rad
     
     # Measurement types and noise
     meas_types = ['ra', 'dec', 'mapp']
@@ -154,7 +154,7 @@ def define_sensors(sensor_id_list=[]):
     rg_lim = [0., 1e6]   # km
     mapp_lim = 16.
     moon_angle_lim = 0.32  # rad
-    sun_el_mask = -5.*pi/180.  # rad
+    sun_el_mask = -10.*pi/180.  # rad
     
     # Measurement types and noise
     meas_types = ['ra', 'dec', 'mapp']
