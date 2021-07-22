@@ -5,16 +5,24 @@ import pandas as pd
 import os
 import sys
 import pickle
+import copy
 from datetime import datetime
 
 sys.path.append('../')
 
+
 cwd = os.getcwd()
 ind = cwd.find('metis')
-metis_dir = cwd[0:ind+5]
+    
+if ind > -1:
+    metis_dir = cwd[0:ind+5]
+else:
+    metis_dir = r'C:\Users\Steve\Documents\code\metis'
+        
 input_data_dir = os.path.join(metis_dir, 'input_data')
 
-from utilities.time_systems import dt2mjd, utcdt2ut1jd
+
+from utilities.time_systems import dt2mjd, mjd2dt, utcdt2ut1jd, utcdt2ttjd, jd2cent
 from utilities.numerical_methods import interp_lagrange
 
 ###############################################################################
@@ -90,7 +98,7 @@ def get_celestrak_eop_alldata(offline_flag=False):
         pklFile.close() 
         
     else:
-    
+        
         # Retrieve data from internet
         pageData = 'https://celestrak.com/SpaceData/eop19620101.txt'
 #        pageData = 'http://www.celestrak.com/SpaceData/EOP-Last5Years.txt'
@@ -128,6 +136,50 @@ def save_celestrak_eop_alldata():
     pklFile.close()
     
     return
+
+
+def get_TAI_UTC(data_text, UTC):
+    '''
+    This function retrieves the TAI_UTC offset seconds for a specific time 
+    from the EOP data
+    
+    
+    Parameters
+    ------
+    data_text : string
+        string containing observed and predicted EOP data, no header
+        information
+    UTC : datetime object
+        time in UTC
+    
+    Returns
+    ------
+    TAI_UTC : dictionary
+        Delta Atomic Time, TAI-UTC (seconds)
+    '''
+    
+    # Compute MJD for desired time
+    MJD = dt2mjd(UTC)
+    MJD_int = int(MJD)
+    
+    # Find EOP data lines around time of interest
+    nchar = 102
+    nskip = 1
+    nlines = 0
+    for ii in range(len(data_text)):
+        start = ii + nlines*(nchar+nskip)
+        stop = ii + nlines*(nchar+nskip) + nchar
+        line = data_text[start:stop]
+        nlines += 1
+        
+        MJD_line = int(line[11:16])
+        
+        if MJD_line == MJD_int:
+            line0 = line
+            TAI_UTC = int(line0[99:102])        
+            break
+
+    return TAI_UTC
 
 
 def get_eop_data(data_text, UTC):
@@ -492,7 +544,7 @@ def compute_precession_IAU1976(TT_cent):
 
 def compute_nutation_IAU1980(IAU1980nut, TT_cent, ddPsi, ddEps):
     '''
-    This function computes the IAU1976 precession matrix required for the 
+    This function computes the IAU1980 nutation matrix required for the 
     frame transformation between Mean of Date (MOD) and True of Date (TOD).
     
     r_MOD = N80 * r_TOD
@@ -514,7 +566,7 @@ def compute_nutation_IAU1980(IAU1980nut, TT_cent, ddPsi, ddEps):
         nutation matrix to compute frame rotation
     FA : 5x1 numpy array
         fundamental arguments of nutation (Delauney arguments)
-    Eps_A : float
+    Eps0 : float
         mean obliquity of the ecliptic [rad]
     Eps_true : float
         true obliquity of the ecliptic [rad]
@@ -546,16 +598,16 @@ def compute_nutation_IAU1980(IAU1980nut, TT_cent, ddPsi, ddEps):
     dEps = ddEps + dEps_sum*0.0001*arcsec2rad
         
     # Mean Obliquity of the Ecliptic, rad
-    Eps_A = (((0.001813*TT_cent - 0.00059)*TT_cent - 46.8150)*TT_cent + 
+    Eps0 = (((0.001813*TT_cent - 0.00059)*TT_cent - 46.8150)*TT_cent + 
              84381.448)*arcsec2rad
     
     # True Obliquity of the Ecliptic, rad
-    Eps_true = Eps_A + dEps
+    Eps_true = Eps0 + dEps
     
     # Construct Nutation matrix
-    # N = ROT1(-Eps_A) * ROT3(dPsi) * ROT1(Eps_true)
-    cep  = cos(Eps_A)
-    sep  = sin(Eps_A)
+    # N = ROT1(-Eps_0 * ROT3(dPsi) * ROT1(Eps_true)
+    cep  = cos(Eps0)
+    sep  = sin(Eps0)
     cPsi = cos(dPsi)
     sPsi = sin(dPsi)
     cept = cos(Eps_true)
@@ -566,7 +618,7 @@ def compute_nutation_IAU1980(IAU1980nut, TT_cent, ddPsi, ddEps):
                   [-sPsi*cep, cept*cPsi*cep+sept*sep, sept*cPsi*cep-sep*cept],
                   [-sPsi*sep, sep*cept*cPsi-sept*cep, sept*sep*cPsi+cept*cep]])
     
-    return N80, FA, Eps_A, Eps_true, dPsi, dEps
+    return N80, FA, Eps0, Eps_true, dPsi, dEps
 
 
 def compute_fundarg_IAU1980(TT_cent):
@@ -582,7 +634,7 @@ def compute_fundarg_IAU1980(TT_cent):
     Returns
     ------
     DA_vec : 5x1 numpy array
-        fundamental arguments of nutation (Delauney arguments)
+        fundamental arguments of nutation (Delauney arguments) [rad]
     
     '''
     
@@ -614,7 +666,7 @@ def compute_fundarg_IAU1980(TT_cent):
     return DA_vec
 
 
-def eqnequinox_IAU1982_simple(dPsi, Eps_A):
+def eqnequinox_IAU1982_simple(dPsi, Eps0):
     '''
     This function computes the IAU1982 equation of the equinoxes matrix 
     required for the frame transformation between True of Date (TOD) and
@@ -626,7 +678,7 @@ def eqnequinox_IAU1982_simple(dPsi, Eps_A):
     ------
     dPsi : float
         nutation in longitude [rad]
-    Eps_A : float
+    Eps0 : float
         mean obliquity of the ecliptic [rad]
     
     Returns
@@ -636,7 +688,7 @@ def eqnequinox_IAU1982_simple(dPsi, Eps_A):
     '''
     
     # Equation of the Equinoxes (simple form for use with TEME) (see [1])
-    Eq1982 = dPsi*cos(Eps_A) # rad
+    Eq1982 = dPsi*cos(Eps0) # rad
     
     # Construct Rotation matrix
     # R  = ROT3(-Eq1982) (Eq. 3-80 in [1])
@@ -788,17 +840,298 @@ def compute_BPN(X, Y, s):
     return BPN
 
 
+def batch_eop_rotation_matrices(UTC_list, eop_alldata_text,
+                                eop_flag='linear',
+                                GMST_only_flag=False):
+    '''
+    This function generates a list of rotation matrices between TEME/GCRF and
+    GCRF/ITRF for use in coordinate transformations.  The function can process
+    a large array of times and has flags to control the level of fidelity of
+    the transformation, in order to facilitate good computational performance
+    for a large number of transforms.
+    
+    Parameters
+    ------
+    UTC_list : list
+        list of datetime object to compute Frame Rotation matrices for
+    eop_alldata_text : string
+        string containing observed and predicted EOP data, no header
+        information
+    increment : float, optional
+        time increment between desired frame rotations [sec] (default=10.)
+    eop_flag : string, optional
+        flag to determine how to determine EOP parameters from input text data
+        'zeros' = set all EOP values to zero (~2km error)
+        'nearest' = set EOP values to nearest whole day (~3m error)
+        'linear' = linearly interpolate EOP values between 2 nearest days (~20cm error)
+        (default = 'linear')
+    GMST_only_flag : boolean, optional
+        flag to determine whether to apply only the Earth rotation angle for
+        the GCRF/ITRF transformation (i.e., no precession, nutation, polar motion)
+        True = apply GMST Earth rotation angle only (no P, N, W)
+        False = apply full transformation including P, N, W
+        (default = False)
+    
+    Returns
+    ------
+    GCRF_TEME_list : list of 3x3 numpy arrays
+        transformation matrix at each time for GCRF/TEME
+        r_GCRF = GCRF_TEME * r_TEME
+    ITRF_GCRF_list : list of 3x3 numpy arrays
+        transformation matrix at each time for GCRF/TEME
+        r_ITRF = ITRF_GCRF * r_GCRF
+    
+    '''    
+    
+    # Initialize Output
+    GCRF_TEME_list = []
+    ITRF_GCRF_list = []
+    
+    # Constants    
+    arcsec2rad = (1./3600.) * pi/180.
+    
+    # Retrieve IAU Nutation data from file
+    IAU1980_nut = get_nutation_data()
+    
+    # Retrieve polar motion data from file
+    XYs_df = get_XYs2006_alldata()
+    
+    # Generate MJD list
+    MJD_list = [dt2mjd(UTC) for UTC in UTC_list]
+    
+    # Loop over times
+    for kk in range(len(MJD_list)):
+        
+        MJD_kk = MJD_list[kk]
+        UTC_kk = UTC_list[kk]
+#        UTC_kk = mjd2dt(MJD_kk)
+        
+        # Compute the appropriate EOP values for this time using the input
+        # text data.  Per Reference 4 Table 2-3, the following error levels are
+        # expected for different levels of fidelity in the approximation
+        
+        # Set all EOPs to zero
+        # Expected error level ~2km in GEO
+        if eop_flag == 'zeros':
+            
+            xp = 0.
+            yp = 0.
+            UT1_UTC = 0.
+            LOD = 0.
+            ddPsi = 0.
+            ddEps = 0.
+            dX = 0.
+            dY = 0.
+            TAI_UTC = 0.
+        
+        # Read EOP text data for higher level approximations
+        else:
+            nchar = 102
+            nskip = 1
+            nlines = 0
+            MJD_int = int(MJD_kk)
+            
+            # Get closest lines from EOP text data
+            # First index have to search text data
+            if kk == 0:
+                
+                MJD_prior = copy.copy(MJD_int)
+                
+                # Find EOP data lines around time of interest                
+                for ii in range(len(eop_alldata_text)):
+                    start = ii + nlines*(nchar+nskip)
+                    stop = ii + nlines*(nchar+nskip) + nchar
+                    line = eop_alldata_text[start:stop]
+                    nlines += 1
+                    
+                    MJD_line = int(line[11:16])
+                    
+                    if MJD_line == MJD_int:
+                        line0 = line
+                    if MJD_line == MJD_int+1:
+                        line1 = line
+                        break
+                
+            # Otherwise, we can use previous knowledge
+            else:
+                
+                # If it's the same day as last time we can just reuse line0
+                # and line1.  Otherwise, we have to increment nlines to get
+                # the new line1                
+                if MJD_int == MJD_prior + 1:
+                    
+                    print(MJD_int)
+                    print(MJD_prior)
+                    print(line0)
+                    print(line1)
+                    
+                    # Find EOP data lines around time of interest                
+                    for ii in range(len(eop_alldata_text)):
+                        start = ii + nlines*(nchar+nskip)
+                        stop = ii + nlines*(nchar+nskip) + nchar
+                        line = eop_alldata_text[start:stop]
+                        nlines += 1
+                        
+                        MJD_line = int(line[11:16])
+
+                        
+                        if MJD_line == MJD_int:
+                            line0 = line
+                        if MJD_line == MJD_int+1:
+                            line1 = line
+                            break
+                    
+                    
+                    
+#                    line0 = copy.copy(line1)
+#                    nlines += 1
+#                    start = ii + nlines*(nchar+nskip)
+#                    stop = ii + nlines*(nchar+nskip) + nchar
+#                    line1 = eop_alldata_text[start:stop]
+#                    
+#                    MJD_line = int(line[11:16])
+#                    if MJD_line != MJD_int:
+#                        print(MJD_line)
+#                        print(MJD_int)
+#                        sys.exit('Wrong MJD value encountered!')
+                    
+                    MJD_prior = MJD_int
+                    
+#                    print('\n')
+#                    print(nlines)
+#                    print(start)
+#                    print(stop)
+#                    print(line0)
+#                    print(line1)
+#                    
+#                    mistake
+                
+            # Read the EOP values for each line
+            line0_array = eop_read_line(line0)
+            line1_array = eop_read_line(line1)
+            
+            # Set all EOPs to values for nearest day
+            # Expected error level ~3.6m max (0.8m RMS) in GEO
+            if eop_flag == 'nearest':
+                if (MJD_kk - MJD_int) < 0.5:
+                    xp = line0_array[1]*arcsec2rad
+                    yp = line0_array[2]*arcsec2rad
+                    UT1_UTC = line0_array[3]
+                    LOD = line0_array[4]
+                    ddPsi = line0_array[5]*arcsec2rad
+                    ddEps = line0_array[6]*arcsec2rad
+                    dX = line0_array[7]*arcsec2rad
+                    dY = line0_array[8]*arcsec2rad
+                    TAI_UTC = line0_array[9]
+                    
+                else:
+                    xp = line1_array[1]*arcsec2rad
+                    yp = line1_array[2]*arcsec2rad
+                    UT1_UTC = line1_array[3]
+                    LOD = line1_array[4]
+                    ddPsi = line1_array[5]*arcsec2rad
+                    ddEps = line1_array[6]*arcsec2rad
+                    dX = line1_array[7]*arcsec2rad
+                    dY = line1_array[8]*arcsec2rad
+                    TAI_UTC = line1_array[9]
+            
+            # Linear interpolation of values between two nearest days
+            # Expected error level ~22cm max (4cm RMS) in GEO
+            if eop_flag == 'linear':
+                                
+                # Adjust UT1-UTC column in case leap second occurs between lines
+                line0_array[3] -= line0_array[9]
+                line1_array[3] -= line1_array[9]
+                
+                # Leap seconds do not interpolate
+                TAI_UTC = line0_array[9]
+            
+                # Linear interpolation
+                dt = MJD_kk - line0_array[0]
+                interp = (line1_array[1:] - line0_array[1:])/ \
+                    (line1_array[0] - line0_array[0]) * dt + line0_array[1:]
+            
+                # Convert final output
+                xp = interp[0]*arcsec2rad
+                yp = interp[1]*arcsec2rad
+                UT1_UTC = interp[2] + TAI_UTC
+                LOD = interp[3]
+                ddPsi = interp[4]*arcsec2rad
+                ddEps = interp[5]*arcsec2rad
+                dX = interp[6]*arcsec2rad
+                dY = interp[7]*arcsec2rad
+                
+        
+        
+        
+        # Compute rotation matrices for transform
+        # Compute current times
+        UT1_JD = utcdt2ut1jd(UTC_kk, UT1_UTC)
+        TT_JD = utcdt2ttjd(UTC_kk, TAI_UTC)
+        TT_cent = jd2cent(TT_JD)
+        
+        # GCRF/ITRF Transformation
+        # Contruct Earth rotaion angle matrix (TIRS to CIRS)
+        R_CIRS = compute_ERA(UT1_JD)
+        
+        if GMST_only_flag:
+            ITRF_GCRF = R_CIRS.T
+            
+        else:            
+            # Construct polar motion matrix (ITRS to TIRS)
+            W = compute_polarmotion(xp, yp, TT_cent)
+            
+            # Construct Bias-Precessino-Nutation matrix (CIRS to GCRS/ICRS)
+            XYs_data = init_XYs2006(UTC_kk, UTC_kk, XYs_df)
+            
+            X, Y, s = get_XYs(XYs_data, TT_JD)
+            
+            # Add in Free Core Nutation (FCN) correction
+            X = dX + X  # rad
+            Y = dY + Y  # rad
+            
+            # Compute Bias-Precssion-Nutation (BPN) matrix
+            BPN = compute_BPN(X, Y, s)
+            
+            # Transform position vector
+            ITRF_GCRF = np.dot(W.T, np.dot(R_CIRS.T, BPN.T))
+        
+        # TEME/GCRF Transformation
+        # IAU 1976 Precession
+        P = compute_precession_IAU1976(TT_cent)
+        
+        # IAU 1980 Nutation
+        N, FA, Eps0, Eps_true, dPsi, dEps = \
+            compute_nutation_IAU1980(IAU1980_nut, TT_cent, ddPsi, ddEps)
+    
+        # Equation of the Equinonx 1982
+        R_1982 = eqnequinox_IAU1982_simple(dPsi, Eps0)
+        
+        # Compute transformation matrix and output
+        GCRF_TEME = np.dot(P, np.dot(N, R_1982))
+        
+        # Store output
+        GCRF_TEME_list.append(GCRF_TEME)
+        ITRF_GCRF_list.append(ITRF_GCRF)
+    
+    return GCRF_TEME_list, ITRF_GCRF_list
+
+
 if __name__ == '__main__':
     
-    UTC = datetime(2019, 9, 3, 10, 9, 42)
+#    save_celestrak_eop_alldata()
+    
+    UTC = datetime(2020, 8, 10, 0, 0, 0)
     
     eop_alldata = get_celestrak_eop_alldata()
     EOP_data = get_eop_data(eop_alldata, UTC)
     
-    print(EOP_data)
+#    print(EOP_data)
     
     UT1_JD = utcdt2ut1jd(UTC, EOP_data['UT1_UTC'])
     
     R = compute_ERA(UT1_JD)
+    
+    print(R)
     
     

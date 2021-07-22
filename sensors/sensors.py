@@ -10,8 +10,8 @@ def define_sensors(sensor_id_list=[]):
     
     arcsec2rad = pi/(3600.*180.)
     
-    # Falcon Telescopes
-    # Common Parameters
+    # Set up sensors
+    print('RMIT ROO')
     
     # FOV dimensions
     LAM_dim = 0.73   # deg
@@ -44,9 +44,7 @@ def define_sensors(sensor_id_list=[]):
     max_gap = 60.
     obs_gap = 1.
     
-    
-    # Set up sensors
-    print('RMIT ROO')
+    # Station Coordinates
     lat_gs = -37.68
     lon_gs = 145.06
     ht_gs = 0.1724 # km	
@@ -75,7 +73,69 @@ def define_sensors(sensor_id_list=[]):
     sensor_dict['RMIT ROO']['max_pass'] = max_pass
 
 
-     # Falcon Telescopes
+    print('UNSW Viper')
+    
+    # FOV dimensions
+    LAM_dim = 4.0   # deg
+    PHI_dim = 4.0   # deg
+    
+    # Convert to radians
+    LAM_half = 0.5*LAM_dim*pi/180
+    PHI_half = 0.5*PHI_dim*pi/180
+    FOV_hlim = [-LAM_half, LAM_half]
+    FOV_vlim = [-PHI_half, PHI_half]
+    
+    # Constraints/Limits
+    az_lim = [0., 2.*pi]  # rad
+    el_lim = [10.*pi/180., pi/2.]  # rad
+    rg_lim = [0., 1e6]   # km
+    mapp_lim = 16.
+    moon_angle_lim = 0.32  # rad
+    sun_el_mask = -10.*pi/180.  # rad
+    
+    # Measurement types and noise
+    meas_types = ['ra', 'dec', 'mapp']
+    sigma_dict = {}
+    sigma_dict['ra'] = 5.*arcsec2rad   # rad
+    sigma_dict['dec'] = 5.*arcsec2rad  # rad
+    sigma_dict['mapp'] = 0.1
+    
+    # Pass parameters
+    max_pass = 6000.
+    min_pass = 60.
+    max_gap = 60.
+    obs_gap = 1.
+    
+    # Station Coordinates
+    lat_gs = -34.74
+    lon_gs = 148.84
+    ht_gs = 0.570 # km	
+    geodetic_latlonht = [lat_gs, lon_gs, ht_gs]
+    
+    # Location and constraints
+    sensor_dict['UNSW Viper'] = {}
+    sensor_dict['UNSW Viper']['geodetic_latlonht'] = geodetic_latlonht
+    sensor_dict['UNSW Viper']['mapp_lim'] = mapp_lim
+    sensor_dict['UNSW Viper']['moon_angle_lim'] = moon_angle_lim
+    sensor_dict['UNSW Viper']['el_lim'] = el_lim
+    sensor_dict['UNSW Viper']['az_lim'] = az_lim
+    sensor_dict['UNSW Viper']['rg_lim'] = rg_lim
+    sensor_dict['UNSW Viper']['FOV_hlim'] = FOV_hlim
+    sensor_dict['UNSW Viper']['FOV_vlim'] = FOV_vlim
+    sensor_dict['UNSW Viper']['sun_elmask'] = sun_el_mask
+    
+    # Measurements and noise
+    sensor_dict['UNSW Viper']['meas_types'] = meas_types
+    sensor_dict['UNSW Viper']['sigma_dict'] = sigma_dict
+    
+    # Pass parameters
+    sensor_dict['UNSW Viper']['max_gap'] = max_gap
+    sensor_dict['UNSW Viper']['obs_gap'] = obs_gap
+    sensor_dict['UNSW Viper']['min_pass'] = min_pass
+    sensor_dict['UNSW Viper']['max_pass'] = max_pass
+
+
+    # Falcon Telescopes
     # Common Parameters
     
     # FOV dimensions
@@ -195,6 +255,34 @@ def define_sensors(sensor_id_list=[]):
     sensor_dict['FLC Falcon']['obs_gap'] = obs_gap
     sensor_dict['FLC Falcon']['min_pass'] = min_pass
     sensor_dict['FLC Falcon']['max_pass'] = max_pass
+
+    print('CMU Falcon')
+    lat_gs = 39.96
+    lon_gs = 251.76
+    ht_gs = 1.380 # km
+    geodetic_latlonht = [lat_gs, lon_gs, ht_gs]
+    
+    # Location and constraints
+    sensor_dict['CMU Falcon'] = {}
+    sensor_dict['CMU Falcon']['geodetic_latlonht'] = geodetic_latlonht
+    sensor_dict['CMU Falcon']['mapp_lim'] = mapp_lim
+    sensor_dict['CMU Falcon']['moon_angle_lim'] = moon_angle_lim
+    sensor_dict['CMU Falcon']['el_lim'] = el_lim
+    sensor_dict['CMU Falcon']['az_lim'] = az_lim
+    sensor_dict['CMU Falcon']['rg_lim'] = rg_lim
+    sensor_dict['CMU Falcon']['FOV_hlim'] = FOV_hlim
+    sensor_dict['CMU Falcon']['FOV_vlim'] = FOV_vlim
+    sensor_dict['CMU Falcon']['sun_elmask'] = sun_el_mask
+    
+    # Measurements and noise
+    sensor_dict['CMU Falcon']['meas_types'] = meas_types
+    sensor_dict['CMU Falcon']['sigma_dict'] = sigma_dict
+    
+    # Pass parameters
+    sensor_dict['CMU Falcon']['max_gap'] = max_gap
+    sensor_dict['CMU Falcon']['obs_gap'] = obs_gap
+    sensor_dict['CMU Falcon']['min_pass'] = min_pass
+    sensor_dict['CMU Falcon']['max_pass'] = max_pass
 	
     print('NJC Falcon')
     lat_gs = 40.65
@@ -967,6 +1055,33 @@ def define_sensors(sensor_id_list=[]):
 
     
     return sensor_dict
+
+
+def define_sites_from_file(site_data_file):
+    
+    # Determine file type
+    fname, ext = os.path.splitext(site_data_file)
+    
+    if ext == '.json':
+        site_df = pd.read_json(site_data_file)
+
+        site_list = site_df['site'].tolist()
+        lat_list = site_df['lat'].tolist()
+        lon_list = site_df['lon'].tolist()
+
+        # Form dictionary output
+        site_dict = {}
+        for ii in range(len(site_list)):
+            site = site_list[ii]
+            lat = float(lat_list[ii])
+            lon = float(lon_list[ii])
+            ht = 0.
+            
+            site_dict[site] = {}
+            site_dict[site]['geodetic_latlonht'] = [lat, lon, ht]
+
+    
+    return site_dict
 
 
 def generate_sensor_file(sensor_file, sensor_id_list=[]):

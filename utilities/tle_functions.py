@@ -8,13 +8,18 @@ import os
 import matplotlib.pyplot as plt
 import pandas as pd
 import json
+import time
+import pickle
+import copy
 
 sys.path.append('../')
 
 from sensors.sensors import define_sensors
+from sensors.measurements import ecef2azelrange
 from utilities.eop_functions import get_celestrak_eop_alldata
 from utilities.eop_functions import get_nutation_data
 from utilities.eop_functions import get_eop_data
+from utilities.eop_functions import get_XYs2006_alldata
 from utilities.coordinate_systems import teme2gcrf
 from utilities.coordinate_systems import gcrf2teme
 from utilities.coordinate_systems import gcrf2itrf
@@ -47,7 +52,8 @@ def get_spacetrack_tle_data(obj_id_list = [], UTC_list = [], username='',
     ------
     obj_id_list : list, optional
         object NORAD IDs (int)
-        - if empty code will retrieve latest available for entire catalog
+        - if empty code will retrieve latest available for entire catalog 
+          (TLE epochs within last 30 days only)
     UTC_list : list, optional
         UTC datetime objects to specify desired times for TLEs to retrieve
         - if empty code will retrieve latest available
@@ -66,6 +72,10 @@ def get_spacetrack_tle_data(obj_id_list = [], UTC_list = [], username='',
     tle_df : pandas dataframe
         norad, tle line1, tle line2
     '''
+    
+    tle_dict = {}
+    tle_df = []
+    UTC_list = copy.copy(UTC_list)
 
     if len(username) == 0:
         username = input('space-track username: ')
@@ -75,68 +85,507 @@ def get_spacetrack_tle_data(obj_id_list = [], UTC_list = [], username='',
     if len(obj_id_list) >= 1:
         myString = ",".join(map(str, obj_id_list))
 
-        # If only one time is given, add 1 day increment to produce window
+        # If only one time is given, add/subtract 2 day increment to produce window
         if len(UTC_list) ==  1:
-            UTC_list.append(UTC_list[0] + timedelta(days=1.))
+            UTC_list.append(UTC_list[0] + timedelta(days=2.))
+            UTC_list[0] = UTC_list[0] - timedelta(days=2.)
 
         # If times are specified, retrieve from window
-        if len(UTC_list) == 2:
+        if len(UTC_list) >= 2:
+            
+#            if (UTC_list[-1]-UTC_list[0]).total_seconds() < 86400.*2.:
+#                UTC_list[-1] = UTC_list[0] + timedelta(days=2.)
+            
+            # Create expanded window
+            UTC_list[0] = UTC_list[0] - timedelta(days=2.)
+            UTC_list[-1] = UTC_list[-1] + timedelta(days=2.)
+            
             UTC0 = UTC_list[0].strftime('%Y-%m-%d')
-            UTC1 = UTC_list[1].strftime('%Y-%m-%d')
-            pageData = ('//www.space-track.org/basicspacedata/query/class/tle/'
-                        'EPOCH/' + UTC0 + '--' + UTC1 + '/NORAD_CAT_ID/' +
-                        myString + '/orderby/TLE_LINE1 ASC/format/tle')
+            UTC1 = UTC_list[-1].strftime('%Y-%m-%d')
+            pageData = ('//www.space-track.org/basicspacedata/query/class/' +
+                        'gp_history/NORAD_CAT_ID/' + myString + '/orderby/' +
+                        'TLE_LINE1 ASC/EPOCH/' + UTC0 + '--' + UTC1 + 
+                        '/format/tle')
+            
+        
 
         # Otherwise, get latest available
         else:
-            pageData = ('//www.space-track.org/basicspacedata/query/class/'
-                        'tle_latest/ORDINAL/1/NORAD_CAT_ID/' + myString +
-                        '/orderby/TLE_LINE1 ASC/format/tle')
+            pageData = ('//www.space-track.org/basicspacedata/query/class/gp/'
+                        'NORAD_CAT_ID/' + myString +
+                        '/orderby/NORAD_CAT_ID/format/tle')
+    
+    # If no objects specified, retrieve latest for full catalog
+    # Note this query will only return data for TLEs with epochs in the last
+    # 30 days
     else:
-        pageData = '//www.space-track.org/basicspacedata/query/class/tle_latest/ORDINAL/1/EPOCH/%3Enow-30/orderby/NORAD_CAT_ID/format/tle'
+        pageData = ('//www.space-track.org/basicspacedata/query/class/gp/'
+                    '/EPOCH/>now-30/orderby/NORAD_CAT_ID/format/tle')
+#        print('Error: No Objects Specified!')
 
     ST_URL='https://www.space-track.org'
 
     with requests.Session() as s:
         s.post(ST_URL+"/ajaxauth/login", json={'identity':username, 'password':password})
         r = s.get('https:' + pageData)
-        if r.status_code != requests.codes.ok:
+        if r.status_code == requests.codes.ok:
+            
+            # Parse response and form output
+            tle_list = []
+            nchar = 69
+            nskip = 2
+            ntle = int(round(len(r.text)/142.))
+            for ii in range(ntle):
+        
+                line1_start = ii*2*(nchar+nskip)
+                line1_stop = ii*2*(nchar+nskip) + nchar
+                line2_start = ii*2*(nchar+nskip) + nchar + nskip
+                line2_stop = ii*2*(nchar+nskip) + 2*nchar + nskip
+                line1 = r.text[line1_start:line1_stop]
+                line2 = r.text[line2_start:line2_stop]
+                UTC = tletime2datetime(line1)
+        
+                try:
+                    obj_id = int(line1[2:7])
+                except:
+                    continue
+        
+                if obj_id not in tle_dict:
+                    tle_dict[obj_id] = {}
+                    tle_dict[obj_id]['UTC_list'] = []
+                    tle_dict[obj_id]['line1_list'] = []
+                    tle_dict[obj_id]['line2_list'] = []
+        
+                tle_dict[obj_id]['UTC_list'].append(UTC)
+                tle_dict[obj_id]['line1_list'].append(line1)
+                tle_dict[obj_id]['line2_list'].append(line2)
+        
+                linelist = [obj_id,line1,line2,UTC]
+                tle_list.append(linelist)
+        
+            tle_df = pd.DataFrame(tle_list, columns=['norad','line1','line2','utc'])
+            
+            
+        else:
             print("Error: Page data request failed.")
 
-    # Parse response and form output
-    tle_dict = {}
-    tle_list = []
-    nchar = 69
-    nskip = 2
-    ntle = int(round(len(r.text)/142.))
-    for ii in range(ntle):
-
-        line1_start = ii*2*(nchar+nskip)
-        line1_stop = ii*2*(nchar+nskip) + nchar
-        line2_start = ii*2*(nchar+nskip) + nchar + nskip
-        line2_stop = ii*2*(nchar+nskip) + 2*nchar + nskip
-        line1 = r.text[line1_start:line1_stop]
-        line2 = r.text[line2_start:line2_stop]
-        UTC = tletime2datetime(line1)
-
-        obj_id = int(line1[2:7])
-
-        if obj_id not in tle_dict:
-            tle_dict[obj_id] = {}
-            tle_dict[obj_id]['UTC_list'] = []
-            tle_dict[obj_id]['line1_list'] = []
-            tle_dict[obj_id]['line2_list'] = []
-
-        tle_dict[obj_id]['UTC_list'].append(UTC)
-        tle_dict[obj_id]['line1_list'].append(line1)
-        tle_dict[obj_id]['line2_list'].append(line2)
-
-        linelist = [obj_id,line1,line2,UTC]
-        tle_list.append(linelist)
-
-    tle_df = pd.DataFrame(tle_list, columns=['norad','line1','line2','utc'])
+    
 
     return tle_dict, tle_df
+
+
+def generate_tle_list(num_obj, UTC_list, max_obj_id, filename, username, password):
+    '''
+    
+    
+    '''
+    
+    # Alice Springs
+    lat = -23.7
+    lon = 133.9
+    ht = 0.
+    site_ecef = latlonht2ecef(lat, lon, ht)
+        
+    
+    # Proportions of object catalog
+    LEO_polar = 0.5142
+    LEO_lilo = 0.0011
+    LEO_nota = 0.2490
+    Molniya = 0.0184
+    GTO = 0.1030
+    MEO_low = 0.0083
+    MEO_subsynch = 0.0176
+    MEO_nota = 0.0022
+    GEO_slot = 0.0320
+    GEO_graveyard = 0.0158
+    GEO_nota = 0.0277
+    HEO_nota = 0.0050
+    NOTA = 0.0056    
+    
+    # Dictionary of counts in each category
+    total_list = []
+    total_list.append(round(LEO_polar*num_obj))
+    total_list.append(round(LEO_lilo*num_obj))
+    total_list.append(round(LEO_nota*num_obj))
+    total_list.append(round(Molniya*num_obj))
+    total_list.append(round(GTO*num_obj))
+    total_list.append(round(MEO_low*num_obj))
+    total_list.append(round(MEO_subsynch*num_obj))
+    total_list.append(round(MEO_nota*num_obj))
+    total_list.append(round(GEO_slot*num_obj))
+    total_list.append(round(GEO_graveyard*num_obj))
+    total_list.append(round(GEO_nota*num_obj))
+    total_list.append(round(HEO_nota*num_obj))
+    total_list.append(round(NOTA*num_obj))
+    
+    sum_obj = sum(total_list)
+        
+    diff = num_obj - sum_obj
+    total_list[0] += diff
+    
+    # As of Dec 2018 about 43000 objects in catalog
+#    full_list = list(np.arange(1, max_obj_id))
+    full_list = read_tle_file(filename)
+    
+    print(total_list)
+    
+    # Retrieve tle dictionary for the object list
+    tle_dict, dum = \
+        get_spacetrack_tle_data([], [], username, password)
+        
+    full_list = list(tle_dict.keys())
+    print(full_list)
+    print(len(full_list))
+
+    # Loop until all objects added to list
+    obj_id_list = []
+    count_list = [0]*13
+    while len(obj_id_list) < num_obj:
+        
+        print(len(full_list))
+        print(count_list)
+        
+        if len(full_list) == 0:
+            break
+        
+        if sorted(full_list)[0] > max_obj_id:
+            break
+        
+        if sum(count_list) > (num_obj*0.99):
+            real_count_list = copy.copy(count_list)
+            count_list = [0]*13
+        
+        # Randomly select an object id number and attempt to retrieve it        
+        ind = int(np.random.rand()*len(full_list))
+        obj_id = full_list[ind]
+        
+        if obj_id > max_obj_id:
+            continue
+        
+        print('ind', ind)
+        print('obj_id', obj_id)
+    
+        # If found, sort into category
+        if obj_id in tle_dict:
+            
+            line2 = tle_dict[obj_id]['line2_list'][0]            
+            elem = parse_tle_line2(line2)
+            category = categorize_orbit(elem)
+    
+            # If category is not full add to list
+            if count_list[category] < total_list[category]:
+                
+#                # Test retrieval from Dec 2018
+#                UTC_test = [datetime(2018, 12, 22, 0, 0, 0), datetime(2019, 1, 1, 0, 0, 0)]
+#                tle_test, dum = \
+#                    get_spacetrack_tle_data([obj_id], UTC_test, username, password)
+#                
+#                if len(tle_test) == 0:
+#                    print('Delete ', full_list[ind])
+#                    del full_list[ind]
+#                    continue
+                
+                # Check for GEO over Australia
+                if category == 8:
+                    line1 = tle_dict[obj_id]['line1_list'][0]
+                    UTC = tletime2datetime(line1)
+                    
+                    output_state = propagate_TLE([obj_id], [UTC], tle_dict)
+                    r_ecef = output_state[obj_id]['r_ITRF'][0]
+                    az, el, rg = ecef2azelrange(r_ecef, site_ecef)
+                    
+                    if el < 30:
+                        
+                        print('Delete ', full_list[ind])
+                        del full_list[ind]
+                        continue
+                
+                obj_id_list.append(obj_id)
+                count_list[category] += 1
+                print('Delete ', full_list[ind])
+                del full_list[ind]
+                
+                print(obj_id)
+                print(category)
+                print(len(obj_id_list))
+            
+            else:
+                print('Delete ', full_list[ind])
+                del full_list[ind]
+            
+        else:
+            print('Delete ', full_list[ind])
+            del full_list[ind]
+        
+        if len(obj_id_list) == 1000:      
+            
+            obj_id_firsthalf = sorted(obj_id_list)[0:500]
+            obj_id_secondhalf = sorted(obj_id_list)[500:]
+            
+            # Test retrieve from Dec 2018
+            UTC_list = [datetime(2018, 12, 22, 0, 0, 0), datetime(2019, 1, 1, 0, 0, 0)]
+            
+            tle_dict_firsthalf, dum = \
+                get_spacetrack_tle_data(obj_id_firsthalf, UTC_list, username, password)
+                
+            tle_dict_secondhalf, dum = \
+                get_spacetrack_tle_data(obj_id_secondhalf, UTC_list, username, password)
+                
+            print(len(tle_dict_firsthalf))
+            print(len(tle_dict_secondhalf))
+            
+            missing_firsthalf = sorted(list(set(obj_id_firsthalf) - set(tle_dict_firsthalf.keys())))
+            missing_secondhalf = sorted(list(set(obj_id_secondhalf) - set(tle_dict_secondhalf.keys())))
+            
+            print(missing_firsthalf)
+            print(missing_secondhalf)
+            
+            obj_id_list = list(set(obj_id_list) - set(missing_firsthalf))
+            obj_id_list = list(set(obj_id_list) - set(missing_secondhalf))
+            
+            print('Restarting with Nobj = ')
+            print(len(obj_id_list))
+    
+    
+            
+    
+    final_count_list = [xi + yi for xi, yi in zip(real_count_list, count_list)]
+    print(obj_id_list)
+    print(final_count_list)
+    print(sum(final_count_list))
+    
+    
+    
+    return obj_id_list
+
+
+def read_tle_file(filename, username='', password=''):
+    
+    obj_id_list = []
+    with open(filename) as f:
+        for line in f:
+            obj_id = int(line[2:7])
+            obj_id_list.append(obj_id)
+            
+    obj_id_list = sorted(list(set(obj_id_list)))
+    
+    
+    return obj_id_list
+
+
+def categorize_orbit(elem):
+    '''
+    This function determines a unique orbit category for a given orbital
+    element state vector.
+    
+    Parameters
+    ------
+    elem : list
+    elem[0] : a
+      Semi-Major Axis             [km]
+    elem[1] : e
+      Eccentricity                [unitless]
+    elem[2] : i
+      Inclination                 [deg]
+    elem[3] : RAAN
+      Right Asc Ascending Node    [deg]
+    elem[4] : w
+      Argument of Periapsis       [deg]
+    elem[5] : M
+      Mean anomaly                [deg]
+
+    Returns
+    ------
+    category : int
+        0 : LEO_polar (ra < Re + 2000 km, 75 < i < 120 deg)
+        1 : LEO_lilo (ra < Re + 2000 km, 0 < i < 20 deg)
+        2 : LEO_nota (ra < Re + 2000 km, else)
+        3 : Molniya (Re < rp < 15000 km, 37000 < ra < 48000 km, 60 < i < 75 deg)
+        4 : GTO_nota (Re < rp < 10000 km, ra < 50000 km, i < 75 deg OR
+                      10000 < rp < 40000 km, 35000 < ra < 45000 km, i < 75 deg)
+        5 : MEO_low (ra < 10000 km)
+        6 : MEO_subsynch (rp > 23000 km, ra < 32000 km, 45 < i < 75 deg)
+        7 : MEO_nota (rp > 10000 km, ra < 40000 km, e < 0.1)
+        8 : GEO_slot (rp > Rgeo - 50 km, ra < Rgeo + 50 km, 0 < i < 20 deg)
+        9 : GEO_graveyard (rp > Rgeo + 50 km, ra < 45000 km, 0 < i < 20 deg)
+        10 : GEO_nota (rp > 40000 km, ra < 45000 km, 0 < i < 20 deg)
+        11 : HEO_nota (rp > 45000 km)
+        12 : NOTA (else)
+            
+    Reference
+    ------
+    Holzinger et al., "Uncorrelated-Track Classification, Characterization,
+    and Prioritization Using Admissible Regions and Bayesian Inference," 2016   
+    
+    
+    '''
+    
+    a = elem[0]
+    e = elem[1]
+    i = elem[2]
+    
+    Rgeo = 42164.2
+    
+    rp = a*(1-e)
+    ra = a*(1+e)
+    
+    # Compute checks
+    if (ra < (Re + 2000.) and i > 75. and i < 120.):
+        category = 0
+    elif (ra < (Re + 2000.) and i > 0. and i < 20.):
+        category = 1
+    elif ra < (Re + 2000.):
+        category = 2
+    elif (rp > Re and rp < 15000. and ra > 37000. and ra < 40000. and i > 60. and i < 75.):
+        category = 3
+    elif (rp > Re and rp < 10000. and ra < 50000. and i > 60. and i < 75.):
+        category = 4
+    elif (rp > 10000. and rp < 40000. and ra > 35000. and ra < 45000. and i < 75.):
+        category = 4
+    elif (ra < 10000.):
+        category = 5
+    elif (rp > 23000. and ra < 32000. and i > 45. and i < 75.):
+        category = 6
+    elif (rp > 10000. and ra < 40000. and e < 0.1):
+        category = 7
+    elif (rp > (Rgeo - 50.) and ra < (Rgeo + 50.) and i > 0. and i < 20.):
+        category = 8
+    elif (rp > (Rgeo + 50.) and ra < 45000. and i > 0. and i < 20.):
+        category = 9
+    elif (rp > 40000. and ra < 45000. and i > 0. and i < 20.):
+        category = 10
+    elif rp > 45000.:
+        category = 11
+    else:
+        category = 12
+    
+    return category
+
+
+def check_category(tle_list_file, username='', password=''):
+    
+    # Load TLE list
+    pklFile = open(tle_list_file, 'rb')
+    data = pickle.load(pklFile)
+    obj_id_list = data[0]
+    pklFile.close()
+    
+    obj_id_list = sorted(obj_id_list)
+    print(len(obj_id_list))
+    print(sorted(obj_id_list))
+    
+    
+    tle_dict, dum = \
+        get_spacetrack_tle_data([], [], username, password)
+        
+    count_list = [0]*13
+    for obj_id in obj_id_list:
+        line2 = tle_dict[obj_id]['line2_list'][0]
+        
+        elem = parse_tle_line2(line2)
+        category = categorize_orbit(elem)
+        
+        count_list[category] += 1
+    
+    print(count_list)
+    print(sum(count_list))
+    
+    
+    return
+
+
+def gen_tle_textfiles(tle_list_file, username='', password=''):
+    
+    # Load TLE list
+    pklFile = open(tle_list_file, 'rb')
+    data = pickle.load(pklFile)
+    obj_id_list = data[0]
+    pklFile.close()
+    
+    obj_id_list = sorted(obj_id_list)
+    print(len(obj_id_list))
+    
+    obj_id_firsthalf = sorted(obj_id_list)[0:500]
+    obj_id_secondhalf = sorted(obj_id_list)[500:]
+    
+    UTC0 = datetime(2019, 2, 20, 0, 0, 0)
+#    UTC1 = datetime(2019, 1, 1, 0, 0, 0)
+    UTC1 = UTC0 + timedelta(days=10)
+    
+    while UTC1 < datetime(2019, 12, 31):
+    
+        UTC_list = [UTC0, UTC1]
+        datestr = UTC1.strftime('%Y_%m_%d')
+        print('\n\n', datestr)
+        
+        tle_dict_firsthalf, dum = \
+            get_spacetrack_tle_data(obj_id_firsthalf, UTC_list, username, password)
+            
+        tle_dict_secondhalf, dum = \
+            get_spacetrack_tle_data(obj_id_secondhalf, UTC_list, username, password)
+            
+        print(len(tle_dict_firsthalf))
+        print(len(tle_dict_secondhalf))
+        
+        missing_firsthalf = sorted(list(set(obj_id_firsthalf) - set(tle_dict_firsthalf.keys())))
+        missing_secondhalf = sorted(list(set(obj_id_secondhalf) - set(tle_dict_secondhalf.keys())))
+        
+        print(missing_firsthalf)
+        print(missing_secondhalf)
+        
+        tle_dict_firsthalf.update(tle_dict_secondhalf)
+        tle_dict = tle_dict_firsthalf
+        print(len(tle_dict))
+        
+        fname = 'TLE_' + datestr + '.txt'
+        output_file = os.path.join( 'D:\documents\\research\sensor_management\site_location', fname )
+        
+        for obj_id in obj_id_list:
+            
+            if obj_id in tle_dict:
+                line1 = tle_dict[obj_id]['line1_list'][-1]
+                line2 = tle_dict[obj_id]['line2_list'][-1]
+            else:
+#                print(obj_id)
+                fname_prior = 'TLE_' + UTC0.strftime('%Y_%m_%d') + '.txt'
+#                print(fname_prior)
+                input_file = os.path.join( 'D:\documents\\research\sensor_management\site_location', fname_prior )
+                with open(input_file) as f:
+                    line_list = [line.rstrip() for line in f]
+                for ii in range(len(line_list)):
+                    line = line_list[ii]
+#                    print(int(line[2:7]))
+                    if int(line[2:7]) == obj_id:
+                        line1 = line
+                        line2 = line_list[ii+1]
+#                        print(int(line[2:7]))
+#                        print(line)
+#                        print(all_lines[ii+1])
+                        
+                        break
+                
+                
+                print(obj_id)
+                print(line1)
+                print(line2)
+                
+                    
+            
+#            print(line1)
+#            print(line2)
+            
+            outfile = open(output_file,'a')
+            outfile.write(line1 + '\n')
+            outfile.write(line2 + '\n')
+            outfile.close()
+            
+        
+        # Increment for next pass
+        UTC0 = UTC0 + timedelta(days=10)
+        UTC1 = UTC1 + timedelta(days=10)
+        
+    
+    return
 
 
 def get_tle_range(username='', password='', start_norad='', stop_norad=''):
@@ -1248,7 +1697,7 @@ def plot_all_tle_common_time(obj_id_list, UTC_list, tle_dict={}):
     return
 
 
-def find_closest_tle_epoch(line1_list, line2_list, UTC):
+def find_closest_tle_epoch(line1_list, line2_list, UTC, prev_flag=False):
     '''
     This function finds the TLE with the epoch closest to the given UTC time.
 
@@ -1260,6 +1709,9 @@ def find_closest_tle_epoch(line1_list, line2_list, UTC):
         list of TLE line2 strings
     UTC : datetime object
         UTC time for which closest TLE is desired
+    prev_flag : boolean, optional
+        only consider TLEs with epochs previous to UTC (true) or consider all
+        TLEs (false) (default=false)
 
     Returns
     ------
@@ -1274,10 +1726,18 @@ def find_closest_tle_epoch(line1_list, line2_list, UTC):
     for ii in range(len(line1_list)):
         line1 = line1_list[ii]
         tle_epoch = tletime2datetime(line1)
-        dt_sec = abs((UTC - tle_epoch).total_seconds())
-        if dt_sec < minimum:
-            ind = ii
-            minimum = dt_sec
+        dt_sec = (UTC - tle_epoch).total_seconds()
+
+        
+        if prev_flag:
+            if dt_sec >= 0 and abs(dt_sec) < minimum:
+                ind = ii
+                minimum = dt_sec
+                        
+        else:        
+            if abs(dt_sec) < minimum:
+                ind = ii
+                minimum = dt_sec
 
     line1 = line1_list[ind]
     line2 = line2_list[ind]
@@ -1285,8 +1745,8 @@ def find_closest_tle_epoch(line1_list, line2_list, UTC):
     return line1, line2
 
 
-def propagate_TLE(obj_id_list, UTC_list, tle_dict={}, offline_flag=False,
-                  username='', password=''):
+def propagate_TLE(obj_id_list, UTC_list, tle_dict={}, prev_flag=False,
+                  offline_flag=False, frame_flag=True, username='', password=''):
     '''
     This function retrieves TLE data for the objects in the input list from
     space-track.org and propagates them to the times given in UTC_list.  The
@@ -1302,6 +1762,9 @@ def propagate_TLE(obj_id_list, UTC_list, tle_dict={}, offline_flag=False,
     offline_flag : boolean, optional
         flag to determine whether to retrieve EOP data from internet or from
         a locally saved file (default = False)
+    frame_flag : boolean, optional
+        flag to determine whether to rotate state vector to GCRF and ITRF to 
+        include with output along with state vector in TEME (default = True)
     username : string, optional
         space-track.org username (code will prompt for input if not supplied)
     password : string, optional
@@ -1314,6 +1777,12 @@ def propagate_TLE(obj_id_list, UTC_list, tle_dict={}, offline_flag=False,
         position/velocity in TEME and GCRF
 
     '''
+    
+    total_prop = 0.
+    total_teme2gcrf = 0.
+    total_gcrf2itrf = 0.
+    tle_epoch_time = 0.
+    total_eop_time = 0.
 
     # If no TLE information is provided, retrieve from sources as needed
     if len(tle_dict) == 0:
@@ -1323,13 +1792,20 @@ def propagate_TLE(obj_id_list, UTC_list, tle_dict={}, offline_flag=False,
             get_spacetrack_tle_data(obj_id_list, UTC_list, username, password)
 
         # Retreive TLE data from database
+    
+    
+    # If frame rotations to GCRF and ITRF are desired, retrieve EOP data
+    if frame_flag:  
+        
+        # Retrieve latest EOP data from celestrak.com
+        eop_alldata = get_celestrak_eop_alldata(offline_flag)
+    
+        # Retrieve IAU Nutation data from file
+        IAU1980_nutation = get_nutation_data()
+        
+        # Retrieve polar motion data from file
+        XYs_df = get_XYs2006_alldata()
 
-
-    # Retrieve latest EOP data from celestrak.com
-    eop_alldata = get_celestrak_eop_alldata(offline_flag)
-
-    # Retrieve IAU Nutation data from file
-    IAU1980_nutation = get_nutation_data()
 
     # Loop over objects
     output_state = {}
@@ -1342,18 +1818,23 @@ def propagate_TLE(obj_id_list, UTC_list, tle_dict={}, offline_flag=False,
         output_state[obj_id]['UTC'] = []
         output_state[obj_id]['r_GCRF'] = []
         output_state[obj_id]['v_GCRF'] = []
+        output_state[obj_id]['r_ITRF'] = []
+        output_state[obj_id]['v_ITRF'] = []
         output_state[obj_id]['r_TEME'] = []
         output_state[obj_id]['v_TEME'] = []
 
         # Loop over times
         for UTC in UTC_list:
             
-            print(UTC)
-
             # Find the closest TLE by epoch
-            line1, line2 = find_closest_tle_epoch(line1_list, line2_list, UTC)
+            epoch_start = time.time()
+            line1, line2 = find_closest_tle_epoch(line1_list, line2_list, UTC,
+                                                  prev_flag)
+            
+            tle_epoch_time += time.time() - epoch_start
 
             # Propagate TLE using SGP4
+            prop_start = time.time()
             satellite = twoline2rv(line1, line2, wgs84)
             r_TEME, v_TEME = satellite.propagate(UTC.year, UTC.month, UTC.day,
                                                  UTC.hour, UTC.minute,
@@ -1362,24 +1843,54 @@ def propagate_TLE(obj_id_list, UTC_list, tle_dict={}, offline_flag=False,
 
             r_TEME = np.reshape(r_TEME, (3,1))
             v_TEME = np.reshape(v_TEME, (3,1))
-
-            # Get EOP data for this time
-            EOP_data = get_eop_data(eop_alldata, UTC)
-
-            # Convert from TEME to GCRF (ECI)
-            r_GCRF, v_GCRF = teme2gcrf(r_TEME, v_TEME, UTC, IAU1980_nutation,
-                                       EOP_data)
-
-
+            
+            total_prop += time.time() - prop_start
+            
             # Store output
             output_state[obj_id]['UTC'].append(UTC)
-            output_state[obj_id]['r_GCRF'].append(r_GCRF)
-            output_state[obj_id]['v_GCRF'].append(v_GCRF)
             output_state[obj_id]['r_TEME'].append(r_TEME)
             output_state[obj_id]['v_TEME'].append(v_TEME)
 
+            # If desired, compute state vector in GCRF and ITRF
+            # Note this will be slow for large datasets - use batch processing
+            if frame_flag:
+                
+                # Get EOP data for this time
+                eop_start = time.time()
+                EOP_data = get_eop_data(eop_alldata, UTC)
+                
+                total_eop_time += time.time() - eop_start
+    
+                # Convert from TEME to GCRF (ECI)
+                teme_start = time.time()
+                r_GCRF, v_GCRF = teme2gcrf(r_TEME, v_TEME, UTC, IAU1980_nutation,
+                                           EOP_data)
+                
+                total_teme2gcrf += time.time() - teme_start
+                
+                # Convert from GCRF to ITRF (ECEF)
+                itrf_start = time.time()
+                r_ITRF, v_ITRF = gcrf2itrf(r_GCRF, v_GCRF, UTC, EOP_data, XYs_df)
+                
+                total_gcrf2itrf += time.time() - itrf_start
+
+                # Store output
+                output_state[obj_id]['r_GCRF'].append(r_GCRF)
+                output_state[obj_id]['v_GCRF'].append(v_GCRF)
+                output_state[obj_id]['r_ITRF'].append(r_ITRF)
+                output_state[obj_id]['v_ITRF'].append(v_ITRF)
+            
+            
+        print(obj_id)
+        print('TLE epoch find: ', tle_epoch_time)
+        print('Prop: ', total_prop)
+        print('EOP: ', total_eop_time)
+        print('TEME: ', total_teme2gcrf)
+        print('ITRF: ', total_gcrf2itrf)
+
 
     return output_state
+
 
 def get_planet_ephem():
     '''
@@ -1411,17 +1922,86 @@ if __name__ == '__main__' :
     plt.close('all')
     
     
-    obj_id_list = [43164, 43166, 43691, 43692, 43851, 43863, 44074, 44075,
-                   44227, 44228, 44372, 44496]
+#    obj_id_list = [43164, 43166, 43691, 43692, 43851, 43863, 44074, 44075,
+#                   44227, 44228, 44372, 44496]
+#    
+#    obj_id_list = [43164, 43692, 43851, 44227, 44074, 44496]
+#    
+#    obj_id_list = [43164, 43692, 43851, 44227]
+#    
+#    UTC_list = [datetime(2018, 1, 1), datetime(2019, 10, 4)]
+#    
+#    plot_sma_rp_ra(obj_id_list, UTC_list)
     
-    obj_id_list = [43164, 43692, 43851, 44227, 44074, 44496]
+    # Landsat-8 Data
+    landsat8_norad = 39084
     
-    obj_id_list = [43164, 43692, 43851, 44227]
+    # Sentinel 2 Data
+    sentinel_2a_norad = 40697
+    sentinel_2b_norad = 42063
     
-    UTC_list = [datetime(2018, 1, 1), datetime(2019, 10, 4)]
+    # Retrieve TLE and print state vectors
+    obj_id_list = [landsat8_norad, sentinel_2a_norad, sentinel_2b_norad]
+    UTC_start = datetime(2020, 6, 29, 0, 0, 0)
+    UTC_stop = datetime(2020, 7, 1, 0, 0, 0)
+    dt = 10.
     
-    plot_sma_rp_ra(obj_id_list, UTC_list)
+    delta_t = (UTC_stop - UTC_start).total_seconds()
+    UTC_list = [UTC_start + timedelta(seconds=ti) for ti in list(np.arange(0, delta_t, dt))]
+    
+    print(UTC_list[0], UTC_list[-1])
+    
+    # Retrieve TLE 
+    retrieve_list = [UTC_list[0] - timedelta(days=1), UTC_list[-1] + timedelta(days=1)]
+    tle_dict, dum = get_spacetrack_tle_data(obj_id_list, retrieve_list, 
+                                            username='steve.gehly@gmail.com', 
+                                            password='SpaceTrackPword!')
+    
+    output_state = propagate_TLE(obj_id_list, UTC_list, tle_dict, prev_flag=True)
+    
+    # Save output
+    fname = os.path.join(r'D:\documents\research\cubesats\GeoscienceAustralia\data\check_tle_propagation.pkl')
+    pklFile = open( fname, 'wb' )
+    pickle.dump( [output_state], pklFile, -1 )
+    pklFile.close()
+    
+#    
+#    UTC_list = [datetime(2021, 3, 24, 0, 0, 0)]
+#   
+#    output_state = propagate_TLE(obj_id_list, UTC_list, tle_dict)
+#    print(output_state)
+#
+#    r_eci = output_state[25544]['r_GCRF'][0]
+    
+#    filename = os.path.join('D:\documents\\research\sensor_management\site_location', 'tle_data_2020.txt')
 
+    
+#    num_obj = 1000
+#    UTC_list = [datetime(2020, 1, 1, 0, 0, 0), datetime(2020, 1, 10, 0, 0, 0)]
+#    max_obj_id = 40000
+    
+#    obj_id_list = [47967]
+#    UTC_window = [datetime(2021, 3, 21), datetime(2021, 3, 24)]
+#    tle_dict, tle_df = get_spacetrack_tle_data(obj_id_list, UTC_window)
+#    
+#    print(tle_dict)
+    
+    
+    
+#    obj_id_list = generate_tle_list(num_obj, UTC_list, max_obj_id, filename, username, password)
+#    print(obj_id_list)
+#    
+#    # Save data
+#    tle_list_file =  os.path.join( 'D:\documents\\research\sensor_management\site_location','tle_obj_file.pkl' )
+#    pklFile = open( filename, 'wb' )
+#    pickle.dump( [obj_id_list], pklFile, -1 )
+#    pklFile.close()
+    
+#    gen_tle_textfiles(filename, username, password)
+    
+    
+#    check_category(tle_list_file, username, password)
+    
 
 
 #    obj_id_list = [2639, 20777, 28544, 29495, 40146, 42816]

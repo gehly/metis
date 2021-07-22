@@ -8,6 +8,9 @@ import sys
 sys.path.append('../')
 
 from utilities.constants import GME, J2E, Re
+from utilities.time_systems import utcdt2ttjd, jd2cent
+from utilities.ephemeris import compute_sun_coords
+from utilities.eop_functions import get_celestrak_eop_alldata, get_eop_data
 
 
 ###############################################################################
@@ -259,38 +262,80 @@ def sunsynch_inclination(a, e):
     return i
 
 
-def sunsynch_RAAN(launch_dt, LTAN):
+def RAAN_to_LTAN(RAAN, UTC, EOP_data):
     '''
-    This function computes the RAAN to achieve a desired sunsynchronous orbit
-    local time of ascending node (LTAN).
+    This function computes the Local Time of Ascending Node for a 
+    sunsynchronous orbit.
     
     Parameters
     ------
-    launch_dt : datetime object
-        launch date and time [UTC]
+    RAAN : float
+        Right Ascension of Ascending Node [deg]
+    UTC : datetime object
+        time in UTC
+    EOP_data : dictionary
+        EOP data for the given time including pole coordinates and offsets,
+        time offsets, and length of day 
+        
+    Returns
+    ------
     LTAN : float
         local time of ascending node, decimal hour in range [0, 24) 
+    '''
     
+    # Compute TT in JD format
+    TT_JD = utcdt2ttjd(UTC, EOP_data['TAI_UTC'])
+    
+    # Compute TT in centuries since J2000 epoch
+    TT_cent = jd2cent(TT_JD)
+    
+    # Compute apparent right ascension of the sun
+    sun_eci_geom, sun_eci_app = compute_sun_coords(TT_cent)
+    sun_ra = atan2(sun_eci_app[1], sun_eci_app[0]) * 180./pi     # deg
+    
+    # Compute LTAN in decimal hours
+    LTAN = ((RAAN - sun_ra)/15. + 12.) % 24.    # decimal hours    
+    
+    return LTAN
+
+
+def LTAN_to_RAAN(LTAN, UTC, EOP_data):
+    '''
+    This function computes the Right Ascension of the Ascending Node for a
+    sunsynchronous orbit given LTAN.
+    
+    Parameters
+    ------
+    LTAN : float
+        local time of ascending node, decimal hour in range [0, 24)     
+    UTC : datetime object
+        time in UTC
+    EOP_data : dictionary
+        EOP data for the given time including pole coordinates and offsets,
+        time offsets, and length of day 
+        
     Returns
     ------
     RAAN : float
-        right ascension of ascending node [deg]
+        Right Ascension of Ascending Node [deg]
+        
     '''
     
-    # Change in solar RA
-    dRAAN = 360./365.2421897 * pi/180. * 1./86400.  # rad/sec
+    # Compute TT in JD format
+    TT_JD = utcdt2ttjd(UTC, EOP_data['TAI_UTC'])
     
-    # Compute solar RA angle at time of launch
-    year = launch_dt.year
-    vernal = datetime(year, 3, 21, 12, 0, 0)
-    delta = (launch_dt - vernal).total_seconds()
-    solar_RA = dRAAN*delta * 180./pi  # deg
+    # Compute TT in centuries since J2000 epoch
+    TT_cent = jd2cent(TT_JD)
     
-    # Compute desired RAAN
-    hour_angle = (LTAN - 12.)*15.  # deg
-    RAAN = solar_RA + hour_angle
+    # Compute apparent right ascension of the sun
+    sun_eci_geom, sun_eci_app = compute_sun_coords(TT_cent)
+    sun_ra = atan2(sun_eci_app[1], sun_eci_app[0]) * 180./pi     # deg
+    
+    # Compute RAAN in degrees
+    RAAN = ((LTAN - 12.)*15. + sun_ra) % 360.      
     
     return RAAN
+
 
 
 def compute_vc(r, GM=GME):
@@ -1016,14 +1061,14 @@ def element_conversion(x_in, iflag, oflag, GM=GME, dt=0.):
 
 if __name__ == '__main__':
     
-    e = 0.1
-    theta = 40.
+    RAAN = 0.
+    UTC = datetime(2000, 1, 1, 12, 0, 0)
+    eop_alldata = get_celestrak_eop_alldata()
+    EOP_data = get_eop_data(eop_alldata, UTC)
     
-    kep = [8000., e, 10, 20, 30, theta]
     
-    cart = kep2cart(kep)
+    LTAN = compute_LTAN(RAAN, UTC, EOP_data)
+    print(LTAN)
     
-    kep2 = cart2kep(cart)
     
-    print(cart)
-    print(kep2)
+    
