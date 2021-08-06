@@ -63,12 +63,12 @@ if __name__ == '__main__':
 #    print(vis_dict)
 
     
-    # Generate output file
-    vis_file_min_el = 10.
-#    outdir = os.path.join(metis_dir, 'skyfield_data')
-#    vis_file = os.path.join(outdir, 'test_visible_passes.csv')
-    vis_file = 'test_visible_passes3.csv'
-    generate_visibility_file(vis_dict, vis_file, vis_file_min_el)
+#    # Generate output file
+#    vis_file_min_el = 10.
+##    outdir = os.path.join(metis_dir, 'skyfield_data')
+##    vis_file = os.path.join(outdir, 'test_visible_passes.csv')
+#    vis_file = 'test_visible_passes3.csv'
+#    generate_visibility_file(vis_dict, vis_file, vis_file_min_el)
     
     
     
