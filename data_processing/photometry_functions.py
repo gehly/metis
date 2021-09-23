@@ -301,18 +301,22 @@ def generate_plots():
     
 
     # Load all data
-    data_dir = 'D:\documents\\research\cubesats\M2PF\\2021_08_06'
+    data_dir = 'D:\documents\\research\cubesats\M2\data'
   
-    data_file = os.path.join(data_dir, '45727_CBR_2021_08_06_main.csv')
-    CBR_main = csv2dataframe(data_file)
+#    data_file = os.path.join(data_dir, 'CBR_2021_09_03_main.csv')
+#    CBR_main = csv2dataframe(data_file)
     
-    data_file = os.path.join(data_dir, '45727_CBR_2021_08_06_view.csv')
+    data_file = os.path.join(data_dir, 'CMU_2021_09_07_view.csv')
     CBR_view = csv2dataframe(data_file)
     
-    df_list = [CBR_main, CBR_view]
-    label_list = ['Main', 'View']
-    color = iter(['b', 'r'])
-    plot_lightcurve(df_list, label_list, color, 'NORAD 45727 2021-08-06 CBR-Falcon')
+#    df_list = [CBR_main, CBR_view]
+#    label_list = ['Main', 'View']
+#    color = iter(['b', 'r'])
+    
+    df_list = [CBR_view]
+    label_list = ['View']
+    color = iter(['r'])
+    plot_lightcurve(df_list, label_list, color, 'NORAD 47967 2021-09-07 CMU-Falcon')
     
     return
 
