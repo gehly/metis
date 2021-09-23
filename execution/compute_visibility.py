@@ -50,10 +50,10 @@ if __name__ == '__main__':
     
     
 #    obj_id_list = [45727, 47967, 29648, 46113, 24846, 23528, 26624, 35491]
-    obj_id_list = [45727, 47967]
-    sensor_id_list = ['UNSW Falcon'] #, 'NJC Falcon', 'OJC Falcon', 'PSU Falcon', 'CMU Falcon']
+    obj_id_list = [47967]
+    sensor_id_list = ['UNSW Falcon', 'CMU Falcon']
     
-    UTC0 = datetime(2021, 8, 9, 0, 0, 0)
+    UTC0 = datetime(2021, 9, 13, 0, 0, 0)
     delta_t = 7.*86400.
     dt = 10.
     UTC_list = [UTC0 + timedelta(seconds=ti) for ti in list(np.arange(0, delta_t, dt))]
@@ -68,7 +68,7 @@ if __name__ == '__main__':
     vis_file_min_el = 10.
 #    outdir = os.path.join(metis_dir, 'skyfield_data')
 #    vis_file = os.path.join(outdir, 'test_visible_passes.csv')
-    vis_file = 'M2_visible_passes.csv'
+    vis_file = 'M2_visible_passes_2021_09_13.csv'
     generate_visibility_file(vis_dict, vis_file, vis_file_min_el)
     
     
