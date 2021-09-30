@@ -1,5 +1,5 @@
 import numpy as np
-
+from scipy.integrate import odeint, ode
 
 from numerical_integration import rk4, rkf78, dopri87
 
@@ -27,6 +27,7 @@ def general_dynamics(Xo, tvec, state_params, integrator, int_params):
         # Run integrator
         tout, Xout, fcalls = rk4(intfcn, tvec, Xo, params)
         
+        
     if integrator == 'rkf78':
         
         # Setup integrator parameters
@@ -38,7 +39,26 @@ def general_dynamics(Xo, tvec, state_params, integrator, int_params):
         params['local_extrap'] = int_params['local_extrap']
         
         # Run integrator
-        tout, Xout, fcalls = rkf78(intfcn, tvec, Xo, params)
+        if len(tvec) == 2:
+            tout, Xout, fcalls = rkf78(intfcn, tvec, Xo, params)
+            
+        else:
+            
+            Xout = np.zeros((len(tvec), len(Xo)))
+            Xout[0] = Xo
+            tin = tvec[0:2]
+            
+            # Run integrator
+            k = 1
+            while tin[0] < tvec[-1]:           
+                dum, Xout_step, fcalls = rkf78(intfcn, tin, Xo, params)
+                Xo = Xout_step[-1,:]
+                tin = tvec[k:k+2]
+                Xout[k] = Xo               
+                k += 1
+            
+            tout = tvec
+            
         
     if integrator == 'dopri87':
         
@@ -50,9 +70,65 @@ def general_dynamics(Xo, tvec, state_params, integrator, int_params):
         params['atol'] = int_params['atol']
         
         # Run integrator
-        tout, Xout, fcalls = dopri87(intfcn, tvec, Xo, params)
+        if len(tvec) == 2:
+            tout, Xout, fcalls = dopri87(intfcn, tvec, Xo, params)
+            
+        else:
+            
+            Xout = np.zeros((len(tvec), len(Xo)))
+            Xout[0] = Xo
+            tin = tvec[0:2]
+            
+            # Run integrator
+            k = 1
+            while tin[0] < tvec[-1]:           
+                dum, Xout_step, fcalls = dopri87(intfcn, tin, Xo, params)
+                Xo = Xout_step[-1,:]
+                tin = tvec[k:k+2]
+                Xout[k] = Xo               
+                k += 1
+            
+            tout = tvec
+            
         
-    
+    if integrator == 'odeint':
+        
+        # Setup integrator parameters
+        params = state_params
+        intfcn = int_params['intfcn']
+        rtol = int_params['rtol']
+        atol = int_params['atol']
+        
+        # Run integrator
+        tout = tvec
+        Xout = odeint(intfcn,Xo,tvec,(params,),rtol=rtol,atol=atol)
+        
+        
+    if integrator == 'ode':
+        
+        # Setup integrator parameters
+        params = state_params
+        intfcn = int_params['intfcn']
+        ode_integrator = int_params['ode_integrator']
+        rtol = int_params['rtol']
+        atol = int_params['atol']
+        
+        solver = ode(intfcn)
+        solver.set_integrator(ode_integrator, atol=atol, rtol=rtol)
+        solver.set_f_params(params)
+        
+        solver.set_initial_value(Xo, tvec[0])
+        Xout = np.zeros((len(tvec), len(Xo)))
+        Xout[0] = Xo
+        
+        # Run integrator
+        k = 1
+        while solver.successful() and solver.t < tvec[-1]:
+            solver.integrate(tvec[k])
+            Xout[k] = solver.y
+            k += 1
+        
+        tout = tvec
     
     
     
@@ -286,6 +362,7 @@ def ode_twobody(t, X, params):
     ------
     dX : 6 element array array
       state derivative vector
+    
     '''
     
     # Additional arguments
