@@ -31,21 +31,29 @@ def rk4(intfcn, tin, y0, params):
     
     '''
     
+    
+    
     # Start and end times
-    h = params['step']
     t0 = tin[0]
     tf = tin[-1]
-    N = int(ceil((tf-t0)/h))
-    
+    if len(tin) == 2:
+        h = params['step']
+        tvec = np.arange(t0, tf, h)
+        tvec = np.append(tvec, tf)
+    else:
+        tvec = tin
+
     # Initial setup
     yn = y0.flatten()
     tn = t0
     yvec = y0.reshape(1, len(y0))
-    tvec = np.zeros(N+1,)
-    tvec[0] = t0
+    fcalls = 0
     
     # Loop to end
-    for ii in range(N):
+    for ii in range(len(tvec)-1):
+        
+        # Step size
+        h = tvec[ii+1] - tvec[ii]
         
         # Compute k values
         k1 = h * intfcn(tn,yn,params)
@@ -54,17 +62,15 @@ def rk4(intfcn, tin, y0, params):
         k4 = h * intfcn(tn+h,yn+k3,params)
         
         # Compute solution
-        yn1 = yn + (1/6)*(k1 + 2*k2 + 2*k3 + k4)
+        yn += (1./6.)*(k1 + 2.*k2 + 2.*k3 + k4)
         
-        # Increment time and yn
-        tn = tn+h
-        yn = yn1
+        # Increment function calls      
+        fcalls += 4
         
         # Store output
-        yvec = np.concatenate((yvec, yn1.reshape(1,len(y0))), axis=0)
-        tvec[ii+1] = tn
+        yvec = np.concatenate((yvec, yn.reshape(1,len(y0))), axis=0)
 
-    return tvec, yvec
+    return tvec, yvec, fcalls
 
 
 def rkf78(intfcn, tin, y0, params):

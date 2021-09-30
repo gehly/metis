@@ -1,8 +1,7 @@
 import numpy as np
 
 
-from utilities.constants import GME
-
+from numerical_integration import rk4, rkf78, dopri87
 
 
 
@@ -17,10 +16,16 @@ def general_dynamics(Xo, tvec, state_params, integrator, int_params):
     
     '''
     
+    # Setup and run integrator depending on user selection
+    if integrator == 'rk4':
+        
+        intfcn = int_params['intfcn']
+        tout, Xout, fcalls = rk4(intfcn, tvec, Xo, state_params)
     
     
     
-    return
+    
+    return tout, Xout
 
 
 
