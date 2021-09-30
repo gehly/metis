@@ -14,7 +14,7 @@ def rk4(intfcn, tin, y0, params):
     intfcn : function handle
         handle for function to integrate
     tin : 1D numpy array
-        times to integrate over, [t0, tf]
+        times to integrate over, [t0, tf] or [t0, t1, t2, ... , tf]
     y0 : numpy array
         initial state vector
     params : dictionary
@@ -30,9 +30,7 @@ def rk4(intfcn, tin, y0, params):
         at corresponding time
     
     '''
-    
-    
-    
+
     # Start and end times
     t0 = tin[0]
     tf = tin[-1]
@@ -231,9 +229,7 @@ def rkf78(intfcn, tin, y0, params):
             # Store Output
             yvec = np.concatenate((yvec, yn.reshape(1,len(yn))), axis=0)
             tvec = np.append(tvec, tn)
-        
-            
-        
+
         # Otherwise, solution is bad, repeat at current time with new h
         else:            
             h = hnew
@@ -419,9 +415,7 @@ def dopri87(intfcn, tin, y0, params):
             # Store Output
             yvec = np.concatenate((yvec, yn.reshape(1,len(yn))), axis=0)
             tvec = np.append(tvec, tn)
-        
-            
-        
+
         # Otherwise, solution is bad, repeat at current time with new h
         else:            
             h = hnew

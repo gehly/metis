@@ -22,21 +22,27 @@ def unit_test_twobody():
     params['A_m'] = 1e-8    # km^2/kg
 
     # Integration times
-    tin = np.array([0., 86400.*2.])    
-    params['step'] = 10.    
-    tin = np.arange(0., 86400.*2.+1., 10.)
+    tin = np.array([0., 86400.*2.])   
+#    tin = np.arange(0., 86400.*2.+1., 10.)
     
     # Initial orbit - Molniya     
     Xo = np.array([2.88824880e3, -7.73903934e2, -5.97116199e3, 2.64414431,
                    9.86808092, 0.0])
     
     # Integration function and additional settings
-    integrator = 'rk4'
+    integrator = 'dopri87'
     int_params = {}
     int_params['intfcn'] = ode_twobody
+    int_params['step'] = 10.
+    int_params['rtol'] = 1e-12
+    int_params['atol'] = 1e-12
+    int_params['local_extrap'] = True
     
     # Run integrator
     tout, Xout = general_dynamics(Xo, tin, params, integrator, int_params)
+    
+    print(len(tout))
+    print(tout[-1])
     
     # Analytic solution
     elem = cart2kep(Xo, GM=params['GM'])

@@ -19,8 +19,39 @@ def general_dynamics(Xo, tvec, state_params, integrator, int_params):
     # Setup and run integrator depending on user selection
     if integrator == 'rk4':
         
+        # Setup integrator parameters
+        params = state_params
+        intfcn = int_params['intfcn']        
+        params['step'] = int_params['step']
+        
+        # Run integrator
+        tout, Xout, fcalls = rk4(intfcn, tvec, Xo, params)
+        
+    if integrator == 'rkf78':
+        
+        # Setup integrator parameters
+        params = state_params
         intfcn = int_params['intfcn']
-        tout, Xout, fcalls = rk4(intfcn, tvec, Xo, state_params)
+        params['step'] = int_params['step']
+        params['rtol'] = int_params['rtol']
+        params['atol'] = int_params['atol']
+        params['local_extrap'] = int_params['local_extrap']
+        
+        # Run integrator
+        tout, Xout, fcalls = rkf78(intfcn, tvec, Xo, params)
+        
+    if integrator == 'dopri87':
+        
+        # Setup integrator parameters
+        params = state_params
+        intfcn = int_params['intfcn']
+        params['step'] = int_params['step']
+        params['rtol'] = int_params['rtol']
+        params['atol'] = int_params['atol']
+        
+        # Run integrator
+        tout, Xout, fcalls = dopri87(intfcn, tvec, Xo, params)
+        
     
     
     
