@@ -1,9 +1,12 @@
 import numpy as np
 from math import pi
 import matplotlib.pyplot as plt
+import sys
 
-from dynamics_functions import general_dynamics
-from dynamics_functions import int_twobody, ode_twobody
+sys.path.append('../')
+
+from dynamics.dynamics_functions import general_dynamics
+from dynamics.dynamics_functions import int_twobody, ode_twobody
 from utilities.astrodynamics import cart2kep, kep2cart
 from utilities.astrodynamics import true2ecc, ecc2true, mean2ecc, ecc2mean
 from utilities.constants import GME, J2E, wE, Re
@@ -30,17 +33,17 @@ def unit_test_twobody():
                    9.86808092, 0.0])
     
     # Integration function and additional settings
-    integrator = 'ode'
     int_params = {}
-    int_params['intfcn'] = ode_twobody
+    int_params['integrator'] = 'ode'
     int_params['ode_integrator'] = 'dop853'
+    int_params['intfcn'] = ode_twobody    
     int_params['step'] = 10.
     int_params['rtol'] = 1e-12
     int_params['atol'] = 1e-12
     int_params['local_extrap'] = True
     
     # Run integrator
-    tout, Xout = general_dynamics(Xo, tin, params, integrator, int_params)
+    tout, Xout = general_dynamics(Xo, tin, params, int_params)
     
     print(len(tout))
     print(tout[-1])

@@ -1,5 +1,7 @@
 import numpy as np
+import sys
 
+sys.path.append('../')
 
 from dynamics.dynamics_functions import general_dynamics
 
@@ -9,7 +11,7 @@ from dynamics.dynamics_functions import general_dynamics
 # Batch Estimation
 ###############################################################################
 
-def ls_batch(state_dict, meas_dict, params, intfcn, meas_fcn):
+def ls_batch(state_dict, meas_dict, state_params, int_params):
     '''
     This function implements the linearized batch estimator for the least
     squares cost function.
@@ -41,6 +43,7 @@ def ls_batch(state_dict, meas_dict, params, intfcn, meas_fcn):
     Po_bar = state_dict[state_tk]['P']
 
     # Measurement information
+    meas_fcn = meas_dict['meas_fcn']
     meas_types = meas_dict['meas_types']
     sigma_dict = meas_dict['sigma_dict']
     p = len(meas_types)
@@ -125,8 +128,7 @@ def ls_batch(state_dict, meas_dict, params, intfcn, meas_fcn):
                 int0 = int0.flatten()
                 tin = [tk_prior, tk]
                 
-                tout, intout = general_dynamics(int0, tin, state_params,
-                                                integrator, int_params)
+                tout, intout = general_dynamics(int0, tin, state_params, int_params)
 
             # Extract values for later calculations
             xout = intout[-1,:]
@@ -135,7 +137,7 @@ def ls_batch(state_dict, meas_dict, params, intfcn, meas_fcn):
             phi = np.reshape(phi_v, (n, n))
 
             # Accumulate the normal equations
-            Hk_til, Gk = meas_fcn(Xref, params)
+            Hk_til, Gk = meas_fcn(Xref, state_params)
             yk = Yk - Gk
             Hk = np.dot(Hk_til, phi)
                         
@@ -146,6 +148,17 @@ def ls_batch(state_dict, meas_dict, params, intfcn, meas_fcn):
             resids_list.append(yk)
             Xref_list.append(Xref)
             phi_list.append(phi)
+            
+#            print(kk)
+#            print(tk)
+#            print(int0)
+#            print(Xref)
+#            print(Yk)
+#            print(Gk)
+#            print(yk)
+#            
+#            if kk > 0:
+#                mistake
 
 
         # Solve the normal equations

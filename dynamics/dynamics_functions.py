@@ -1,7 +1,10 @@
 import numpy as np
 from scipy.integrate import odeint, ode
+import sys
 
-from numerical_integration import rk4, rkf78, dopri87
+sys.path.append('../')
+
+from dynamics.numerical_integration import rk4, rkf78, dopri87
 
 
 
@@ -9,12 +12,14 @@ from numerical_integration import rk4, rkf78, dopri87
 # General Interface
 ###############################################################################
 
-def general_dynamics(Xo, tvec, state_params, integrator, int_params):
+def general_dynamics(Xo, tvec, state_params, int_params):
     '''
     This function provides a general interface to numerical integration 
     routines.
     
     '''
+    
+    integrator = int_params['integrator']
     
     # Setup and run integrator depending on user selection
     if integrator == 'rk4':
@@ -119,13 +124,13 @@ def general_dynamics(Xo, tvec, state_params, integrator, int_params):
         
         solver.set_initial_value(Xo, tvec[0])
         Xout = np.zeros((len(tvec), len(Xo)))
-        Xout[0] = Xo
+        Xout[0] = Xo.flatten()
         
         # Run integrator
         k = 1
         while solver.successful() and solver.t < tvec[-1]:
             solver.integrate(tvec[k])
-            Xout[k] = solver.y
+            Xout[k] = solver.y.flatten()
             k += 1
         
         tout = tvec
@@ -136,6 +141,70 @@ def general_dynamics(Xo, tvec, state_params, integrator, int_params):
 
 
 
+###############################################################################
+# Generic Dynamics Functions
+###############################################################################
+
+def ode_balldrop(t, X, params):
+    '''
+    This function works with ode to propagate an object moving under constant
+    acceleration
+
+    Parameters
+    ------
+    X : 2 element array
+      cartesian state vector 
+    t : float 
+      current time in seconds
+    params : dictionary
+        additional arguments
+
+    Returns
+    ------
+    dX : 2 element array array
+      state derivative vector
+    
+    '''
+    
+    y = float(X[0])
+    dy = float(X[1])
+    
+    dX = np.zeros(2,)
+    dX[0] = dy
+    dX[1] = params['acc']
+    
+    return dX
+
+
+def ode_balldrop_stm(t, X, params):
+
+    # Input data
+    acc = params['acc']
+
+    # Number of states
+    n = 2
+
+    # State Vector
+    y = float(X[0])
+    dy = float(X[1])
+
+    # Generate A matrix
+    A = np.zeros((n, n))
+    A[0,1] = 1.
+
+    # Compute STM components dphi = A*phi
+    phi_mat = np.reshape(X[n:], (n, n))
+    dphi_mat = np.dot(A, phi_mat)
+    dphi_v = np.reshape(dphi_mat, (n**2, 1))
+
+    # Derivative vector
+    dX = np.zeros(n+n**2,)
+
+    dX[0] = dy
+    dX[1] = acc
+    dX[n:] = dphi_v.flatten()
+
+    return dX
 
 
 ###############################################################################
