@@ -3,7 +3,7 @@ from math import pi
 import pandas as pd
 import sys
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
 
 sys.path.append('C:\\Users\Steve\Documents\code\metis')
@@ -296,13 +296,15 @@ def generate_meas_file():
 
 def generate_sensor_location_file():
     
-    fdir = 'D:\documents\\teaching\\unsw_ssa_undergrad\lab\\telescope\meas_data'
-    fname = 'meas_data_all3.csv'
+    fdir = r'D:\documents\teaching\unsw_ssa_undergrad\2021\lab\telescope\orbit_determination\student_data'
+    fname = 'meas_data_input_Jordan.csv'
     meas_file_in = os.path.join(fdir, fname)
     
     df = pd.read_csv(meas_file_in, header=None)
     
     print(df)
+    
+
     
     t0 = datetime(2019, 9, 3, 10, 9, 42)
     
@@ -322,7 +324,8 @@ def generate_sensor_location_file():
     for ii in range(len(times)):
         
         print(times[ii])
-        ti = datetime.strptime(times[ii], '%Y-%m-%dT%H:%M:%S.%f')
+#        ti = datetime.strptime(times[ii], '%Y-%m-%dT%H:%M:%S.%f')
+        ti = t0 + timedelta(seconds=times[ii])
         
         ti_sec = (ti - t0).total_seconds()
         EOP_data = get_eop_data(eop_alldata, ti)
@@ -338,7 +341,7 @@ def generate_sensor_location_file():
         
     print(output)
     sensor_df = pd.DataFrame(output)    
-    csv_name = os.path.join(fdir, 'sensor_eci.csv')
+    csv_name = os.path.join(fdir, 'sensor_eci_Jordan.csv')
     sensor_df.to_csv(csv_name, index=False)  
         
     

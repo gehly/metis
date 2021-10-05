@@ -143,7 +143,7 @@ def execute_balldrop_test():
 
 
 
-def H_balldrop(Xref, inputs):
+def H_balldrop(Xref, params):
     
     # Break out state
     y = float(Xref[0])
@@ -155,6 +155,11 @@ def H_balldrop(Xref, inputs):
     
     return Hk_til, Gk
 
+
+
+###############################################################################
+# Orbit Dynamics Test (Two-Body Orbit)
+###############################################################################
 
 
 
