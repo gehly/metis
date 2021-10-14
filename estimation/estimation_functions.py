@@ -11,7 +11,7 @@ from dynamics.dynamics_functions import general_dynamics
 # Batch Estimation
 ###############################################################################
 
-def ls_batch(state_dict, meas_dict, state_params, int_params):
+def ls_batch(state_dict, meas_dict, state_params, sensor_params, int_params):
     '''
     This function implements the linearized batch estimator for the least
     squares cost function.
@@ -44,8 +44,8 @@ def ls_batch(state_dict, meas_dict, state_params, int_params):
 
     # Measurement information
     meas_fcn = meas_dict['meas_fcn']
-    meas_types = meas_dict['meas_types']
-    sigma_dict = meas_dict['sigma_dict']
+    meas_types = sensor_params['meas_types']
+    sigma_dict = sensor_params['sigma_dict']
     p = len(meas_types)
     Rk = np.zeros((p, p))
     for ii in range(p):
@@ -137,7 +137,7 @@ def ls_batch(state_dict, meas_dict, state_params, int_params):
             phi = np.reshape(phi_v, (n, n))
 
             # Accumulate the normal equations
-            Hk_til, Gk = meas_fcn(Xref, state_params)
+            Hk_til, Gk = meas_fcn(Xref, state_params, sensor_params)
             yk = Yk - Gk
             Hk = np.dot(Hk_til, phi)
                         

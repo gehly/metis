@@ -47,12 +47,13 @@ def balldrop_setup():
     # Generate Truth and Measurements
     truth_dict = {}
     meas_dict = {}
+    sensor_params = {}
     sig_y = 0.01
     sig_dy = 0.001
-    meas_dict['sigma_dict'] = {}
-    meas_dict['sigma_dict']['y'] = sig_y
-    meas_dict['sigma_dict']['dy'] = sig_dy
-    meas_dict['meas_types'] = ['y', 'dy']
+    sensor_params['sigma_dict'] = {}
+    sensor_params['sigma_dict']['y'] = sig_y
+    sensor_params['sigma_dict']['dy'] = sig_dy
+    sensor_params['meas_types'] = ['y', 'dy']
     meas_dict['meas_fcn'] = H_balldrop
     meas_dict['meas'] = {}
     outlier_inds = []
@@ -78,17 +79,17 @@ def balldrop_setup():
         dy_meas = float(X[1]) + dy_noise
         meas_dict['meas'][tk_list[kk]] = np.array([[y_meas], [dy_meas]])
 
-    return state_dict, state_params, int_params, meas_dict, truth_dict
+    return state_dict, state_params, int_params, meas_dict, sensor_params, truth_dict
 
 
 def execute_balldrop_test():
     
-    state_dict, state_params, int_params, meas_dict, truth_dict =\
+    state_dict, state_params, int_params, meas_dict, sensor_params, truth_dict =\
         balldrop_setup()
         
     int_params['intfcn'] = ode_balldrop_stm
         
-    filter_output = ls_batch(state_dict, meas_dict, state_params, int_params)
+    filter_output = ls_batch(state_dict, meas_dict, state_params, sensor_params, int_params)
     
     # Compute errors
     n = 2
@@ -143,7 +144,7 @@ def execute_balldrop_test():
 
 
 
-def H_balldrop(Xref, params):
+def H_balldrop(Xref, state_params, sensor_params):
     
     # Break out state
     y = float(Xref[0])
@@ -165,6 +166,8 @@ def H_balldrop(Xref, params):
 
 
 if __name__ == '__main__':
+    
+    plt.close('all')
     
     execute_balldrop_test()
 
