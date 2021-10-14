@@ -297,7 +297,7 @@ def generate_meas_file():
 def generate_sensor_location_file():
     
     fdir = r'D:\documents\teaching\unsw_ssa_undergrad\2021\lab\telescope\orbit_determination\student_data'
-    fname = 'meas_data_input_Jordan.csv'
+    fname = 'Pass-Data-SSA-3.csv'
     meas_file_in = os.path.join(fdir, fname)
     
     df = pd.read_csv(meas_file_in, header=None)
@@ -341,7 +341,7 @@ def generate_sensor_location_file():
         
     print(output)
     sensor_df = pd.DataFrame(output)    
-    csv_name = os.path.join(fdir, 'sensor_eci_Jordan.csv')
+    csv_name = os.path.join(fdir, 'sensor_eci_Mortaza.csv')
     sensor_df.to_csv(csv_name, index=False)  
         
     

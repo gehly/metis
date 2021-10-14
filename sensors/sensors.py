@@ -2,6 +2,12 @@ from math import pi
 import os
 import pickle
 import pandas as pd
+import sys
+
+sys.path.append('../')
+
+from utilities.coordinate_systems import latlonht2ecef
+
 
 def define_sensors(sensor_id_list=[]):
     
@@ -49,10 +55,12 @@ def define_sensors(sensor_id_list=[]):
     lon_gs = 145.06
     ht_gs = 0.1724 # km	
     geodetic_latlonht = [lat_gs, lon_gs, ht_gs]
+    site_ecef = latlonht2ecef(lat_gs, lon_gs, ht_gs)
     
     # Location and constraints
     sensor_dict['RMIT ROO'] = {}
     sensor_dict['RMIT ROO']['geodetic_latlonht'] = geodetic_latlonht
+    sensor_dict['RMIT ROO']['site_ecef'] = site_ecef
     sensor_dict['RMIT ROO']['mapp_lim'] = mapp_lim
     sensor_dict['RMIT ROO']['moon_angle_lim'] = moon_angle_lim
     sensor_dict['RMIT ROO']['el_lim'] = el_lim
@@ -111,10 +119,12 @@ def define_sensors(sensor_id_list=[]):
     lon_gs = 148.84
     ht_gs = 0.570 # km	
     geodetic_latlonht = [lat_gs, lon_gs, ht_gs]
+    site_ecef = latlonht2ecef(lat_gs, lon_gs, ht_gs)
     
     # Location and constraints
     sensor_dict['UNSW Viper'] = {}
     sensor_dict['UNSW Viper']['geodetic_latlonht'] = geodetic_latlonht
+    sensor_dict['UNSW Viper']['site_ecef'] = site_ecef
     sensor_dict['UNSW Viper']['mapp_lim'] = mapp_lim
     sensor_dict['UNSW Viper']['moon_angle_lim'] = moon_angle_lim
     sensor_dict['UNSW Viper']['el_lim'] = el_lim
@@ -175,10 +185,12 @@ def define_sensors(sensor_id_list=[]):
     lon_gs = 149.17
     ht_gs = 0.606 # km	
     geodetic_latlonht = [lat_gs, lon_gs, ht_gs]
+    site_ecef = latlonht2ecef(lat_gs, lon_gs, ht_gs)
     
     # Location and constraints
     sensor_dict['UNSW Falcon'] = {}
     sensor_dict['UNSW Falcon']['geodetic_latlonht'] = geodetic_latlonht
+    sensor_dict['UNSW Falcon']['site_ecef'] = site_ecef
     sensor_dict['UNSW Falcon']['mapp_lim'] = mapp_lim
     sensor_dict['UNSW Falcon']['moon_angle_lim'] = moon_angle_lim
     sensor_dict['UNSW Falcon']['el_lim'] = el_lim
@@ -204,10 +216,12 @@ def define_sensors(sensor_id_list=[]):
     lon_gs = 255.01
     ht_gs = 2.805 # km	
     geodetic_latlonht = [lat_gs, lon_gs, ht_gs]
+    site_ecef = latlonht2ecef(lat_gs, lon_gs, ht_gs)
     
     # Location and constraints
     sensor_dict['USAFA Falcon'] = {}
     sensor_dict['USAFA Falcon']['geodetic_latlonht'] = geodetic_latlonht
+    sensor_dict['USAFA Falcon']['site_ecef'] = site_ecef
     sensor_dict['USAFA Falcon']['mapp_lim'] = mapp_lim
     sensor_dict['USAFA Falcon']['moon_angle_lim'] = moon_angle_lim
     sensor_dict['USAFA Falcon']['el_lim'] = el_lim
@@ -233,10 +247,12 @@ def define_sensors(sensor_id_list=[]):
     lon_gs = 251.93
     ht_gs = 1.969 # km
     geodetic_latlonht = [lat_gs, lon_gs, ht_gs]
+    site_ecef = latlonht2ecef(lat_gs, lon_gs, ht_gs)
     
     # Location and constraints
     sensor_dict['FLC Falcon'] = {}
     sensor_dict['FLC Falcon']['geodetic_latlonht'] = geodetic_latlonht
+    sensor_dict['FLC Falcon']['site_ecef'] = site_ecef
     sensor_dict['FLC Falcon']['mapp_lim'] = mapp_lim
     sensor_dict['FLC Falcon']['moon_angle_lim'] = moon_angle_lim
     sensor_dict['FLC Falcon']['el_lim'] = el_lim
@@ -257,14 +273,23 @@ def define_sensors(sensor_id_list=[]):
     sensor_dict['FLC Falcon']['max_pass'] = max_pass
 
     print('CMU Falcon')
-    lat_gs = 39.96
-    lon_gs = 251.76
-    ht_gs = 1.380 # km
+    
+    # From Chun paper
+#    lat_gs = 39.96
+#    lon_gs = 251.76
+#    ht_gs = 1.380 # km
+    
+    # From TheSkyX at site
+    lat_gs = 38. + 57./60. + 48.12/3600.       # deg
+    lon_gs = -(108. + 14./60. + 15.84/3600.)   # deg
+    ht_gs = 1.86116    # km
     geodetic_latlonht = [lat_gs, lon_gs, ht_gs]
+    site_ecef = latlonht2ecef(lat_gs, lon_gs, ht_gs)
     
     # Location and constraints
     sensor_dict['CMU Falcon'] = {}
     sensor_dict['CMU Falcon']['geodetic_latlonht'] = geodetic_latlonht
+    sensor_dict['CMU Falcon']['site_ecef'] = site_ecef
     sensor_dict['CMU Falcon']['mapp_lim'] = mapp_lim
     sensor_dict['CMU Falcon']['moon_angle_lim'] = moon_angle_lim
     sensor_dict['CMU Falcon']['el_lim'] = el_lim
@@ -289,10 +314,12 @@ def define_sensors(sensor_id_list=[]):
     lon_gs = 256.80
     ht_gs = 1.177 # km
     geodetic_latlonht = [lat_gs, lon_gs, ht_gs]
+    site_ecef = latlonht2ecef(lat_gs, lon_gs, ht_gs)
     
     # Location and constraints
     sensor_dict['NJC Falcon'] = {}
     sensor_dict['NJC Falcon']['geodetic_latlonht'] = geodetic_latlonht
+    sensor_dict['NJC Falcon']['site_ecef'] = site_ecef
     sensor_dict['NJC Falcon']['mapp_lim'] = mapp_lim
     sensor_dict['NJC Falcon']['moon_angle_lim'] = moon_angle_lim
     sensor_dict['NJC Falcon']['el_lim'] = el_lim
@@ -317,10 +344,12 @@ def define_sensors(sensor_id_list=[]):
     lon_gs = 256.46
     ht_gs = 1.221 # km
     geodetic_latlonht = [lat_gs, lon_gs, ht_gs]
+    site_ecef = latlonht2ecef(lat_gs, lon_gs, ht_gs)
     
     # Location and constraints
     sensor_dict['OJC Falcon'] = {}
     sensor_dict['OJC Falcon']['geodetic_latlonht'] = geodetic_latlonht
+    sensor_dict['OJC Falcon']['site_ecef'] = site_ecef
     sensor_dict['OJC Falcon']['mapp_lim'] = mapp_lim
     sensor_dict['OJC Falcon']['moon_angle_lim'] = moon_angle_lim
     sensor_dict['OJC Falcon']['el_lim'] = el_lim
@@ -345,10 +374,12 @@ def define_sensors(sensor_id_list=[]):
     lon_gs = 282.17
     ht_gs = 0.347 # km
     geodetic_latlonht = [lat_gs, lon_gs, ht_gs]	
+    site_ecef = latlonht2ecef(lat_gs, lon_gs, ht_gs)
     
     # Location and constraints
     sensor_dict['PSU Falcon'] = {}
     sensor_dict['PSU Falcon']['geodetic_latlonht'] = geodetic_latlonht
+    sensor_dict['PSU Falcon']['site_ecef'] = site_ecef
     sensor_dict['PSU Falcon']['mapp_lim'] = mapp_lim
     sensor_dict['PSU Falcon']['moon_angle_lim'] = moon_angle_lim
     sensor_dict['PSU Falcon']['el_lim'] = el_lim
@@ -373,10 +404,12 @@ def define_sensors(sensor_id_list=[]):
     lon_gs = 289.32
     ht_gs = 1.139 # km
     geodetic_latlonht = [lat_gs, lon_gs, ht_gs]
+    site_ecef = latlonht2ecef(lat_gs, lon_gs, ht_gs)
 
     # Location and constraints
     sensor_dict['Mamalluca Falcon'] = {}
     sensor_dict['Mamalluca Falcon']['geodetic_latlonht'] = geodetic_latlonht
+    sensor_dict['Mamalluca Falcon']['site_ecef'] = site_ecef
     sensor_dict['Mamalluca Falcon']['mapp_lim'] = mapp_lim
     sensor_dict['Mamalluca Falcon']['moon_angle_lim'] = moon_angle_lim
     sensor_dict['Mamalluca Falcon']['el_lim'] = el_lim
@@ -402,10 +435,12 @@ def define_sensors(sensor_id_list=[]):
     lon_gs = 115.86
     ht_gs = 0. # km
     geodetic_latlonht = [lat_gs, lon_gs, ht_gs]
+    site_ecef = latlonht2ecef(lat_gs, lon_gs, ht_gs)
     
     # Location and constraints
     sensor_dict['Perth Falcon'] = {}
     sensor_dict['Perth Falcon']['geodetic_latlonht'] = geodetic_latlonht
+    sensor_dict['Perth Falcon']['site_ecef'] = site_ecef
     sensor_dict['Perth Falcon']['mapp_lim'] = mapp_lim
     sensor_dict['Perth Falcon']['moon_angle_lim'] = moon_angle_lim
     sensor_dict['Perth Falcon']['el_lim'] = el_lim
@@ -432,6 +467,7 @@ def define_sensors(sensor_id_list=[]):
     lon_gs = 149.0099
     ht_gs = 0.805  # km
     geodetic_latlonht = [lat_gs, lon_gs, ht_gs]
+    site_ecef = latlonht2ecef(lat_gs, lon_gs, ht_gs)
     
     # Constraints/Limits
     az_lim = [0., 2.*pi]  # rad
@@ -464,6 +500,7 @@ def define_sensors(sensor_id_list=[]):
     # Location and constraints
     sensor_dict['Stromlo Laser'] = {}
     sensor_dict['Stromlo Laser']['geodetic_latlonht'] = geodetic_latlonht
+    sensor_dict['Stromlo Laser']['site_ecef'] = site_ecef
     sensor_dict['Stromlo Laser']['el_lim'] = el_lim
     sensor_dict['Stromlo Laser']['az_lim'] = az_lim
     sensor_dict['Stromlo Laser']['rg_lim'] = rg_lim
@@ -487,6 +524,7 @@ def define_sensors(sensor_id_list=[]):
     lon_gs = 149.0099
     ht_gs = 0.805  # km
     geodetic_latlonht = [lat_gs, lon_gs, ht_gs]
+    site_ecef = latlonht2ecef(lat_gs, lon_gs, ht_gs)
     
     # Constraints/Limits
     az_lim = [0., 2.*pi]  # rad
@@ -520,6 +558,7 @@ def define_sensors(sensor_id_list=[]):
     # Location and constraints
     sensor_dict['Stromlo Optical'] = {}
     sensor_dict['Stromlo Optical']['geodetic_latlonht'] = geodetic_latlonht
+    sensor_dict['Stromlo Optical']['site_ecef'] = site_ecef
     sensor_dict['Stromlo Optical']['mapp_lim'] = mapp_lim
     sensor_dict['Stromlo Optical']['sun_elmask'] = sun_el_mask
     sensor_dict['Stromlo Optical']['el_lim'] = el_lim
@@ -544,6 +583,7 @@ def define_sensors(sensor_id_list=[]):
     lon_gs = 7.4652
     ht_gs = 0.9512  # km
     geodetic_latlonht = [lat_gs, lon_gs, ht_gs]
+    site_ecef = latlonht2ecef(lat_gs, lon_gs, ht_gs)
     
     # Constraints/Limits
     az_lim = [0., 2.*pi]  # rad
@@ -576,6 +616,7 @@ def define_sensors(sensor_id_list=[]):
     # Location and constraints
     sensor_dict['Zimmerwald Laser'] = {}
     sensor_dict['Zimmerwald Laser']['geodetic_latlonht'] = geodetic_latlonht
+    sensor_dict['Zimmerwald Laser']['site_ecef'] = site_ecef
     sensor_dict['Zimmerwald Laser']['el_lim'] = el_lim
     sensor_dict['Zimmerwald Laser']['az_lim'] = az_lim
     sensor_dict['Zimmerwald Laser']['rg_lim'] = rg_lim
@@ -599,6 +640,7 @@ def define_sensors(sensor_id_list=[]):
     lon_gs = 7.4652
     ht_gs = 0.9512  # km
     geodetic_latlonht = [lat_gs, lon_gs, ht_gs]
+    site_ecef = latlonht2ecef(lat_gs, lon_gs, ht_gs)
     
     # Constraints/Limits
     az_lim = [0., 2.*pi]  # rad
@@ -632,6 +674,7 @@ def define_sensors(sensor_id_list=[]):
     # Location and constraints
     sensor_dict['Zimmerwald Optical'] = {}
     sensor_dict['Zimmerwald Optical']['geodetic_latlonht'] = geodetic_latlonht
+    sensor_dict['Zimmerwald Optical']['site_ecef'] = site_ecef
     sensor_dict['Zimmerwald Optical']['mapp_lim'] = mapp_lim
     sensor_dict['Zimmerwald Optical']['sun_elmask'] = sun_el_mask
     sensor_dict['Zimmerwald Optical']['el_lim'] = el_lim
@@ -656,6 +699,7 @@ def define_sensors(sensor_id_list=[]):
     lon_gs =  -71.4930
     ht_gs = 2.48905  # km
     geodetic_latlonht = [lat_gs, lon_gs, ht_gs]
+    site_ecef = latlonht2ecef(lat_gs, lon_gs, ht_gs)
     
     # Constraints/Limits
     az_lim = [0., 2.*pi]  # rad
@@ -688,6 +732,7 @@ def define_sensors(sensor_id_list=[]):
     # Location and constraints
     sensor_dict['Arequipa Laser'] = {}
     sensor_dict['Arequipa Laser']['geodetic_latlonht'] = geodetic_latlonht
+    sensor_dict['Arequipa Laser']['site_ecef'] = site_ecef
     sensor_dict['Arequipa Laser']['el_lim'] = el_lim
     sensor_dict['Arequipa Laser']['az_lim'] = az_lim
     sensor_dict['Arequipa Laser']['rg_lim'] = rg_lim
@@ -711,6 +756,7 @@ def define_sensors(sensor_id_list=[]):
     lon_gs =  -71.4930
     ht_gs = 2.48905  # km
     geodetic_latlonht = [lat_gs, lon_gs, ht_gs]
+    site_ecef = latlonht2ecef(lat_gs, lon_gs, ht_gs)
     
     # Constraints/Limits
     az_lim = [0., 2.*pi]  # rad
@@ -744,6 +790,7 @@ def define_sensors(sensor_id_list=[]):
     # Location and constraints
     sensor_dict['Arequipa Optical'] = {}
     sensor_dict['Arequipa Optical']['geodetic_latlonht'] = geodetic_latlonht
+    sensor_dict['Arequipa Optical']['site_ecef'] = site_ecef
     sensor_dict['Arequipa Optical']['mapp_lim'] = mapp_lim
     sensor_dict['Arequipa Optical']['sun_elmask'] = sun_el_mask
     sensor_dict['Arequipa Optical']['el_lim'] = el_lim
@@ -768,6 +815,7 @@ def define_sensors(sensor_id_list=[]):
     lon_gs =  203.743079
     ht_gs = 3.056272  # km
     geodetic_latlonht = [lat_gs, lon_gs, ht_gs]
+    site_ecef = latlonht2ecef(lat_gs, lon_gs, ht_gs)
     
     # Constraints/Limits
     az_lim = [0., 2.*pi]  # rad
@@ -800,6 +848,7 @@ def define_sensors(sensor_id_list=[]):
     # Location and constraints
     sensor_dict['Haleakala Laser'] = {}
     sensor_dict['Haleakala Laser']['geodetic_latlonht'] = geodetic_latlonht
+    sensor_dict['Haleakala Laser']['site_ecef'] = site_ecef
     sensor_dict['Haleakala Laser']['el_lim'] = el_lim
     sensor_dict['Haleakala Laser']['az_lim'] = az_lim
     sensor_dict['Haleakala Laser']['rg_lim'] = rg_lim
@@ -823,6 +872,7 @@ def define_sensors(sensor_id_list=[]):
     lon_gs =  203.743079
     ht_gs = 3.056272  # km
     geodetic_latlonht = [lat_gs, lon_gs, ht_gs]
+    site_ecef = latlonht2ecef(lat_gs, lon_gs, ht_gs)
     
     # Constraints/Limits
     az_lim = [0., 2.*pi]  # rad
@@ -856,6 +906,7 @@ def define_sensors(sensor_id_list=[]):
     # Location and constraints
     sensor_dict['Haleakala Optical'] = {}
     sensor_dict['Haleakala Optical']['geodetic_latlonht'] = geodetic_latlonht
+    sensor_dict['Haleakala Optical']['site_ecef'] = site_ecef
     sensor_dict['Haleakala Optical']['mapp_lim'] = mapp_lim
     sensor_dict['Haleakala Optical']['sun_elmask'] = sun_el_mask
     sensor_dict['Haleakala Optical']['el_lim'] = el_lim
@@ -880,6 +931,7 @@ def define_sensors(sensor_id_list=[]):
     lon_gs =  115.3467
     ht_gs = 0.244  # km
     geodetic_latlonht = [lat_gs, lon_gs, ht_gs]
+    site_ecef = latlonht2ecef(lat_gs, lon_gs, ht_gs)
     
     # Constraints/Limits
     az_lim = [0., 2.*pi]  # rad
@@ -912,6 +964,7 @@ def define_sensors(sensor_id_list=[]):
     # Location and constraints
     sensor_dict['Yarragadee Laser'] = {}
     sensor_dict['Yarragadee Laser']['geodetic_latlonht'] = geodetic_latlonht
+    sensor_dict['Yarragadee Laser']['site_ecef'] = site_ecef
     sensor_dict['Yarragadee Laser']['el_lim'] = el_lim
     sensor_dict['Yarragadee Laser']['az_lim'] = az_lim
     sensor_dict['Yarragadee Laser']['rg_lim'] = rg_lim
@@ -935,6 +988,7 @@ def define_sensors(sensor_id_list=[]):
     lon_gs =  115.3467
     ht_gs = 0.244  # km
     geodetic_latlonht = [lat_gs, lon_gs, ht_gs]
+    site_ecef = latlonht2ecef(lat_gs, lon_gs, ht_gs)
     
     # Constraints/Limits
     az_lim = [0., 2.*pi]  # rad
@@ -968,6 +1022,7 @@ def define_sensors(sensor_id_list=[]):
     # Location and constraints
     sensor_dict['Yarragadee Optical'] = {}
     sensor_dict['Yarragadee Optical']['geodetic_latlonht'] = geodetic_latlonht
+    sensor_dict['Yarragadee Optical']['site_ecef'] = site_ecef
     sensor_dict['Yarragadee Optical']['mapp_lim'] = mapp_lim
     sensor_dict['Yarragadee Optical']['sun_elmask'] = sun_el_mask
     sensor_dict['Yarragadee Optical']['el_lim'] = el_lim
@@ -993,6 +1048,7 @@ def define_sensors(sensor_id_list=[]):
     lon_gs = 149.17
     ht_gs = 0.606 # km	
     geodetic_latlonht = [lat_gs, lon_gs, ht_gs]
+    site_ecef = latlonht2ecef(lat_gs, lon_gs, ht_gs)
     
     # Constraints/Limits
     az_lim = [0., 2.*pi]  # rad
@@ -1028,6 +1084,7 @@ def define_sensors(sensor_id_list=[]):
     # Location and constraints
     sensor_dict['ADFA UHF Radio'] = {}
     sensor_dict['ADFA UHF Radio']['geodetic_latlonht'] = geodetic_latlonht
+    sensor_dict['ADFA UHF Radio']['site_ecef'] = site_ecef
     sensor_dict['ADFA UHF Radio']['el_lim'] = el_lim
     sensor_dict['ADFA UHF Radio']['az_lim'] = az_lim
     sensor_dict['ADFA UHF Radio']['rg_lim'] = rg_lim
