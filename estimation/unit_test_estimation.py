@@ -1,12 +1,20 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import sys
+from datetime import datetime, timedelta
 
 sys.path.append('../')
 
 from estimation.estimation_functions import ls_batch
 from dynamics.dynamics_functions import general_dynamics
 from dynamics.dynamics_functions import ode_balldrop, ode_balldrop_stm
+from dynamics.dynamics_functions import ode_twobody, ode_twobody_stm
+from sensors.sensors import define_sensors
+from sensors.visibility_functions import check_visibility
+from utilities.astrodynamics import kep2cart
+from utilities.constants import GME
+from utilities.eop_functions import get_celestrak_eop_alldata, get_eop_data
+from utilities.eop_functions import get_XYs2006_alldata
 
 
 
@@ -163,13 +171,106 @@ def H_balldrop(Xref, state_params, sensor_params):
 ###############################################################################
 
 
+def twobody_setup():
+    
+    # Retrieve latest EOP data from celestrak.com
+    eop_alldata = get_celestrak_eop_alldata()
+        
+    # Retrieve polar motion data from file
+    XYs_df = get_XYs2006_alldata()
+    
+    # Define state parameters
+    state_params = {}
+    state_params['GM'] = GME
+    
+    # Integration function and additional settings
+    int_params = {}
+    int_params['integrator'] = 'ode'
+    int_params['ode_integrator'] = 'dop853'
+    int_params['intfcn'] = ode_twobody
+    int_params['rtol'] = 1e-12
+    int_params['atol'] = 1e-12
+
+    # Time vector
+    tvec = np.arange(0., 86400.*0.5 + 1., 10.)
+    UTC0 = datetime(2021, 10, 10, 0, 0, 0)
+    tk_list = [UTC0 + timedelta(seconds=ti) for ti in tvec]
+
+    # Inital State
+    elem = [7000., 0.01, 98., 0., 0., 0.]
+    X_true = np.reshape(kep2cart(elem), (6,1))
+    P = np.diag([1., 1., 1., 1e-6, 1e-6, 1e-6])
+    pert_vect = np.multiply(np.sqrt(np.diag(P)), np.random.randn(6))
+    X_init = X_true + np.reshape(pert_vect, (6, 1))
+    
+    state_dict = {}
+    state_dict[tk_list[0]] = {}
+    state_dict[tk_list[0]]['X'] = X_init
+    state_dict[tk_list[0]]['P'] = P
+    
+    
+    # Generate truth and measurements
+    sensor_id_list = ['CMU Falcon']
+    sensor_params = define_sensors(sensor_id_list)
+    print(sensor_params)
+    
+
+    
+    truth_dict = {}
+    X = X_true.copy()
+    for kk in range(len(tk_list)):
+        
+        if kk > 0:
+            tin = [tvec[kk-1], tvec[kk]]
+            tout, Xout = general_dynamics(X, tin, state_params, int_params)
+            X = Xout[-1,:].reshape(6, 1)
+        
+        truth_dict[tk_list[kk]] = X
+        
+        # Check visibility conditions and compute measurements
+        UTC = tk_list[kk]
+        EOP_data = get_eop_data(eop_alldata, UTC)
+        
+        for sensor_id in sensor_id_list:
+            sensor = sensor_params[sensor_id]
+            if check_visibility(X, sensor, UTC, EOP_data, XYs_df):
+                
+                # Compute measurements
+                x = 1
+    
+    
+    return truth_dict
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 if __name__ == '__main__':
     
     plt.close('all')
     
-    execute_balldrop_test()
+#    execute_balldrop_test()
+    
+    twobody_setup()
 
 
 
