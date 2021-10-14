@@ -69,6 +69,7 @@ def define_sensors(sensor_id_list=[]):
     sensor_dict['RMIT ROO']['FOV_hlim'] = FOV_hlim
     sensor_dict['RMIT ROO']['FOV_vlim'] = FOV_vlim
     sensor_dict['RMIT ROO']['sun_elmask'] = sun_el_mask
+    sensor_dict['RMIT ROO']['passive_optical'] = True
     
     # Measurements and noise
     sensor_dict['RMIT ROO']['meas_types'] = meas_types
@@ -133,6 +134,7 @@ def define_sensors(sensor_id_list=[]):
     sensor_dict['UNSW Viper']['FOV_hlim'] = FOV_hlim
     sensor_dict['UNSW Viper']['FOV_vlim'] = FOV_vlim
     sensor_dict['UNSW Viper']['sun_elmask'] = sun_el_mask
+    sensor_dict['UNSW Viper']['passive_optical'] = True
     
     # Measurements and noise
     sensor_dict['UNSW Viper']['meas_types'] = meas_types
@@ -199,6 +201,7 @@ def define_sensors(sensor_id_list=[]):
     sensor_dict['UNSW Falcon']['FOV_hlim'] = FOV_hlim
     sensor_dict['UNSW Falcon']['FOV_vlim'] = FOV_vlim
     sensor_dict['UNSW Falcon']['sun_elmask'] = sun_el_mask
+    sensor_dict['UNSW Falcon']['passive_optical'] = True
     
     # Measurements and noise
     sensor_dict['UNSW Falcon']['meas_types'] = meas_types
@@ -230,6 +233,7 @@ def define_sensors(sensor_id_list=[]):
     sensor_dict['USAFA Falcon']['FOV_hlim'] = FOV_hlim
     sensor_dict['USAFA Falcon']['FOV_vlim'] = FOV_vlim
     sensor_dict['USAFA Falcon']['sun_elmask'] = sun_el_mask
+    sensor_dict['USAFA Falcon']['passive_optical'] = True
     
     # Measurements and noise
     sensor_dict['USAFA Falcon']['meas_types'] = meas_types
@@ -261,6 +265,7 @@ def define_sensors(sensor_id_list=[]):
     sensor_dict['FLC Falcon']['FOV_hlim'] = FOV_hlim
     sensor_dict['FLC Falcon']['FOV_vlim'] = FOV_vlim
     sensor_dict['FLC Falcon']['sun_elmask'] = sun_el_mask
+    sensor_dict['FLC Falcon']['passive_optical'] = True
     
     # Measurements and noise
     sensor_dict['FLC Falcon']['meas_types'] = meas_types
@@ -298,6 +303,7 @@ def define_sensors(sensor_id_list=[]):
     sensor_dict['CMU Falcon']['FOV_hlim'] = FOV_hlim
     sensor_dict['CMU Falcon']['FOV_vlim'] = FOV_vlim
     sensor_dict['CMU Falcon']['sun_elmask'] = sun_el_mask
+    sensor_dict['CMU Falcon']['passive_optical'] = True
     
     # Measurements and noise
     sensor_dict['CMU Falcon']['meas_types'] = meas_types
@@ -328,6 +334,7 @@ def define_sensors(sensor_id_list=[]):
     sensor_dict['NJC Falcon']['FOV_hlim'] = FOV_hlim
     sensor_dict['NJC Falcon']['FOV_vlim'] = FOV_vlim
     sensor_dict['NJC Falcon']['sun_elmask'] = sun_el_mask
+    sensor_dict['NJC Falcon']['passive_optical'] = True
     
     # Measurements and noise
     sensor_dict['NJC Falcon']['meas_types'] = meas_types
@@ -358,6 +365,7 @@ def define_sensors(sensor_id_list=[]):
     sensor_dict['OJC Falcon']['FOV_hlim'] = FOV_hlim
     sensor_dict['OJC Falcon']['FOV_vlim'] = FOV_vlim
     sensor_dict['OJC Falcon']['sun_elmask'] = sun_el_mask
+    sensor_dict['OJC Falcon']['passive_optical'] = True
     
     # Measurements and noise
     sensor_dict['OJC Falcon']['meas_types'] = meas_types
@@ -388,6 +396,7 @@ def define_sensors(sensor_id_list=[]):
     sensor_dict['PSU Falcon']['FOV_hlim'] = FOV_hlim
     sensor_dict['PSU Falcon']['FOV_vlim'] = FOV_vlim
     sensor_dict['PSU Falcon']['sun_elmask'] = sun_el_mask
+    sensor_dict['PSU Falcon']['passive_optical'] = True
     
     # Measurements and noise
     sensor_dict['PSU Falcon']['meas_types'] = meas_types
@@ -418,6 +427,7 @@ def define_sensors(sensor_id_list=[]):
     sensor_dict['Mamalluca Falcon']['FOV_hlim'] = FOV_hlim
     sensor_dict['Mamalluca Falcon']['FOV_vlim'] = FOV_vlim
     sensor_dict['Mamalluca Falcon']['sun_elmask'] = sun_el_mask
+    sensor_dict['Mamalluca Falcon']['passive_optical'] = True
     
     # Measurements and noise
     sensor_dict['Mamalluca Falcon']['meas_types'] = meas_types
@@ -449,6 +459,7 @@ def define_sensors(sensor_id_list=[]):
     sensor_dict['Perth Falcon']['FOV_hlim'] = FOV_hlim
     sensor_dict['Perth Falcon']['FOV_vlim'] = FOV_vlim
     sensor_dict['Perth Falcon']['sun_elmask'] = sun_el_mask
+    sensor_dict['Perth Falcon']['passive_optical'] = True
     
     # Measurements and noise
     sensor_dict['Perth Falcon']['meas_types'] = meas_types
@@ -507,6 +518,7 @@ def define_sensors(sensor_id_list=[]):
     sensor_dict['Stromlo Laser']['FOV_hlim'] = FOV_hlim
     sensor_dict['Stromlo Laser']['FOV_vlim'] = FOV_vlim
     sensor_dict['Stromlo Laser']['laser_output'] = 1.  # Watts
+    sensor_dict['Stromlo Laser']['passive_optical'] = False
     
     # Measurements and noise
     sensor_dict['Stromlo Laser']['meas_types'] = meas_types
@@ -566,6 +578,7 @@ def define_sensors(sensor_id_list=[]):
     sensor_dict['Stromlo Optical']['rg_lim'] = rg_lim
     sensor_dict['Stromlo Optical']['FOV_hlim'] = FOV_hlim
     sensor_dict['Stromlo Optical']['FOV_vlim'] = FOV_vlim
+    sensor_dict['Stromlo Optical']['passive_optical'] = True
     
     # Measurements and noise
     sensor_dict['Stromlo Optical']['meas_types'] = meas_types
@@ -623,6 +636,7 @@ def define_sensors(sensor_id_list=[]):
     sensor_dict['Zimmerwald Laser']['FOV_hlim'] = FOV_hlim
     sensor_dict['Zimmerwald Laser']['FOV_vlim'] = FOV_vlim
     sensor_dict['Zimmerwald Laser']['laser_output'] = 1.  # Watts
+    sensor_dict['Zimmerwald Laser']['passive_optical'] = False
     
     # Measurements and noise
     sensor_dict['Zimmerwald Laser']['meas_types'] = meas_types
@@ -682,6 +696,7 @@ def define_sensors(sensor_id_list=[]):
     sensor_dict['Zimmerwald Optical']['rg_lim'] = rg_lim
     sensor_dict['Zimmerwald Optical']['FOV_hlim'] = FOV_hlim
     sensor_dict['Zimmerwald Optical']['FOV_vlim'] = FOV_vlim
+    sensor_dict['Zimmerwald Optical']['passive_optical'] = True
     
     # Measurements and noise
     sensor_dict['Zimmerwald Optical']['meas_types'] = meas_types
@@ -739,6 +754,7 @@ def define_sensors(sensor_id_list=[]):
     sensor_dict['Arequipa Laser']['FOV_hlim'] = FOV_hlim
     sensor_dict['Arequipa Laser']['FOV_vlim'] = FOV_vlim
     sensor_dict['Arequipa Laser']['laser_output'] = 1.  # Watts
+    sensor_dict['Arequipa Laser']['passive_optical'] = False
     
     # Measurements and noise
     sensor_dict['Arequipa Laser']['meas_types'] = meas_types
@@ -798,6 +814,7 @@ def define_sensors(sensor_id_list=[]):
     sensor_dict['Arequipa Optical']['rg_lim'] = rg_lim
     sensor_dict['Arequipa Optical']['FOV_hlim'] = FOV_hlim
     sensor_dict['Arequipa Optical']['FOV_vlim'] = FOV_vlim
+    sensor_dict['Arequipa Optical']['passive_optical'] = True
     
     # Measurements and noise
     sensor_dict['Arequipa Optical']['meas_types'] = meas_types
@@ -855,6 +872,7 @@ def define_sensors(sensor_id_list=[]):
     sensor_dict['Haleakala Laser']['FOV_hlim'] = FOV_hlim
     sensor_dict['Haleakala Laser']['FOV_vlim'] = FOV_vlim
     sensor_dict['Haleakala Laser']['laser_output'] = 1.  # Watts
+    sensor_dict['Haleakala Laser']['passive_optical'] = False
     
     # Measurements and noise
     sensor_dict['Haleakala Laser']['meas_types'] = meas_types
@@ -914,6 +932,7 @@ def define_sensors(sensor_id_list=[]):
     sensor_dict['Haleakala Optical']['rg_lim'] = rg_lim
     sensor_dict['Haleakala Optical']['FOV_hlim'] = FOV_hlim
     sensor_dict['Haleakala Optical']['FOV_vlim'] = FOV_vlim
+    sensor_dict['Haleakala Optical']['passive_optical'] = True
     
     # Measurements and noise
     sensor_dict['Haleakala Optical']['meas_types'] = meas_types
@@ -971,6 +990,7 @@ def define_sensors(sensor_id_list=[]):
     sensor_dict['Yarragadee Laser']['FOV_hlim'] = FOV_hlim
     sensor_dict['Yarragadee Laser']['FOV_vlim'] = FOV_vlim
     sensor_dict['Yarragadee Laser']['laser_output'] = 1.  # Watts
+    sensor_dict['Yarragadee Laser']['passive_optical'] = False
     
     # Measurements and noise
     sensor_dict['Yarragadee Laser']['meas_types'] = meas_types
@@ -1030,6 +1050,7 @@ def define_sensors(sensor_id_list=[]):
     sensor_dict['Yarragadee Optical']['rg_lim'] = rg_lim
     sensor_dict['Yarragadee Optical']['FOV_hlim'] = FOV_hlim
     sensor_dict['Yarragadee Optical']['FOV_vlim'] = FOV_vlim
+    sensor_dict['Yarragadee Optical']['passive_optical'] = True
     
     # Measurements and noise
     sensor_dict['Yarragadee Optical']['meas_types'] = meas_types
@@ -1091,6 +1112,7 @@ def define_sensors(sensor_id_list=[]):
     sensor_dict['ADFA UHF Radio']['FOV_hlim'] = FOV_hlim
     sensor_dict['ADFA UHF Radio']['FOV_vlim'] = FOV_vlim
     sensor_dict['ADFA UHF Radio']['freq_lim'] = freq_lim
+    sensor_dict['ADFA UHF Radio']['passive_optical'] = False
     
     # Measurements and noise
     sensor_dict['ADFA UHF Radio']['meas_types'] = meas_types

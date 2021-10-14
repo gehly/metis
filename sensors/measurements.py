@@ -11,7 +11,7 @@ from utilities.coordinate_systems import gcrf2itrf
 from utilities.coordinate_systems import ecef2enu
 
 
-def compute_measurement(X, sensor, UTC, EOP_data, XYs_df=[], meas_types=[],
+def compute_measurement(X, state_params, sensor, UTC, EOP_data, XYs_df=[], meas_types=[],
                         sun_gcrf=[]):
     
     # Retrieve measurement types
