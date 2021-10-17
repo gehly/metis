@@ -11,6 +11,7 @@ from dynamics.dynamics_functions import ode_balldrop, ode_balldrop_stm
 from dynamics.dynamics_functions import ode_twobody, ode_twobody_stm
 from sensors.sensors import define_sensors
 from sensors.visibility_functions import check_visibility
+from sensors.measurements import compute_measurement
 from utilities.astrodynamics import kep2cart
 from utilities.constants import GME
 from utilities.eop_functions import get_celestrak_eop_alldata, get_eop_data
@@ -173,6 +174,8 @@ def H_balldrop(Xref, state_params, sensor_params):
 
 def twobody_setup():
     
+    arcsec2rad = pi/(3600.*180.)
+    
     # Retrieve latest EOP data from celestrak.com
     eop_alldata = get_celestrak_eop_alldata()
         
@@ -182,6 +185,8 @@ def twobody_setup():
     # Define state parameters
     state_params = {}
     state_params['GM'] = GME
+    state_params['radius_m'] = 1.
+    state_params['albedo'] = 0.1
     
     # Integration function and additional settings
     int_params = {}
@@ -209,13 +214,18 @@ def twobody_setup():
     state_dict[tk_list[0]]['P'] = P
     
     
-    # Generate truth and measurements
+    # Sensor and measurement parameters
     sensor_id_list = ['CMU Falcon']
     sensor_params = define_sensors(sensor_id_list)
+    sensor_params['meas_types'] = ['ra', 'dec']
+    sigma_dict = {}
+    sigma_dict['ra'] = 5.*arcsec2rad   # rad
+    sigma_dict['dec'] = 5.*arcsec2rad  # rad
+    sensor_params['sigma_dict'] = sigma_dict
     print(sensor_params)
     
 
-    
+    # Generate truth and measurements
     truth_dict = {}
     X = X_true.copy()
     for kk in range(len(tk_list)):
@@ -236,7 +246,8 @@ def twobody_setup():
             if check_visibility(X, sensor, UTC, EOP_data, XYs_df):
                 
                 # Compute measurements
-                x = 1
+                meas = compute_measurement(X, state_params, sensor, UTC,
+                                           EOP_data, XYs_df, meas_types)
     
     
     return truth_dict

@@ -13,6 +13,7 @@ sys.path.append('../')
 #from skyfield.api import Topos, EarthSatellite, Loader
 
 from sensors.sensors import define_sensors
+from sensors.brdf_models import compute_mapp_lambert
 from utilities.ephemeris import compute_sun_coords, compute_moon_coords
 from utilities.tle_functions import get_spacetrack_tle_data
 from utilities.tle_functions import find_closest_tle_epoch
@@ -451,7 +452,7 @@ def compute_visible_passes(UTC_list, obj_id_list, sensor_id_list, tle_dict={},
                     # from catalog
                     if 'mapp_lim' in sensor:
                         mapp_lim = sensor['mapp_lim']
-                        mapp = compute_mapp(phase_angle, rg_km, radius_km, albedo)
+                        mapp = compute_mapp_lambert(phase_angle, rg_km, radius_km, albedo)
                         if mapp > mapp_lim:
                             vis_array[ii] = False
                             mapp_inds.append(ii)
@@ -844,7 +845,10 @@ def check_visibility(X, state_params, sensor, UTC, EOP_data, XYs_df):
             # from catalog
             if 'mapp_lim' in sensor:
                 mapp_lim = sensor['mapp_lim']
-                mapp = compute_measurement(rso_gcrf, state_params, sensor, UTC, EOP_data, XYs_df, ['el'])[0]
+                phase_angle, sat_rg, sat_radius, albedo=0.1
+                mapp = compute_mapp_lambert(phase_angle, rg_km,
+                                            state_params['radius_m']/1000.,
+                                            state_params['albedo'])
                 if mapp > mapp_lim:
                     vis_flag = False
 
@@ -1112,45 +1116,6 @@ def compute_pass(UTC_vis, rg_vis, el_vis, sensor):
                 el_max = -1
                         
     return start_list, stop_list, TCA_list, TME_list, rg_min_list, el_max_list
-
-
-def compute_mapp(phase_angle, sat_rg, sat_radius, albedo=0.1):
-    '''
-    This function computes the apparent magnitude of a space object
-    due to reflected sunlight. Assumes object is diffuse sphere.
-
-    Reference
-    ------
-    Cognion, "Observations and Modeling of GEO Satellites at Large
-    Phase Angles," 2013.
-
-    Parameters
-    ------
-    phase_angle : float
-        angle at satellite between sun vector and observer vector [rad]
-    sat_rg : float
-        range from observer to satellite [km]
-    sat_radius : float
-        radius of spherical satellite [km]
-    albedo : float, optional
-        unitless reflectivity parameter of object (default = 0.1)
-
-    Returns
-    ------
-    mapp : float
-        apparent magnitude
-    '''
-
-    # Fraction of incident solar flux reflected by diffuse sphere satellite
-    F_diff = (2./3.) * (albedo/pi) * (sat_radius/sat_rg)**2. * \
-        (sin(phase_angle) + (pi - phase_angle)*cos(phase_angle))
-
-    if sat_radius == 0.:
-        mapp = 100.
-    else:
-        mapp = -26.74 - 2.5*log10(F_diff)
-
-    return mapp
 
 
 def rcs2radius_meters(rcs_m2):
