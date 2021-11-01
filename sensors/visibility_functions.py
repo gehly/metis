@@ -120,7 +120,7 @@ def get_database_object_params(rso_dict):
     return rso_dict
 
 
-def compute_visible_passes(UTC_list, obj_id_list, sensor_id_list, tle_dict={},
+def compute_visible_passes(UTC_list, obj_id_list, sensor_dict, tle_dict={},
                            TAI_UTC=37., offline_flag=False, source='spacetrack',
                            username='', password=''):
     '''
@@ -169,12 +169,12 @@ def compute_visible_passes(UTC_list, obj_id_list, sensor_id_list, tle_dict={},
     # Load sensor data
     # Include options here to load from file, URL, graph database, ...
     
-    # Load from database
-    if source == 'database':        
-        sensor_dict = get_database_sensor_data(sensor_id_list)
-        
-    else:        
-        sensor_dict = define_sensors(sensor_id_list)
+#    # Load from database
+#    if source == 'database':        
+#        sensor_dict = get_database_sensor_data(sensor_id_list)
+#        
+#    else:        
+#        sensor_dict = define_sensors(sensor_id_list)
         
     # Compute sensor location in ITRF
     for sensor_id in sensor_dict:

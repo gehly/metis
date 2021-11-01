@@ -1826,7 +1826,7 @@ def propagate_TLE(obj_id_list, UTC_list, tle_dict={}, prev_flag=False,
         # Loop over times
         for UTC in UTC_list:
             
-            print(obj_id, UTC)
+#            print(obj_id, UTC)
             
             # Find the closest TLE by epoch
             epoch_start = time.time()

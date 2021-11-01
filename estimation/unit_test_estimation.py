@@ -227,8 +227,12 @@ def twobody_setup():
 
     # Generate truth and measurements
     truth_dict = {}
+    meas_dict = {}
+    meas_dict['meas'] = {}
     X = X_true.copy()
     for kk in range(len(tk_list)):
+        
+        tk = tk_list[kk]
         
         if kk > 0:
             tin = [tvec[kk-1], tvec[kk]]
@@ -246,8 +250,15 @@ def twobody_setup():
             if check_visibility(X, sensor, UTC, EOP_data, XYs_df):
                 
                 # Compute measurements
-                meas = compute_measurement(X, state_params, sensor, UTC,
-                                           EOP_data, XYs_df, meas_types)
+                Yk = compute_measurement(X, state_params, sensor, UTC,
+                                         EOP_data, XYs_df,
+                                         meas_types=sensor_params['meas_types'])
+                
+                Yk[0] += np.random.randn()*sigma_dict['ra']
+                Yk[1] += np.random.randn()*sigma_dict['dec']
+                
+                meas_dict['meas'][tk] = Yk
+                
     
     
     return truth_dict
