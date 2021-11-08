@@ -792,6 +792,7 @@ def check_visibility(X, state_params, sensor, UTC, EOP_data, XYs_df):
             
             if sun_el > sun_elmask:
                 vis_flag = False
+                print(UTC, 'Station Dark!')
                 
         # Laser constraints
         if 'laser_output' in sensor and state_params['laser_lim'] > 0.:
@@ -833,24 +834,31 @@ def check_visibility(X, state_params, sensor, UTC, EOP_data, XYs_df):
                 half_cone = asin(Re/r)
                 if sun_angle < half_cone:
                     vis_flag = False
+                    print(UTC, 'Eclipse!')
 
             # Check too close to moon
             if 'moon_angle_lim' in sensor:
                 moon_angle_lim = sensor['moon_angle_lim']
                 if moon_angle < moon_angle_lim:
                     vis_flag = False
+                    print(UTC, 'Moon Limit!')
                             
             # Check apparent magnitude
             # Optional input for albedo could be retrieved for each object
             # from catalog
             if 'mapp_lim' in sensor:
                 mapp_lim = sensor['mapp_lim']
-                phase_angle, sat_rg, sat_radius, albedo=0.1
                 mapp = compute_mapp_lambert(phase_angle, rg_km,
                                             state_params['radius_m']/1000.,
                                             state_params['albedo'])
+                print('\n', UTC, el_rad, mapp, vis_flag)
+                
+                
                 if mapp > mapp_lim:
                     vis_flag = False
+                    
+
+    print(UTC, el_rad, vis_flag)
 
     return vis_flag
 

@@ -1,4 +1,5 @@
 import numpy as np
+from math import pi
 import matplotlib.pyplot as plt
 import sys
 from datetime import datetime, timedelta
@@ -38,6 +39,7 @@ def balldrop_setup():
     int_params['intfcn'] = ode_balldrop
     int_params['rtol'] = 1e-12
     int_params['atol'] = 1e-12
+    int_params['time_system'] = 'seconds'
 
     # Time vector
     tk_list = np.arange(0.,100.1,1.)
@@ -56,15 +58,18 @@ def balldrop_setup():
     # Generate Truth and Measurements
     truth_dict = {}
     meas_dict = {}
+    meas_dict['tk_list'] = []
+    meas_dict['Yk_list'] = []
+    meas_dict['sensor_id_list'] = []
     sensor_params = {}
+    sensor_params[1] = {}
     sig_y = 0.01
     sig_dy = 0.001
-    sensor_params['sigma_dict'] = {}
-    sensor_params['sigma_dict']['y'] = sig_y
-    sensor_params['sigma_dict']['dy'] = sig_dy
-    sensor_params['meas_types'] = ['y', 'dy']
-    meas_dict['meas_fcn'] = H_balldrop
-    meas_dict['meas'] = {}
+    sensor_params[1]['sigma_dict'] = {}
+    sensor_params[1]['sigma_dict']['y'] = sig_y
+    sensor_params[1]['sigma_dict']['dy'] = sig_dy
+    sensor_params[1]['meas_types'] = ['y', 'dy']
+    meas_fcn = H_balldrop
     outlier_inds = []
     X = X_true.copy()
     
@@ -86,19 +91,21 @@ def balldrop_setup():
         
         y_meas = float(X[0]) + y_noise
         dy_meas = float(X[1]) + dy_noise
-        meas_dict['meas'][tk_list[kk]] = np.array([[y_meas], [dy_meas]])
+        meas_dict['tk_list'].append(tk_list[kk])
+        meas_dict['Yk_list'].append(np.array([[y_meas], [dy_meas]]))
+        meas_dict['sensor_id_list'].append(1)
 
-    return state_dict, state_params, int_params, meas_dict, sensor_params, truth_dict
+    return state_dict, state_params, int_params, meas_fcn, meas_dict, sensor_params, truth_dict
 
 
 def execute_balldrop_test():
     
-    state_dict, state_params, int_params, meas_dict, sensor_params, truth_dict =\
+    state_dict, state_params, int_params, meas_fcn, meas_dict, sensor_params, truth_dict =\
         balldrop_setup()
         
     int_params['intfcn'] = ode_balldrop_stm
         
-    filter_output = ls_batch(state_dict, meas_dict, state_params, sensor_params, int_params)
+    filter_output = ls_batch(state_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
     
     # Compute errors
     n = 2
@@ -153,17 +160,27 @@ def execute_balldrop_test():
 
 
 
-def H_balldrop(Xref, state_params, sensor_params):
+def H_balldrop(tk, Xref, state_params, sensor_kk):
     
     # Break out state
     y = float(Xref[0])
     dy = float(Xref[1])
     
+    # Measurement information
+    meas_types = sensor_kk['meas_types']
+    sigma_dict = sensor_kk['sigma_dict']
+    p = len(meas_types)
+    Rk = np.zeros((p, p))
+    for ii in range(p):
+        mtype = meas_types[ii]
+        sig = sigma_dict[mtype]
+        Rk[ii,ii] = sig**2.   
+    
     # Hk_til and Gi
     Hk_til = np.diag([1.,1.])
     Gk = np.array([[y],[dy]])
     
-    return Hk_til, Gk
+    return Hk_til, Gk, Rk
 
 
 
@@ -195,10 +212,11 @@ def twobody_setup():
     int_params['intfcn'] = ode_twobody
     int_params['rtol'] = 1e-12
     int_params['atol'] = 1e-12
+    int_params['time_system'] = 'datetime'
 
     # Time vector
     tvec = np.arange(0., 86400.*0.5 + 1., 10.)
-    UTC0 = datetime(2021, 10, 10, 0, 0, 0)
+    UTC0 = datetime(2021, 6, 1, 0, 0, 0)
     tk_list = [UTC0 + timedelta(seconds=ti) for ti in tvec]
 
     # Inital State
@@ -215,27 +233,26 @@ def twobody_setup():
     
     
     # Sensor and measurement parameters
-    sensor_id_list = ['CMU Falcon']
+    sensor_id_list = ['CMU Falcon', 'PSU Falcon']
     sensor_params = define_sensors(sensor_id_list)
-    sensor_params['meas_types'] = ['ra', 'dec']
+    sensor_params[sensor_id_list[0]]['meas_types'] = ['ra', 'dec']
     sigma_dict = {}
     sigma_dict['ra'] = 5.*arcsec2rad   # rad
     sigma_dict['dec'] = 5.*arcsec2rad  # rad
-    sensor_params['sigma_dict'] = sigma_dict
+    sensor_params[sensor_id_list[0]]['sigma_dict'] = sigma_dict
     print(sensor_params)
-    
 
     # Generate truth and measurements
     truth_dict = {}
     meas_dict = {}
-    meas_dict['meas'] = {}
+    meas_dict['tk_list'] = []
+    meas_dict['Yk_list'] = []
+    meas_dict['sensor_id_list'] = []
     X = X_true.copy()
     for kk in range(len(tk_list)):
         
-        tk = tk_list[kk]
-        
         if kk > 0:
-            tin = [tvec[kk-1], tvec[kk]]
+            tin = [tk_list[kk-1], tk_list[kk]]
             tout, Xout = general_dynamics(X, tin, state_params, int_params)
             X = Xout[-1,:].reshape(6, 1)
         
@@ -247,21 +264,53 @@ def twobody_setup():
         
         for sensor_id in sensor_id_list:
             sensor = sensor_params[sensor_id]
-            if check_visibility(X, sensor, UTC, EOP_data, XYs_df):
+            if check_visibility(X, state_params, sensor, UTC, EOP_data, XYs_df):
                 
                 # Compute measurements
                 Yk = compute_measurement(X, state_params, sensor, UTC,
                                          EOP_data, XYs_df,
-                                         meas_types=sensor_params['meas_types'])
+                                         meas_types=sensor['meas_types'])
                 
                 Yk[0] += np.random.randn()*sigma_dict['ra']
                 Yk[1] += np.random.randn()*sigma_dict['dec']
                 
-                meas_dict['meas'][tk] = Yk
+                meas_dict['tk_list'].append(UTC)
+                meas_dict['Yk_list'].append(Yk)
+                meas_dict['sensor_id_list'].append(sensor_id)
+                
+
+    # Plot data
+    tplot = [(tk - tk_list[0]).total_seconds()/3600. for tk in tk_list]
+    xplot = []
+    yplot = []
+    zplot = []
+    for tk in tk_list:
+        X = truth_dict[tk]
+        xplot.append(X[0])
+        yplot.append(X[1])
+        zplot.append(X[2])
+        
+    
+    plt.figure()
+    plt.subplot(3,1,1)
+    plt.plot(tplot, xplot, 'k.')
+    plt.ylabel('X [km]')
+    plt.subplot(3,1,2)
+    plt.plot(tplot, yplot, 'k.')
+    plt.ylabel('Y [km]')
+    plt.subplot(3,1,3)
+    plt.plot(tplot, zplot, 'k.')
+    plt.ylabel('Z [km]')
+    plt.xlabel('Time [hours]')
+    
+                
+    plt.show()   
+    
+    print(meas_dict)
                 
     
     
-    return truth_dict
+    return 
 
 
 

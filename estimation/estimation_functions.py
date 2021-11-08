@@ -11,7 +11,7 @@ from dynamics.dynamics_functions import general_dynamics
 # Batch Estimation
 ###############################################################################
 
-def ls_batch(state_dict, meas_dict, state_params, sensor_params, int_params):
+def ls_batch(state_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params):
     '''
     This function implements the linearized batch estimator for the least
     squares cost function.
@@ -22,14 +22,10 @@ def ls_batch(state_dict, meas_dict, state_params, sensor_params, int_params):
         initial state and covariance for filter execution
     meas_dict : dictionary
         measurement data over time for the filter and parameters (noise, etc)
-    inputs : dictionary
-        input parameters
-    intfcn : function handle
-        function for dynamics model
+
     meas_fcn : function handle
         function for measurements
-    pnorm : float, optional
-        p-norm distribution parameter (default=2.)
+
 
     Returns
     ------
@@ -42,29 +38,19 @@ def ls_batch(state_dict, meas_dict, state_params, sensor_params, int_params):
     Xo_ref = state_dict[state_tk]['X']
     Po_bar = state_dict[state_tk]['P']
 
-    # Measurement information
-    meas_fcn = meas_dict['meas_fcn']
-    meas_types = sensor_params['meas_types']
-    sigma_dict = sensor_params['sigma_dict']
-    p = len(meas_types)
-    Rk = np.zeros((p, p))
-    for ii in range(p):
-        mtype = meas_types[ii]
-        sig = sigma_dict[mtype]
-        Rk[ii,ii] = sig**2.   
-
     # Setup
     cholPo = np.linalg.inv(np.linalg.cholesky(Po_bar))
     invPo_bar = np.dot(cholPo.T, cholPo)
-    cholRk = np.linalg.inv(np.linalg.cholesky(Rk))
-    invRk = np.dot(cholRk.T, cholRk)
+
     n = len(Xo_ref)
 
     # Initialize output
     filter_output = {}
 
     # Measurement times
-    tk_list = sorted(meas_dict['meas'].keys())
+    tk_list = meas_dict['tk_list']
+    Yk_list = meas_dict['Yk_list']
+    sensor_id_list = meas_dict['sensor_id_list']
 
     # Number of epochs
     L = len(tk_list)
@@ -111,9 +97,9 @@ def ls_batch(state_dict, meas_dict, state_params, sensor_params, int_params):
             tk = tk_list[kk]
 
             # Read the next observation
-            Yk = meas_dict['meas'][tk]
-
-            # If Rk is different at each time epoch, include it here
+            Yk = meas_dict['Yk_list'][kk]
+            sensor_id = meas_dict['sensor_id_list'][kk]
+            sensor_kk = sensor_params[sensor_id]
 
             # Initialize
             Xref_prior = Xref.copy()
@@ -137,9 +123,11 @@ def ls_batch(state_dict, meas_dict, state_params, sensor_params, int_params):
             phi = np.reshape(phi_v, (n, n))
 
             # Accumulate the normal equations
-            Hk_til, Gk = meas_fcn(Xref, state_params, sensor_params)
+            Hk_til, Gk, Rk = meas_fcn(tk, Xref, state_params, sensor_kk)
             yk = Yk - Gk
             Hk = np.dot(Hk_til, phi)
+            cholRk = np.linalg.inv(np.linalg.cholesky(Rk))
+            invRk = np.dot(cholRk.T, cholRk)
                         
             Lambda += np.dot(Hk.T, np.dot(invRk, Hk))
             N += np.dot(Hk.T, np.dot(invRk, yk))
