@@ -11,7 +11,8 @@ from dynamics.dynamics_functions import general_dynamics
 # Batch Estimation
 ###############################################################################
 
-def ls_batch(state_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params):
+def ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
+             sensor_params, int_params):
     '''
     This function implements the linearized batch estimator for the least
     squares cost function.
@@ -97,9 +98,8 @@ def ls_batch(state_dict, meas_dict, meas_fcn, state_params, sensor_params, int_p
             tk = tk_list[kk]
 
             # Read the next observation
-            Yk = meas_dict['Yk_list'][kk]
-            sensor_id = meas_dict['sensor_id_list'][kk]
-            sensor_kk = sensor_params[sensor_id]
+            Yk = Yk_list[kk]
+            sensor_id = sensor_id_list[kk]
 
             # Initialize
             Xref_prior = Xref.copy()
@@ -123,7 +123,7 @@ def ls_batch(state_dict, meas_dict, meas_fcn, state_params, sensor_params, int_p
             phi = np.reshape(phi_v, (n, n))
 
             # Accumulate the normal equations
-            Hk_til, Gk, Rk = meas_fcn(tk, Xref, state_params, sensor_kk)
+            Hk_til, Gk, Rk = meas_fcn(tk, Xref, state_params, sensor_params, sensor_id)
             yk = Yk - Gk
             Hk = np.dot(Hk_til, phi)
             cholRk = np.linalg.inv(np.linalg.cholesky(Rk))
@@ -174,8 +174,50 @@ def ls_batch(state_dict, meas_dict, meas_fcn, state_params, sensor_params, int_p
         filter_output[tk]['X'] = X
         filter_output[tk]['P'] = P
         filter_output[tk]['resids'] = resids
+        
+    
+    # Integrate over full time
+    tk_truth = list(truth_dict.keys())
+    phi_v = phi0_v.copy()
+    Xref = Xo_ref.copy()
+    full_state_output = {}
+    for kk in range(len(tk_truth)):
+        
+        # Current and previous time
+        if kk == 0:
+            tk_prior = state_tk
+        else:
+            tk_prior = tk_truth[kk-1]
+            
+        tk = tk_truth[kk]
+        
+        # Initial Conditions for Integration Routine
+        Xref_prior = Xref.copy()
+        int0 = np.concatenate((Xref_prior, phi_v))
 
-    return filter_output
+        # Integrate Xref and STM
+        if tk_prior == tk:
+            intout = int0.T
+        else:
+            int0 = int0.flatten()
+            tin = [tk_prior, tk]
+            
+            tout, intout = general_dynamics(int0, tin, state_params, int_params)
+
+        # Extract values for later calculations
+        xout = intout[-1,:]
+        Xref = xout[0:n].reshape(n, 1)
+        phi_v = xout[n:].reshape(n**2, 1)
+        phi = np.reshape(phi_v, (n, n))
+        P = np.dot(phi, np.dot(Po, phi.T))
+        
+        full_state_output[tk] = {}
+        full_state_output[tk]['X'] = Xref
+        full_state_output[tk]['P'] = P
+        
+    
+
+    return filter_output, full_state_output
 
 
 

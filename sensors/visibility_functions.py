@@ -776,24 +776,6 @@ def check_visibility(X, state_params, sensor, UTC, EOP_data, XYs_df):
     # Check optional constraints
     if vis_flag:
         
-        # Compute sun/moon position
-        TAI_UTC = EOP_data['TAI_UTC']  
-        TT_JD = utcdt2ttjd(UTC, TAI_UTC)
-        TT_cent = jd2cent(TT_JD)
-        sun_eci_geom, sun_eci_app = compute_sun_coords(TT_cent)
-        moon_eci_geom, moon_eci_app = compute_moon_coords(TT_cent)
-        
-        # Sunlit/station dark constraint
-        if 'sun_elmask' in sensor:
-            sun_elmask = sensor['sun_elmask']
-                
-            # Compute sun elevation angle
-            sun_el = compute_measurement(sun_eci_app, state_params, sensor, UTC, EOP_data, XYs_df, ['el'])[0]
-            
-            if sun_el > sun_elmask:
-                vis_flag = False
-                print(UTC, 'Station Dark!')
-                
         # Laser constraints
         if 'laser_output' in sensor and state_params['laser_lim'] > 0.:
             laser_lim = state_params['laser_lim']
@@ -817,8 +799,26 @@ def check_visibility(X, state_params, sensor, UTC, EOP_data, XYs_df):
             vis_flag = False
             
         # Eclipse and lighting conditions
-        if sensor['passive_optical']:
+        if sensor['passive_optical']:            
             
+            # Compute sun/moon position
+            TAI_UTC = EOP_data['TAI_UTC']  
+            TT_JD = utcdt2ttjd(UTC, TAI_UTC)
+            TT_cent = jd2cent(TT_JD)
+            sun_eci_geom, sun_eci_app = compute_sun_coords(TT_cent)
+            moon_eci_geom, moon_eci_app = compute_moon_coords(TT_cent)
+            
+            # Sunlit/station dark constraint
+            if 'sun_elmask' in sensor:
+                sun_elmask = sensor['sun_elmask']
+                    
+                # Compute sun elevation angle
+                sun_el = compute_measurement(sun_eci_app, state_params, sensor, UTC, EOP_data, XYs_df, ['el'])[0]
+                
+                if sun_el > sun_elmask:
+                    vis_flag = False
+                    print(UTC, 'Station Dark!')
+
             # For remaining indices compute angles and visibility conditions
             rso_gcrf = X[0:3].reshape(3,1)
             phase_angle, sun_angle, moon_angle = \
@@ -858,7 +858,7 @@ def check_visibility(X, state_params, sensor, UTC, EOP_data, XYs_df):
                     vis_flag = False
                     
 
-    print(UTC, el_rad, vis_flag)
+#    print(UTC, el_rad, vis_flag)
 
     return vis_flag
 

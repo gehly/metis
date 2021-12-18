@@ -606,6 +606,6 @@ def ode_twobody_stm(t, X, params):
     dX[4] = -GM*y/r**3
     dX[5] = -GM*z/r**3
 
-    dX[n:] = dphi_v
+    dX[n:] = dphi_v.flatten()
 
     return dX
