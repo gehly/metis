@@ -11,42 +11,29 @@ from utilities.coordinate_systems import gcrf2itrf
 from utilities.coordinate_systems import ecef2enu
 
 
-def compute_measurement(X, sun_gcrf, sensor, spacecraftConfig, surfaces, UTC,
-                        EOP_data, meas_types=[], XYs_df=[]):
+def compute_measurement(X, state_params, sensor, UTC, EOP_data, XYs_df=[], meas_types=[],
+                        sun_gcrf=[]):
     
-    # Retrieve sensor parameters
+    # Retrieve measurement types
     if len(meas_types) == 0:
         meas_types = sensor['meas_types']
-    geodetic_latlonht = sensor['geodetic_latlonht']
     
     # Compute station location in GCRF
-    lat = geodetic_latlonht[0]
-    lon = geodetic_latlonht[1]
-    ht = geodetic_latlonht[2]
-    stat_itrf = latlonht2ecef(lat, lon, ht)
-    stat_gcrf, dum = itrf2gcrf(stat_itrf, np.zeros((3,1)), UTC, EOP_data,
-                               XYs_df)
+    sensor_itrf = sensor['site_ecef']
+    sensor_gcrf, dum = itrf2gcrf(sensor_itrf, np.zeros((3,1)), UTC, EOP_data,
+                                 XYs_df)
     
     # Object location in GCRF
     r_gcrf = X[0:3].reshape(3,1)
     
     # Compute range and line of sight vector
-    rg = np.linalg.norm(r_gcrf - stat_gcrf)
-    rho_hat_gcrf = (r_gcrf - stat_gcrf)/rg
+    rg = np.linalg.norm(r_gcrf - sensor_gcrf)
+    rho_hat_gcrf = (r_gcrf - sensor_gcrf)/rg
     
     # Rotate to ENU frame
     rho_hat_itrf, dum = gcrf2itrf(rho_hat_gcrf, np.zeros((3,1)), UTC, EOP_data,
                                   XYs_df)
-    rho_hat_enu = ecef2enu(rho_hat_itrf, stat_itrf)
-    
-#    print('\n measurements')
-#    print(stat_gcrf)
-#    print(r_gcrf)
-#    print(rho_hat_gcrf)
-#    print(rho_hat_enu)
-#    print('el', asin(rho_hat_enu[2])*180/pi)
-    
-    
+    rho_hat_enu = ecef2enu(rho_hat_itrf, sensor_itrf)
     
     # Loop over measurement types
     Y = np.zeros((len(meas_types),1))
@@ -64,23 +51,27 @@ def compute_measurement(X, sun_gcrf, sensor, spacecraftConfig, surfaces, UTC,
     
         elif mtype == 'az':
             Y[ii] = atan2(rho_hat_enu[0], rho_hat_enu[1])  # rad  
+            if Y[ii] < 0.:
+                Y[ii] += 2.*pi
             
         elif mtype == 'el':
             Y[ii] = asin(rho_hat_enu[2])  # rad
             
         elif mtype == 'mapp':
             
-            sat2sun = sun_gcrf - r_gcrf
-            sat2obs = stat_gcrf - r_gcrf
-            if spacecraftConfig['type'] == '3DoF':
-                mapp = compute_mapp(sat2sun, sat2obs, spacecraftConfig, surfaces)                
-                Y[ii] = mapp
-               
-                    
-            elif spacecraftConfig['type'] == '6DoF' or spacecraftConfig['type'] == '3att':
-                q_BI = X[6:10].reshape(4,1)                
-                mapp = compute_mapp(sat2sun, sat2obs, spacecraftConfig, surfaces, q_BI)                
-                Y[ii] = mapp
+            Y[ii] = 1.
+            
+#            sat2sun = sun_gcrf - r_gcrf
+#            sat2obs = stat_gcrf - r_gcrf
+#            if spacecraftConfig['type'] == '3DoF':
+#                mapp = compute_mapp(sat2sun, sat2obs, spacecraftConfig, surfaces)                
+#                Y[ii] = mapp
+#               
+#                    
+#            elif spacecraftConfig['type'] == '6DoF' or spacecraftConfig['type'] == '3att':
+#                q_BI = X[6:10].reshape(4,1)                
+#                mapp = compute_mapp(sat2sun, sat2obs, spacecraftConfig, surfaces, q_BI)                
+#                Y[ii] = mapp
                 
         else:
             print('Invalid Measurement Type! Entered: ', mtype)

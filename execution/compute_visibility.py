@@ -11,6 +11,7 @@ from utilities.constants import Re
 from utilities.tle_functions import launch2tle, tletime2datetime
 from sensors.visibility_functions import compute_visible_passes
 from sensors.visibility_functions import generate_visibility_file
+from sensors.sensors import define_sensors
 
 
 if __name__ == '__main__':
@@ -58,7 +59,8 @@ if __name__ == '__main__':
     dt = 10.
     UTC_list = [UTC0 + timedelta(seconds=ti) for ti in list(np.arange(0, delta_t, dt))]
     
-    vis_dict = compute_visible_passes(UTC_list, obj_id_list, sensor_id_list)
+    sensor_dict = define_sensors(sensor_id_list)
+    vis_dict = compute_visible_passes(UTC_list, obj_id_list, sensor_dict)
     
     
 #    print(vis_dict)
