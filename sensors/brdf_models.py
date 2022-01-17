@@ -1,9 +1,16 @@
 import numpy as np
 from math import pi, sin, cos, tan, asin, acos, atan, atan2, log10
 import sys
+import os
+import inspect
 import copy
 
-sys.path.append('../')
+filename = inspect.getframeinfo(inspect.currentframe()).filename
+current_dir = os.path.dirname(os.path.abspath(filename))
+
+ind = current_dir.find('metis')
+metis_dir = current_dir[0:ind+5]
+sys.path.append(metis_dir)
 
 import utilities.attitude as att
 

@@ -2,12 +2,18 @@ import numpy as np
 from math import pi, cos, sin, acos, asin, atan2, log10
 import os
 import sys
+import inspect
 import csv
 import time
 from datetime import datetime, timedelta
 import getpass
 
-sys.path.append('../')
+filename = inspect.getframeinfo(inspect.currentframe()).filename
+current_dir = os.path.dirname(os.path.abspath(filename))
+
+ind = current_dir.find('metis')
+metis_dir = current_dir[0:ind+5]
+sys.path.append(metis_dir)
 
 #from skyfield.constants import ERAD
 #from skyfield.api import Topos, EarthSatellite, Loader

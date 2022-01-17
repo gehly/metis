@@ -1,23 +1,16 @@
-#import ephem
-#import pysolar.julian as julian
-#import pysolar.solar as solar
-
-#import TurboProp.PyUtils.Time as TPT
-
-
-
-# Compute the sun/moon position in ECI
-#sun_eci = compute_sun_eci2(JED_JD)
-#moon_eci = compute_moon_eci2(JED_JD)
-
-
-
 import numpy as np
 from math import pi, sin, cos, asin, atan2
 import sys
+import os
+import inspect
 from datetime import datetime, timedelta
 
-sys.path.append('../')
+filename = inspect.getframeinfo(inspect.currentframe()).filename
+current_dir = os.path.dirname(os.path.abspath(filename))
+
+ind = current_dir.find('metis')
+metis_dir = current_dir[0:ind+5]
+sys.path.append(metis_dir)
 
 
 from utilities.constants import AU_km

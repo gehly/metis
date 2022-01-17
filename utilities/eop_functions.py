@@ -4,23 +4,18 @@ import requests
 import pandas as pd
 import os
 import sys
+import inspect
 import pickle
 import copy
 from datetime import datetime
 
-sys.path.append('../')
+filename = inspect.getframeinfo(inspect.currentframe()).filename
+current_dir = os.path.dirname(os.path.abspath(filename))
 
-
-cwd = os.getcwd()
-ind = cwd.find('metis')
-    
-if ind > -1:
-    metis_dir = cwd[0:ind+5]
-else:
-    metis_dir = r'C:\Users\Steve\Documents\code\metis'
-        
+ind = current_dir.find('metis')
+metis_dir = current_dir[0:ind+5]
 input_data_dir = os.path.join(metis_dir, 'input_data')
-
+sys.path.append(metis_dir)
 
 from utilities.time_systems import dt2mjd, mjd2dt, utcdt2ut1jd, utcdt2ttjd, jd2cent
 from utilities.numerical_methods import interp_lagrange
