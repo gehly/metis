@@ -280,6 +280,8 @@ def compute_visible_passes(UTC_list, obj_id_list, sensor_dict, tle_dict={},
     
 #    print(rso_dict)
     
+    vis_calc_start = time.time()
+    pass_calc_time = 0.
 
     # Initialize output
     start_list_all = []
@@ -479,8 +481,12 @@ def compute_visible_passes(UTC_list, obj_id_list, sensor_dict, tle_dict={},
 #            print('moon_inds', moon_inds)
             
             # Compute pass start and stop times
+            pass_calc_start = time.time()
+            
             start_list, stop_list, TCA_list, TME_list, rg_min_list, el_max_list = \
                 compute_pass(UTC_vis, rg_vis, el_vis, sensor)
+                
+            pass_calc_time += time.time() - pass_calc_start
 
             # Store output
             npass = len(start_list)
@@ -492,6 +498,11 @@ def compute_visible_passes(UTC_list, obj_id_list, sensor_dict, tle_dict={},
             el_max_list_all.extend(el_max_list)
             obj_id_list_all.extend([obj_id]*npass)
             sensor_id_list_all.extend([sensor_id]*npass)
+            
+    vis_calc_time = time.time() - vis_calc_start - pass_calc_time
+    
+    print('pass_calc_time', pass_calc_time)
+    print('vis_calc_time', vis_calc_time)
 
     # Sort results
 #    start_list_JD = [ti for ti in start_list_all]
@@ -517,7 +528,7 @@ def compute_visible_passes(UTC_list, obj_id_list, sensor_dict, tle_dict={},
     vis_dict['obj_id_list'] = sorted_obj_id
     vis_dict['sensor_id_list'] = sorted_sensor_id
 
-    return vis_dict
+    return vis_dict, rso_dict
 
 
 def compute_transit_dict(UTC_window, obj_id_list, site_dict, increment=10.,
@@ -1521,7 +1532,7 @@ def compute_angles(rso_gcrf, sun_gcrf, moon_gcrf, sensor_gcrf):
 #    return moon_eci_geom, moon_eci_app
 
 
-def generate_visibility_file(vis_dict, vis_file, vis_file_min_el):
+def generate_visibility_file(vis_dict, rso_dict, UTC_list, outdir, vis_file, vis_file_min_el):
     '''
     This function produces the visibility .CSV file with output passes
     sorted by start times.
@@ -1575,6 +1586,31 @@ def generate_visibility_file(vis_dict, vis_file, vis_file_min_el):
                              UTC_TCA, UTC_TME, rg_min, el_max])
     
     csvfile.close()
+    
+    
+    for obj_id in rso_dict:
+        fname = 'NORAD_' + str(obj_id).zfill(5) + '_GCRF_pos.csv'
+        obj_file = os.path.join(outdir, fname)
+        gcrf_list = rso_dict[obj_id]['r_GCRF']
+        
+        with open(obj_file, 'w', newline='') as csvfile:
+            writer = csv.writer(csvfile, delimiter=',')
+            writer.writerow(['UTC', 'X [km]', 'Y [km]', 'Z [km]'])
+            
+            for ii in range(len(UTC_list)):
+                UTC = UTC_list[ii].strftime('%Y-%m-%d %H:%M:%S')
+                x = str(float(gcrf_list[ii][0]))
+                y = str(float(gcrf_list[ii][1]))
+                z = str(float(gcrf_list[ii][2]))
+                
+                writer.writerow([UTC, x, y, z])
+                
+        csvfile.close()
+        
+    
+        
+    
+    
     
     return
 
