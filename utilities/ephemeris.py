@@ -1,23 +1,16 @@
-#import ephem
-#import pysolar.julian as julian
-#import pysolar.solar as solar
-
-#import TurboProp.PyUtils.Time as TPT
-
-
-
-# Compute the sun/moon position in ECI
-#sun_eci = compute_sun_eci2(JED_JD)
-#moon_eci = compute_moon_eci2(JED_JD)
-
-
-
 import numpy as np
 from math import pi, sin, cos, asin, atan2
 import sys
+import os
+import inspect
 from datetime import datetime, timedelta
 
-sys.path.append('../')
+filename = inspect.getframeinfo(inspect.currentframe()).filename
+current_dir = os.path.dirname(os.path.abspath(filename))
+
+ind = current_dir.find('metis')
+metis_dir = current_dir[0:ind+5]
+sys.path.append(metis_dir)
 
 
 from utilities.constants import AU_km
@@ -211,17 +204,17 @@ def compute_moon_coords(TT_cent):
                  (TT_cent**3.)/450000) * deg2rad
                  
     
-    print('DA_vec')
-    print(DA_vec)
-    print('\n\n')
-    print('moon_mean_anomaly Mprime', moon_mean_anomaly % (2*pi) * 180/pi)
-    print('sun_mean_anomaly M', np.mod(sun_mean_anomaly, 2*pi) * 180/pi)
-    print('moon_arg_lat F', moon_arg_lat % (2*pi) * 180/pi)
-    print('moon_mean_elongation D', moon_mean_elongation % (2*pi) * 180/pi)
-    print('moon_loan', moon_loan % (2*pi) * 180/pi)
-    print('\n\n')
-    
-    print('moon_mean_long Lprime', moon_mean_longitude % (2*pi) * 180/pi)
+#    print('DA_vec')
+#    print(DA_vec)
+#    print('\n\n')
+#    print('moon_mean_anomaly Mprime', moon_mean_anomaly % (2*pi) * 180/pi)
+#    print('sun_mean_anomaly M', np.mod(sun_mean_anomaly, 2*pi) * 180/pi)
+#    print('moon_arg_lat F', moon_arg_lat % (2*pi) * 180/pi)
+#    print('moon_mean_elongation D', moon_mean_elongation % (2*pi) * 180/pi)
+#    print('moon_loan', moon_loan % (2*pi) * 180/pi)
+#    print('\n\n')
+#    
+#    print('moon_mean_long Lprime', moon_mean_longitude % (2*pi) * 180/pi)
 
     # Additioanl Arguments
     A1 = (119.75 + 131.849*TT_cent) * deg2rad
@@ -353,24 +346,24 @@ def compute_moon_coords(TT_cent):
         - 115.*sin(moon_mean_longitude + moon_mean_anomaly)
 
     # Calculation moon coordinates
-    print('moon_mean_longitude', moon_mean_longitude)
+#    print('moon_mean_longitude', moon_mean_longitude)
     
     lon_rad = moon_mean_longitude + (L_sum/1e6) * deg2rad
     lat_rad = (B_sum/1e6) * deg2rad
     r_km = 385000.56 + R_sum/1000.
     
-    print('TT_cent', TT_cent)
-    print('A1', A1 * 180/pi % 360.)
-    print('A2', A2 * 180/pi % 360.)
-    print('A3', A3 * 180/pi % 360.)
-    print('E', E)
-    print('L_sum', L_sum)
-    print('B_sum', B_sum)
-    print('R_sum', R_sum)
-    
-    print('lon_deg', lon_rad * 180/pi % 360.)
-    print('lat_deg', lat_rad * 180/pi)
-    print('r_km', r_km)
+#    print('TT_cent', TT_cent)
+#    print('A1', A1 * 180/pi % 360.)
+#    print('A2', A2 * 180/pi % 360.)
+#    print('A3', A3 * 180/pi % 360.)
+#    print('E', E)
+#    print('L_sum', L_sum)
+#    print('B_sum', B_sum)
+#    print('R_sum', R_sum)
+#    
+#    print('lon_deg', lon_rad * 180/pi % 360.)
+#    print('lat_deg', lat_rad * 180/pi)
+#    print('r_km', r_km)
     
     
     # Obliquity of the Ecliptic (Eq 22.2)
@@ -422,12 +415,12 @@ def compute_moon_coords(TT_cent):
     ra_app = atan2(moon_eci_app[1], moon_eci_app[0])
     dec_app = asin(moon_eci_app[2]/r_km)
     
-    print('\n\nApparent Coords')
-    print('apparent long', lon_app_rad*180/pi % 360.)
-    print('dPsi', dPsi*180/pi)
-    print('Eps_true', Eps_true_rad*180/pi)
-    print('ra app', ra_app*180/pi)
-    print('dec app', dec_app*180/pi)
+#    print('\n\nApparent Coords')
+#    print('apparent long', lon_app_rad*180/pi % 360.)
+#    print('dPsi', dPsi*180/pi)
+#    print('Eps_true', Eps_true_rad*180/pi)
+#    print('ra app', ra_app*180/pi)
+#    print('dec app', dec_app*180/pi)
     
     
     

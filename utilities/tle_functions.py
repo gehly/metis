@@ -5,6 +5,7 @@ import getpass
 from datetime import datetime, timedelta
 import sys
 import os
+import inspect
 import matplotlib.pyplot as plt
 import pandas as pd
 import json
@@ -12,7 +13,12 @@ import time
 import pickle
 import copy
 
-sys.path.append('../')
+filename = inspect.getframeinfo(inspect.currentframe()).filename
+current_dir = os.path.dirname(os.path.abspath(filename))
+
+ind = current_dir.find('metis')
+metis_dir = current_dir[0:ind+5]
+sys.path.append(metis_dir)
 
 from sensors.sensors import define_sensors
 from sensors.measurements import ecef2azelrange
@@ -625,6 +631,17 @@ def get_tle_range(username='', password='', start_norad='', stop_norad=''):
                 print("Error: Page data request failed.")
             tle_df = pd.DataFrame(response_dict)
             return tle_df
+
+
+def tle_archiver():
+    tle_df = get_tle_range(username='',password='', start_norad='43689', stop_norad='81000')
+    
+    os.chdir(r'D:\documents\research\launch_identification\data\tle_archive')
+    
+    filename = datetime.now().strftime("%Y%m%d-%H%M%S")+'_tle_latest.csv'
+    tle_df.to_csv(filename)
+    
+    return
 
 
 def tledict2dataframe(tle_dict):
@@ -1826,6 +1843,8 @@ def propagate_TLE(obj_id_list, UTC_list, tle_dict={}, prev_flag=False,
         # Loop over times
         for UTC in UTC_list:
             
+#            print(obj_id, UTC)
+            
             # Find the closest TLE by epoch
             epoch_start = time.time()
             line1, line2 = find_closest_tle_epoch(line1_list, line2_list, UTC,
@@ -1953,17 +1972,17 @@ if __name__ == '__main__' :
     
     # Retrieve TLE 
     retrieve_list = [UTC_list[0] - timedelta(days=1), UTC_list[-1] + timedelta(days=1)]
-    tle_dict, dum = get_spacetrack_tle_data(obj_id_list, retrieve_list, 
-                                            username='steve.gehly@gmail.com', 
-                                            password='SpaceTrackPword!')
+    tle_dict, dum = get_spacetrack_tle_data(obj_id_list, retrieve_list)
+    
+    print(tle_dict)
     
     output_state = propagate_TLE(obj_id_list, UTC_list, tle_dict, prev_flag=True)
     
-    # Save output
-    fname = os.path.join(r'D:\documents\research\cubesats\GeoscienceAustralia\data\check_tle_propagation.pkl')
-    pklFile = open( fname, 'wb' )
-    pickle.dump( [output_state], pklFile, -1 )
-    pklFile.close()
+    # # Save output
+    # fname = os.path.join(r'D:\documents\research\cubesats\GeoscienceAustralia\data\check_tle_propagation.pkl')
+    # pklFile = open( fname, 'wb' )
+    # pickle.dump( [output_state], pklFile, -1 )
+    # pklFile.close()
     
 #    
 #    UTC_list = [datetime(2021, 3, 24, 0, 0, 0)]

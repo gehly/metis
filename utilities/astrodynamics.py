@@ -4,10 +4,16 @@ from math import sinh, cosh, tanh, atanh
 from datetime import datetime
 import os
 import sys
+import inspect
 
-sys.path.append('../')
+filename = inspect.getframeinfo(inspect.currentframe()).filename
+current_dir = os.path.dirname(os.path.abspath(filename))
 
-from utilities.constants import GME, J2E, Re
+ind = current_dir.find('metis')
+metis_dir = current_dir[0:ind+5]
+sys.path.append(metis_dir)
+
+from utilities.constants import GME, J2E, Re, wE
 from utilities.time_systems import utcdt2ttjd, jd2cent
 from utilities.ephemeris import compute_sun_coords
 from utilities.eop_functions import get_celestrak_eop_alldata, get_eop_data
@@ -1067,8 +1073,35 @@ if __name__ == '__main__':
     EOP_data = get_eop_data(eop_alldata, UTC)
     
     
-    LTAN = compute_LTAN(RAAN, UTC, EOP_data)
+    LTAN = RAAN_to_LTAN(RAAN, UTC, EOP_data)
     print(LTAN)
     
     
+###############################################################################
+# Orbit Transfers
+###############################################################################
+
+def compute_launch_velocity(lat_rad, R=Re, w=wE):
+    '''
+    This function computes the launch velocity component contributed by the 
+    planet's rotation for a given latitude.
     
+    Parameters
+    ------
+    lat_rad : float
+        geodetic latitude [radians]
+    R : float, optional
+        planet radius (default=Re) [km]
+    w : float, optional
+        planet rotational velocity (default=wE) [rad/s]
+        
+    Returns
+    ------
+    v0 : float
+        velocity magnitude [km/s]
+    
+    '''
+    
+    v0 = R*w*cos(lat_rad)
+    
+    return v0    

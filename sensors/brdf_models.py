@@ -1,12 +1,57 @@
 import numpy as np
 from math import pi, sin, cos, tan, asin, acos, atan, atan2, log10
 import sys
+import os
+import inspect
 import copy
 
-sys.path.append('../')
+filename = inspect.getframeinfo(inspect.currentframe()).filename
+current_dir = os.path.dirname(os.path.abspath(filename))
+
+ind = current_dir.find('metis')
+metis_dir = current_dir[0:ind+5]
+sys.path.append(metis_dir)
 
 import utilities.attitude as att
 
+
+def compute_mapp_lambert(phase_angle, sat_rg, sat_radius, albedo=0.1):
+    '''
+    This function computes the apparent magnitude of a space object
+    due to reflected sunlight. Assumes object is diffuse sphere.
+
+    Reference
+    ------
+    Cognion, "Observations and Modeling of GEO Satellites at Large
+    Phase Angles," 2013.
+
+    Parameters
+    ------
+    phase_angle : float
+        angle at satellite between sun vector and observer vector [rad]
+    sat_rg : float
+        range from observer to satellite [km]
+    sat_radius : float
+        radius of spherical satellite [km]
+    albedo : float, optional
+        unitless reflectivity parameter of object (default = 0.1)
+
+    Returns
+    ------
+    mapp : float
+        apparent magnitude
+    '''
+
+    # Fraction of incident solar flux reflected by diffuse sphere satellite
+    F_diff = (2./3.) * (albedo/pi) * (sat_radius/sat_rg)**2. * \
+        (sin(phase_angle) + (pi - phase_angle)*cos(phase_angle))
+
+    if sat_radius == 0.:
+        mapp = 100.
+    else:
+        mapp = -26.74 - 2.5*log10(F_diff)
+
+    return mapp
 
 
 def compute_mapp(sat2sun, sat2obs, spacecraftConfig, surfaces, q_BI=[]):

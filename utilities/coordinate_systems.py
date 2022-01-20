@@ -2,10 +2,17 @@ import numpy as np
 from math import pi, sin, cos, tan, asin, acos, atan, atan2
 from datetime import datetime
 import sys
+import os
+import inspect
 import copy
 import time
 
-sys.path.append('../')
+filename = inspect.getframeinfo(inspect.currentframe()).filename
+current_dir = os.path.dirname(os.path.abspath(filename))
+
+ind = current_dir.find('metis')
+metis_dir = current_dir[0:ind+5]
+sys.path.append(metis_dir)
 
 from utilities.time_systems import utcdt2ttjd
 from utilities.time_systems import utcdt2ut1jd
