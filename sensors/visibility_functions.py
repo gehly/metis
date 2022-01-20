@@ -240,16 +240,19 @@ def compute_visible_passes(UTC_list, obj_id_list, sensor_dict, tle_dict={},
         start = time.time()
         # Loop over objects
         for obj_id in rso_dict:
-            rso_teme_list = rso_dict[obj_id]['r_TEME']
+            r_teme_list = rso_dict[obj_id]['r_TEME']
+            v_teme_list = rso_dict[obj_id]['v_TEME']
             
             if 'r_GCRF' not in rso_dict[obj_id]:
                 rso_dict[obj_id]['r_GCRF'] = []
                 rso_dict[obj_id]['r_ITRF'] = []
                 
-            r_GCRF = np.dot(GCRF_TEME, rso_teme_list[ii])
+            r_GCRF = np.dot(GCRF_TEME, r_teme_list[ii])
+            v_GCRF = np.dot(GCRF_TEME, v_teme_list[ii])
             r_ITRF = np.dot(ITRF_GCRF, r_GCRF)
             
             rso_dict[obj_id]['r_GCRF'].append(r_GCRF)
+            rso_dict[obj_id]['v_GCRF'].append(v_GCRF)
             rso_dict[obj_id]['r_ITRF'].append(r_ITRF)
             
         obj_loop_time += time.time() - start
@@ -1589,21 +1592,26 @@ def generate_visibility_file(vis_dict, rso_dict, UTC_list, outdir, vis_file, vis
     
     
     for obj_id in rso_dict:
-        fname = 'NORAD_' + str(obj_id).zfill(5) + '_GCRF_pos.csv'
+        fname = 'NORAD_' + str(obj_id).zfill(5) + '_GCRF_posvel.csv'
         obj_file = os.path.join(outdir, fname)
-        gcrf_list = rso_dict[obj_id]['r_GCRF']
+        r_gcrf_list = rso_dict[obj_id]['r_GCRF']
+        v_gcrf_list = rso_dict[obj_id]['v_GCRF']
         
         with open(obj_file, 'w', newline='') as csvfile:
             writer = csv.writer(csvfile, delimiter=',')
-            writer.writerow(['UTC', 'X [km]', 'Y [km]', 'Z [km]'])
+            writer.writerow(['UTC', 'X [km]', 'Y [km]', 'Z [km]', 'dX [km/s]', 
+                             'dY [km/s]', 'dZ [km/s]'])
             
             for ii in range(len(UTC_list)):
                 UTC = UTC_list[ii].strftime('%Y-%m-%d %H:%M:%S')
-                x = str(float(gcrf_list[ii][0]))
-                y = str(float(gcrf_list[ii][1]))
-                z = str(float(gcrf_list[ii][2]))
+                x = str(float(r_gcrf_list[ii][0]))
+                y = str(float(r_gcrf_list[ii][1]))
+                z = str(float(r_gcrf_list[ii][2]))
+                dx = str(float(v_gcrf_list[ii][0]))
+                dy = str(float(v_gcrf_list[ii][1]))
+                dz = str(float(v_gcrf_list[ii][2]))
                 
-                writer.writerow([UTC, x, y, z])
+                writer.writerow([UTC, x, y, z, dx, dy, dz])
                 
         csvfile.close()
         
