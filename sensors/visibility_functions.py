@@ -1590,9 +1590,9 @@ def generate_visibility_file(vis_dict, rso_dict, UTC_list, outdir, vis_file, vis
     
     csvfile.close()
     
-    
+    datestr = UTC_list[0].strftime('%Y_%m_%d')
     for obj_id in rso_dict:
-        fname = 'NORAD_' + str(obj_id).zfill(5) + '_GCRF_posvel.csv'
+        fname = 'NORAD_' + str(obj_id).zfill(5) + '_GCRF_posvel_' + datestr + '.csv'
         obj_file = os.path.join(outdir, fname)
         r_gcrf_list = rso_dict[obj_id]['r_GCRF']
         v_gcrf_list = rso_dict[obj_id]['v_GCRF']
