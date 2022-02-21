@@ -2,6 +2,7 @@ import numpy as np
 from math import pi, sin, cos, tan, fmod, fabs, atan, atan2, acos, asin
 from math import sinh, cosh, tanh, atanh
 from datetime import datetime
+import pandas as pd
 import os
 import sys
 import inspect
@@ -14,7 +15,9 @@ ind = current_dir.find('metis')
 metis_dir = current_dir[0:ind+5]
 sys.path.append(metis_dir)
 
+from utilities.astrodynamics import sma2meanmot, meanmot2sma, sunsynch_inclination
 from utilities.constants import GME, J2E, Re, wE
+
 
 
 ###############################################################################
@@ -79,6 +82,31 @@ def swath2fov(a, swath_rad, R=Re):
     fov = 2.*f
     
     return fov
+
+
+def swath2Nto(swath_km, R=Re):
+    '''
+    This function computes the minimum number of revs before repeat Nto 
+    required for full global coverage with no gaps, given the swath in km.
+    
+    Parameters
+    ------
+    swath_km : float
+        swath width on surface of planet at equator [km]
+    R : float, optional
+        radius of central body (default=Re)
+        
+    Returns
+    ------
+    Nto : int
+        whole number of orbit revolutions before repeat
+        
+    '''
+    
+    swath_rad = swath_km/R
+    Nto = int(np.ceil(2.*pi/swath_rad))
+    
+    return Nto
 
 
 def plot_swath_vs_altitude():
@@ -438,6 +466,94 @@ def compute_triple_list(hmin, hmax, fov, Cto_list, R=Re, GM=GME):
     return triple_list
 
 
+def Nto_to_triple(Nto_required, hmin, hmax, Cto_list, R=Re, GM=GME):
+    
+    # Compute minumum and maximum mean motion in rev/day
+    # Note that Keplerian period and mean motion are slightly different from 
+    # nodal period and mean motion, but should be ok to set up these bounds
+    a_min = R + hmin
+    a_max = R + hmax
+    n_max = np.sqrt(GM/a_min**3.) * 86400./(2.*pi)     # rev/day
+    n_min = np.sqrt(GM/a_max**3.) * 86400./(2.*pi)     # rev/day
+    
+    
+    # Find values of Nto that create rational numbers for valid ranges of 
+    # Cto
+    data_list = []
+    for Cto in Cto_list:
+        
+        # Generate candidate values of Nto
+        Nto_min = np.ceil(Cto*n_min)
+        Nto_max = np.floor(Cto*n_max)
+        Nto_range = list(np.arange(Nto_min, Nto_max))
+        
+        if Nto_max < Nto_required:
+            continue
+        
+        # Remove entries that are too small or not coprime
+        del_list = []
+        for Nto in Nto_range:
+            if Nto < Nto_required:
+                del_list.append(Nto)
+                
+            if not is_coprime(Nto, Cto):
+                del_list.append(Nto)
+                
+        Nto_list = list(set(Nto_range) - set(del_list))
+                
+        # Compute triples
+        for Nto in Nto_list:
+            vo = np.round(Nto/Cto)
+            Dto = Nto - vo*Cto
+            
+            # Skip entries that have Eto = 1
+            Eto = compute_Eto(vo, Dto, Cto)
+#            if Eto == 1:
+#                continue
+            
+            # Check delta < swath to ensure full global coverage
+            # Assume near-circular sunsynch orbit
+#            a, i = nodal_period_to_sunsynch_orbit(Nto, Cto, 1e-4)
+#            swath_rad, swath_km = compute_groundswath(a, fov)
+#            delta = 2*pi/Nto
+            
+#            print(Nto, Cto)
+#            print(a)
+#            print(swath_rad, delta)
+            
+           
+#            if delta > swath_rad : 
+#                continue   
+            
+            # Compute delta at Equator
+            delta = 2*pi/Nto
+            delta_km = R*delta
+            
+            
+            # Orbit Altitude
+            # Assume near-circular sunsynch orbit
+            a, i = nodal_period_to_sunsynch_orbit(Nto, Cto, 1e-4)
+            h = a - R
+            
+            
+            data_list.append([vo, Dto, Cto, Nto, Eto, h, delta_km])
+            
+#        print(Nto_list)
+#        print(del_list)
+#        print(triple_list)
+   
+    
+    
+    # Generate pandas dataframe 
+    column_headers = ['vo [rev/day]', 'Dto [revs]', 'Cto [days]',
+                      'Nto [revs]', 'Eto [days]', 'Altitude [km]',
+                      'Delta_Equator [km]']
+    
+    recurrent_df = pd.DataFrame(data_list, columns = column_headers)
+    
+    return recurrent_df
+
+
 def is_coprime(x, y):
     '''
     This function checks if two numbers are coprime
@@ -590,3 +706,39 @@ def nodal_period_to_sunsynch_orbit(Nto, Cto, e, R=Re, GM=GME, J2=J2E):
     i = i * 180./pi
     
     return a, i
+
+
+if __name__ == '__main__':
+    
+    
+    swath_km = 16.
+    Nto = swath2Nto(swath_km)
+    
+    print(Nto)
+    
+    n = sma2meanmot(Re+600.)
+    n_revday = n * 86400./(2.*pi)
+    print(n_revday)
+    
+    print(Nto/n_revday)
+    
+    hmin = 590.
+    hmax = 650.
+    Cto_list = [160, 170, 180, 190, 200]
+    recurrent_df = Nto_to_triple(Nto, hmin, hmax, Cto_list)
+    
+    print(recurrent_df)
+    
+    fdir = r'D:\documents\research\cubesats\OzFuel'
+    fname = os.path.join(fdir, 'OzFuel_Recurrent_Orbits.csv')
+    recurrent_df.to_csv(fname)
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
