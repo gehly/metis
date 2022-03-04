@@ -15,8 +15,9 @@ ind = current_dir.find('metis')
 metis_dir = current_dir[0:ind+5]
 sys.path.append(metis_dir)
 
-from utilities.astrodynamics import sma2meanmot, meanmot2sma, sunsynch_inclination
+from utilities.astrodynamics import sma2meanmot, meanmot2sma, sunsynch_inclination, LTAN_to_RAAN
 from utilities.constants import GME, J2E, Re, wE
+from utilities.eop_functions import get_celestrak_eop_alldata, get_eop_data
 
 
 
@@ -82,6 +83,22 @@ def swath2fov(a, swath_rad, R=Re):
     fov = 2.*f
     
     return fov
+
+
+def alpha2f(alpha, a, R=Re):
+    
+    
+    rho = np.sqrt(R**2. + a**2. - 2.*Re*a*cos(alpha))
+    f = asin((sin(alpha)/rho)*Re)
+    
+    return f
+
+def f2el(f, a, R=Re):
+    
+    sinx = a*sin(f)/R
+    el = pi/2. - asin(sinx)
+    
+    return el
 
 
 def swath2Nto(swath_km, R=Re):
@@ -712,26 +729,117 @@ if __name__ == '__main__':
     
     
     swath_km = 16.
+    h = 550.
+    
+    
     Nto = swath2Nto(swath_km)
     
-    print(Nto)
+    print('Nto', Nto)
     
-    n = sma2meanmot(Re+600.)
+    n = sma2meanmot(Re+h)
     n_revday = n * 86400./(2.*pi)
-    print(n_revday)
+    print('n [rev/day]', n_revday)
     
-    print(Nto/n_revday)
+    print('min days in repeat', Nto/n_revday)
     
-    hmin = 590.
+    
+    
+    
+    hmin = 540.
     hmax = 650.
     Cto_list = [160, 170, 180, 190, 200]
     recurrent_df = Nto_to_triple(Nto, hmin, hmax, Cto_list)
     
     print(recurrent_df)
     
+#    fdir = r'D:\documents\research\cubesats\OzFuel'
+#    fname = os.path.join(fdir, 'OzFuel_Recurrent_Orbits.csv')
+#    recurrent_df.to_csv(fname)
+    
+    
+    # Final Orbit Elements/Setup
+    print('\n\nFinal Orbit Setup')
+    LTAN = 13.5
+    triple = [15, 7, 170]
+    Cto = triple[2]
+    Nto = triple[2]*triple[0] + triple[1]
+    
+    print(Nto, Cto)
+    e = 1e-4
+    a, i = nodal_period_to_sunsynch_orbit(Nto, Cto, e)
+    
+    h = a - Re
+    
+    swath_rad = swath_km/Re
+    alpha = swath_rad/2.
+    f = alpha2f(alpha, (Re+h))
+    fov_deg = f*2*180./pi
+    
+    print('fov_deg', fov_deg)
+    
+    
+    for slew_deg in [0., 5., 10., 15., 20.]:
+        slew_f = f + slew_deg*pi/180
+        min_el = f2el(slew_f, (Re+h))
+        
+        print('slew [deg]', slew_deg, 'min el [deg]', min_el*180./pi)
+    
+    UTC = datetime(2022, 2, 22, 13, 30, 0)
+    eop_alldata = get_celestrak_eop_alldata()
+    EOP_data = get_eop_data(eop_alldata, UTC)
+    RAAN = LTAN_to_RAAN(LTAN, UTC, EOP_data)
+    
+    print(a, e, i, RAAN)
+    
+    
+    
+    
+    a = Re + 550.
+    fov = 1.67*pi/180.
+    
+    for fov_deg in [1.67, 10, 20, 30, 40]:
+        
+        fov = fov_deg * pi/180.    
+        swath_rad, swath_km = compute_groundswath(a, fov, R=Re)
+        Nto = swath2Nto(swath_km)
+        Cto = Nto/15.
+    
+        print(swath_km)
+        print(Nto)
+        print(Cto)
+        
+        
+    
+    Nto = 100
+    hmin = 500.
+    hmax = 600.
+    Cto_list = [6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+    recurrent_df = Nto_to_triple(Nto, hmin, hmax, Cto_list)
+    
+    print(recurrent_df)
+    
     fdir = r'D:\documents\research\cubesats\OzFuel'
-    fname = os.path.join(fdir, 'OzFuel_Recurrent_Orbits.csv')
+    fname = os.path.join(fdir, 'OzFuel_Recurrent_Orbits2.csv')
     recurrent_df.to_csv(fname)
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     
     
     

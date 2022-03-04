@@ -1065,16 +1065,7 @@ def element_conversion(x_in, iflag, oflag, GM=GME, dt=0.):
     return x_out
 
 
-if __name__ == '__main__':
-    
-    RAAN = 0.
-    UTC = datetime(2000, 1, 1, 12, 0, 0)
-    eop_alldata = get_celestrak_eop_alldata()
-    EOP_data = get_eop_data(eop_alldata, UTC)
-    
-    
-    LTAN = RAAN_to_LTAN(RAAN, UTC, EOP_data)
-    print(LTAN)
+
     
     
 ###############################################################################
@@ -1105,3 +1096,24 @@ def compute_launch_velocity(lat_rad, R=Re, w=wE):
     v0 = R*w*cos(lat_rad)
     
     return v0    
+
+
+
+if __name__ == '__main__':
+    
+#    RAAN = 0.
+#    UTC = datetime(2000, 1, 1, 12, 0, 0)
+#    eop_alldata = get_celestrak_eop_alldata()
+#    EOP_data = get_eop_data(eop_alldata, UTC)
+#    
+#    
+#    LTAN = RAAN_to_LTAN(RAAN, UTC, EOP_data)
+#    print(LTAN)
+    
+    
+    cart = np.array([710.87, 5151.26, 5075.69, 0.9039, -5.222, 5.1735])
+    kep = cart2kep(cart)
+    print(kep)
+    
+    
+    
