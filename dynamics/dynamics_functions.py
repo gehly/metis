@@ -29,11 +29,11 @@ def general_dynamics(Xo, tvec, state_params, int_params):
     integrator = int_params['integrator']
     
     # Convert time to seconds
-    time_system = int_params['time_system']
-    if time_system == 'datetime':
+    time_format = int_params['time_format']
+    if time_format == 'datetime':
         t0 = tvec[0]
         tvec = [(ti - t0).total_seconds() for ti in tvec]
-    if time_system == 'JD':
+    if time_format == 'JD':
         t0 = tvec[0]
         tvec = [(ti - t0)*86400. for ti in tvec]
         
