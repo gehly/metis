@@ -375,7 +375,7 @@ def eci2ric(rc_vect, vc_vect, Q_eci=[]):
         Q_eci = Q_eci.reshape(3,1)
         Q_ric = np.dot(ON, Q_eci)
     else:
-        Q_ric = np.dot(np.dot(ON, Q_ric), ON.T)
+        Q_ric = np.dot(np.dot(ON, Q_eci), ON.T)
 
     return Q_ric
 

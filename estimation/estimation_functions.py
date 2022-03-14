@@ -100,6 +100,8 @@ def ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         # Loop over times
         for kk in range(L):
             
+#            print('\nkk = ', kk)
+            
             # Current and previous time
             if kk == 0:
                 tk_prior = state_tk
@@ -132,6 +134,9 @@ def ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
             Xref = xout[0:n].reshape(n, 1)
             phi_v = xout[n:].reshape(n**2, 1)
             phi = np.reshape(phi_v, (n, n))
+            
+#            print('\n\n')
+#            print('Xref', Xref)
 
             # Accumulate the normal equations
             Hk_til, Gk, Rk = meas_fcn(tk, Xref, state_params, sensor_params, sensor_id)
@@ -156,8 +161,12 @@ def ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
 #            print(Gk)
 #            print(yk)
 #            
-#            if kk > 0:
+#            if kk > 2:
 #                mistake
+
+
+        print(Lambda)
+        print(np.linalg.eig(Lambda))
 
 
         # Solve the normal equations
@@ -366,7 +375,136 @@ def H_radec(tk, Xref, state_params, sensor_params, sensor_id):
     return Hk_til, Gk, Rk
 
 
+def H_cwrho(tk, Xref, state_params, sensor_params, sensor_id):
 
+    
+    # Measurement noise
+    sensor_kk = sensor_params[sensor_id]
+    sigma_dict = sensor_kk['sigma_dict']
+    Rk = np.zeros((1, 1))
+    sig = sigma_dict['rho']
+    Rk[0,0] = sig**2.   
+    
+    # Object location in RIC
+    x = float(Xref[0])
+    y = float(Xref[1])
+    z = float(Xref[2])
+    
+    # Compute range and line of sight vector
+    rho = np.linalg.norm([x, y, z])
+    
+#    print('\n H fcn')
+#    print(Xref)
+#    print(x)
+#    print(y)
+#    print(z)
+#    print(rho)
+
+    # Hk_til and Gi
+    Gk = np.zeros((1,1))
+    Gk[0] = rho
+    
+    Hk_til = np.zeros((1,6))
+    Hk_til[0,0] = x/rho
+    Hk_til[0,1] = y/rho
+    Hk_til[0,2] = z/rho  
+    
+#    print('Gk', Gk)
+#    print('Hk_til', Hk_til)
+    
+    
+    return Hk_til, Gk, Rk
+
+
+def H_cwxyz(tk, Xref, state_params, sensor_params, sensor_id):
+
+    
+    # Measurement noise
+    sensor_kk = sensor_params[sensor_id]
+    sigma_dict = sensor_kk['sigma_dict']
+    Rk = np.zeros((6,6))
+    Rk[0,0] = sigma_dict['x']**2.   
+    Rk[1,1] = sigma_dict['y']**2.
+    Rk[2,2] = sigma_dict['z']**2.
+    Rk[3,3] = sigma_dict['dx']**2.
+    Rk[4,4] = sigma_dict['dy']**2.
+    Rk[5,5] = sigma_dict['dz']**2.
+    
+    # Object location in RIC
+    x = float(Xref[0])
+    y = float(Xref[1])
+    z = float(Xref[2])
+    dx = float(Xref[3])
+    dy = float(Xref[4])
+    dz = float(Xref[5])
+
+    # Hk_til and Gi
+#    Gk = np.zeros((6,1))
+#    Gk[0] = x
+#    Gk[1] = y
+#    Gk[2] = z
+#    Gk[3]
+    
+    Gk = Xref.reshape(6,1)
+    
+#    Hk_til = np.zeros((6,6))
+#    Hk_til[0,0] = 1.
+#    Hk_til[1,1] = 1.
+#    Hk_til[2,2] = 1.
+    Hk_til = np.eye(6)
+    
+#    print('Gk', Gk)
+#    print('Hk_til', Hk_til)
+    
+    
+    return Hk_til, Gk, Rk
+
+
+def H_nonlincw_full(tk, Xref, state_params, sensor_params, sensor_id):
+
+    
+    # Measurement noise
+    sensor_kk = sensor_params[sensor_id]
+    sigma_dict = sensor_kk['sigma_dict']
+    Rk = np.zeros((6,6))
+    Rk[0,0] = sigma_dict['x']**2.   
+    Rk[1,1] = sigma_dict['y']**2.
+    Rk[2,2] = sigma_dict['z']**2.
+    Rk[3,3] = sigma_dict['dx']**2.
+    Rk[4,4] = sigma_dict['dy']**2.
+    Rk[5,5] = sigma_dict['dz']**2.
+    
+    # Object location in RIC
+    x = float(Xref[0])
+    y = float(Xref[1])
+    z = float(Xref[2])
+    dx = float(Xref[3])
+    dy = float(Xref[4])
+    dz = float(Xref[5])
+
+    # Hk_til and Gi
+#    Gk = np.zeros((6,1))
+#    Gk[0] = x
+#    Gk[1] = y
+#    Gk[2] = z
+#    Gk[3]
+    
+    Gk = Xref[0:6].reshape(6,1)
+    
+    Hk_til = np.zeros((6,9))
+    Hk_til[0,0] = 1.
+    Hk_til[1,1] = 1.
+    Hk_til[2,2] = 1.
+    Hk_til[3,3] = 1.
+    Hk_til[4,4] = 1.
+    Hk_til[5,5] = 1.
+    
+    
+#    print('Gk', Gk)
+#    print('Hk_til', Hk_til)
+    
+    
+    return Hk_til, Gk, Rk
 
 
 #def lp_batch(state_dict, meas_dict, inputs, intfcn, meas_fcn, pnorm=2.):

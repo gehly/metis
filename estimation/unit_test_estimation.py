@@ -499,7 +499,7 @@ def execute_twobody_test():
     
     arcsec2rad = pi/(3600.*180.)
     
-    pklFile = open('twobody_geo_setup.pkl', 'rb' )
+    pklFile = open('twobody_leo_setup.pkl', 'rb' )
     data = pickle.load( pklFile )
     state_dict = data[0]
     state_params = data[1]
@@ -516,7 +516,7 @@ def execute_twobody_test():
     
     # Compute errors
     n = 6
-    p = 2
+    p = len(meas_dict['Yk_list'][0])
     X_err = np.zeros((n, len(filter_output)))
     resids = np.zeros((p, len(filter_output)))
     sig_x = np.zeros(len(filter_output),)
@@ -587,19 +587,34 @@ def execute_twobody_test():
     plt.xlabel('Time [hours]')
     
     plt.figure()
-#    plt.subplot(3,1,1)
-#    plt.plot(thrs, resids[0,:]*1000., 'k.')
-#    plt.ylabel('Range[m]')
     
-    plt.subplot(3,1,2)
-    plt.plot(thrs, resids[0,:]/arcsec2rad, 'k.')
-    plt.ylabel('RA [arcsec]')
-    
-    plt.subplot(3,1,3)
-    plt.plot(thrs, resids[1,:]/arcsec2rad, 'k.')
-    plt.ylabel('DEC [arcsec]')
-    
-    plt.xlabel('Time [hours]')
+    if p == 3:
+        plt.subplot(3,1,1)
+        plt.plot(thrs, resids[0,:]*1000., 'k.')
+        plt.ylabel('Range [m]')
+        
+        plt.subplot(3,1,2)
+        plt.plot(thrs, resids[1,:]/arcsec2rad, 'k.')
+        plt.ylabel('RA [arcsec]')
+        
+        plt.subplot(3,1,3)
+        plt.plot(thrs, resids[2,:]/arcsec2rad, 'k.')
+        plt.ylabel('DEC [arcsec]')
+        
+        plt.xlabel('Time [hours]')
+        
+    elif p == 2:
+        
+        plt.subplot(1,1,1)
+        plt.plot(thrs, resids[0,:]/arcsec2rad, 'k.')
+        plt.ylabel('RA [arcsec]')
+        
+        plt.subplot(2,1,1)
+        plt.plot(thrs, resids[1,:]/arcsec2rad, 'k.')
+        plt.ylabel('DEC [arcsec]')
+        
+        plt.xlabel('Time [hours]')
+        
     
     plt.show()
     
@@ -630,6 +645,8 @@ if __name__ == '__main__':
 #    execute_balldrop_test()
     
 #    twobody_geo_setup()
+    
+#    twobody_leo_setup()
     
     execute_twobody_test()
 

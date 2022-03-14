@@ -30,6 +30,8 @@ def compute_measurement(X, state_params, sensor, UTC, EOP_data, XYs_df=[], meas_
     sensor_gcrf, dum = itrf2gcrf(sensor_itrf, np.zeros((3,1)), UTC, EOP_data,
                                  XYs_df)
     
+#    print('sensor_gcrf', sensor_gcrf)
+    
     # Object location in GCRF
     r_gcrf = X[0:3].reshape(3,1)
     
