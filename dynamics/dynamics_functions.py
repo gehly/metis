@@ -791,6 +791,33 @@ def ode_nonlin_cw_stm(t, X, params):
 
 
 
+def ode_lincw(t, X, params):
+    
+    # Additional arguments
+    n = params['mean_motion']
+
+    # State Vector
+    x = float(X[0])
+    y = float(X[1])
+    z = float(X[2])
+    dx = float(X[3])
+    dy = float(X[4])
+    dz = float(X[5])
+    
+    # Derivative vector
+    dX = np.zeros(6,)
+
+    dX[0] = dx
+    dX[1] = dy
+    dX[2] = dz
+
+    dX[3] = 2.*n*dy + 3.*n**2.*x
+    dX[4] = -2.*n*dx
+    dX[5] = -n**2.*z
+    
+    return dX
+
+
     
 def ode_lincw_stm(t, X, params):
     '''
