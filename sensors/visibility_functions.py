@@ -71,22 +71,29 @@ def define_RSOs(obj_id_list, UTC_list, tle_dict={}, prev_flag=False,
     # Include options here to import from space-track, celestrak, text file,
     # other URL, graph database, ...
     
-    if len(tle_dict) == 0:
-        
-        # Download from space-track.org
-        if source == 'spacetrack':            
-            
-            rso_dict = propagate_TLE(obj_id_list, UTC_list, tle_dict,
-                                     prev_flag, offline_flag, frame_flag,
-                                     username, password)
-            
-        # Retrieve from graph database
-        if source == 'database':
-            tle_dict = {}
-#            tle_dict = get_database_tle_data(obj_id_list)
-
-    # Initialize object size
-    # Include options here for RCS from SATCAT, graph database, ...  
+    
+    if source == 'spacetrack':
+        rso_dict = propagate_TLE(obj_id_list, UTC_list, tle_dict,
+                                 prev_flag, offline_flag, frame_flag,
+                                 username, password)
+    
+    
+#    if len(tle_dict) == 0:
+#        
+#        # Download from space-track.org
+#        if source == 'spacetrack':            
+#            
+#            rso_dict = propagate_TLE(obj_id_list, UTC_list, tle_dict,
+#                                     prev_flag, offline_flag, frame_flag,
+#                                     username, password)
+#            
+#        # Retrieve from graph database
+#        if source == 'database':
+#            tle_dict = {}
+##            tle_dict = get_database_tle_data(obj_id_list)
+#
+#    # Initialize object size
+#    # Include options here for RCS from SATCAT, graph database, ...  
     
     # Retrieve from database
     if source == 'database':
