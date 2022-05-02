@@ -1,3 +1,8 @@
+from math import pi
+
+# Generic Values
+arcsec2rad = pi/(3600.*180.)
+
 # Earth parameters
 wE = 7.2921158553e-5  # rad/s
 GME = 398600.4415  # km^3/s^2

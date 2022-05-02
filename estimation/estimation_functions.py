@@ -1,4 +1,5 @@
 import numpy as np
+from math import asin, atan2
 import sys
 import os
 import inspect
@@ -11,6 +12,9 @@ metis_dir = current_dir[0:ind+5]
 sys.path.append(metis_dir)
 
 from dynamics.dynamics_functions import general_dynamics
+from utilities.coordinate_systems import itrf2gcrf, gcrf2itrf, ecef2enu
+from utilities.eop_functions import get_celestrak_eop_alldata, get_eop_data
+from utilities.eop_functions import get_XYs2006_alldata
 
 
 
@@ -96,6 +100,8 @@ def ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         # Loop over times
         for kk in range(L):
             
+#            print('\nkk = ', kk)
+            
             # Current and previous time
             if kk == 0:
                 tk_prior = state_tk
@@ -128,6 +134,9 @@ def ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
             Xref = xout[0:n].reshape(n, 1)
             phi_v = xout[n:].reshape(n**2, 1)
             phi = np.reshape(phi_v, (n, n))
+            
+#            print('\n\n')
+#            print('Xref', Xref)
 
             # Accumulate the normal equations
             Hk_til, Gk, Rk = meas_fcn(tk, Xref, state_params, sensor_params, sensor_id)
@@ -152,8 +161,12 @@ def ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
 #            print(Gk)
 #            print(yk)
 #            
-#            if kk > 0:
+#            if kk > 2:
 #                mistake
+
+
+        print(Lambda)
+        print(np.linalg.eig(Lambda))
 
 
         # Solve the normal equations
@@ -227,7 +240,271 @@ def ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
     return filter_output, full_state_output
 
 
+###############################################################################
+# Measurement Functions
+###############################################################################
+    
+def H_rgradec(tk, Xref, state_params, sensor_params, sensor_id):
+    
+    
+    # Compute sensor position in GCRF
+    eop_alldata = sensor_params['eop_alldata']
+    XYs_df = sensor_params['XYs_df']
+    EOP_data = get_eop_data(eop_alldata, tk)
+    
+    sensor_kk = sensor_params[sensor_id]
+    sensor_itrf = sensor_kk['site_ecef']
+    sensor_gcrf, dum = itrf2gcrf(sensor_itrf, np.zeros((3,1)), tk, EOP_data, XYs_df)
+    
+    # Measurement noise
+    meas_types = sensor_kk['meas_types']
+    sigma_dict = sensor_kk['sigma_dict']
+    p = len(meas_types)
+    Rk = np.zeros((p, p))
+    for ii in range(p):
+        mtype = meas_types[ii]
+        sig = sigma_dict[mtype]
+        Rk[ii,ii] = sig**2.   
+    
+    
+    # Object location in GCRF
+    r_gcrf = Xref[0:3].reshape(3,1)
+    
+    # Compute range and line of sight vector
+    rho_gcrf = r_gcrf - sensor_gcrf
+    rg = np.linalg.norm(rho_gcrf)
+    rho_hat_gcrf = rho_gcrf/rg
+    
+    ra = atan2(rho_hat_gcrf[1], rho_hat_gcrf[0]) #rad
+    dec = asin(rho_hat_gcrf[2])  #rad
 
+    # Calculate partials of rho
+    drho_dx = rho_hat_gcrf[0]
+    drho_dy = rho_hat_gcrf[1]
+    drho_dz = rho_hat_gcrf[2]
+    
+    # Calculate partials of right ascension
+    d_atan = 1./(1. + (rho_gcrf[1]/rho_gcrf[0])**2.)
+    dra_dx = d_atan*(-(rho_gcrf[1])/((rho_gcrf[0])**2.))
+    dra_dy = d_atan*(1./(rho_gcrf[0]))
+    
+    # Calculate partials of declination
+    d_asin = 1./np.sqrt(1. - ((rho_gcrf[2])/rg)**2.)
+    ddec_dx = d_asin*(-(rho_gcrf[2])/rg**2.)*drho_dx
+    ddec_dy = d_asin*(-(rho_gcrf[2])/rg**2.)*drho_dy
+    ddec_dz = d_asin*(1./rg - ((rho_gcrf[2])/rg**2.)*drho_dz)
+
+    # Hk_til and Gi
+    Gk = np.reshape([rg, ra, dec], (3,1))
+    
+    Hk_til = np.zeros((3,6))
+    Hk_til[0,0] = drho_dx
+    Hk_til[0,1] = drho_dy
+    Hk_til[0,2] = drho_dz
+    Hk_til[1,0] = dra_dx
+    Hk_til[1,1] = dra_dy
+    Hk_til[2,0] = ddec_dx
+    Hk_til[2,1] = ddec_dy
+    Hk_til[2,2] = ddec_dz    
+    
+    
+    return Hk_til, Gk, Rk
+
+
+def H_radec(tk, Xref, state_params, sensor_params, sensor_id):
+    
+    
+    # Compute sensor position in GCRF
+    eop_alldata = sensor_params['eop_alldata']
+    XYs_df = sensor_params['XYs_df']
+    EOP_data = get_eop_data(eop_alldata, tk)
+    
+    sensor_kk = sensor_params[sensor_id]
+    sensor_itrf = sensor_kk['site_ecef']
+    sensor_gcrf, dum = itrf2gcrf(sensor_itrf, np.zeros((3,1)), tk, EOP_data, XYs_df)
+    
+    # Measurement noise
+    meas_types = sensor_kk['meas_types']
+    sigma_dict = sensor_kk['sigma_dict']
+    p = len(meas_types)
+    Rk = np.zeros((p, p))
+    for ii in range(p):
+        mtype = meas_types[ii]
+        sig = sigma_dict[mtype]
+        Rk[ii,ii] = sig**2.   
+    
+    
+    # Object location in GCRF
+    r_gcrf = Xref[0:3].reshape(3,1)
+    
+    # Compute range and line of sight vector
+    rho_gcrf = r_gcrf - sensor_gcrf
+    rg = np.linalg.norm(rho_gcrf)
+    rho_hat_gcrf = rho_gcrf/rg
+    
+    ra = atan2(rho_hat_gcrf[1], rho_hat_gcrf[0]) #rad
+    dec = asin(rho_hat_gcrf[2])  #rad
+
+    # Calculate partials of rho
+    drho_dx = rho_hat_gcrf[0]
+    drho_dy = rho_hat_gcrf[1]
+    drho_dz = rho_hat_gcrf[2]
+    
+    # Calculate partials of right ascension
+    d_atan = 1./(1. + (rho_gcrf[1]/rho_gcrf[0])**2.)
+    dra_dx = d_atan*(-(rho_gcrf[1])/((rho_gcrf[0])**2.))
+    dra_dy = d_atan*(1./(rho_gcrf[0]))
+    
+    # Calculate partials of declination
+    d_asin = 1./np.sqrt(1. - ((rho_gcrf[2])/rg)**2.)
+    ddec_dx = d_asin*(-(rho_gcrf[2])/rg**2.)*drho_dx
+    ddec_dy = d_asin*(-(rho_gcrf[2])/rg**2.)*drho_dy
+    ddec_dz = d_asin*(1./rg - ((rho_gcrf[2])/rg**2.)*drho_dz)
+
+    # Hk_til and Gi
+    Gk = np.reshape([ra, dec], (2,1))
+    
+    Hk_til = np.zeros((2,6))
+    Hk_til[0,0] = dra_dx
+    Hk_til[0,1] = dra_dy
+    Hk_til[1,0] = ddec_dx
+    Hk_til[1,1] = ddec_dy
+    Hk_til[1,2] = ddec_dz    
+    
+    
+    return Hk_til, Gk, Rk
+
+
+def H_cwrho(tk, Xref, state_params, sensor_params, sensor_id):
+
+    
+    # Measurement noise
+    sensor_kk = sensor_params[sensor_id]
+    sigma_dict = sensor_kk['sigma_dict']
+    Rk = np.zeros((1, 1))
+    sig = sigma_dict['rho']
+    Rk[0,0] = sig**2.   
+    
+    # Object location in RIC
+    x = float(Xref[0])
+    y = float(Xref[1])
+    z = float(Xref[2])
+    
+    # Compute range and line of sight vector
+    rho = np.linalg.norm([x, y, z])
+    
+#    print('\n H fcn')
+#    print(Xref)
+#    print(x)
+#    print(y)
+#    print(z)
+#    print(rho)
+
+    # Hk_til and Gi
+    Gk = np.zeros((1,1))
+    Gk[0] = rho
+    
+    Hk_til = np.zeros((1,6))
+    Hk_til[0,0] = x/rho
+    Hk_til[0,1] = y/rho
+    Hk_til[0,2] = z/rho  
+    
+#    print('Gk', Gk)
+#    print('Hk_til', Hk_til)
+    
+    
+    return Hk_til, Gk, Rk
+
+
+def H_cwxyz(tk, Xref, state_params, sensor_params, sensor_id):
+
+    
+    # Measurement noise
+    sensor_kk = sensor_params[sensor_id]
+    sigma_dict = sensor_kk['sigma_dict']
+    Rk = np.zeros((6,6))
+    Rk[0,0] = sigma_dict['x']**2.   
+    Rk[1,1] = sigma_dict['y']**2.
+    Rk[2,2] = sigma_dict['z']**2.
+    Rk[3,3] = sigma_dict['dx']**2.
+    Rk[4,4] = sigma_dict['dy']**2.
+    Rk[5,5] = sigma_dict['dz']**2.
+    
+    # Object location in RIC
+    x = float(Xref[0])
+    y = float(Xref[1])
+    z = float(Xref[2])
+    dx = float(Xref[3])
+    dy = float(Xref[4])
+    dz = float(Xref[5])
+
+    # Hk_til and Gi
+#    Gk = np.zeros((6,1))
+#    Gk[0] = x
+#    Gk[1] = y
+#    Gk[2] = z
+#    Gk[3]
+    
+    Gk = Xref.reshape(6,1)
+    
+#    Hk_til = np.zeros((6,6))
+#    Hk_til[0,0] = 1.
+#    Hk_til[1,1] = 1.
+#    Hk_til[2,2] = 1.
+    Hk_til = np.eye(6)
+    
+#    print('Gk', Gk)
+#    print('Hk_til', Hk_til)
+    
+    
+    return Hk_til, Gk, Rk
+
+
+def H_nonlincw_full(tk, Xref, state_params, sensor_params, sensor_id):
+
+    
+    # Measurement noise
+    sensor_kk = sensor_params[sensor_id]
+    sigma_dict = sensor_kk['sigma_dict']
+    Rk = np.zeros((6,6))
+    Rk[0,0] = sigma_dict['x']**2.   
+    Rk[1,1] = sigma_dict['y']**2.
+    Rk[2,2] = sigma_dict['z']**2.
+    Rk[3,3] = sigma_dict['dx']**2.
+    Rk[4,4] = sigma_dict['dy']**2.
+    Rk[5,5] = sigma_dict['dz']**2.
+    
+    # Object location in RIC
+    x = float(Xref[0])
+    y = float(Xref[1])
+    z = float(Xref[2])
+    dx = float(Xref[3])
+    dy = float(Xref[4])
+    dz = float(Xref[5])
+
+    # Hk_til and Gi
+#    Gk = np.zeros((6,1))
+#    Gk[0] = x
+#    Gk[1] = y
+#    Gk[2] = z
+#    Gk[3]
+    
+    Gk = Xref[0:6].reshape(6,1)
+    
+    Hk_til = np.zeros((6,9))
+    Hk_til[0,0] = 1.
+    Hk_til[1,1] = 1.
+    Hk_til[2,2] = 1.
+    Hk_til[3,3] = 1.
+    Hk_til[4,4] = 1.
+    Hk_til[5,5] = 1.
+    
+    
+#    print('Gk', Gk)
+#    print('Hk_til', Hk_til)
+    
+    
+    return Hk_til, Gk, Rk
 
 
 #def lp_batch(state_dict, meas_dict, inputs, intfcn, meas_fcn, pnorm=2.):

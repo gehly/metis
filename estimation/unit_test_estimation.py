@@ -4,10 +4,17 @@ import matplotlib.pyplot as plt
 import sys
 from datetime import datetime, timedelta
 import pickle
+import os
+import inspect
 
-sys.path.append('../')
+filename = inspect.getframeinfo(inspect.currentframe()).filename
+current_dir = os.path.dirname(os.path.abspath(filename))
 
-from estimation.estimation_functions import ls_batch
+ind = current_dir.find('metis')
+metis_dir = current_dir[0:ind+5]
+sys.path.append(metis_dir)
+
+from estimation.estimation_functions import ls_batch, H_rgradec, H_radec
 from dynamics.dynamics_functions import general_dynamics
 from dynamics.dynamics_functions import ode_balldrop, ode_balldrop_stm
 from dynamics.dynamics_functions import ode_twobody, ode_twobody_stm
@@ -216,7 +223,7 @@ def twobody_leo_setup():
     int_params['intfcn'] = ode_twobody
     int_params['rtol'] = 1e-12
     int_params['atol'] = 1e-12
-    int_params['time_system'] = 'datetime'
+    int_params['time_format'] = 'datetime'
 
     # Time vector
     tvec = np.arange(0., 3600.*12. + 1., 10.)
@@ -362,7 +369,7 @@ def twobody_geo_setup():
     int_params['intfcn'] = ode_twobody
     int_params['rtol'] = 1e-12
     int_params['atol'] = 1e-12
-    int_params['time_system'] = 'datetime'
+    int_params['time_format'] = 'datetime'
 
     # Time vector
     tk_list = []
@@ -486,142 +493,13 @@ def twobody_geo_setup():
 
 
 
-def H_rgradec(tk, Xref, state_params, sensor_params, sensor_id):
-    
-    
-    # Compute sensor position in GCRF
-    eop_alldata = sensor_params['eop_alldata']
-    XYs_df = sensor_params['XYs_df']
-    EOP_data = get_eop_data(eop_alldata, tk)
-    
-    sensor_kk = sensor_params[sensor_id]
-    sensor_itrf = sensor_kk['site_ecef']
-    sensor_gcrf, dum = itrf2gcrf(sensor_itrf, np.zeros((3,1)), tk, EOP_data, XYs_df)
-    
-    # Measurement noise
-    meas_types = sensor_kk['meas_types']
-    sigma_dict = sensor_kk['sigma_dict']
-    p = len(meas_types)
-    Rk = np.zeros((p, p))
-    for ii in range(p):
-        mtype = meas_types[ii]
-        sig = sigma_dict[mtype]
-        Rk[ii,ii] = sig**2.   
-    
-    
-    # Object location in GCRF
-    r_gcrf = Xref[0:3].reshape(3,1)
-    
-    # Compute range and line of sight vector
-    rho_gcrf = r_gcrf - sensor_gcrf
-    rg = np.linalg.norm(rho_gcrf)
-    rho_hat_gcrf = rho_gcrf/rg
-    
-    ra = atan2(rho_hat_gcrf[1], rho_hat_gcrf[0]) #rad
-    dec = asin(rho_hat_gcrf[2])  #rad
-
-    # Calculate partials of rho
-    drho_dx = rho_hat_gcrf[0]
-    drho_dy = rho_hat_gcrf[1]
-    drho_dz = rho_hat_gcrf[2]
-    
-    # Calculate partials of right ascension
-    d_atan = 1./(1. + (rho_gcrf[1]/rho_gcrf[0])**2.)
-    dra_dx = d_atan*(-(rho_gcrf[1])/((rho_gcrf[0])**2.))
-    dra_dy = d_atan*(1./(rho_gcrf[0]))
-    
-    # Calculate partials of declination
-    d_asin = 1./np.sqrt(1. - ((rho_gcrf[2])/rg)**2.)
-    ddec_dx = d_asin*(-(rho_gcrf[2])/rg**2.)*drho_dx
-    ddec_dy = d_asin*(-(rho_gcrf[2])/rg**2.)*drho_dy
-    ddec_dz = d_asin*(1./rg - ((rho_gcrf[2])/rg**2.)*drho_dz)
-
-    # Hk_til and Gi
-    Gk = np.reshape([rg, ra, dec], (3,1))
-    
-    Hk_til = np.zeros((3,6))
-    Hk_til[0,0] = drho_dx
-    Hk_til[0,1] = drho_dy
-    Hk_til[0,2] = drho_dz
-    Hk_til[1,0] = dra_dx
-    Hk_til[1,1] = dra_dy
-    Hk_til[2,0] = ddec_dx
-    Hk_til[2,1] = ddec_dy
-    Hk_til[2,2] = ddec_dz    
-    
-    
-    return Hk_til, Gk, Rk
-
-
-def H_radec(tk, Xref, state_params, sensor_params, sensor_id):
-    
-    
-    # Compute sensor position in GCRF
-    eop_alldata = sensor_params['eop_alldata']
-    XYs_df = sensor_params['XYs_df']
-    EOP_data = get_eop_data(eop_alldata, tk)
-    
-    sensor_kk = sensor_params[sensor_id]
-    sensor_itrf = sensor_kk['site_ecef']
-    sensor_gcrf, dum = itrf2gcrf(sensor_itrf, np.zeros((3,1)), tk, EOP_data, XYs_df)
-    
-    # Measurement noise
-    meas_types = sensor_kk['meas_types']
-    sigma_dict = sensor_kk['sigma_dict']
-    p = len(meas_types)
-    Rk = np.zeros((p, p))
-    for ii in range(p):
-        mtype = meas_types[ii]
-        sig = sigma_dict[mtype]
-        Rk[ii,ii] = sig**2.   
-    
-    
-    # Object location in GCRF
-    r_gcrf = Xref[0:3].reshape(3,1)
-    
-    # Compute range and line of sight vector
-    rho_gcrf = r_gcrf - sensor_gcrf
-    rg = np.linalg.norm(rho_gcrf)
-    rho_hat_gcrf = rho_gcrf/rg
-    
-    ra = atan2(rho_hat_gcrf[1], rho_hat_gcrf[0]) #rad
-    dec = asin(rho_hat_gcrf[2])  #rad
-
-    # Calculate partials of rho
-    drho_dx = rho_hat_gcrf[0]
-    drho_dy = rho_hat_gcrf[1]
-    drho_dz = rho_hat_gcrf[2]
-    
-    # Calculate partials of right ascension
-    d_atan = 1./(1. + (rho_gcrf[1]/rho_gcrf[0])**2.)
-    dra_dx = d_atan*(-(rho_gcrf[1])/((rho_gcrf[0])**2.))
-    dra_dy = d_atan*(1./(rho_gcrf[0]))
-    
-    # Calculate partials of declination
-    d_asin = 1./np.sqrt(1. - ((rho_gcrf[2])/rg)**2.)
-    ddec_dx = d_asin*(-(rho_gcrf[2])/rg**2.)*drho_dx
-    ddec_dy = d_asin*(-(rho_gcrf[2])/rg**2.)*drho_dy
-    ddec_dz = d_asin*(1./rg - ((rho_gcrf[2])/rg**2.)*drho_dz)
-
-    # Hk_til and Gi
-    Gk = np.reshape([ra, dec], (2,1))
-    
-    Hk_til = np.zeros((2,6))
-    Hk_til[0,0] = dra_dx
-    Hk_til[0,1] = dra_dy
-    Hk_til[1,0] = ddec_dx
-    Hk_til[1,1] = ddec_dy
-    Hk_til[1,2] = ddec_dz    
-    
-    
-    return Hk_til, Gk, Rk
 
 
 def execute_twobody_test():
     
     arcsec2rad = pi/(3600.*180.)
     
-    pklFile = open('twobody_geo_setup.pkl', 'rb' )
+    pklFile = open('twobody_leo_setup.pkl', 'rb' )
     data = pickle.load( pklFile )
     state_dict = data[0]
     state_params = data[1]
@@ -638,7 +516,7 @@ def execute_twobody_test():
     
     # Compute errors
     n = 6
-    p = 2
+    p = len(meas_dict['Yk_list'][0])
     X_err = np.zeros((n, len(filter_output)))
     resids = np.zeros((p, len(filter_output)))
     sig_x = np.zeros(len(filter_output),)
@@ -709,19 +587,34 @@ def execute_twobody_test():
     plt.xlabel('Time [hours]')
     
     plt.figure()
-#    plt.subplot(3,1,1)
-#    plt.plot(thrs, resids[0,:]*1000., 'k.')
-#    plt.ylabel('Range[m]')
     
-    plt.subplot(3,1,2)
-    plt.plot(thrs, resids[0,:]/arcsec2rad, 'k.')
-    plt.ylabel('RA [arcsec]')
-    
-    plt.subplot(3,1,3)
-    plt.plot(thrs, resids[1,:]/arcsec2rad, 'k.')
-    plt.ylabel('DEC [arcsec]')
-    
-    plt.xlabel('Time [hours]')
+    if p == 3:
+        plt.subplot(3,1,1)
+        plt.plot(thrs, resids[0,:]*1000., 'k.')
+        plt.ylabel('Range [m]')
+        
+        plt.subplot(3,1,2)
+        plt.plot(thrs, resids[1,:]/arcsec2rad, 'k.')
+        plt.ylabel('RA [arcsec]')
+        
+        plt.subplot(3,1,3)
+        plt.plot(thrs, resids[2,:]/arcsec2rad, 'k.')
+        plt.ylabel('DEC [arcsec]')
+        
+        plt.xlabel('Time [hours]')
+        
+    elif p == 2:
+        
+        plt.subplot(1,1,1)
+        plt.plot(thrs, resids[0,:]/arcsec2rad, 'k.')
+        plt.ylabel('RA [arcsec]')
+        
+        plt.subplot(2,1,1)
+        plt.plot(thrs, resids[1,:]/arcsec2rad, 'k.')
+        plt.ylabel('DEC [arcsec]')
+        
+        plt.xlabel('Time [hours]')
+        
     
     plt.show()
     
@@ -752,6 +645,8 @@ if __name__ == '__main__':
 #    execute_balldrop_test()
     
 #    twobody_geo_setup()
+    
+#    twobody_leo_setup()
     
     execute_twobody_test()
 

@@ -26,17 +26,21 @@ def general_dynamics(Xo, tvec, state_params, int_params):
     
     '''
     
+#    print(tvec)
+    
     integrator = int_params['integrator']
     
     # Convert time to seconds
-    time_system = int_params['time_system']
-    if time_system == 'datetime':
+    time_format = int_params['time_format']
+    if time_format == 'datetime':
         t0 = tvec[0]
         tvec = [(ti - t0).total_seconds() for ti in tvec]
-    if time_system == 'JD':
+    if time_format == 'JD':
         t0 = tvec[0]
         tvec = [(ti - t0)*86400. for ti in tvec]
         
+    
+#    print('tvec', tvec)
     
     # Setup and run integrator depending on user selection
     if integrator == 'rk4':
@@ -143,9 +147,13 @@ def general_dynamics(Xo, tvec, state_params, int_params):
         Xout = np.zeros((len(tvec), len(Xo)))
         Xout[0] = Xo.flatten()
         
+        eps = 1e-12
+        
         # Run integrator
         k = 1
-        while solver.successful() and solver.t < tvec[-1]:
+        while solver.successful() and solver.t < (tvec[-1]-eps):
+#            print('k', k)
+#            print('tvec_k', tvec[k])
             solver.integrate(tvec[k])
             Xout[k] = solver.y.flatten()
             k += 1
@@ -616,3 +624,277 @@ def ode_twobody_stm(t, X, params):
     dX[n:] = dphi_v.flatten()
 
     return dX
+
+
+###############################################################################
+# Relative Motion Functions
+###############################################################################
+    
+
+def ode_nonlin_cw(t, X, params):
+    
+    # Additional arguments
+    GM = params['GM']
+
+    # State Vector
+    x = float(X[0])
+    y = float(X[1])
+    z = float(X[2])
+    dx = float(X[3])
+    dy = float(X[4])
+    dz = float(X[5])
+    dtheta = float(X[6])
+    rc = float(X[7])
+    drc = float(X[8])
+    
+    # Deputy orbit radius
+    rd = np.sqrt((rc + x)**2. + y**2. + z**2.)
+
+    # Derivative vector
+    dX = np.zeros(9,)
+
+    dX[0] = dx
+    dX[1] = dy
+    dX[2] = dz
+
+    dX[3] = 2.*dtheta*dy - 2.*dtheta*y*drc/rc + x*dtheta**2. + GM/rc**2. - (GM/rd**3.)*(rc + x)
+    dX[4] = -2.*dtheta*dx + 2.*dtheta*x*drc/rc + y*dtheta**2. - (GM/rd**3.)*y
+    dX[5] = -(GM/rd**3.)*z
+    
+    dX[6] = -2.*drc/rc*dtheta
+    
+    dX[7] = drc
+    dX[8] = rc*dtheta**2. - GM/rc**2.
+    
+    return dX
+
+
+def ode_nonlin_cw_stm(t, X, params):
+    
+    # Additional arguments
+    GM = params['GM']
+
+    # State Vector
+    x = float(X[0])
+    y = float(X[1])
+    z = float(X[2])
+    dx = float(X[3])
+    dy = float(X[4])
+    dz = float(X[5])
+    dtheta = float(X[6])
+    rc = float(X[7])
+    drc = float(X[8])
+    
+    # Deputy orbit radius
+    rd = np.sqrt((rc + x)**2. + y**2. + z**2.)
+    
+    # A matrix partials
+    drd_dx = (rc + x)/rd
+    drd_dy = y/rd
+    drd_dz = z/rd
+    drd_drc = (rc + x)/rd
+    
+    mu_term = 3.*GM/rd**4.
+    
+    ddx_dx = dtheta**2. - GM/rd**3. + mu_term*drd_dx*(rc + x)
+    ddx_dy = -2.*dtheta*y*drc/rc + mu_term*drd_dy*(rc + x)
+    ddx_dz = mu_term*drd_dz*(rc + x)
+    ddx_ddx = 0.
+    ddx_ddy = 2.*dtheta
+    ddx_ddz = 0.
+    ddx_ddtheta = 2.*dy - 2.*y*drc/rc + 2.*x*dtheta
+    ddx_drc = 2.*dtheta*y*drc/rc**2. - 2.*GM/rc**3. + mu_term*drd_drc*(rc + x)
+    ddx_ddrc = -2.*dtheta*y/rc
+    
+    ddy_dx = 2.*dtheta*drc/rc + mu_term*drd_dx*y
+    ddy_dy = dtheta**2. - GM/rd**3. + mu_term*drd_dy*y
+    ddy_dz = mu_term*drd_dz*y
+    ddy_ddx = -2.*dtheta
+    ddy_ddy = 0.
+    ddy_ddz = 0.
+    ddy_ddtheta = -2.*dx + 2.*x*drc/rc + 2.*y*dtheta
+    ddy_drc = -2.*dtheta*x*drc/rc**2. + mu_term*drd_drc*y
+    ddy_ddrc = 2.*dtheta*x/rc
+    
+    ddz_dx = mu_term*drd_dx*z
+    ddz_dy = mu_term*drd_dy*z
+    ddz_dz = -GM/rd**3. + mu_term*drd_dz*z
+    ddz_drc = mu_term*drd_drc*z
+    
+    
+    # Generate A matrix
+    A = np.zeros((9, 9))
+
+    A[0,3] = 1.
+    A[1,4] = 1.
+    A[2,5] = 1.
+
+    A[3,0] = ddx_dx
+    A[3,1] = ddx_dy
+    A[3,2] = ddx_dz
+    A[3,3] = ddx_ddx
+    A[3,4] = ddx_ddy
+    A[3,5] = ddx_ddz
+    A[3,6] = ddx_ddtheta
+    A[3,7] = ddx_drc
+    A[3,8] = ddx_ddrc
+    
+    A[4,0] = ddy_dx
+    A[4,1] = ddy_dy
+    A[4,2] = ddy_dz
+    A[4,3] = ddy_ddx
+    A[4,4] = ddy_ddy
+    A[4,5] = ddy_ddz
+    A[4,6] = ddy_ddtheta
+    A[4,7] = ddy_drc
+    A[4,8] = ddy_ddrc
+    
+    A[5,0] = ddz_dx
+    A[5,1] = ddz_dy
+    A[5,2] = ddz_dz
+    A[5,7] = ddz_drc
+    
+    A[6,6] = -2.*drc/rc
+    A[6,7] = 2.*drc*dtheta/rc**2.
+    A[6,8] = -2.*dtheta/rc
+    
+    A[7,8] = 1.
+    
+    A[8,6] = 2.*rc*dtheta
+    A[8,7] = dtheta**2. + 2.*GM/rc
+
+    # Compute STM components dphi = A*phi
+    phi_mat = np.reshape(X[9:], (9,9))
+    dphi_mat = np.dot(A, phi_mat)
+    dphi_v = np.reshape(dphi_mat, (9**2, 1))
+    
+
+    # Derivative vector
+    dX = np.zeros(90,)
+
+    dX[0] = dx
+    dX[1] = dy
+    dX[2] = dz
+
+    dX[3] = 2.*dtheta*dy - 2.*dtheta*y*drc/rc + x*dtheta**2. + GM/rc**2. - (GM/rd**3.)*(rc + x)
+    dX[4] = -2.*dtheta*dx + 2.*dtheta*x*drc/rc + y*dtheta**2. - (GM/rd**3.)*y
+    dX[5] = -(GM/rd**3.)*z
+    
+    dX[6] = -2.*drc/rc*dtheta
+    
+    dX[7] = drc
+    dX[8] = rc*dtheta**2. - GM/rc**2.
+    
+    dX[9:] = dphi_v.flatten()
+    
+    return dX
+
+
+
+def ode_lincw(t, X, params):
+    
+    # Additional arguments
+    n = params['mean_motion']
+
+    # State Vector
+    x = float(X[0])
+    y = float(X[1])
+    z = float(X[2])
+    dx = float(X[3])
+    dy = float(X[4])
+    dz = float(X[5])
+    
+    # Derivative vector
+    dX = np.zeros(6,)
+
+    dX[0] = dx
+    dX[1] = dy
+    dX[2] = dz
+
+    dX[3] = 2.*n*dy + 3.*n**2.*x
+    dX[4] = -2.*n*dx
+    dX[5] = -n**2.*z
+    
+    return dX
+
+
+    
+def ode_lincw_stm(t, X, params):
+    '''
+    This function works with ode to propagate a relative orbit using the 
+    linear Clohessy-Wiltshire Equations, assuming simple two-body dynamics.  
+    No perturbations included.
+    Partials for the STM dynamics are included.
+
+    Parameters
+    ------
+    X : 42 element array
+      initial condition vector of relative orbit state and STM (Hill Frame)
+    t : float 
+      current time in seconds
+    params : dictionary
+        additional arguments
+
+    Returns
+    ------
+    dX : 42 element array
+      derivative vector
+      
+    '''
+    
+#    print('\nODE function')
+#    print('X', X)
+    
+    # Additional arguments
+    n = params['mean_motion']
+
+    # State Vector
+    x = float(X[0])
+    y = float(X[1])
+    z = float(X[2])
+    dx = float(X[3])
+    dy = float(X[4])
+    dz = float(X[5])
+
+    # Generate A matrix
+    A = np.zeros((6, 6))
+
+    A[0,3] = 1.
+    A[1,4] = 1.
+    A[2,5] = 1.
+
+    A[3,0] = 3.*n**2.
+    A[3,4] = 2.*n
+
+    A[4,0] = -2.*n
+
+    A[5,2] = n**2.
+
+    # Compute STM components dphi = A*phi
+    phi_mat = np.reshape(X[6:], (6, 6))
+    dphi_mat = np.dot(A, phi_mat)
+    dphi_v = np.reshape(dphi_mat, (6**2, 1))
+
+    # Derivative vector
+    dX = np.zeros(42,)
+
+    dX[0] = dx
+    dX[1] = dy
+    dX[2] = dz
+
+    dX[3] = 2.*n*dy + 3.*n**2.*x
+    dX[4] = -2.*n*dx
+    dX[5] = -n**2.*z
+
+    dX[6:] = dphi_v.flatten()
+    
+    
+    return dX
+
+
+
+
+
+
+
+

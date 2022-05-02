@@ -41,6 +41,7 @@ def unit_test_twobody():
     int_params['rtol'] = 1e-12
     int_params['atol'] = 1e-12
     int_params['local_extrap'] = True
+    int_params['time_format'] = 'sec'
     
     # Run integrator
     tout, Xout = general_dynamics(Xo, tin, params, int_params)

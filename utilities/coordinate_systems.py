@@ -375,7 +375,7 @@ def eci2ric(rc_vect, vc_vect, Q_eci=[]):
         Q_eci = Q_eci.reshape(3,1)
         Q_ric = np.dot(ON, Q_eci)
     else:
-        Q_ric = np.dot(np.dot(ON, Q_ric), ON.T)
+        Q_ric = np.dot(np.dot(ON, Q_eci), ON.T)
 
     return Q_ric
 
@@ -424,6 +424,105 @@ def ric2eci(rc_vect, vc_vect, Q_ric=[]):
         Q_eci = np.dot(np.dot(NO, Q_ric), NO.T)
 
     return Q_eci
+
+
+def eci2ric_vel(rc_vect, vc_vect, rho_ric, drho_eci):
+    '''
+    This function computes the rotation from ECI to RIC and rotates input
+    relative velocity drho_eci to RIC.
+
+    Parameters
+    ------
+    rc_vect : 3x1 numpy array
+      position vector of chief (or truth) orbit in ECI
+    vc_vect : 3x1 numpy array
+      velocity vector of chief (or truth) orbit in ECI
+    rho_ric : 3x1 numpy array
+      relative position vector in RIC
+    drho_eci : 3x1 numpy array
+      relative velocity vector in ECI
+
+    Returns
+    ------
+    drho_ric : 3x1 numpy array
+      relative velocity in RIC
+
+    '''
+    
+    # Reshape inputs
+    rc_vect = rc_vect.reshape(3,1)
+    vc_vect = vc_vect.reshape(3,1)
+    rho_ric = rho_ric.reshape(3,1)
+    drho_eci = drho_eci.reshape(3,1)
+
+    # Compute transformation matrix to Hill (RIC) frame
+    rc = np.linalg.norm(rc_vect)
+    OR = rc_vect/rc
+    h_vect = np.cross(rc_vect, vc_vect, axis=0)
+    h = np.linalg.norm(h_vect)
+    OH = h_vect/h
+    OT = np.cross(OH, OR, axis=0)
+
+    ON = np.concatenate((OR.T, OT.T, OH.T))
+
+    # Compute angular velocity vector
+    dtheta = h/rc**2.
+    w = np.reshape([0., 0., dtheta], (3,1))
+    
+    # Compute relative velocity vector using kinematic identity
+    drho_ric = np.dot(ON, drho_eci) - np.cross(w, rho_ric, axis=0)
+
+    return drho_ric
+
+
+def ric2eci_vel(rc_vect, vc_vect, rho_ric, drho_ric):
+    '''
+    This function computes the rotation from RIC to ECI and rotates input
+    relative velocity drho_ric to ECI.
+
+    Parameters
+    ------
+    rc_vect : 3x1 numpy array
+      position vector of chief (or truth) orbit in ECI
+    vc_vect : 3x1 numpy array
+      velocity vector of chief (or truth) orbit in ECI
+    rho_ric : 3x1 numpy array
+      relative position vector in RIC
+    drho_ric : 3x1 numpy array
+      relative velocity vector in RIC
+
+    Returns
+    ------
+    drho_eci : 3x1 numpy array
+      relative velocity in ECI
+
+    '''
+    
+    # Reshape inputs
+    rc_vect = rc_vect.reshape(3,1)
+    vc_vect = vc_vect.reshape(3,1)
+    rho_ric = rho_ric.reshape(3,1)
+    drho_ric = drho_ric.reshape(3,1)
+
+    # Compute transformation matrix to Hill (RIC) frame
+    rc = np.linalg.norm(rc_vect)
+    OR = rc_vect/rc
+    h_vect = np.cross(rc_vect, vc_vect, axis=0)
+    h = np.linalg.norm(h_vect)
+    OH = h_vect/h
+    OT = np.cross(OH, OR, axis=0)
+
+    ON = np.concatenate((OR.T, OT.T, OH.T))
+    NO = ON.T
+    
+    # Compute angular velocity vector
+    dtheta = h/rc**2.
+    w = np.reshape([0., 0., dtheta], (3,1))
+    
+    # Compute relative velocity vector using kinematic identity
+    drho_eci = np.dot(NO, (drho_ric + np.cross(w, rho_ric, axis=0))) 
+    
+    return drho_eci
 
 
 def lvlh2ric():
