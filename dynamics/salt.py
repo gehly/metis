@@ -288,19 +288,15 @@ def int_salt_grav_drag(t, X, params):
 def salt_setup():
     
     params = {}
-    Xo = np.array([7000., 0.01, 28.3, 80.5, 173.])
-    Xo[2] = asin(2./np.sqrt(5))*180/pi
+    Xo = np.array([7000., 0.001, 98., 0., 0.])
     params['GM'] = 3.986e5
     params['J2'] = 1.0826e-3
-    params['J3'] = -2.5327e-6*0
+    params['J3'] = -2.5327e-6
     params['Re'] = 6378.1363
     params['wE'] = 7.2921158553e-5
-    params['rho0'] = 3.019e-4
-    params['r0'] = 7378.1363
-    params['H'] = 268
-    params['Cd'] = 2.2*0
+    params['Cd'] = 2.2
     params['A_m'] = 1e-8
-    params['N'] = 20   
+    params['N'] = 20
     
     return Xo, params
 
@@ -308,7 +304,7 @@ def salt_setup():
 def run_salt_propagator(Xo, params):
     
     # Setup RK4 integrator
-    tin = np.array([0, 1*365.25*86400])
+    tin = np.array([0, 5*365.25*86400])
     Xo[2] = Xo[2]*pi/180
     Xo[3] = Xo[3]*pi/180
     Xo[4] = Xo[4]*pi/180
@@ -320,19 +316,19 @@ def run_salt_propagator(Xo, params):
     
     tout, yout = rk4(intfcn, tin, Xo, params)
     
-    # Analytic result on Omega
-    omega0 = Xo[3]
-    dt = tin[1] - tin[0]
-    n = np.sqrt(params['GM']/a**3.)
-    e = Xo[1]
-    p = a*(1.-e**2.)
-    J2 = params['J2']
-    Re = params['Re']
-    dRAANdt = -3.*n*J2*Re**2./(2.*p**2.)*cos(Xo[2])
-    RAANf_analytic = omega0 + dRAANdt*dt
-    RAANf_analytic = fmod(RAANf_analytic, 2*pi)*180/pi
-    
-    RAANf_numeric = fmod(yout[-1,3], 2*pi)*180/pi
+#    # Analytic result on Omega
+#    omega0 = Xo[3]
+#    dt = tin[1] - tin[0]
+#    n = np.sqrt(params['GM']/a**3.)
+#    e = Xo[1]
+#    p = a*(1.-e**2.)
+#    J2 = params['J2']
+#    Re = params['Re']
+#    dRAANdt = -3.*n*J2*Re**2./(2.*p**2.)*cos(Xo[2])
+#    RAANf_analytic = omega0 + dRAANdt*dt
+#    RAANf_analytic = fmod(RAANf_analytic, 2*pi)*180/pi
+#    
+#    RAANf_numeric = fmod(yout[-1,3], 2*pi)*180/pi
 
     return tout, yout
 

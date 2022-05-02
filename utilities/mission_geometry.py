@@ -88,8 +88,8 @@ def swath2fov(a, swath_rad, R=Re):
 def alpha2f(alpha, a, R=Re):
     
     
-    rho = np.sqrt(R**2. + a**2. - 2.*Re*a*cos(alpha))
-    f = asin((sin(alpha)/rho)*Re)
+    rho = np.sqrt(R**2. + a**2. - 2.*R*a*cos(alpha))
+    f = asin((sin(alpha)/rho)*R)
     
     return f
 
@@ -124,6 +124,44 @@ def swath2Nto(swath_km, R=Re):
     Nto = int(np.ceil(2.*pi/swath_rad))
     
     return Nto
+
+
+def compute_minimum_repeat(h, fov, R=Re):
+    '''
+    This function computes the minimum number of revs and days required for
+    full global coverage with no gaps.
+    
+    Parameters
+    ------
+    h : float
+        altitude [km]
+    fov : float
+        field of view [rad]
+    R : float, optional
+        radius of central body (default=Re)
+        
+    Returns
+    ------
+    Nto : int
+        whole number of orbit revolutions before repeat
+    Cto : int
+        whole number of days before repeat
+    
+    '''
+    
+    # Compute swath
+    a = h + R
+    swath_rad, swath_km = compute_groundswath(a, fov, R)
+    
+    # Compute minumum Nto
+    Nto = swath2Nto(swath_km, R)
+    
+    # Compute minimum Cto
+    n = sma2meanmot(a)
+    n_revday = n * 86400./(2.*pi)
+    Cto = int(np.floor(Nto/n_revday))    
+    
+    return Nto, Cto
 
 
 def plot_swath_vs_altitude():
@@ -530,17 +568,17 @@ def Nto_to_triple(Nto_required, hmin, hmax, Cto_list, R=Re, GM=GME):
             
             # Check delta < swath to ensure full global coverage
             # Assume near-circular sunsynch orbit
-#            a, i = nodal_period_to_sunsynch_orbit(Nto, Cto, 1e-4)
-#            swath_rad, swath_km = compute_groundswath(a, fov)
-#            delta = 2*pi/Nto
+            a, i = nodal_period_to_sunsynch_orbit(Nto, Cto, 1e-4)
+            swath_rad, swath_km = compute_groundswath(a, fov)
+            delta = 2*pi/Nto
             
 #            print(Nto, Cto)
 #            print(a)
 #            print(swath_rad, delta)
             
            
-#            if delta > swath_rad : 
-#                continue   
+            if delta > swath_rad : 
+                continue   
             
             # Compute delta at Equator
             delta = 2*pi/Nto
@@ -728,99 +766,192 @@ def nodal_period_to_sunsynch_orbit(Nto, Cto, e, R=Re, GM=GME, J2=J2E):
 if __name__ == '__main__':
     
     
-    swath_km = 16.
-    h = 550.
+    print('\n\nLarge Satellite Case')
+    
+    h = 650
+    fov = 20.*pi/180.
+    Nto, Cto = compute_minimum_repeat(h, fov)
+    
+    print(Nto)
+    print(Cto)
+    
+    Cto_list = [11, 12, 13, 14, 15]
     
     
-    Nto = swath2Nto(swath_km)
-    
-    print('Nto', Nto)
-    
-    n = sma2meanmot(Re+h)
-    n_revday = n * 86400./(2.*pi)
-    print('n [rev/day]', n_revday)
-    
-    print('min days in repeat', Nto/n_revday)
-    
-    
-    
-    
-    hmin = 540.
-    hmax = 650.
-    Cto_list = [160, 170, 180, 190, 200]
-    recurrent_df = Nto_to_triple(Nto, hmin, hmax, Cto_list)
+    recurrent_df = Nto_to_triple(Nto, 600., 660., Cto_list)
     
     print(recurrent_df)
     
-#    fdir = r'D:\documents\research\cubesats\OzFuel'
-#    fname = os.path.join(fdir, 'OzFuel_Recurrent_Orbits.csv')
+    fdir = r'D:\documents\teaching\unsw_orbital_mechanics\2022\lab'
+    fname = os.path.join(fdir, 'large_sat_recurrent.csv')
 #    recurrent_df.to_csv(fname)
     
+    h = 633.2428
+    el = f2el(fov/2., h+Re)
     
-    # Final Orbit Elements/Setup
-    print('\n\nFinal Orbit Setup')
-    LTAN = 13.5
-    triple = [15, 7, 170]
-    Cto = triple[2]
-    Nto = triple[2]*triple[0] + triple[1]
+    print('el deg', el*180/pi)
     
-    print(Nto, Cto)
+    # Compute orbit parameters for Large Satellite
     e = 1e-4
+    Nto = 192
+    Cto = 13
     a, i = nodal_period_to_sunsynch_orbit(Nto, Cto, e)
     
-    h = a - Re
+    print(a)
+    print(i)
     
-    swath_rad = swath_km/Re
-    alpha = swath_rad/2.
-    f = alpha2f(alpha, (Re+h))
-    fov_deg = f*2*180./pi
-    
-    print('fov_deg', fov_deg)
-    
-    
-    for slew_deg in [0., 5., 10., 15., 20.]:
-        slew_f = f + slew_deg*pi/180
-        min_el = f2el(slew_f, (Re+h))
-        
-        print('slew [deg]', slew_deg, 'min el [deg]', min_el*180./pi)
-    
-    UTC = datetime(2022, 2, 22, 13, 30, 0)
+    LTAN = 22.5
+    UTC = datetime(2022, 2, 28, 22, 30, 0)
     eop_alldata = get_celestrak_eop_alldata()
     EOP_data = get_eop_data(eop_alldata, UTC)
+    
     RAAN = LTAN_to_RAAN(LTAN, UTC, EOP_data)
     
-    print(a, e, i, RAAN)
+    print(RAAN)
     
     
     
+    print('\n\nSmall Satellite Case')
     
-    a = Re + 550.
-    fov = 1.67*pi/180.
+    h = 575
+    fov = 10.*pi/180.
+    Nto, Cto = compute_minimum_repeat(h, fov)
     
-    for fov_deg in [1.67, 10, 20, 30, 40]:
-        
-        fov = fov_deg * pi/180.    
-        swath_rad, swath_km = compute_groundswath(a, fov, R=Re)
-        Nto = swath2Nto(swath_km)
-        Cto = Nto/15.
+    print(Nto)
+    print(Cto)
     
-        print(swath_km)
-        print(Nto)
-        print(Cto)
-        
-        
+    Cto_list = [25, 26, 27, 28, 29, 30, 31, 32]
     
-    Nto = 100
-    hmin = 500.
-    hmax = 600.
-    Cto_list = [6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
-    recurrent_df = Nto_to_triple(Nto, hmin, hmax, Cto_list)
+    
+    recurrent_df = Nto_to_triple(Nto, 500., 575., Cto_list)
     
     print(recurrent_df)
     
-    fdir = r'D:\documents\research\cubesats\OzFuel'
-    fname = os.path.join(fdir, 'OzFuel_Recurrent_Orbits2.csv')
-    recurrent_df.to_csv(fname)
+    fdir = r'D:\documents\teaching\unsw_orbital_mechanics\2022\lab'
+    fname = os.path.join(fdir, 'small_sat_recurrent.csv')
+#    recurrent_df.to_csv(fname)
+    
+    h = 549.975
+    el = f2el(fov/2., h+Re)
+    
+    print('el deg', el*180/pi)
+    
+    # Compute orbit parameters for Large Satellite
+    e = 1e-4
+    Nto = 421
+    Cto = 28
+    a, i = nodal_period_to_sunsynch_orbit(Nto, Cto, e)
+    
+    print(a)
+    print(i)
+    
+    LTAN = 22.5
+    UTC = datetime(2022, 2, 28, 22, 30, 0)
+    eop_alldata = get_celestrak_eop_alldata()
+    EOP_data = get_eop_data(eop_alldata, UTC)
+    
+    RAAN = LTAN_to_RAAN(LTAN, UTC, EOP_data)
+    
+    print(RAAN)
+    
+    
+    
+    
+    
+    
+#    swath_km = 16.
+#    h = 550.
+#    
+#    
+#    Nto = swath2Nto(swath_km)
+#    
+#    print('Nto', Nto)
+#    
+#    n = sma2meanmot(Re+h)
+#    n_revday = n * 86400./(2.*pi)
+#    print('n [rev/day]', n_revday)
+#    
+#    print('min days in repeat', Nto/n_revday)
+#    
+#    
+#    
+#    
+#    hmin = 540.
+#    hmax = 650.
+#    Cto_list = [160, 170, 180, 190, 200]
+#    recurrent_df = Nto_to_triple(Nto, hmin, hmax, Cto_list)
+#    
+#    print(recurrent_df)
+#    
+##    fdir = r'D:\documents\research\cubesats\OzFuel'
+##    fname = os.path.join(fdir, 'OzFuel_Recurrent_Orbits.csv')
+##    recurrent_df.to_csv(fname)
+#    
+#    
+#    # Final Orbit Elements/Setup
+#    print('\n\nFinal Orbit Setup')
+#    LTAN = 13.5
+#    triple = [15, 7, 170]
+#    Cto = triple[2]
+#    Nto = triple[2]*triple[0] + triple[1]
+#    
+#    print(Nto, Cto)
+#    e = 1e-4
+#    a, i = nodal_period_to_sunsynch_orbit(Nto, Cto, e)
+#    
+#    h = a - Re
+#    
+#    swath_rad = swath_km/Re
+#    alpha = swath_rad/2.
+#    f = alpha2f(alpha, (Re+h))
+#    fov_deg = f*2*180./pi
+#    
+#    print('fov_deg', fov_deg)
+#    
+#    
+#    for slew_deg in [0., 5., 10., 15., 20.]:
+#        slew_f = f + slew_deg*pi/180
+#        min_el = f2el(slew_f, (Re+h))
+#        
+#        print('slew [deg]', slew_deg, 'min el [deg]', min_el*180./pi)
+#    
+#    UTC = datetime(2022, 2, 22, 13, 30, 0)
+#    eop_alldata = get_celestrak_eop_alldata()
+#    EOP_data = get_eop_data(eop_alldata, UTC)
+#    RAAN = LTAN_to_RAAN(LTAN, UTC, EOP_data)
+#    
+#    print(a, e, i, RAAN)
+#    
+#    
+#    
+#    
+#    a = Re + 550.
+#    fov = 1.67*pi/180.
+#    
+#    for fov_deg in [1.67, 10, 20, 30, 40]:
+#        
+#        fov = fov_deg * pi/180.    
+#        swath_rad, swath_km = compute_groundswath(a, fov, R=Re)
+#        Nto = swath2Nto(swath_km)
+#        Cto = Nto/15.
+#    
+#        print(swath_km)
+#        print(Nto)
+#        print(Cto)
+#        
+#        
+#    
+#    Nto = 100
+#    hmin = 500.
+#    hmax = 600.
+#    Cto_list = [6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+#    recurrent_df = Nto_to_triple(Nto, hmin, hmax, Cto_list)
+#    
+#    print(recurrent_df)
+#    
+#    fdir = r'D:\documents\research\cubesats\OzFuel'
+#    fname = os.path.join(fdir, 'OzFuel_Recurrent_Orbits2.csv')
+#    recurrent_df.to_csv(fname)
     
     
     
