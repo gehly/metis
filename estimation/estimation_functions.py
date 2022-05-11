@@ -32,17 +32,26 @@ def ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
     ------
     state_dict : dictionary
         initial state and covariance for filter execution
+    truth_dict : dictionary
+        true state at all times
     meas_dict : dictionary
         measurement data over time for the filter and parameters (noise, etc)
-
     meas_fcn : function handle
         function for measurements
-
+    state_params : dictionary
+        physical parameters of spacecraft and central body
+    sensor_params : dictionary
+        location, constraint, noise parameters of sensors
+    int_params : dictionary
+        numerical integration parameters
 
     Returns
     ------
     filter_output : dictionary
-        output state, covariance, and post-fit residuals over time
+        output state, covariance, and post-fit residuals at measurement times
+    full_state_output : dictionary
+        output state and covariance at all truth times
+        
     '''
 
     # State information
@@ -238,6 +247,177 @@ def ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
     
 
     return filter_output, full_state_output
+
+
+###############################################################################
+# Sequential Estimation
+###############################################################################
+
+def ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
+           sensor_params, int_params):    
+    '''
+    This function implements the linearized batch estimator for the least
+    squares cost function.
+
+    Parameters
+    ------
+    state_dict : dictionary
+        initial state and covariance for filter execution
+    truth_dict : dictionary
+        true state at all times
+    meas_dict : dictionary
+        measurement data over time for the filter and parameters (noise, etc)
+    meas_fcn : function handle
+        function for measurements
+    state_params : dictionary
+        physical parameters of spacecraft and central body
+    sensor_params : dictionary
+        location, constraint, noise parameters of sensors
+    int_params : dictionary
+        numerical integration parameters
+
+    Returns
+    ------
+    filter_output : dictionary
+        output state, covariance, and post-fit residuals at measurement times
+    full_state_output : dictionary
+        output state and covariance at all truth times
+        
+    '''
+    
+    # State information
+    state_tk = sorted(state_dict.keys())[-1]
+    Xo_ref = state_dict[state_tk]['X']
+    Po_bar = state_dict[state_tk]['P']
+
+    # Setup
+    cholPo = np.linalg.inv(np.linalg.cholesky(Po_bar))
+    invPo_bar = np.dot(cholPo.T, cholPo)
+
+    n = len(Xo_ref)
+
+    # Initialize output
+    filter_output = {}
+    full_state_output = {}
+
+    # Measurement times
+    tk_meas = meas_dict['tk_list']
+    Yk_meas = meas_dict['Yk_list']
+    sensor_id_meas = meas_dict['sensor_id_list']
+    
+    # Include truth times for full output state
+    tk_truth = list(truth_dict.keys())
+    tk_combine = list(tk_meas)
+    tk_combine.extend(tk_truth)
+    tk_combine = sorted(tk_combine)
+
+    # Number of epochs
+    L = len(tk_combine)
+
+    # Initialize
+    xhat = np.zeros((n, 1))
+    P = Po_bar
+    Xref = Xo_ref
+    phi = np.identity(n)
+    phi_v = np.reshape(phi, (n**2, 1))
+    conv_flag = False
+    
+    # Loop over times
+    for kk in range(L):
+    
+        # Current and previous time
+        if kk == 0:
+            tk_prior = state_tk
+        else:
+            tk_prior = tk_combine[kk-1]
+
+        tk = tk_list[kk]
+        
+        # Propagate to next time
+        # Initial Conditions for Integration Routine
+        Xref_prior = Xref
+        xhat_prior = xhat
+        P_prior = P
+        int0 = np.concatenate((Xref_prior, phi_v))
+
+        # Integrate Xref and STM
+        if tk_prior == tk:
+            intout = int0.T
+        else:
+            int0 = int0.flatten()
+            tin = [tk_prior, tk]
+            
+            tout, intout = general_dynamics(int0, tin, state_params, int_params)
+
+        # Extract values for later calculations
+        xout = intout[-1,:]
+        Xref = xout[0:n].reshape(n, 1)
+        phi_v = xout[n:].reshape(n**2, 1)
+        phi = np.reshape(phi_v, (n, n))
+        
+        # Time Update: a priori state and covar at tk
+        xbar = np.dot(phi, xhat_prior)
+        Pbar = np.dot(phi, np.dot(P_prior, phi))
+        
+        # Measurement Update: posterior state and covar at tk
+        if tk in tk_meas:
+            
+            # Retrieve measurement data
+            meas_ind = tk_meas.index(tk)
+            Yk = Yk_meas[meas_ind]
+            sensor_id = sensor_id_meas[meas_ind]
+
+            # Compute prefit residuals and  Kalman gain
+            Hk_til, Gk, Rk = meas_fcn(tk, Xref, state_params, sensor_params, sensor_id)
+            yk = Yk - Gk
+            
+            K1 = np.dot(Hk_til, np.dot(Pbar, Hk_til.T)) + Rk
+            K2 = np.dot(Pbar, Hk_til.T)
+            Kk = np.dot(K2, np.linalg.inv(K1))
+            
+            # Predicted residuals
+            Bk = yk - np.dot(Hk_til, xbar)
+            P_bk = K1
+            
+            # Measurement update (Joseph form of covariance)
+            xhat = xbar + np.dot(Kk, Bk)
+            P1 = np.eye(n) - np.dot(Kk, Hk_til)
+            P2 = np.dot(Kk, np.dot(Rk, Kk.T))
+            P = np.dot(P1, np.dot(Pbar, P1.T)) + P2
+            
+            # Post-fit residuals and updated state
+            resids = yk - np.dot(Hk_til, xhat)
+            Xk = Xref + xhat
+            
+            # Store output
+            filter_output[tk] = {}
+            filter_output[tk]['X'] = Xk
+            filter_output[tk]['P'] = P
+            filter_output[tk]['resids'] = resids
+            
+        # No measurement update at this time
+        else:
+            
+            # No measurement update to be made
+            xhat = xbar 
+            P = Pbar
+            
+            # Updated state
+            Xk = Xref + xhat
+        
+        # Store output
+        full_state_output[tk] = {}
+        full_state_output[tk]['X'] = Xref
+        full_state_output[tk]['P'] = P
+        
+        # After filter convergence, update reference trajectory
+        if conv_flag:
+            Xref = Xk
+            xhat = np.zeros((n, 1))
+    
+    
+    return filter_output, full_state_output
+
 
 
 ###############################################################################
