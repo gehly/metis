@@ -17,6 +17,64 @@ from utilities.coordinate_systems import eci2ric
 
 
 
+###############################################################################
+# Balldrop Analysis
+###############################################################################
+
+def compute_balldrop_errors(filter_output, truth_dict):
+    
+    # Compute errors
+    n = 2
+    p = 2
+    X_err = np.zeros((n, len(filter_output)))
+    resids = np.zeros((p, len(filter_output)))
+    sig_y = np.zeros(len(filter_output),)
+    sig_dy = np.zeros(len(filter_output),)
+    tk_list = list(filter_output.keys())
+    for kk in range(len(filter_output)):
+        tk = tk_list[kk]
+        X = filter_output[tk]['X']
+        P = filter_output[tk]['P']
+        resids[:,kk] = filter_output[tk]['resids'].flatten()
+        
+        X_true = truth_dict[tk]
+        X_err[:,kk] = (X - X_true).flatten()
+        sig_y[kk] = np.sqrt(P[0,0])
+        sig_dy[kk] = np.sqrt(P[1,1])
+        
+    plt.figure()
+    plt.subplot(2,1,1)
+    plt.plot(tk_list, X_err[0,:], 'k.')
+    plt.plot(tk_list, 3*sig_y, 'k--')
+    plt.plot(tk_list, -3*sig_y, 'k--')
+    plt.ylabel('Pos Err [m]')
+    
+    plt.subplot(2,1,2)
+    plt.plot(tk_list, X_err[1,:], 'k.')
+    plt.plot(tk_list, 3*sig_dy, 'k--')
+    plt.plot(tk_list, -3*sig_dy, 'k--')
+    plt.ylabel('Vel Err [m/s]')
+    plt.xlabel('Time [sec]')
+    
+    plt.figure()
+    plt.subplot(2,1,1)
+    plt.plot(tk_list, resids[0,:], 'k.')
+    plt.ylabel('Y Resids [m]')
+    
+    plt.subplot(2,1,2)
+    plt.plot(tk_list, resids[1,:], 'k.')
+    plt.ylabel('dY Resids [m/s]')
+    plt.xlabel('Time [sec]')
+    
+    plt.show()
+    
+    
+    return
+
+
+###############################################################################
+# Orbit Analysis
+###############################################################################
 
 
 def compute_orbit_errors(fname):

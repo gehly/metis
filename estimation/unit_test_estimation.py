@@ -14,7 +14,9 @@ ind = current_dir.find('metis')
 metis_dir = current_dir[0:ind+5]
 sys.path.append(metis_dir)
 
-from estimation.estimation_functions import ls_batch, H_rgradec, H_radec
+import estimation.analysis_functions as analysis
+import estimtaion.estimtion_functions as est
+# from estimation.estimation_functions import ls_batch, H_rgradec, H_radec
 from dynamics.dynamics_functions import general_dynamics
 from dynamics.dynamics_functions import ode_balldrop, ode_balldrop_stm
 from dynamics.dynamics_functions import ode_twobody, ode_twobody_stm
@@ -40,6 +42,7 @@ def balldrop_setup():
     state_params = {}
     state_params['acc'] = acc
     state_params['Q'] = np.diag([1e-12,1e-12])
+    state_params['gap_seconds'] = 10.
     
     # Integration function and additional settings
     int_params = {}
@@ -113,53 +116,13 @@ def execute_balldrop_test():
         balldrop_setup()
         
     int_params['intfcn'] = ode_balldrop_stm
-        
-    filter_output, full_state_output = ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
     
-    # Compute errors
-    n = 2
-    p = 2
-    X_err = np.zeros((n, len(filter_output)))
-    resids = np.zeros((p, len(filter_output)))
-    sig_y = np.zeros(len(filter_output),)
-    sig_dy = np.zeros(len(filter_output),)
-    tk_list = list(filter_output.keys())
-    for kk in range(len(filter_output)):
-        tk = tk_list[kk]
-        X = filter_output[tk]['X']
-        P = filter_output[tk]['P']
-        resids[:,kk] = filter_output[tk]['resids'].flatten()
-        
-        X_true = truth_dict[tk]
-        X_err[:,kk] = (X - X_true).flatten()
-        sig_y[kk] = np.sqrt(P[0,0])
-        sig_dy[kk] = np.sqrt(P[1,1])
-        
-    plt.figure()
-    plt.subplot(2,1,1)
-    plt.plot(tk_list, X_err[0,:], 'k.')
-    plt.plot(tk_list, 3*sig_y, 'k--')
-    plt.plot(tk_list, -3*sig_y, 'k--')
-    plt.ylabel('Pos Err [m]')
     
-    plt.subplot(2,1,2)
-    plt.plot(tk_list, X_err[1,:], 'k.')
-    plt.plot(tk_list, 3*sig_dy, 'k--')
-    plt.plot(tk_list, -3*sig_dy, 'k--')
-    plt.ylabel('Vel Err [m/s]')
-    plt.xlabel('Time [sec]')
+    # Batch Test
+    filter_output, full_state_output = est.ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
+    analysis.compute_balldrop_errors(filter_output, truth_dict)
     
-    plt.figure()
-    plt.subplot(2,1,1)
-    plt.plot(tk_list, resids[0,:], 'k.')
-    plt.ylabel('Y Resids [m]')
-    
-    plt.subplot(2,1,2)
-    plt.plot(tk_list, resids[1,:], 'k.')
-    plt.ylabel('dY Resids [m/s]')
-    plt.xlabel('Time [sec]')
-    
-    plt.show()
+    # EKF Test
     
         
         
@@ -642,13 +605,13 @@ if __name__ == '__main__':
     
     plt.close('all')
     
-#    execute_balldrop_test()
+    execute_balldrop_test()
     
 #    twobody_geo_setup()
     
 #    twobody_leo_setup()
     
-    execute_twobody_test()
+    # execute_twobody_test()
 
 
 
