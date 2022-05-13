@@ -15,7 +15,7 @@ metis_dir = current_dir[0:ind+5]
 sys.path.append(metis_dir)
 
 import estimation.analysis_functions as analysis
-import estimtaion.estimtion_functions as est
+import estimation.estimation_functions as est
 # from estimation.estimation_functions import ls_batch, H_rgradec, H_radec
 from dynamics.dynamics_functions import general_dynamics
 from dynamics.dynamics_functions import ode_balldrop, ode_balldrop_stm
@@ -41,7 +41,7 @@ def balldrop_setup():
     acc = 9.81  #m/s^2
     state_params = {}
     state_params['acc'] = acc
-    state_params['Q'] = np.diag([1e-12,1e-12])
+    state_params['Q'] = np.diag([1e-2])
     state_params['gap_seconds'] = 10.
     
     # Integration function and additional settings
@@ -75,8 +75,8 @@ def balldrop_setup():
     meas_dict['sensor_id_list'] = []
     sensor_params = {}
     sensor_params[1] = {}
-    sig_y = 0.01
-    sig_dy = 0.001
+    sig_y = 0.1
+    sig_dy = 0.01
     sensor_params[1]['sigma_dict'] = {}
     sensor_params[1]['sigma_dict']['y'] = sig_y
     sensor_params[1]['sigma_dict']['dy'] = sig_dy
@@ -123,7 +123,8 @@ def execute_balldrop_test():
     analysis.compute_balldrop_errors(filter_output, truth_dict)
     
     # EKF Test
-    
+    filter_output, full_state_output = est.ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
+    analysis.compute_balldrop_errors(filter_output, truth_dict)
         
         
         

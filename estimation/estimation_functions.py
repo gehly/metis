@@ -404,6 +404,11 @@ def ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         P2 = np.dot(Kk, np.dot(Rk, Kk.T))
         P = np.dot(P1, np.dot(Pbar, P1.T)) + P2
         
+        # P1 = np.eye(n) - np.dot(Kk, Hk_til)
+        # P = np.dot(P1, Pbar)
+        
+        P = 0.5 * (P + P.T)
+        
         # Post-fit residuals and updated state
         resids = yk - np.dot(Hk_til, xhat)
         Xk = Xref + xhat
@@ -413,6 +418,25 @@ def ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         filter_output[tk]['X'] = Xk
         filter_output[tk]['P'] = P
         filter_output[tk]['resids'] = resids
+        
+        print('\n')
+        print('tk', tk)
+        print('xbar', xbar)
+        print('xhat', xhat)
+        print('Xref', Xref)
+        print('Xk', Xk)
+        print('Yk', Yk)
+        print('Hk_til', Hk_til)
+        print('Kk', Kk)
+        print('resids', resids)
+        print('Pbar', Pbar)
+        print('P', P)
+        
+        # if kk > 2:
+        #     mistake
+        
+        
+        
 
         # After filter convergence, update reference trajectory
         if conv_flag:
