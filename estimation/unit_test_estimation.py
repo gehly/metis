@@ -48,7 +48,7 @@ def balldrop_setup():
     int_params['intfcn'] = ode_balldrop
     int_params['rtol'] = 1e-12
     int_params['atol'] = 1e-12
-    int_params['time_system'] = 'seconds'
+    int_params['time_format'] = 'seconds'
 
     # Time vector
     tk_list = np.arange(0.,100.1,1.)

@@ -270,7 +270,7 @@ def ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
     meas_fcn : function handle
         function for measurements
     state_params : dictionary
-        physical parameters of spacecraft and central body
+        physical parameters and constants
     sensor_params : dictionary
         location, constraint, noise parameters of sensors
     int_params : dictionary
@@ -289,30 +289,28 @@ def ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
     state_tk = sorted(state_dict.keys())[-1]
     Xo_ref = state_dict[state_tk]['X']
     Po_bar = state_dict[state_tk]['P']
+    Q = state_params['Q']
+    gap_seconds = state_params['gap_seconds']
+    time_format = int_params['time_format']
 
     # Setup
     cholPo = np.linalg.inv(np.linalg.cholesky(Po_bar))
     invPo_bar = np.dot(cholPo.T, cholPo)
 
     n = len(Xo_ref)
+    q = int(Q.shape[0])
 
     # Initialize output
     filter_output = {}
     full_state_output = {}
 
     # Measurement times
-    tk_meas = meas_dict['tk_list']
-    Yk_meas = meas_dict['Yk_list']
-    sensor_id_meas = meas_dict['sensor_id_list']
+    tk_list = meas_dict['tk_list']
+    Yk_list = meas_dict['Yk_list']
+    sensor_id_list = meas_dict['sensor_id_list']
     
-    # Include truth times for full output state
-    tk_truth = list(truth_dict.keys())
-    tk_combine = list(tk_meas)
-    tk_combine.extend(tk_truth)
-    tk_combine = sorted(tk_combine)
-
     # Number of epochs
-    L = len(tk_combine)
+    L = len(tk_list)
 
     # Initialize
     xhat = np.zeros((n, 1))
@@ -329,9 +327,25 @@ def ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         if kk == 0:
             tk_prior = state_tk
         else:
-            tk_prior = tk_combine[kk-1]
+            tk_prior = tk_list[kk-1]
 
         tk = tk_list[kk]
+        
+        if time_format == 'seconds':
+            delta_t = tk - tk_prior
+        elif time_format == 'JD':
+            delta_t = (tk - tk_prior)*86400.
+        elif time_format == 'datetime':
+            delta_t = (tk - tk_prior).total_seconds()
+            
+        # Set convergence flag to use EKF
+        if kk > 10:
+            conv_flag = True
+            
+            # Don't use EKF after big gaps
+            if delta_t > gap_seconds:
+                conv_flag = False
+                
         
         # Propagate to next time
         # Initial Conditions for Integration Routine
@@ -356,60 +370,50 @@ def ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         phi = np.reshape(phi_v, (n, n))
         
         # Time Update: a priori state and covar at tk
-        xbar = np.dot(phi, xhat_prior)
-        Pbar = np.dot(phi, np.dot(P_prior, phi))
         
-        # Measurement Update: posterior state and covar at tk
-        if tk in tk_meas:
-            
-            # Retrieve measurement data
-            meas_ind = tk_meas.index(tk)
-            Yk = Yk_meas[meas_ind]
-            sensor_id = sensor_id_meas[meas_ind]
-
-            # Compute prefit residuals and  Kalman gain
-            Hk_til, Gk, Rk = meas_fcn(tk, Xref, state_params, sensor_params, sensor_id)
-            yk = Yk - Gk
-            
-            K1 = np.dot(Hk_til, np.dot(Pbar, Hk_til.T)) + Rk
-            K2 = np.dot(Pbar, Hk_til.T)
-            Kk = np.dot(K2, np.linalg.inv(K1))
-            
-            # Predicted residuals
-            Bk = yk - np.dot(Hk_til, xbar)
-            P_bk = K1
-            
-            # Measurement update (Joseph form of covariance)
-            xhat = xbar + np.dot(Kk, Bk)
-            P1 = np.eye(n) - np.dot(Kk, Hk_til)
-            P2 = np.dot(Kk, np.dot(Rk, Kk.T))
-            P = np.dot(P1, np.dot(Pbar, P1.T)) + P2
-            
-            # Post-fit residuals and updated state
-            resids = yk - np.dot(Hk_til, xhat)
-            Xk = Xref + xhat
-            
-            # Store output
-            filter_output[tk] = {}
-            filter_output[tk]['X'] = Xk
-            filter_output[tk]['P'] = P
-            filter_output[tk]['resids'] = resids
-            
-        # No measurement update at this time
+        # State Noise Compensation
+        # Zero out SNC for long time gaps
+        if delta_t > gap_seconds:        
+            Gamma = np.zeros((n,q))
         else:
-            
-            # No measurement update to be made
-            xhat = xbar 
-            P = Pbar
-            
-            # Updated state
-            Xk = Xref + xhat
+            Gamma = delta_t * np.concatenate((np.eye(q)*delta_t/2., np.eye(q)))
+
+        xbar = np.dot(phi, xhat_prior)
+        Pbar = np.dot(phi, np.dot(P_prior, phi)) + np.dot(Gamma, np.dot(Q, Gamma.T))
+        
+        # Measurement Update: posterior state and covar at tk            
+        # Retrieve measurement data
+        Yk = Yk_list[kk]
+        sensor_id = sensor_id_list[kk]
+
+        # Compute prefit residuals and  Kalman gain
+        Hk_til, Gk, Rk = meas_fcn(tk, Xref, state_params, sensor_params, sensor_id)
+        yk = Yk - Gk
+        
+        K1 = np.dot(Pbar, Hk_til.T)
+        K2 = np.dot(Hk_til, np.dot(Pbar, Hk_til.T)) + Rk        
+        Kk = np.dot(K1, np.linalg.inv(K2))
+        
+        # Predicted residuals
+        Bk = yk - np.dot(Hk_til, xbar)
+        P_bk = K2
+        
+        # Measurement update (Joseph form of covariance)
+        xhat = xbar + np.dot(Kk, Bk)
+        P1 = np.eye(n) - np.dot(Kk, Hk_til)
+        P2 = np.dot(Kk, np.dot(Rk, Kk.T))
+        P = np.dot(P1, np.dot(Pbar, P1.T)) + P2
+        
+        # Post-fit residuals and updated state
+        resids = yk - np.dot(Hk_til, xhat)
+        Xk = Xref + xhat
         
         # Store output
-        full_state_output[tk] = {}
-        full_state_output[tk]['X'] = Xref
-        full_state_output[tk]['P'] = P
-        
+        filter_output[tk] = {}
+        filter_output[tk]['X'] = Xk
+        filter_output[tk]['P'] = P
+        filter_output[tk]['resids'] = resids
+
         # After filter convergence, update reference trajectory
         if conv_flag:
             Xref = Xk
