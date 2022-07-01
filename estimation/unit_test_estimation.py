@@ -37,6 +37,11 @@ from utilities.eop_functions import get_XYs2006_alldata
 
 def linear_motion_setup():
     
+    # Define state parameters
+    state_params = {}
+    state_params['Q'] = np.diag([1e-12])
+    
+    
     
     
     return
