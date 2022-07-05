@@ -339,7 +339,7 @@ def ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
             delta_t = (tk - tk_prior).total_seconds()
             
         # Set convergence flag to use EKF
-        if kk > 10:
+        if kk > 100:
             conv_flag = True
             
             # Don't use EKF after big gaps

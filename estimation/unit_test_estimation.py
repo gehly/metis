@@ -36,7 +36,7 @@ def linear_motion_setup():
     
     # Define state parameters
     state_params = {}
-    state_params['Q'] = np.diag([1e-12])
+    state_params['Q'] = np.diag([1e-12])*0.
     state_params['gap_seconds'] = 10.
     
     # Integration function and additional settings
@@ -134,12 +134,12 @@ def execute_linear1d_test():
     
     
     # Batch Test
-    filter_output, full_state_output = est.ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
-    analysis.compute_linear1d_errors(filter_output, truth_dict)
+    # filter_output, full_state_output = est.ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
+    # analysis.compute_linear1d_errors(filter_output, truth_dict)
     
-    # # EKF Test
-    # filter_output, full_state_output = est.ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
-    # analysis.compute_balldrop_errors(filter_output, truth_dict)
+    # EKF Test
+    filter_output, full_state_output = est.ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
+    analysis.compute_linear1d_errors(filter_output, truth_dict)
         
         
         
