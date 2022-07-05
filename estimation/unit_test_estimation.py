@@ -96,6 +96,7 @@ def linear_motion_setup():
         meas_dict['tk_list'].append(tk_list[kk])
         meas_dict['Yk_list'].append(np.array([[rg_meas]]))
         meas_dict['sensor_id_list'].append(1)
+        
 
     return state_dict, state_params, int_params, meas_fcn, meas_dict, sensor_params, truth_dict
 
@@ -127,7 +128,7 @@ def H_linear1d_rg(tk, Xref, state_params, sensor_params, sensor_id):
 def execute_linear1d_test():
     
     state_dict, state_params, int_params, meas_fcn, meas_dict, sensor_params, truth_dict =\
-        balldrop_setup()
+        linear_motion_setup()
         
     int_params['intfcn'] = dyn.ode_linear1d_stm
     
@@ -720,7 +721,9 @@ if __name__ == '__main__':
     
     plt.close('all')
     
-    execute_balldrop_test()
+    execute_linear1d_test()
+    
+    # execute_balldrop_test()
     
 #    twobody_geo_setup()
     

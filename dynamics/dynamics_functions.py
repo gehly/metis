@@ -170,7 +170,7 @@ def general_dynamics(Xo, tvec, state_params, int_params):
 # Generic Dynamics Functions
 ###############################################################################
 
-def ode_linear(t, X, params):
+def ode_linear1d(t, X, params):
     '''
     This function works with ode to propagate an object moving with no 
     acceleration.

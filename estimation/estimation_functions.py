@@ -162,20 +162,20 @@ def ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
             Xref_list.append(Xref)
             phi_list.append(phi)
             
-#            print(kk)
-#            print(tk)
-#            print(int0)
-#            print(Xref)
-#            print(Yk)
-#            print(Gk)
-#            print(yk)
-#            
-#            if kk > 2:
-#                mistake
+            # print(kk)
+            # print(tk)
+            # print(int0)
+            # print(Xref)
+            # print(Yk)
+            # print(Gk)
+            # print(yk)
+            
+            # if kk > 2:
+            #     mistake
 
 
-        print(Lambda)
-        print(np.linalg.eig(Lambda))
+        # print(Lambda)
+        # print(np.linalg.eig(Lambda))
 
 
         # Solve the normal equations
