@@ -17,6 +17,57 @@ from utilities.coordinate_systems import eci2ric
 
 
 
+
+###############################################################################
+# Linear Motion Analysis
+###############################################################################
+
+def compute_linear1d_errors(filter_output, truth_dict):
+    
+    # Compute errors
+    n = 2
+    p = 1
+    X_err = np.zeros((n, len(filter_output)))
+    resids = np.zeros((p, len(filter_output)))
+    sig_x = np.zeros(len(filter_output),)
+    sig_dx = np.zeros(len(filter_output),)
+    tk_list = list(filter_output.keys())
+    for kk in range(len(filter_output)):
+        tk = tk_list[kk]
+        X = filter_output[tk]['X']
+        P = filter_output[tk]['P']
+        resids[:,kk] = filter_output[tk]['resids'].flatten()
+        
+        X_true = truth_dict[tk]
+        X_err[:,kk] = (X - X_true).flatten()
+        sig_x[kk] = np.sqrt(P[0,0])
+        sig_dx[kk] = np.sqrt(P[1,1])
+        
+    plt.figure()
+    plt.subplot(2,1,1)
+    plt.plot(tk_list, X_err[0,:], 'k.')
+    plt.plot(tk_list, 3*sig_x, 'k--')
+    plt.plot(tk_list, -3*sig_x, 'k--')
+    plt.ylabel('Pos Err [m]')
+    
+    plt.subplot(2,1,2)
+    plt.plot(tk_list, X_err[1,:], 'k.')
+    plt.plot(tk_list, 3*sig_dx, 'k--')
+    plt.plot(tk_list, -3*sig_dx, 'k--')
+    plt.ylabel('Vel Err [m/s]')
+    plt.xlabel('Time [sec]')
+    
+    plt.figure()
+    plt.plot(tk_list, resids[0,:], 'k.')
+    plt.ylabel('Range Resids [m]')
+    
+    plt.show()
+    
+    
+    return
+
+
+
 ###############################################################################
 # Balldrop Analysis
 ###############################################################################

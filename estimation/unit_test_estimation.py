@@ -16,10 +16,7 @@ sys.path.append(metis_dir)
 
 import estimation.analysis_functions as analysis
 import estimation.estimation_functions as est
-# from estimation.estimation_functions import ls_batch, H_rgradec, H_radec
-from dynamics.dynamics_functions import general_dynamics
-from dynamics.dynamics_functions import ode_balldrop, ode_balldrop_stm
-from dynamics.dynamics_functions import ode_twobody, ode_twobody_stm
+import dynamics.dynamics_functions as dyn
 from sensors.sensors import define_sensors
 from sensors.visibility_functions import check_visibility
 from sensors.measurements import compute_measurement
@@ -40,12 +37,113 @@ def linear_motion_setup():
     # Define state parameters
     state_params = {}
     state_params['Q'] = np.diag([1e-12])
+    state_params['gap_seconds'] = 10.
+    
+    # Integration function and additional settings
+    int_params = {}
+    int_params['integrator'] = 'ode'
+    int_params['ode_integrator'] = 'dop853'
+    int_params['intfcn'] = dyn.ode_linear1d
+    int_params['rtol'] = 1e-12
+    int_params['atol'] = 1e-12
+    int_params['time_format'] = 'seconds'
+
+    # Time vector
+    tk_list = np.arange(0.,100.1,1.)
+    
+    # Inital State
+    X_true = np.array([[0.],[1.]])
+    P = np.array([[100., 0.],[0., 1.]])
+    pert_vect = np.multiply(np.sqrt(np.diag(P)), np.random.randn(2))
+    X_init = X_true + np.reshape(pert_vect, (2, 1))
+    
+    state_dict = {}
+    state_dict[tk_list[0]] = {}
+    state_dict[tk_list[0]]['X'] = X_init
+    state_dict[tk_list[0]]['P'] = P
+    
+    # Generate Truth and Measurements
+    truth_dict = {}
+    meas_dict = {}
+    meas_dict['tk_list'] = []
+    meas_dict['Yk_list'] = []
+    meas_dict['sensor_id_list'] = []
+    sensor_params = {}
+    sensor_params[1] = {}
+    sig_rg = 0.1
+    sensor_params[1]['sigma_dict'] = {}
+    sensor_params[1]['sigma_dict']['rg'] = sig_rg
+    sensor_params[1]['meas_types'] = ['rg']
+    meas_fcn = H_linear1d_rg
+    outlier_inds = []
+    X = X_true.copy()
+    
+    for kk in range(len(tk_list)):
+        
+        if kk > 0:
+            tin = [tk_list[kk-1], tk_list[kk]]
+            tout, Xout = dyn.general_dynamics(X, tin, state_params, int_params)
+            X = Xout[-1,:].reshape(2, 1)
+        
+        truth_dict[tk_list[kk]] = X
+        
+        if kk in outlier_inds:
+            rg_noise = 100.*sig_rg*np.random.randn()
+        else:
+            rg_noise = sig_rg*np.random.randn()
+        
+        rg_meas = float(X[0]) + rg_noise
+        meas_dict['tk_list'].append(tk_list[kk])
+        meas_dict['Yk_list'].append(np.array([[rg_meas]]))
+        meas_dict['sensor_id_list'].append(1)
+
+    return state_dict, state_params, int_params, meas_fcn, meas_dict, sensor_params, truth_dict
+
+
+def H_linear1d_rg(tk, Xref, state_params, sensor_params, sensor_id):
+    
+    # Break out state
+    x = float(Xref[0])
+    
+    # Measurement information
+    sensor_kk = sensor_params[sensor_id]
+    meas_types = sensor_kk['meas_types']
+    sigma_dict = sensor_kk['sigma_dict']
+    p = len(meas_types)
+    Rk = np.zeros((p, p))
+    for ii in range(p):
+        mtype = meas_types[ii]
+        sig = sigma_dict[mtype]
+        Rk[ii,ii] = sig**2.   
+    
+    # Hk_til and Gi
+    Hk_til = np.array([[1., 0.]])
+    Gk = np.array([[x]])
+    
+    return Hk_til, Gk, Rk
+
+
+
+def execute_linear1d_test():
+    
+    state_dict, state_params, int_params, meas_fcn, meas_dict, sensor_params, truth_dict =\
+        balldrop_setup()
+        
+    int_params['intfcn'] = dyn.ode_linear1d_stm
     
     
+    # Batch Test
+    filter_output, full_state_output = est.ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
+    analysis.compute_linear1d_errors(filter_output, truth_dict)
     
+    # # EKF Test
+    # filter_output, full_state_output = est.ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
+    # analysis.compute_balldrop_errors(filter_output, truth_dict)
+        
+        
+        
     
     return
-
 
 ###############################################################################
 # Constant Acceleration Test (Ball Dropping)
@@ -64,7 +162,7 @@ def balldrop_setup():
     int_params = {}
     int_params['integrator'] = 'ode'
     int_params['ode_integrator'] = 'dop853'
-    int_params['intfcn'] = ode_balldrop
+    int_params['intfcn'] = dyn.ode_balldrop
     int_params['rtol'] = 1e-12
     int_params['atol'] = 1e-12
     int_params['time_format'] = 'seconds'
@@ -105,7 +203,7 @@ def balldrop_setup():
         
         if kk > 0:
             tin = [tk_list[kk-1], tk_list[kk]]
-            tout, Xout = general_dynamics(X, tin, state_params, int_params)
+            tout, Xout = dyn.general_dynamics(X, tin, state_params, int_params)
             X = Xout[-1,:].reshape(2, 1)
         
         truth_dict[tk_list[kk]] = X
@@ -131,7 +229,7 @@ def execute_balldrop_test():
     state_dict, state_params, int_params, meas_fcn, meas_dict, sensor_params, truth_dict =\
         balldrop_setup()
         
-    int_params['intfcn'] = ode_balldrop_stm
+    int_params['intfcn'] = dyn.ode_balldrop_stm
     
     
     # Batch Test
@@ -200,7 +298,7 @@ def twobody_leo_setup():
     int_params = {}
     int_params['integrator'] = 'ode'
     int_params['ode_integrator'] = 'dop853'
-    int_params['intfcn'] = ode_twobody
+    int_params['intfcn'] = dyn.ode_twobody
     int_params['rtol'] = 1e-12
     int_params['atol'] = 1e-12
     int_params['time_format'] = 'datetime'
@@ -239,7 +337,7 @@ def twobody_leo_setup():
 
     # Generate truth and measurements
     truth_dict = {}
-    meas_fcn = H_rgradec
+    meas_fcn = est.H_rgradec
     meas_dict = {}
     meas_dict['tk_list'] = []
     meas_dict['Yk_list'] = []
@@ -249,7 +347,7 @@ def twobody_leo_setup():
         
         if kk > 0:
             tin = [tk_list[kk-1], tk_list[kk]]
-            tout, Xout = general_dynamics(X, tin, state_params, int_params)
+            tout, Xout = dyn.general_dynamics(X, tin, state_params, int_params)
             X = Xout[-1,:].reshape(6, 1)
         
         truth_dict[tk_list[kk]] = X
@@ -346,7 +444,7 @@ def twobody_geo_setup():
     int_params = {}
     int_params['integrator'] = 'ode'
     int_params['ode_integrator'] = 'dop853'
-    int_params['intfcn'] = ode_twobody
+    int_params['intfcn'] = dyn.ode_twobody
     int_params['rtol'] = 1e-12
     int_params['atol'] = 1e-12
     int_params['time_format'] = 'datetime'
@@ -387,7 +485,7 @@ def twobody_geo_setup():
 
     # Generate truth and measurements
     truth_dict = {}
-    meas_fcn = H_radec
+    meas_fcn = est.H_radec
     meas_dict = {}
     meas_dict['tk_list'] = []
     meas_dict['Yk_list'] = []
@@ -397,7 +495,7 @@ def twobody_geo_setup():
         
         if kk > 0:
             tin = [tk_list[kk-1], tk_list[kk]]
-            tout, Xout = general_dynamics(X, tin, state_params, int_params)
+            tout, Xout = dyn.general_dynamics(X, tin, state_params, int_params)
             X = Xout[-1,:].reshape(6, 1)
         
         truth_dict[tk_list[kk]] = X
@@ -490,9 +588,9 @@ def execute_twobody_test():
     truth_dict = data[6]
     pklFile.close()
         
-    int_params['intfcn'] = ode_twobody_stm
+    int_params['intfcn'] = dyn.ode_twobody_stm
         
-    filter_output, full_state_output = ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
+    filter_output, full_state_output = est.ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
     
     # Compute errors
     n = 6

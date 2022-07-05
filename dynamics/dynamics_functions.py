@@ -170,6 +170,65 @@ def general_dynamics(Xo, tvec, state_params, int_params):
 # Generic Dynamics Functions
 ###############################################################################
 
+def ode_linear(t, X, params):
+    '''
+    This function works with ode to propagate an object moving with no 
+    acceleration.
+
+    Parameters
+    ------
+    X : 2 element array
+      cartesian state vector 
+    t : float 
+      current time in seconds
+    params : dictionary
+        additional arguments
+
+    Returns
+    ------
+    dX : 2 element array array
+      state derivative vector
+    
+    '''
+    
+    x = float(X[0])
+    dx = float(X[1])
+    
+    dX = np.zeros(2,)
+    dX[0] = dx
+    dX[1] = 0.
+    
+    return dX
+
+
+def ode_linear1d_stm(t, X, params):
+
+    # Number of states
+    n = 2
+
+    # State Vector
+    x = float(X[0])
+    dx = float(X[1])
+
+    # Generate A matrix
+    A = np.zeros((n, n))
+    A[0,1] = 1.
+
+    # Compute STM components dphi = A*phi
+    phi_mat = np.reshape(X[n:], (n, n))
+    dphi_mat = np.dot(A, phi_mat)
+    dphi_v = np.reshape(dphi_mat, (n**2, 1))
+
+    # Derivative vector
+    dX = np.zeros(n+n**2,)
+
+    dX[0] = dx
+    dX[1] = 0.
+    dX[n:] = dphi_v.flatten()
+
+    return dX
+
+
 def ode_balldrop(t, X, params):
     '''
     This function works with ode to propagate an object moving under constant
