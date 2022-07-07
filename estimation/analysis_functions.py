@@ -43,30 +43,31 @@ def compute_linear1d_errors(filter_output, truth_dict):
         sig_x[kk] = np.sqrt(P[0,0])
         sig_dx[kk] = np.sqrt(P[1,1])
         
+    resids_max = np.ceil(np.max(np.abs(resids))) 
+        
     plt.figure()
-    plt.subplot(2,1,1)
+    plt.subplot(3,1,1)
     plt.plot(tk_list, X_err[0,:], 'k.')
     plt.plot(tk_list, 3*sig_x, 'k--')
     plt.plot(tk_list, -3*sig_x, 'k--')
     plt.ylabel('Pos Err [m]')
     
-    plt.subplot(2,1,2)
+    plt.subplot(3,1,2)
     plt.plot(tk_list, X_err[1,:], 'k.')
     plt.plot(tk_list, 3*sig_dx, 'k--')
     plt.plot(tk_list, -3*sig_dx, 'k--')
     plt.ylabel('Vel Err [m/s]')
-    plt.xlabel('Time [sec]')
     
-    plt.figure()
+    
+    plt.subplot(3,1,3)
     plt.plot(tk_list, resids[0,:], 'k.')
+    plt.ylim([-resids_max, resids_max])
     plt.ylabel('Range Resids [m]')
+    plt.xlabel('Time [sec]')
     
     plt.show()
     
-    
-    print(sig_x)
-    print(sig_dx)
-    
+   
     print('\nError Statistics')
     print('Pos mean and std [m]: ' + '{:.3f}'.format(np.mean(X_err[0,:])) + ', {:.3f}'.format(np.std(X_err[0,:])))
     print('Vel mean and std [m/s]: ' + '{:.3f}'.format(np.mean(X_err[1,:])) + ', {:.3f}'.format(np.std(X_err[1,:])))
@@ -138,14 +139,14 @@ def compute_balldrop_errors(filter_output, truth_dict):
 ###############################################################################
 
 
-def compute_orbit_errors(fname):
+def compute_orbit_errors(filter_output, full_state_output, truth_dict):
     
-    pklFile = open(fname, 'rb' )
-    data = pickle.load( pklFile )
-    filter_output = data[0]
-    full_state_output = data[1]
-    truth_dict = data[2]
-    pklFile.close()
+#    pklFile = open(fname, 'rb' )
+#    data = pickle.load( pklFile )
+#    filter_output = data[0]
+#    full_state_output = data[1]
+#    truth_dict = data[2]
+#    pklFile.close()
     
     # Times
     tk_list = list(full_state_output.keys())

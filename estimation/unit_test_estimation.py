@@ -54,10 +54,9 @@ def linear_motion_setup():
     # Inital State
     X_true = np.array([[0.],[5.]])
     P = np.array([[10000., 0.],[0., 25.]])
-#    pert_vect = np.multiply(np.sqrt(np.diag(P)), np.random.randn(2))
-#    X_init = X_true + np.reshape(pert_vect, (2, 1))
+    pert_vect = np.multiply(np.sqrt(np.diag(P)), np.random.randn(2))
+    X_init = X_true + np.reshape(pert_vect, (2, 1))
     
-    X_init = np.array([[100.], [0.]])
     
     state_dict = {}
     state_dict[tk_list[0]] = {}
@@ -136,8 +135,8 @@ def execute_linear1d_test():
     
     
     # Batch Test
-    # filter_output, full_state_output = est.ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
-    # analysis.compute_linear1d_errors(filter_output, truth_dict)
+#    filter_output, full_state_output = est.ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
+#    analysis.compute_linear1d_errors(filter_output, truth_dict)
     
     # EKF Test
     filter_output, full_state_output = est.ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
@@ -158,7 +157,7 @@ def balldrop_setup():
     acc = 9.81  #m/s^2
     state_params = {}
     state_params['acc'] = acc
-    state_params['Q'] = np.diag([1e-2])
+    state_params['Q'] = np.diag([1e-8])
     state_params['gap_seconds'] = 10.
     
     # Integration function and additional settings
@@ -442,6 +441,8 @@ def twobody_geo_setup():
     state_params['GM'] = GME
     state_params['radius_m'] = 1.
     state_params['albedo'] = 0.1
+    state_params['Q'] = np.diag([1e-12])
+    state_params['gap_seconds'] = 900.
     
     # Integration function and additional settings
     int_params = {}
@@ -580,7 +581,7 @@ def execute_twobody_test():
     
     arcsec2rad = pi/(3600.*180.)
     
-    pklFile = open('twobody_leo_setup.pkl', 'rb' )
+    pklFile = open('twobody_geo_setup.pkl', 'rb' )
     data = pickle.load( pklFile )
     state_dict = data[0]
     state_params = data[1]
@@ -595,109 +596,111 @@ def execute_twobody_test():
         
     filter_output, full_state_output = est.ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
     
-    # Compute errors
-    n = 6
-    p = len(meas_dict['Yk_list'][0])
-    X_err = np.zeros((n, len(filter_output)))
-    resids = np.zeros((p, len(filter_output)))
-    sig_x = np.zeros(len(filter_output),)
-    sig_y = np.zeros(len(filter_output),)
-    sig_z = np.zeros(len(filter_output),)
-    sig_dx = np.zeros(len(filter_output),)
-    sig_dy = np.zeros(len(filter_output),)
-    sig_dz = np.zeros(len(filter_output),)
+    analysis.compute_orbit_errors(filter_output, full_state_output, truth_dict)
     
-    tk_list = list(filter_output.keys())
-    t0 = sorted(truth_dict.keys())[0]
-    thrs = [(tk - t0).total_seconds()/3600. for tk in tk_list]
-    for kk in range(len(filter_output)):
-        tk = tk_list[kk]
-        X = filter_output[tk]['X']
-        P = filter_output[tk]['P']
-        resids[:,kk] = filter_output[tk]['resids'].flatten()
-        
-        X_true = truth_dict[tk]
-        X_err[:,kk] = (X - X_true).flatten()
-        sig_x[kk] = np.sqrt(P[0,0])
-        sig_y[kk] = np.sqrt(P[1,1])
-        sig_z[kk] = np.sqrt(P[2,2])
-        sig_dx[kk] = np.sqrt(P[3,3])
-        sig_dy[kk] = np.sqrt(P[4,4])
-        sig_dz[kk] = np.sqrt(P[5,5])
-        
-    plt.figure()
-    plt.subplot(3,1,1)
-    plt.plot(thrs, X_err[0,:], 'k.')
-    plt.plot(thrs, 3*sig_x, 'k--')
-    plt.plot(thrs, -3*sig_x, 'k--')
-    plt.ylabel('X Err [km]')
-    
-    plt.subplot(3,1,2)
-    plt.plot(thrs, X_err[1,:], 'k.')
-    plt.plot(thrs, 3*sig_y, 'k--')
-    plt.plot(thrs, -3*sig_y, 'k--')
-    plt.ylabel('Y Err [km]')
-    
-    plt.subplot(3,1,3)
-    plt.plot(thrs, X_err[2,:], 'k.')
-    plt.plot(thrs, 3*sig_z, 'k--')
-    plt.plot(thrs, -3*sig_z, 'k--')
-    plt.ylabel('Z Err [km]')
-
-    plt.xlabel('Time [hours]')
-    
-    plt.figure()
-    plt.subplot(3,1,1)
-    plt.plot(thrs, X_err[3,:], 'k.')
-    plt.plot(thrs, 3*sig_dx, 'k--')
-    plt.plot(thrs, -3*sig_dx, 'k--')
-    plt.ylabel('dX Err [km/s]')
-    
-    plt.subplot(3,1,2)
-    plt.plot(thrs, X_err[4,:], 'k.')
-    plt.plot(thrs, 3*sig_dy, 'k--')
-    plt.plot(thrs, -3*sig_dy, 'k--')
-    plt.ylabel('dY Err [km/s]')
-    
-    plt.subplot(3,1,3)
-    plt.plot(thrs, X_err[5,:], 'k.')
-    plt.plot(thrs, 3*sig_dz, 'k--')
-    plt.plot(thrs, -3*sig_dz, 'k--')
-    plt.ylabel('dZ Err [km/s]')
-
-    plt.xlabel('Time [hours]')
-    
-    plt.figure()
-    
-    if p == 3:
-        plt.subplot(3,1,1)
-        plt.plot(thrs, resids[0,:]*1000., 'k.')
-        plt.ylabel('Range [m]')
-        
-        plt.subplot(3,1,2)
-        plt.plot(thrs, resids[1,:]/arcsec2rad, 'k.')
-        plt.ylabel('RA [arcsec]')
-        
-        plt.subplot(3,1,3)
-        plt.plot(thrs, resids[2,:]/arcsec2rad, 'k.')
-        plt.ylabel('DEC [arcsec]')
-        
-        plt.xlabel('Time [hours]')
-        
-    elif p == 2:
-        
-        plt.subplot(1,1,1)
-        plt.plot(thrs, resids[0,:]/arcsec2rad, 'k.')
-        plt.ylabel('RA [arcsec]')
-        
-        plt.subplot(2,1,1)
-        plt.plot(thrs, resids[1,:]/arcsec2rad, 'k.')
-        plt.ylabel('DEC [arcsec]')
-        
-        plt.xlabel('Time [hours]')
-        
-    
-    plt.show()
+#    # Compute errors
+#    n = 6
+#    p = len(meas_dict['Yk_list'][0])
+#    X_err = np.zeros((n, len(filter_output)))
+#    resids = np.zeros((p, len(filter_output)))
+#    sig_x = np.zeros(len(filter_output),)
+#    sig_y = np.zeros(len(filter_output),)
+#    sig_z = np.zeros(len(filter_output),)
+#    sig_dx = np.zeros(len(filter_output),)
+#    sig_dy = np.zeros(len(filter_output),)
+#    sig_dz = np.zeros(len(filter_output),)
+#    
+#    tk_list = list(filter_output.keys())
+#    t0 = sorted(truth_dict.keys())[0]
+#    thrs = [(tk - t0).total_seconds()/3600. for tk in tk_list]
+#    for kk in range(len(filter_output)):
+#        tk = tk_list[kk]
+#        X = filter_output[tk]['X']
+#        P = filter_output[tk]['P']
+#        resids[:,kk] = filter_output[tk]['resids'].flatten()
+#        
+#        X_true = truth_dict[tk]
+#        X_err[:,kk] = (X - X_true).flatten()
+#        sig_x[kk] = np.sqrt(P[0,0])
+#        sig_y[kk] = np.sqrt(P[1,1])
+#        sig_z[kk] = np.sqrt(P[2,2])
+#        sig_dx[kk] = np.sqrt(P[3,3])
+#        sig_dy[kk] = np.sqrt(P[4,4])
+#        sig_dz[kk] = np.sqrt(P[5,5])
+#        
+#    plt.figure()
+#    plt.subplot(3,1,1)
+#    plt.plot(thrs, X_err[0,:], 'k.')
+#    plt.plot(thrs, 3*sig_x, 'k--')
+#    plt.plot(thrs, -3*sig_x, 'k--')
+#    plt.ylabel('X Err [km]')
+#    
+#    plt.subplot(3,1,2)
+#    plt.plot(thrs, X_err[1,:], 'k.')
+#    plt.plot(thrs, 3*sig_y, 'k--')
+#    plt.plot(thrs, -3*sig_y, 'k--')
+#    plt.ylabel('Y Err [km]')
+#    
+#    plt.subplot(3,1,3)
+#    plt.plot(thrs, X_err[2,:], 'k.')
+#    plt.plot(thrs, 3*sig_z, 'k--')
+#    plt.plot(thrs, -3*sig_z, 'k--')
+#    plt.ylabel('Z Err [km]')
+#
+#    plt.xlabel('Time [hours]')
+#    
+#    plt.figure()
+#    plt.subplot(3,1,1)
+#    plt.plot(thrs, X_err[3,:], 'k.')
+#    plt.plot(thrs, 3*sig_dx, 'k--')
+#    plt.plot(thrs, -3*sig_dx, 'k--')
+#    plt.ylabel('dX Err [km/s]')
+#    
+#    plt.subplot(3,1,2)
+#    plt.plot(thrs, X_err[4,:], 'k.')
+#    plt.plot(thrs, 3*sig_dy, 'k--')
+#    plt.plot(thrs, -3*sig_dy, 'k--')
+#    plt.ylabel('dY Err [km/s]')
+#    
+#    plt.subplot(3,1,3)
+#    plt.plot(thrs, X_err[5,:], 'k.')
+#    plt.plot(thrs, 3*sig_dz, 'k--')
+#    plt.plot(thrs, -3*sig_dz, 'k--')
+#    plt.ylabel('dZ Err [km/s]')
+#
+#    plt.xlabel('Time [hours]')
+#    
+#    plt.figure()
+#    
+#    if p == 3:
+#        plt.subplot(3,1,1)
+#        plt.plot(thrs, resids[0,:]*1000., 'k.')
+#        plt.ylabel('Range [m]')
+#        
+#        plt.subplot(3,1,2)
+#        plt.plot(thrs, resids[1,:]/arcsec2rad, 'k.')
+#        plt.ylabel('RA [arcsec]')
+#        
+#        plt.subplot(3,1,3)
+#        plt.plot(thrs, resids[2,:]/arcsec2rad, 'k.')
+#        plt.ylabel('DEC [arcsec]')
+#        
+#        plt.xlabel('Time [hours]')
+#        
+#    elif p == 2:
+#        
+#        plt.subplot(2,1,1)
+#        plt.plot(thrs, resids[0,:]/arcsec2rad, 'k.')
+#        plt.ylabel('RA [arcsec]')
+#        
+#        plt.subplot(2,1,2)
+#        plt.plot(thrs, resids[1,:]/arcsec2rad, 'k.')
+#        plt.ylabel('DEC [arcsec]')
+#        
+#        plt.xlabel('Time [hours]')
+#        
+#    
+#    plt.show()
     
         
         
@@ -723,15 +726,15 @@ if __name__ == '__main__':
     
     plt.close('all')
     
-    execute_linear1d_test()
+#    execute_linear1d_test()
     
-    # execute_balldrop_test()
+#    execute_balldrop_test()
     
 #    twobody_geo_setup()
     
 #    twobody_leo_setup()
     
-    # execute_twobody_test()
+    execute_twobody_test()
 
 
 

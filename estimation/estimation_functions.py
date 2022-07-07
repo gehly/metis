@@ -338,15 +338,7 @@ def ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         elif time_format == 'datetime':
             delta_t = (tk - tk_prior).total_seconds()
             
-        # Set convergence flag to use EKF
-        if kk > 100:
-            conv_flag = True
             
-            # Don't use EKF after big gaps
-            if delta_t > gap_seconds:
-                conv_flag = False
-                
-        
         # Propagate to next time
         # Initial Conditions for Integration Routine
         Xref_prior = Xref
@@ -419,26 +411,40 @@ def ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         filter_output[tk]['P'] = P
         filter_output[tk]['resids'] = resids
         
-        print('\n')
-        print('tk', tk)
-        print('xbar', xbar)
-        print('xhat', xhat)
-        print('Xref', Xref)
-        print('Xk', Xk)
-        print('Yk', Yk)
-        print('Hk_til', Hk_til)
-        print('Kk', Kk)
-        print('resids', resids)
-        print('Gamma', Gamma)
-        print('phi', phi)
-        print('P_prior', P_prior)
-        print('Pbar', Pbar)
-        print('P', P)
+#        print('\n')
+#        print('tk', tk)
+#        print('xbar', xbar)
+#        print('xhat', xhat)
+#        print('Xref', Xref)
+#        print('Xk', Xk)
+#        print('Yk', Yk)
+#        print('Hk_til', Hk_til)
+#        print('Kk', Kk)
+#        print('resids', resids)
+#        print('Gamma', Gamma)
+#        print('phi', phi)
+#        print('P_prior', P_prior)
+#        print('Pbar', Pbar)
+#        print('P', P)
         
 #        if kk > 2:
 #             mistake
         
+        # Check convergence criteria and set flag to use EKF
+#        if kk > 10:
+        P_diff = np.trace(P)/np.trace(P_prior)
+#        print('\n')
+        print(kk)
+        print(P_diff)
         
+        if P_diff > 0.9 and P_diff < 1.0:
+            conv_flag = True
+        else:
+            conv_flag = False
+            
+        # Don't use EKF after big gaps
+        if delta_t > gap_seconds:
+            conv_flag = False
         
 
         # After filter convergence, update reference trajectory
