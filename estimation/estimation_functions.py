@@ -317,7 +317,7 @@ def ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
     P = Po_bar
     Xref = Xo_ref
     phi = np.identity(n)
-    phi_v = np.reshape(phi, (n**2, 1))
+    phi0_v = np.reshape(phi, (n**2, 1))
     conv_flag = False
     
     # Loop over times
@@ -352,7 +352,7 @@ def ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         Xref_prior = Xref
         xhat_prior = xhat
         P_prior = P
-        int0 = np.concatenate((Xref_prior, phi_v))
+        int0 = np.concatenate((Xref_prior, phi0_v))
 
         # Integrate Xref and STM
         if tk_prior == tk:
@@ -379,7 +379,7 @@ def ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
             Gamma = delta_t * np.concatenate((np.eye(q)*delta_t/2., np.eye(q)))
 
         xbar = np.dot(phi, xhat_prior)
-        Pbar = np.dot(phi, np.dot(P_prior, phi)) + np.dot(Gamma, np.dot(Q, Gamma.T))
+        Pbar = np.dot(phi, np.dot(P_prior, phi.T)) + np.dot(Gamma, np.dot(Q, Gamma.T))
         
         # Measurement Update: posterior state and covar at tk            
         # Retrieve measurement data
@@ -429,11 +429,14 @@ def ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         print('Hk_til', Hk_til)
         print('Kk', Kk)
         print('resids', resids)
+        print('Gamma', Gamma)
+        print('phi', phi)
+        print('P_prior', P_prior)
         print('Pbar', Pbar)
         print('P', P)
         
-        # if kk > 2:
-        #     mistake
+#        if kk > 2:
+#             mistake
         
         
         

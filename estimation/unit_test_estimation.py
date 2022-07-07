@@ -36,8 +36,8 @@ def linear_motion_setup():
     
     # Define state parameters
     state_params = {}
-    state_params['Q'] = np.diag([1e-12])*0.
-    state_params['gap_seconds'] = 10.
+    state_params['Q'] = np.diag([1e-8])
+    state_params['gap_seconds'] = 100.
     
     # Integration function and additional settings
     int_params = {}
@@ -49,13 +49,15 @@ def linear_motion_setup():
     int_params['time_format'] = 'seconds'
 
     # Time vector
-    tk_list = np.arange(0.,100.1,1.)
+    tk_list = np.arange(0.,900.1,10.)
     
     # Inital State
-    X_true = np.array([[0.],[1.]])
-    P = np.array([[100., 0.],[0., 1.]])
-    pert_vect = np.multiply(np.sqrt(np.diag(P)), np.random.randn(2))
-    X_init = X_true + np.reshape(pert_vect, (2, 1))
+    X_true = np.array([[0.],[5.]])
+    P = np.array([[10000., 0.],[0., 25.]])
+#    pert_vect = np.multiply(np.sqrt(np.diag(P)), np.random.randn(2))
+#    X_init = X_true + np.reshape(pert_vect, (2, 1))
+    
+    X_init = np.array([[100.], [0.]])
     
     state_dict = {}
     state_dict[tk_list[0]] = {}
@@ -70,7 +72,7 @@ def linear_motion_setup():
     meas_dict['sensor_id_list'] = []
     sensor_params = {}
     sensor_params[1] = {}
-    sig_rg = 0.1
+    sig_rg = 0.5
     sensor_params[1]['sigma_dict'] = {}
     sensor_params[1]['sigma_dict']['rg'] = sig_rg
     sensor_params[1]['meas_types'] = ['rg']
