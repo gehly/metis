@@ -50,12 +50,14 @@ def compute_linear1d_errors(filter_output, truth_dict):
     plt.plot(tk_list, X_err[0,:], 'k.')
     plt.plot(tk_list, 3*sig_x, 'k--')
     plt.plot(tk_list, -3*sig_x, 'k--')
+#    plt.ylim([-1, 1])
     plt.ylabel('Pos Err [m]')
     
     plt.subplot(3,1,2)
     plt.plot(tk_list, X_err[1,:], 'k.')
     plt.plot(tk_list, 3*sig_dx, 'k--')
     plt.plot(tk_list, -3*sig_dx, 'k--')
+#    plt.ylim([-0.05, 0.05])
     plt.ylabel('Vel Err [m/s]')
     
     
@@ -129,6 +131,12 @@ def compute_balldrop_errors(filter_output, truth_dict):
     plt.xlabel('Time [sec]')
     
     plt.show()
+    
+    print('\nError Statistics')
+    print('Pos mean and std [m]: ' + '{:.3f}'.format(np.mean(X_err[0,:])) + ', {:.3f}'.format(np.std(X_err[0,:])))
+    print('Vel mean and std [m/s]: ' + '{:.3f}'.format(np.mean(X_err[1,:])) + ', {:.3f}'.format(np.std(X_err[1,:])))
+    print('Pos Resids mean and std [m]: ' + '{:.3f}'.format(np.mean(resids[0,:])) + ', {:.3f}'.format(np.std(resids[0,:])))
+    print('Vel Resids mean and std [m]: ' + '{:.3f}'.format(np.mean(resids[1,:])) + ', {:.3f}'.format(np.std(resids[1,:])))
     
     
     return

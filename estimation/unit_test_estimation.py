@@ -135,8 +135,8 @@ def execute_linear1d_test():
     
     
     # Batch Test
-#    filter_output, full_state_output = est.ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
-#    analysis.compute_linear1d_errors(filter_output, truth_dict)
+    filter_output, full_state_output = est.ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
+    analysis.compute_linear1d_errors(filter_output, truth_dict)
     
     # EKF Test
     filter_output, full_state_output = est.ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
@@ -728,13 +728,13 @@ if __name__ == '__main__':
     
 #    execute_linear1d_test()
     
-#    execute_balldrop_test()
+    execute_balldrop_test()
     
 #    twobody_geo_setup()
     
 #    twobody_leo_setup()
     
-    execute_twobody_test()
+#    execute_twobody_test()
 
 
 
