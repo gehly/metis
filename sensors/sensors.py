@@ -1143,8 +1143,8 @@ def define_sensors(sensor_id_list=[]):
     
     # Constraints/Limits
     az_lim = [0., 2.*pi]  # rad
-    el_lim = [30.*pi/180., pi/2.]  # rad
-    rg_lim = [0., 4000.]   # km
+    el_lim = [0.*pi/180., pi/2.]  # rad
+    rg_lim = [0., 40000.]   # km
     
     # FOV dimensions
     LAM_dim = 20.   # deg
@@ -1155,9 +1155,6 @@ def define_sensors(sensor_id_list=[]):
     PHI_half = 0.5*PHI_dim*pi/180
     FOV_hlim = [-LAM_half, LAM_half]
     FOV_vlim = [-PHI_half, PHI_half]
-    
-    # Frequency limiits
-    freq_lim = [300e6, 3e9]  # Hz
    
     # Measurement types and noise
     meas_types = ['rg', 'ra', 'dec']
@@ -1181,7 +1178,6 @@ def define_sensors(sensor_id_list=[]):
     sensor_dict['Born s101']['rg_lim'] = rg_lim
     sensor_dict['Born s101']['FOV_hlim'] = FOV_hlim
     sensor_dict['Born s101']['FOV_vlim'] = FOV_vlim
-    sensor_dict['Born s101']['freq_lim'] = freq_lim
     sensor_dict['Born s101']['passive_optical'] = False
     
     # Measurements and noise
@@ -1202,8 +1198,8 @@ def define_sensors(sensor_id_list=[]):
     
     # Constraints/Limits
     az_lim = [0., 2.*pi]  # rad
-    el_lim = [30.*pi/180., pi/2.]  # rad
-    rg_lim = [0., 4000.]   # km
+    el_lim = [0.*pi/180., pi/2.]  # rad
+    rg_lim = [0., 40000.]   # km
     
     # FOV dimensions
     LAM_dim = 20.   # deg
@@ -1214,9 +1210,6 @@ def define_sensors(sensor_id_list=[]):
     PHI_half = 0.5*PHI_dim*pi/180
     FOV_hlim = [-LAM_half, LAM_half]
     FOV_vlim = [-PHI_half, PHI_half]
-    
-    # Frequency limiits
-    freq_lim = [300e6, 3e9]  # Hz
    
     # Measurement types and noise
     meas_types = ['rg', 'ra', 'dec']
@@ -1240,7 +1233,6 @@ def define_sensors(sensor_id_list=[]):
     sensor_dict['Born s337']['rg_lim'] = rg_lim
     sensor_dict['Born s337']['FOV_hlim'] = FOV_hlim
     sensor_dict['Born s337']['FOV_vlim'] = FOV_vlim
-    sensor_dict['Born s337']['freq_lim'] = freq_lim
     sensor_dict['Born s337']['passive_optical'] = False
     
     # Measurements and noise
@@ -1256,14 +1248,14 @@ def define_sensors(sensor_id_list=[]):
     
     print('Born s394')
     
-    site_ecef = np.reshape([3860.900, 3238.500, 3898.100], (3,1))
+    site_ecef = np.reshape([549.500, -1380.870, 6182.200], (3,1))
     lat, lon, ht = coord.ecef2latlonht(site_ecef)
     geodetic_latlonht = [lat, lon, ht]
     
     # Constraints/Limits
     az_lim = [0., 2.*pi]  # rad
-    el_lim = [30.*pi/180., pi/2.]  # rad
-    rg_lim = [0., 4000.]   # km
+    el_lim = [0.*pi/180., pi/2.]  # rad
+    rg_lim = [0., 40000.]   # km
     
     # FOV dimensions
     LAM_dim = 20.   # deg
@@ -1274,9 +1266,6 @@ def define_sensors(sensor_id_list=[]):
     PHI_half = 0.5*PHI_dim*pi/180
     FOV_hlim = [-LAM_half, LAM_half]
     FOV_vlim = [-PHI_half, PHI_half]
-    
-    # Frequency limiits
-    freq_lim = [300e6, 3e9]  # Hz
    
     # Measurement types and noise
     meas_types = ['rg', 'ra', 'dec']
@@ -1300,7 +1289,6 @@ def define_sensors(sensor_id_list=[]):
     sensor_dict['Born s394']['rg_lim'] = rg_lim
     sensor_dict['Born s394']['FOV_hlim'] = FOV_hlim
     sensor_dict['Born s394']['FOV_vlim'] = FOV_vlim
-    sensor_dict['Born s394']['freq_lim'] = freq_lim
     sensor_dict['Born s394']['passive_optical'] = False
     
     # Measurements and noise

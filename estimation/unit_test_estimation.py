@@ -22,7 +22,7 @@ from sensors.visibility_functions import check_visibility
 from sensors.measurements import compute_measurement
 from utilities.astrodynamics import kep2cart
 from utilities.constants import GME, arcsec2rad
-from utilities.coordinate_systems import itrf2gcrf, gcrf2itrf, ecef2enu
+from utilities.coordinate_systems import itrf2gcrf, gcrf2itrf, ecef2enu, ecef2latlonht
 from utilities.eop_functions import get_celestrak_eop_alldata, get_eop_data
 from utilities.eop_functions import get_XYs2006_alldata
 
@@ -279,6 +279,155 @@ def H_balldrop(tk, Xref, state_params, sensor_params, sensor_id):
 ###############################################################################
 
 
+def twobody_geo_setup():
+        
+    # Retrieve latest EOP data from celestrak.com
+    eop_alldata = get_celestrak_eop_alldata()
+        
+    # Retrieve polar motion data from file
+    XYs_df = get_XYs2006_alldata()
+    
+    # Define state parameters
+    state_params = {}
+    state_params['GM'] = GME
+    state_params['radius_m'] = 1.
+    state_params['albedo'] = 0.1
+    state_params['Q'] = 1e-12 * np.diag([1, 1, 1])
+    state_params['gap_seconds'] = 900.
+    
+    # Integration function and additional settings
+    int_params = {}
+    int_params['integrator'] = 'ode'
+    int_params['ode_integrator'] = 'dop853'
+    int_params['intfcn'] = dyn.ode_twobody
+    int_params['rtol'] = 1e-12
+    int_params['atol'] = 1e-12
+    int_params['time_format'] = 'datetime'
+
+    # Time vector
+    tk_list = []
+    for hr in range(24):
+        UTC = datetime(2021, 6, 21, hr, 0, 0)
+        tvec = np.arange(0., 601., 60.)
+        tk_list.extend([UTC + timedelta(seconds=ti) for ti in tvec])
+
+    # Inital State
+    elem = [42164.1, 0.001, 0., 90., 0., 0.]
+    X_true = np.reshape(kep2cart(elem), (6,1))
+    P = np.diag([1., 1., 1., 1e-6, 1e-6, 1e-6])
+    pert_vect = np.multiply(np.sqrt(np.diag(P)), np.random.randn(6))
+    X_init = X_true + np.reshape(pert_vect, (6, 1))
+    
+    state_dict = {}
+    state_dict[tk_list[0]] = {}
+    state_dict[tk_list[0]]['X'] = X_init
+    state_dict[tk_list[0]]['P'] = P
+    
+    
+    # Sensor and measurement parameters
+    sensor_id_list = ['UNSW Falcon']
+    sensor_params = define_sensors(sensor_id_list)
+    sensor_params['eop_alldata'] = eop_alldata
+    sensor_params['XYs_df'] = XYs_df
+    
+    for sensor_id in sensor_id_list:
+        sensor_params[sensor_id]['meas_types'] = ['ra', 'dec']
+        sigma_dict = {}
+        sigma_dict['ra'] = 5.*arcsec2rad   # rad
+        sigma_dict['dec'] = 5.*arcsec2rad  # rad
+        sensor_params[sensor_id]['sigma_dict'] = sigma_dict
+    print(sensor_params)
+
+    # Generate truth and measurements
+    truth_dict = {}
+    meas_fcn = est.H_radec
+    meas_dict = {}
+    meas_dict['tk_list'] = []
+    meas_dict['Yk_list'] = []
+    meas_dict['sensor_id_list'] = []
+    X = X_true.copy()
+    for kk in range(len(tk_list)):
+        
+        if kk > 0:
+            tin = [tk_list[kk-1], tk_list[kk]]
+            tout, Xout = dyn.general_dynamics(X, tin, state_params, int_params)
+            X = Xout[-1,:].reshape(6, 1)
+        
+        truth_dict[tk_list[kk]] = X
+        
+        # Check visibility conditions and compute measurements
+        UTC = tk_list[kk]
+        EOP_data = get_eop_data(eop_alldata, UTC)
+        
+        for sensor_id in sensor_id_list:
+            sensor = sensor_params[sensor_id]
+            if check_visibility(X, state_params, sensor, UTC, EOP_data, XYs_df):
+                
+                # Compute measurements
+                Yk = compute_measurement(X, state_params, sensor, UTC,
+                                         EOP_data, XYs_df,
+                                         meas_types=sensor['meas_types'])
+                
+                Yk[0] += np.random.randn()*sigma_dict['ra']
+                Yk[1] += np.random.randn()*sigma_dict['dec']
+                
+                meas_dict['tk_list'].append(UTC)
+                meas_dict['Yk_list'].append(Yk)
+                meas_dict['sensor_id_list'].append(sensor_id)
+                
+
+    # Plot data
+    tplot = [(tk - tk_list[0]).total_seconds()/3600. for tk in tk_list]
+    xplot = []
+    yplot = []
+    zplot = []
+    for tk in tk_list:
+        X = truth_dict[tk]
+        xplot.append(X[0])
+        yplot.append(X[1])
+        zplot.append(X[2])
+        
+    meas_tk = meas_dict['tk_list']
+    meas_tplot = [(tk - tk_list[0]).total_seconds()/3600. for tk in meas_tk]
+    meas_sensor_id = meas_dict['sensor_id_list']
+    meas_sensor_index = [sensor_id_list.index(sensor_id) for sensor_id in meas_sensor_id]
+    
+        
+    
+    plt.figure()
+    plt.subplot(3,1,1)
+    plt.plot(tplot, xplot, 'k.')
+    plt.ylabel('X [km]')
+    plt.subplot(3,1,2)
+    plt.plot(tplot, yplot, 'k.')
+    plt.ylabel('Y [km]')
+    plt.subplot(3,1,3)
+    plt.plot(tplot, zplot, 'k.')
+    plt.ylabel('Z [km]')
+    plt.xlabel('Time [hours]')
+    
+    plt.figure()
+    plt.plot(meas_tplot, meas_sensor_index, 'k.')
+    plt.xlabel('Time [hours]')
+    plt.xlim([0, 25])
+    plt.yticks([0], ['UNSW Falcon'])
+    plt.ylabel('Sensor ID')
+    
+                
+    plt.show()   
+    
+    print(meas_dict)
+                
+    setup_file = os.path.join('unit_test', 'twobody_geo_setup.pkl')
+    pklFile = open( setup_file, 'wb' )
+    pickle.dump( [state_dict, state_params, int_params, meas_fcn, meas_dict, sensor_params, truth_dict], pklFile, -1 )
+    pklFile.close()
+                
+    
+    
+    return 
+
+
 def twobody_leo_setup():
     
     
@@ -429,9 +578,9 @@ def twobody_leo_setup():
     return
 
 
-
-def twobody_geo_setup():
-        
+def twobody_born_setup():
+    
+    
     # Retrieve latest EOP data from celestrak.com
     eop_alldata = get_celestrak_eop_alldata()
         
@@ -443,7 +592,8 @@ def twobody_geo_setup():
     state_params['GM'] = GME
     state_params['radius_m'] = 1.
     state_params['albedo'] = 0.1
-    state_params['Q'] = 1e-12 * np.diag([1, 1, 1])
+    state_params['laser_lim'] = 1e6
+    state_params['Q'] = 1e-16 * np.diag([1, 1, 1])
     state_params['gap_seconds'] = 900.
     
     # Integration function and additional settings
@@ -456,18 +606,29 @@ def twobody_geo_setup():
     int_params['time_format'] = 'datetime'
 
     # Time vector
-    tk_list = []
-    for hr in range(24):
-        UTC = datetime(2021, 6, 21, hr, 0, 0)
-        tvec = np.arange(0., 601., 60.)
-        tk_list.extend([UTC + timedelta(seconds=ti) for ti in tvec])
+    tvec = np.arange(0., 18341., 20.)
+#    UTC0 = datetime(1999, 10, 3, 23, 11, 9, 181400)
+    UTC0 = datetime(1999, 10, 4, 1, 45, 0)
+#    UTC0 = datetime(2000, 1, 1, 12, 0, 0)
+    tk_list = [UTC0 + timedelta(seconds=ti) for ti in tvec]
 
     # Inital State
-    elem = [42164.1, 0.001, 0., 90., 0., 0.]
-    X_true = np.reshape(kep2cart(elem), (6,1))
+    X_true = np.reshape([757.700301, 5222.606566, 4851.49977,
+                         2.213250611, 4.678372741, -5.371314404], (6,1))
     P = np.diag([1., 1., 1., 1e-6, 1e-6, 1e-6])
     pert_vect = np.multiply(np.sqrt(np.diag(P)), np.random.randn(6))
     X_init = X_true + np.reshape(pert_vect, (6, 1))
+    
+    # Check initial satellite location
+    r_GCRF = X_true[0:3].reshape(3,1)
+    v_GCRF = X_true[3:6].reshape(3,1)
+    EOP_data = get_eop_data(eop_alldata, UTC0)
+    r_ecef, dum = gcrf2itrf(r_GCRF, v_GCRF, UTC0, EOP_data, XYs_df)
+    
+    lat, lon, ht = ecef2latlonht(r_ecef)
+    print(lat, lon, ht)
+    
+#    mistake
     
     state_dict = {}
     state_dict[tk_list[0]] = {}
@@ -476,22 +637,22 @@ def twobody_geo_setup():
     
     
     # Sensor and measurement parameters
-    sensor_id_list = ['UNSW Falcon']
+    sensor_id_list = ['Born s101', 'Born s337', 'Born s394']
     sensor_params = define_sensors(sensor_id_list)
     sensor_params['eop_alldata'] = eop_alldata
     sensor_params['XYs_df'] = XYs_df
     
     for sensor_id in sensor_id_list:
-        sensor_params[sensor_id]['meas_types'] = ['ra', 'dec']
+        sensor_params[sensor_id]['meas_types'] = ['rg', 'ra', 'dec']
         sigma_dict = {}
+        sigma_dict['rg'] = 0.001  # km
         sigma_dict['ra'] = 5.*arcsec2rad   # rad
         sigma_dict['dec'] = 5.*arcsec2rad  # rad
         sensor_params[sensor_id]['sigma_dict'] = sigma_dict
-    print(sensor_params)
 
     # Generate truth and measurements
     truth_dict = {}
-    meas_fcn = est.H_radec
+    meas_fcn = est.H_rgradec
     meas_dict = {}
     meas_dict['tk_list'] = []
     meas_dict['Yk_list'] = []
@@ -512,16 +673,18 @@ def twobody_geo_setup():
         
         for sensor_id in sensor_id_list:
             sensor = sensor_params[sensor_id]
+            sigma_dict = sensor['sigma_dict']
+            meas_types = sensor['meas_types']
             if check_visibility(X, state_params, sensor, UTC, EOP_data, XYs_df):
                 
                 # Compute measurements
                 Yk = compute_measurement(X, state_params, sensor, UTC,
-                                         EOP_data, XYs_df,
-                                         meas_types=sensor['meas_types'])
+                                         EOP_data, XYs_df, meas_types)
                 
-                Yk[0] += np.random.randn()*sigma_dict['ra']
-                Yk[1] += np.random.randn()*sigma_dict['dec']
-                
+                for mtype in meas_types:
+                    mind = meas_types.index(mtype)
+                    Yk[mind] += np.random.randn()*sigma_dict[mtype]
+
                 meas_dict['tk_list'].append(UTC)
                 meas_dict['Yk_list'].append(Yk)
                 meas_dict['sensor_id_list'].append(sensor_id)
@@ -560,8 +723,8 @@ def twobody_geo_setup():
     plt.figure()
     plt.plot(meas_tplot, meas_sensor_index, 'k.')
     plt.xlabel('Time [hours]')
-    plt.xlim([0, 25])
-    plt.yticks([0], ['UNSW Falcon'])
+    plt.xlim([0, 5.5])
+    plt.yticks([0, 1, 2], ['s101', 's337', 's394'])
     plt.ylabel('Sensor ID')
     
                 
@@ -569,14 +732,17 @@ def twobody_geo_setup():
     
     print(meas_dict)
                 
-    setup_file = os.path.join('unit_test', 'twobody_geo_setup.pkl')
+    setup_file = os.path.join('unit_test', 'twobody_born_setup.pkl')
     pklFile = open( setup_file, 'wb' )
     pickle.dump( [state_dict, state_params, int_params, meas_fcn, meas_dict, sensor_params, truth_dict], pklFile, -1 )
     pklFile.close()
-                
     
     
-    return 
+    return
+
+
+
+
 
 
 
@@ -585,7 +751,7 @@ def twobody_geo_setup():
 def execute_twobody_test():
     
         
-    setup_file = os.path.join('unit_test', 'twobody_leo_setup.pkl')
+    setup_file = os.path.join('unit_test', 'twobody_geo_setup.pkl')
     
     pklFile = open(setup_file, 'rb' )
     data = pickle.load( pklFile )
@@ -599,10 +765,9 @@ def execute_twobody_test():
     pklFile.close()
         
     int_params['intfcn'] = dyn.ode_twobody_stm
-    state_params['Q'] = 1e-9 * np.diag([1, 1, 1])
+    state_params['Q'] = 1e-16 * np.diag([1, 1, 1])
         
-#    filter_output, full_state_output = est.ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
-#    
+#    filter_output, full_state_output = est.ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)    
 #    analysis.compute_orbit_errors(filter_output, full_state_output, truth_dict)
     
     
@@ -745,6 +910,8 @@ if __name__ == '__main__':
 #    twobody_geo_setup()
     
 #    twobody_leo_setup()
+    
+#    twobody_born_setup()
     
     execute_twobody_test()
 

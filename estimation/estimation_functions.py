@@ -318,6 +318,7 @@ def ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
     phi = np.identity(n)
     phi0_v = np.reshape(phi, (n**2, 1))
     conv_flag = False
+    count = 0
     
     # Loop over times
     for kk in range(L):
@@ -436,14 +437,20 @@ def ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         print(kk)
         print(P_diff)
         
-        if P_diff > 0.9 and P_diff < 1.0:
+#        if P_diff > 0.9 and P_diff < 1.0:
+#            conv_flag = True
+#        else:
+#            conv_flag = False
+        
+        if count > 5:
             conv_flag = True
-        else:
-            conv_flag = False
-            
+
         # Don't use EKF after big gaps
         if delta_t > gap_seconds:
             conv_flag = False
+            count = 0
+            
+        count += 1
         
 
         # After filter convergence, update reference trajectory
