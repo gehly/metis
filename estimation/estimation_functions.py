@@ -302,7 +302,6 @@ def ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
 
     # Initialize output
     filter_output = {}
-    full_state_output = {}
 
     # Measurement times
     tk_list = meas_dict['tk_list']
@@ -451,6 +450,63 @@ def ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         if conv_flag:
             Xref = Xk
             xhat = np.zeros((n, 1))
+            
+            
+    
+            
+    # TODO Generation of full_state_output not working correctly
+    # Use filter_output for error analysis
+    
+    full_state_output = {}
+            
+#    # Integrate over full time
+#    tk_truth = list(truth_dict.keys())
+#    Xk = Xo_ref.copy()
+#    Pk = Po_bar.copy()
+#    full_state_output = {}
+#    for kk in range(len(tk_truth)):
+#        
+#        # Current and previous time
+#        if kk == 0:
+#            tk_prior = state_tk
+#        else:
+#            tk_prior = tk_truth[kk-1]
+#            
+#        tk = tk_truth[kk]
+#        
+#        
+#        # If current time is in filter output, retrieve values from filter 
+#        # state
+#        if tk in filter_output:
+#            Xk = filter_output[tk]['X']
+#            Pk = filter_output[tk]['P']
+#        
+#        # If not, then integrate to get estimated state/covar for this time
+#        
+#            # Initial Conditions for Integration Routine
+#            Xk_prior = Xk.copy()
+#            Pk_prior = Pk.copy()
+#            int0 = np.concatenate((Xk_prior, phi0_v))
+#    
+#            # Integrate Xref and STM
+#            if tk_prior == tk:
+#                intout = int0.T
+#            else:
+#                int0 = int0.flatten()
+#                tin = [tk_prior, tk]
+#                
+#                tout, intout = general_dynamics(int0, tin, state_params, int_params)
+#
+#            # Extract values for later calculations
+#            xout = intout[-1,:]
+#            Xk = xout[0:n].reshape(n, 1)
+#            phi_v = xout[n:].reshape(n**2, 1)
+#            phi = np.reshape(phi_v, (n, n))
+#            Pk = np.dot(phi, np.dot(Pk_prior, phi.T))
+#        
+#        full_state_output[tk] = {}
+#        full_state_output[tk]['X'] = Xk
+#        full_state_output[tk]['P'] = Pk
     
     
     return filter_output, full_state_output

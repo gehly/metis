@@ -21,7 +21,7 @@ from sensors.sensors import define_sensors
 from sensors.visibility_functions import check_visibility
 from sensors.measurements import compute_measurement
 from utilities.astrodynamics import kep2cart
-from utilities.constants import GME
+from utilities.constants import GME, arcsec2rad
 from utilities.coordinate_systems import itrf2gcrf, gcrf2itrf, ecef2enu
 from utilities.eop_functions import get_celestrak_eop_alldata, get_eop_data
 from utilities.eop_functions import get_XYs2006_alldata
@@ -234,9 +234,9 @@ def execute_balldrop_test():
     int_params['intfcn'] = dyn.ode_balldrop_stm
     
     
-    # Batch Test
-    filter_output, full_state_output = est.ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
-    analysis.compute_balldrop_errors(filter_output, truth_dict)
+#    # Batch Test
+#    filter_output, full_state_output = est.ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
+#    analysis.compute_balldrop_errors(filter_output, truth_dict)
     
     # EKF Test
     filter_output, full_state_output = est.ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
@@ -281,7 +281,6 @@ def H_balldrop(tk, Xref, state_params, sensor_params, sensor_id):
 
 def twobody_leo_setup():
     
-    arcsec2rad = pi/(3600.*180.)
     
     # Retrieve latest EOP data from celestrak.com
     eop_alldata = get_celestrak_eop_alldata()
@@ -295,6 +294,8 @@ def twobody_leo_setup():
     state_params['radius_m'] = 1.
     state_params['albedo'] = 0.1
     state_params['laser_lim'] = 1e6
+    state_params['Q'] = 1e-12 * np.diag([1, 1, 1])
+    state_params['gap_seconds'] = 900.
     
     # Integration function and additional settings
     int_params = {}
@@ -410,6 +411,8 @@ def twobody_leo_setup():
     plt.figure()
     plt.plot(meas_tplot, meas_sensor_index, 'k.')
     plt.xlabel('Time [hours]')
+    plt.xlim([0, 12])
+    plt.yticks([0, 1, 2, 3, 4], ['Zimmerwald', 'Stromlo', 'Arequipa', 'Haleakala', 'Yarragadee'])
     plt.ylabel('Sensor ID')
     
                 
@@ -417,7 +420,8 @@ def twobody_leo_setup():
     
     print(meas_dict)
                 
-    pklFile = open( 'twobody_leo_setup.pkl', 'wb' )
+    setup_file = os.path.join('unit_test', 'twobody_leo_setup.pkl')
+    pklFile = open( setup_file, 'wb' )
     pickle.dump( [state_dict, state_params, int_params, meas_fcn, meas_dict, sensor_params, truth_dict], pklFile, -1 )
     pklFile.close()
     
@@ -427,9 +431,7 @@ def twobody_leo_setup():
 
 
 def twobody_geo_setup():
-    
-    arcsec2rad = pi/(3600.*180.)
-    
+        
     # Retrieve latest EOP data from celestrak.com
     eop_alldata = get_celestrak_eop_alldata()
         
@@ -441,7 +443,7 @@ def twobody_geo_setup():
     state_params['GM'] = GME
     state_params['radius_m'] = 1.
     state_params['albedo'] = 0.1
-    state_params['Q'] = np.diag([1e-12])
+    state_params['Q'] = 1e-12 * np.diag([1, 1, 1])
     state_params['gap_seconds'] = 900.
     
     # Integration function and additional settings
@@ -558,6 +560,8 @@ def twobody_geo_setup():
     plt.figure()
     plt.plot(meas_tplot, meas_sensor_index, 'k.')
     plt.xlabel('Time [hours]')
+    plt.xlim([0, 25])
+    plt.yticks([0], ['UNSW Falcon'])
     plt.ylabel('Sensor ID')
     
                 
@@ -565,7 +569,8 @@ def twobody_geo_setup():
     
     print(meas_dict)
                 
-    pklFile = open( 'twobody_geo_setup.pkl', 'wb' )
+    setup_file = os.path.join('unit_test', 'twobody_geo_setup.pkl')
+    pklFile = open( setup_file, 'wb' )
     pickle.dump( [state_dict, state_params, int_params, meas_fcn, meas_dict, sensor_params, truth_dict], pklFile, -1 )
     pklFile.close()
                 
@@ -579,9 +584,10 @@ def twobody_geo_setup():
 
 def execute_twobody_test():
     
-    arcsec2rad = pi/(3600.*180.)
+        
+    setup_file = os.path.join('unit_test', 'twobody_leo_setup.pkl')
     
-    pklFile = open('twobody_geo_setup.pkl', 'rb' )
+    pklFile = open(setup_file, 'rb' )
     data = pickle.load( pklFile )
     state_dict = data[0]
     state_params = data[1]
@@ -593,10 +599,16 @@ def execute_twobody_test():
     pklFile.close()
         
     int_params['intfcn'] = dyn.ode_twobody_stm
+    state_params['Q'] = 1e-9 * np.diag([1, 1, 1])
         
-    filter_output, full_state_output = est.ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
+#    filter_output, full_state_output = est.ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
+#    
+#    analysis.compute_orbit_errors(filter_output, full_state_output, truth_dict)
     
-    analysis.compute_orbit_errors(filter_output, full_state_output, truth_dict)
+    
+    filter_output, full_state_output = est.ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
+    analysis.compute_orbit_errors(filter_output, filter_output, truth_dict)
+    
     
 #    # Compute errors
 #    n = 6
@@ -728,13 +740,13 @@ if __name__ == '__main__':
     
 #    execute_linear1d_test()
     
-    execute_balldrop_test()
+#    execute_balldrop_test()
     
 #    twobody_geo_setup()
     
 #    twobody_leo_setup()
     
-#    execute_twobody_test()
+    execute_twobody_test()
 
 
 
