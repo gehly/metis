@@ -18,15 +18,143 @@ from utilities.coordinate_systems import eci2ric
 
 
 
+###############################################################################
+# Linear Motion Analysis
+###############################################################################
 
-def compute_orbit_errors(fname):
+def compute_linear1d_errors(filter_output, truth_dict):
     
-    pklFile = open(fname, 'rb' )
-    data = pickle.load( pklFile )
-    filter_output = data[0]
-    full_state_output = data[1]
-    truth_dict = data[2]
-    pklFile.close()
+    # Compute errors
+    n = 2
+    p = 1
+    X_err = np.zeros((n, len(filter_output)))
+    resids = np.zeros((p, len(filter_output)))
+    sig_x = np.zeros(len(filter_output),)
+    sig_dx = np.zeros(len(filter_output),)
+    tk_list = list(filter_output.keys())
+    for kk in range(len(filter_output)):
+        tk = tk_list[kk]
+        X = filter_output[tk]['X']
+        P = filter_output[tk]['P']
+        resids[:,kk] = filter_output[tk]['resids'].flatten()
+        
+        X_true = truth_dict[tk]
+        X_err[:,kk] = (X - X_true).flatten()
+        sig_x[kk] = np.sqrt(P[0,0])
+        sig_dx[kk] = np.sqrt(P[1,1])
+        
+    resids_max = np.ceil(np.max(np.abs(resids))) 
+        
+    plt.figure()
+    plt.subplot(3,1,1)
+    plt.plot(tk_list, X_err[0,:], 'k.')
+    plt.plot(tk_list, 3*sig_x, 'k--')
+    plt.plot(tk_list, -3*sig_x, 'k--')
+#    plt.ylim([-1, 1])
+    plt.ylabel('Pos Err [m]')
+    
+    plt.subplot(3,1,2)
+    plt.plot(tk_list, X_err[1,:], 'k.')
+    plt.plot(tk_list, 3*sig_dx, 'k--')
+    plt.plot(tk_list, -3*sig_dx, 'k--')
+#    plt.ylim([-0.05, 0.05])
+    plt.ylabel('Vel Err [m/s]')
+    
+    
+    plt.subplot(3,1,3)
+    plt.plot(tk_list, resids[0,:], 'k.')
+    plt.ylim([-resids_max, resids_max])
+    plt.ylabel('Range Resids [m]')
+    plt.xlabel('Time [sec]')
+    
+    plt.show()
+    
+   
+    print('\nError Statistics')
+    print('Pos mean and std [m]: ' + '{:.3f}'.format(np.mean(X_err[0,:])) + ', {:.3f}'.format(np.std(X_err[0,:])))
+    print('Vel mean and std [m/s]: ' + '{:.3f}'.format(np.mean(X_err[1,:])) + ', {:.3f}'.format(np.std(X_err[1,:])))
+    print('Rg Resids mean and std [m]: ' + '{:.3f}'.format(np.mean(resids[0,:])) + ', {:.3f}'.format(np.std(resids[0,:])))
+    
+    
+    
+    return
+
+
+
+###############################################################################
+# Balldrop Analysis
+###############################################################################
+
+def compute_balldrop_errors(filter_output, truth_dict):
+    
+    # Compute errors
+    n = 2
+    p = 2
+    X_err = np.zeros((n, len(filter_output)))
+    resids = np.zeros((p, len(filter_output)))
+    sig_y = np.zeros(len(filter_output),)
+    sig_dy = np.zeros(len(filter_output),)
+    tk_list = list(filter_output.keys())
+    for kk in range(len(filter_output)):
+        tk = tk_list[kk]
+        X = filter_output[tk]['X']
+        P = filter_output[tk]['P']
+        resids[:,kk] = filter_output[tk]['resids'].flatten()
+        
+        X_true = truth_dict[tk]
+        X_err[:,kk] = (X - X_true).flatten()
+        sig_y[kk] = np.sqrt(P[0,0])
+        sig_dy[kk] = np.sqrt(P[1,1])
+        
+    plt.figure()
+    plt.subplot(2,1,1)
+    plt.plot(tk_list, X_err[0,:], 'k.')
+    plt.plot(tk_list, 3*sig_y, 'k--')
+    plt.plot(tk_list, -3*sig_y, 'k--')
+    plt.ylabel('Pos Err [m]')
+    
+    plt.subplot(2,1,2)
+    plt.plot(tk_list, X_err[1,:], 'k.')
+    plt.plot(tk_list, 3*sig_dy, 'k--')
+    plt.plot(tk_list, -3*sig_dy, 'k--')
+    plt.ylabel('Vel Err [m/s]')
+    plt.xlabel('Time [sec]')
+    
+    plt.figure()
+    plt.subplot(2,1,1)
+    plt.plot(tk_list, resids[0,:], 'k.')
+    plt.ylabel('Y Resids [m]')
+    
+    plt.subplot(2,1,2)
+    plt.plot(tk_list, resids[1,:], 'k.')
+    plt.ylabel('dY Resids [m/s]')
+    plt.xlabel('Time [sec]')
+    
+    plt.show()
+    
+    print('\nError Statistics')
+    print('Pos mean and std [m]: ' + '{:.3f}'.format(np.mean(X_err[0,:])) + ', {:.3f}'.format(np.std(X_err[0,:])))
+    print('Vel mean and std [m/s]: ' + '{:.3f}'.format(np.mean(X_err[1,:])) + ', {:.3f}'.format(np.std(X_err[1,:])))
+    print('Pos Resids mean and std [m]: ' + '{:.3f}'.format(np.mean(resids[0,:])) + ', {:.3f}'.format(np.std(resids[0,:])))
+    print('Vel Resids mean and std [m]: ' + '{:.3f}'.format(np.mean(resids[1,:])) + ', {:.3f}'.format(np.std(resids[1,:])))
+    
+    
+    return
+
+
+###############################################################################
+# Orbit Analysis
+###############################################################################
+
+
+def compute_orbit_errors(filter_output, full_state_output, truth_dict):
+    
+#    pklFile = open(fname, 'rb' )
+#    data = pickle.load( pklFile )
+#    filter_output = data[0]
+#    full_state_output = data[1]
+#    truth_dict = data[2]
+#    pklFile.close()
     
     # Times
     tk_list = list(full_state_output.keys())
