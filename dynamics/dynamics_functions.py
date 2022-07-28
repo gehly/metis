@@ -1,8 +1,10 @@
 import numpy as np
+from math import exp
 from scipy.integrate import odeint, ode
 import sys
 import os
 import inspect
+from datetime import datetime, timedelta
 
 filename = inspect.getframeinfo(inspect.currentframe()).filename
 current_dir = os.path.dirname(os.path.abspath(filename))
@@ -11,7 +13,10 @@ ind = current_dir.find('metis')
 metis_dir = current_dir[0:ind+5]
 sys.path.append(metis_dir)
 
-from dynamics.numerical_integration import rk4, rkf78, dopri87
+import dynamics.numerical_integration as numint
+import utilities.astrodynamics as astro
+import utilities.coordinate_systems as coord
+import utilities.eop_functions as eop
 
 
 
@@ -51,7 +56,7 @@ def general_dynamics(Xo, tvec, state_params, int_params):
         params['step'] = int_params['step']
         
         # Run integrator
-        tout, Xout, fcalls = rk4(intfcn, tvec, Xo, params)
+        tout, Xout, fcalls = numint.rk4(intfcn, tvec, Xo, params)
         
         
     if integrator == 'rkf78':
@@ -66,7 +71,7 @@ def general_dynamics(Xo, tvec, state_params, int_params):
         
         # Run integrator
         if len(tvec) == 2:
-            tout, Xout, fcalls = rkf78(intfcn, tvec, Xo, params)
+            tout, Xout, fcalls = numint.rkf78(intfcn, tvec, Xo, params)
             
         else:
             
@@ -77,7 +82,7 @@ def general_dynamics(Xo, tvec, state_params, int_params):
             # Run integrator
             k = 1
             while tin[0] < tvec[-1]:           
-                dum, Xout_step, fcalls = rkf78(intfcn, tin, Xo, params)
+                dum, Xout_step, fcalls = numint.rkf78(intfcn, tin, Xo, params)
                 Xo = Xout_step[-1,:]
                 tin = tvec[k:k+2]
                 Xout[k] = Xo               
@@ -97,7 +102,7 @@ def general_dynamics(Xo, tvec, state_params, int_params):
         
         # Run integrator
         if len(tvec) == 2:
-            tout, Xout, fcalls = dopri87(intfcn, tvec, Xo, params)
+            tout, Xout, fcalls = numint.dopri87(intfcn, tvec, Xo, params)
             
         else:
             
@@ -108,7 +113,7 @@ def general_dynamics(Xo, tvec, state_params, int_params):
             # Run integrator
             k = 1
             while tin[0] < tvec[-1]:           
-                dum, Xout_step, fcalls = dopri87(intfcn, tin, Xo, params)
+                dum, Xout_step, fcalls = numint.dopri87(intfcn, tin, Xo, params)
                 Xo = Xout_step[-1,:]
                 tin = tvec[k:k+2]
                 Xout[k] = Xo               
@@ -715,6 +720,14 @@ def ode_twobody_j2_drag(t, X, params):
     
     # Additional arguments
     GM = params['GM']
+    J2 = params['J2']
+    Cd = params['Cd']
+    R = params['R']
+    dtheta = params['dtheta']
+    A_m = params['A_m']
+    UTC0 = params['UTC0']
+    eop_alldata = params['eop_alldata']
+    XYs_df = params['XYs_df']
 
     # State Vector
     x = float(X[0])
@@ -725,7 +738,39 @@ def ode_twobody_j2_drag(t, X, params):
     dz = float(X[5])
 
     # Compute radius
-    r = np.linalg.norm([x, y, z])
+    r_vect = np.array([[x], [y], [z]])
+    r = np.linalg.norm(r_vect)
+
+    # Compute drag component
+    if Cd == 0. or A_m == 0.:
+        x_drag = 0.
+        y_drag = 0.
+        z_drag = 0.
+    
+    else:    
+        # Find vector va of spacecraft relative to atmosphere
+        v_vect = np.array([[dx], [dy], [dz]])
+        w_vect = np.array([[0.], [0.], [dtheta]])
+        va_vect = v_vect - np.cross(w_vect, r_vect, axis=0)
+        va = np.linalg.norm(va_vect)
+        va_x = float(va_vect[0])
+        va_y = float(va_vect[1])
+        va_z = float(va_vect[2])
+        
+        # Atmosphere lookup
+        UTC = UTC0 + timedelta(seconds=t)
+        EOP_data = eop.get_eop_data(eop_alldata, UTC)
+        r_ecef, dum = coord.gcrf2itrf(r_vect, v_vect, UTC, EOP_data, XYs_df)
+        lat, lon, ht = coord.ecef2latlonht(r_ecef)
+        
+        rho0, h0, H = astro.atmosphere_lookup(ht)
+        
+        # Calculate drag
+        drag = -0.5*A_m*Cd*rho0*exp(-(ht - h0)/H)
+        x_drag = drag*va*va_x
+        y_drag = drag*va*va_y
+        z_drag = drag*va*va_z
+    
 
     # Derivative vector
     dX = np.zeros(6,)
@@ -734,9 +779,9 @@ def ode_twobody_j2_drag(t, X, params):
     dX[1] = dy
     dX[2] = dz
 
-    dX[3] = -GM*x/r**3
-    dX[4] = -GM*y/r**3
-    dX[5] = -GM*z/r**3
+    dX[3] = -GM*x/r**3. + x_drag - 1.5*J2*R**2.*GM*((x/r**5.) - (5.*x*z**2./r**7.))
+    dX[4] = -GM*y/r**3. + y_drag - 1.5*J2*R**2.*GM*((y/r**5.) - (5.*y*z**2./r**7.))
+    dX[5] = -GM*z/r**3. + z_drag - 1.5*J2*R**2.*GM*((3.*z/r**5.) - (5.*z**3./r**7.))
     
     return dX
 
