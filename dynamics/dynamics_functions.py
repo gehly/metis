@@ -701,6 +701,11 @@ def ode_twobody_j2_drag(t, X, params):
     '''
     This function works with ode to propagate object assuming
     two-body dynamics with J2 and drag perturbations included.
+    This function uses a low fidelity drag model using the 
+    standard atmospheric model, a co-rotating atmosphere to 
+    compute winds, and a spherical Earth to compute orbit height.
+    
+    It should NOT be used for high fidelity orbit prediction.
 
     Parameters
     ------
@@ -725,9 +730,9 @@ def ode_twobody_j2_drag(t, X, params):
     R = params['R']
     dtheta = params['dtheta']
     A_m = params['A_m']
-    UTC0 = params['UTC0']
-    eop_alldata = params['eop_alldata']
-    XYs_df = params['XYs_df']
+#    UTC0 = params['UTC0']
+#    eop_alldata = params['eop_alldata']
+#    XYs_df = params['XYs_df']
 
     # State Vector
     x = float(X[0])
@@ -758,11 +763,12 @@ def ode_twobody_j2_drag(t, X, params):
         va_z = float(va_vect[2])
         
         # Atmosphere lookup
-        UTC = UTC0 + timedelta(seconds=t)
-        EOP_data = eop.get_eop_data(eop_alldata, UTC)
-        r_ecef, dum = coord.gcrf2itrf(r_vect, v_vect, UTC, EOP_data, XYs_df)
-        lat, lon, ht = coord.ecef2latlonht(r_ecef)
+#        UTC = UTC0 + timedelta(seconds=t)
+#        EOP_data = eop.get_eop_data(eop_alldata, UTC)
+#        r_ecef, dum = coord.gcrf2itrf(r_vect, v_vect, UTC, EOP_data, XYs_df)
+#        lat, lon, ht = coord.ecef2latlonht(r_ecef)
         
+        ht = r - R
         rho0, h0, H = astro.atmosphere_lookup(ht)
         
         # Calculate drag

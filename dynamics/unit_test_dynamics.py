@@ -5,22 +5,20 @@ import sys
 
 sys.path.append('../')
 
-from dynamics.dynamics_functions import general_dynamics
-from dynamics.dynamics_functions import int_twobody, ode_twobody
-from utilities.astrodynamics import cart2kep, kep2cart
-from utilities.astrodynamics import true2ecc, ecc2true, mean2ecc, ecc2mean
+import dynamics.dynamics_functions as dyn
+import utilities.astrodynamics as astro
 from utilities.constants import GME, J2E, wE, Re
 
 
-def unit_test_twobody():
+def unit_test_orbit():
     
     
     # Orbit Parameter Setup
     params = {}
     params['GM'] = GME
     params['J2'] = J2E
-    params['wE'] = wE  # rad/s
-    params['Re'] = Re  # km
+    params['dtheta'] = wE  # rad/s
+    params['R'] = Re  # km
     params['Cd'] = 2.2
     params['A_m'] = 1e-8    # km^2/kg
 
@@ -29,14 +27,18 @@ def unit_test_twobody():
     tin = np.arange(0., 86400.*2+1., 10.)
     
     # Initial orbit - Molniya     
-    Xo = np.array([2.88824880e3, -7.73903934e2, -5.97116199e3, 2.64414431,
-                   9.86808092, 0.0])
+#    Xo = np.array([2.88824880e3, -7.73903934e2, -5.97116199e3, 2.64414431,
+#                   9.86808092, 0.0])
+    
+    # Initial orbit - sun-synchronous
+    elem0 = [6978.1363, 0.01, 97.79, 30., 30., 0.]
+    Xo = astro.kep2cart(elem0, GM=params['GM'])
     
     # Integration function and additional settings
     int_params = {}
     int_params['integrator'] = 'ode'
     int_params['ode_integrator'] = 'dop853'
-    int_params['intfcn'] = ode_twobody    
+    int_params['intfcn'] = dyn.ode_twobody_j2_drag 
     int_params['step'] = 10.
     int_params['rtol'] = 1e-12
     int_params['atol'] = 1e-12
@@ -44,23 +46,23 @@ def unit_test_twobody():
     int_params['time_format'] = 'sec'
     
     # Run integrator
-    tout, Xout = general_dynamics(Xo, tin, params, int_params)
+    tout, Xout = dyn.general_dynamics(Xo, tin, params, int_params)
     
     print(len(tout))
     print(tout[-1])
     
-    # Analytic solution
-    elem = cart2kep(Xo, GM=params['GM'])
+    # Analytic TwoBody solution
+    elem = astro.cart2kep(Xo, GM=params['GM'])
     a = elem[0]
     e = elem[1]
     i = elem[2]
     RAAN = elem[3]
     w = elem[4]
     theta0 = elem[5]*pi/180.
-    E0 = true2ecc(theta0, e)
-    M0 = ecc2mean(E0, e)
+    E0 = astro.true2ecc(theta0, e)
+    M0 = astro.ecc2mean(E0, e)
     n = np.sqrt(params['GM']/a**3.)
-    kk = 0
+    
     a_diff = []
     e_diff = []
     i_diff = []
@@ -70,6 +72,8 @@ def unit_test_twobody():
     energy_diff = []
     pos_diff = []
     vel_diff = []
+    
+    kk = 0
     for t in tout:
         
         # Compute new mean anomaly [rad]
@@ -78,19 +82,19 @@ def unit_test_twobody():
             M -= 2*pi
         
         # Convert to true anomaly [rad]
-        E = mean2ecc(M,e)
-        theta = ecc2true(E,e)  
+        E = astro.mean2ecc(M,e)
+        theta = astro.ecc2true(E,e)  
         
         # Convert anomaly angles to deg
         M *= 180./pi
         E *= 180./pi
         theta *= 180./pi
         
-        X_true = kep2cart([a,e,i,RAAN,w,theta], GM=params['GM'])
+        X_true = astro.kep2cart([a,e,i,RAAN,w,theta], GM=params['GM'])
         elem_true = [a,e,i,RAAN,w,theta]
         
         # Convert numeric to elements
-        elem_num = cart2kep(Xout[kk,:], GM=params['GM'])
+        elem_num = astro.cart2kep(Xout[kk,:], GM=params['GM'])
         
         a_diff.append(elem_num[0] - elem_true[0])
         e_diff.append(elem_num[1] - elem_true[1])
@@ -101,7 +105,7 @@ def unit_test_twobody():
         pos_diff.append(np.linalg.norm(X_true[0:3].flatten() - Xout[kk,0:3].flatten()))
         vel_diff.append(np.linalg.norm(X_true[3:6].flatten() - Xout[kk,3:6].flatten()))
         
-        if RAAN_diff[kk] < 0:
+        if RAAN_diff[kk] < -180:
             RAAN_diff[kk] += 360.
         if RAAN_diff[kk] > 180:
             RAAN_diff[kk] -= 360.
@@ -159,7 +163,7 @@ if __name__ == '__main__':
     
     plt.close('all')
     
-    unit_test_twobody()
+    unit_test_orbit()
     
     
     
