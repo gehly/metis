@@ -792,7 +792,191 @@ def ode_twobody_j2_drag(t, X, params):
     return dX
 
 
-#def ode_twobody_ukf(t, X, params):
+def ode_twobody_j2_drag_stm(t, X, params):
+    '''
+    This function works with ode to propagate object assuming
+    two-body dynamics with J2 and drag perturbations included.
+    Partials for the STM dynamics are included.
+    
+    This function uses a low fidelity drag model using the 
+    standard atmospheric model, a co-rotating atmosphere to 
+    compute winds, and a spherical Earth to compute orbit height.
+    
+    It should NOT be used for high fidelity orbit prediction.
+    
+
+    Parameters
+    ------
+    X : (n+n^2) element array
+      initial condition vector of cartesian state and STM (Inertial Frame)
+    t : float 
+      current time in seconds
+    params : dictionary
+        additional arguments
+
+    Returns
+    ------
+    dX : (n+n^2) element array
+      derivative vector
+      
+    '''
+
+    # Additional arguments
+    GM = params['GM']
+    J2 = params['J2']
+    Cd = params['Cd']
+    R = params['R']
+    dtheta = params['dtheta']
+    A_m = params['A_m']
+
+    # Compute number of states
+    n = int((-1 + np.sqrt(1 + 4*len(X)))/2)
+
+    # State Vector
+    x = float(X[0])
+    y = float(X[1])
+    z = float(X[2])
+    dx = float(X[3])
+    dy = float(X[4])
+    dz = float(X[5])
+    
+    # Compute ballistic coefficient from state vector or params
+    if n > 6:
+        beta = float(X[6])
+    else:
+        beta = Cd*A_m
+
+    # Compute radius
+    r_vect = np.array([[x], [y], [z]])
+    r = np.linalg.norm(r_vect)
+    
+    # Find vector va of spacecraft relative to atmosphere
+    v_vect = np.array([[dx], [dy], [dz]])
+    w_vect = np.array([[0.], [0.], [dtheta]])
+    va_vect = v_vect - np.cross(w_vect, r_vect, axis=0)
+    va = np.linalg.norm(va_vect)
+    va_x = float(va_vect[0])
+    va_y = float(va_vect[1])
+    va_z = float(va_vect[2])
+    
+    # Atmosphere lookup
+#        UTC = UTC0 + timedelta(seconds=t)
+#        EOP_data = eop.get_eop_data(eop_alldata, UTC)
+#        r_ecef, dum = coord.gcrf2itrf(r_vect, v_vect, UTC, EOP_data, XYs_df)
+#        lat, lon, ht = coord.ecef2latlonht(r_ecef)
+    
+    ht = r - R
+    rho0, h0, H = astro.atmosphere_lookup(ht)
+    
+    # Calculate drag
+    drag = -0.5*beta*rho0*exp(-(ht - h0)/H)
+    x_drag = drag*va*va_x
+    y_drag = drag*va*va_y
+    z_drag = drag*va*va_z
+    
+    
+    
+    # Find elements of A matrix
+    xx_cf = -GM/r**3. + 3.*GM*x**2./r**5.
+    xx_drag = drag*((-x*va*va_x/(H*r)) - dtheta*va_y*va_x/va)
+    xx_J2 = -1.5*J2*GM*R**2./r**5. - 7.5*J2*GM*R**2./r**7.*(-x**2. - z**2. + 7.*x**2.*z**2./r**2.)
+
+    xy_cf = 3.*GM*x*y/r**5.
+    xy_drag = drag*((-y*va*va_x/(H*r)) + dtheta*va_x**2./va + va*dtheta)
+    xy_J2 = -7.5*x*y/r**7. * J2*R**2.*GM*(-1. + 7.*z**2./r**2.)
+
+    xz_cf = 3.*GM*x*z/r**5.
+    xz_drag = drag*(-z*va*va_x/(H*r))
+    xz_J2 = -7.5*x*z/r**7. * J2*R**2.*GM*(-3. + 7.*z**2./r**2.)
+
+    yy_cf = -GM/r**3. + 3.*GM*y**2./r**5.
+    yy_drag = drag*((-y*va*va_y/(H*r)) + dtheta*va_x*va_y/va)
+    yy_J2 = -1.5*J2*GM*R**2./r**5. - 7.5*J2*GM*R**2./r**7.*(-y**2. - z**2. + 7.*y**2.*z**2./r**2.)
+
+    yx_cf = xy_cf
+    yx_drag = drag*((-x*va*va_y/(H*r)) - dtheta*va_y**2./va - va*dtheta)
+    yx_J2 = xy_J2
+
+    yz_cf = 3.*GM*y*z/r**5.
+    yz_drag = drag*(-z*va*va_y/(H*r))
+    yz_J2 = -7.5*y*z/r**7. * J2*R**2.*GM*(-3. + 7.*z**2./r**2.)
+
+    zz_cf = -GM/r**3. + 3.*GM*z**2./r**5.
+    zz_drag = drag*(-z*va*va_z/(H*r))
+    zz_J2 = -4.5*J2*R**2.*GM/r**5. - 7.5*J2*R**2.*GM/r**7.*(-6.*z**2. + 7.*z**4./r**2.)
+
+    zx_cf = xz_cf
+    zx_drag = drag*((-x*va*va_z/(H*r)) - dtheta*va_y*va_z/va)
+    zx_J2 = xz_J2
+
+    zy_cf = yz_cf
+    zy_drag = drag*((-y*va*va_z/(H*r)) + dtheta*va_x*va_z/va)
+    zy_J2 = yz_J2
+    
+    
+    
+    
+    # Generate A matrix using partials from above
+    A = np.zeros((n,n))
+
+    A[0,3] = 1. 
+    A[1,4] = 1. 
+    A[2,5] = 1.
+
+    A[3,0] = xx_cf + xx_drag + xx_J2
+    A[3,1] = xy_cf + xy_drag + xy_J2
+    A[3,2] = xz_cf + xz_drag + xz_J2
+    A[3,3] = drag*(va_x**2./va + va)
+    A[3,4] = drag*(va_y*va_x/va)
+    A[3,5] = drag*(va_z*va_x/va)      # Note, va_z = dz
+
+    A[4,0] = yx_cf + yx_drag + yx_J2
+    A[4,1] = yy_cf + yy_drag + yy_J2
+    A[4,2] = yz_cf + yz_drag + yz_J2
+    A[4,3] = drag*(va_y*va_x/va)
+    A[4,4] = drag*(va_y**2./va + va)
+    A[4,5] = drag*(va_y*va_z/va)       # Note, va_z = dz
+
+    A[5,0] = zx_cf + zx_drag + zx_J2
+    A[5,1] = zy_cf + zy_drag + zy_J2
+    A[5,2] = zz_cf + zz_drag + zz_J2
+    A[5,3] = drag*(va_x*va_z/va)
+    A[5,4] = drag*(va_y*va_z/va)
+    A[5,5] = drag*(va_z**2./va + va)
+    
+    if n > 6:
+        A[3,6] = x_drag/beta
+        A[4,6] = y_drag/beta
+        A[5,6] = z_drag/beta
+    
+
+    # Compute STM components dphi = A*phi
+    phi_mat = np.reshape(X[n:], (n, n))
+    dphi_mat = np.dot(A, phi_mat)
+    dphi_v = np.reshape(dphi_mat, (n**2, 1))
+
+    # Derivative vector
+    dX = np.zeros(n+n**2,)
+
+    dX[0] = dx
+    dX[1] = dy
+    dX[2] = dz
+
+    dX[3] = -GM*x/r**3. + x_drag - 1.5*J2*R**2.*GM*((x/r**5.) - (5.*x*z**2./r**7.))
+    dX[4] = -GM*y/r**3. + y_drag - 1.5*J2*R**2.*GM*((y/r**5.) - (5.*y*z**2./r**7.))
+    dX[5] = -GM*z/r**3. + z_drag - 1.5*J2*R**2.*GM*((3.*z/r**5.) - (5.*z**3./r**7.))
+    
+    # If beta is included its first derivative is set to zero by initializing
+    # dX above
+
+    dX[n:] = dphi_v.flatten()
+
+    return dX
+
+
+
+
+#def ode_twobody_j2_drag_ukf(t, X, params):
 #    '''
 #    This function works with ode to propagate object assuming
 #    simple two-body dynamics.  No perturbations included.  States for UKF
@@ -846,95 +1030,6 @@ def ode_twobody_j2_drag(t, X, params):
 #    return dX
 #
 #
-#def ode_twobody_stm(t, X, params):
-#    '''
-#    This function works with ode to propagate object assuming
-#    simple two-body dynamics.  No perturbations included.
-#    Partials for the STM dynamics are included.
-#
-#    Parameters
-#    ------
-#    X : (n+n^2) element array
-#      initial condition vector of cartesian state and STM (Inertial Frame)
-#    t : float 
-#      current time in seconds
-#    params : dictionary
-#        additional arguments
-#
-#    Returns
-#    ------
-#    dX : (n+n^2) element array
-#      derivative vector
-#      
-#    '''
-#
-#    # Additional arguments
-#    GM = params['GM']
-#
-#    # Compute number of states
-#    n = int((-1 + np.sqrt(1 + 4*len(X)))/2)
-#
-#    # State Vector
-#    x = float(X[0])
-#    y = float(X[1])
-#    z = float(X[2])
-#    dx = float(X[3])
-#    dy = float(X[4])
-#    dz = float(X[5])
-#
-#    # Compute radius
-#    r = np.linalg.norm([x, y, z])
-#
-#    # Find elements of A matrix
-#    xx_cf = -GM/r**3 + 3.*GM*x**2/r**5
-#    xy_cf = 3.*GM*x*y/r**5
-#    xz_cf = 3.*GM*x*z/r**5
-#    yy_cf = -GM/r**3 + 3.*GM*y**2/r**5
-#    yx_cf = xy_cf
-#    yz_cf = 3.*GM*y*z/r**5
-#    zz_cf = -GM/r**3 + 3.*GM*z**2/r**5
-#    zx_cf = xz_cf
-#    zy_cf = yz_cf
-#
-#    # Generate A matrix
-#    A = np.zeros((n, n))
-#
-#    A[0,3] = 1.
-#    A[1,4] = 1.
-#    A[2,5] = 1.
-#
-#    A[3,0] = xx_cf
-#    A[3,1] = xy_cf
-#    A[3,2] = xz_cf
-#
-#    A[4,0] = yx_cf
-#    A[4,1] = yy_cf
-#    A[4,2] = yz_cf
-#
-#    A[5,0] = zx_cf
-#    A[5,1] = zy_cf
-#    A[5,2] = zz_cf
-#
-#    # Compute STM components dphi = A*phi
-#    phi_mat = np.reshape(X[n:], (n, n))
-#    dphi_mat = np.dot(A, phi_mat)
-#    dphi_v = np.reshape(dphi_mat, (n**2, 1))
-#
-#    # Derivative vector
-#    dX = np.zeros(n+n**2,)
-#
-#    dX[0] = dx
-#    dX[1] = dy
-#    dX[2] = dz
-#
-#    dX[3] = -GM*x/r**3
-#    dX[4] = -GM*y/r**3
-#    dX[5] = -GM*z/r**3
-#
-#    dX[n:] = dphi_v.flatten()
-#
-#    return dX
-
 
 
 ###############################################################################

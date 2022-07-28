@@ -526,6 +526,8 @@ def ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
     
 def H_rgradec(tk, Xref, state_params, sensor_params, sensor_id):
     
+    # Number of states
+    n = len(Xref)
     
     # Compute sensor position in GCRF
     eop_alldata = sensor_params['eop_alldata']
@@ -577,7 +579,7 @@ def H_rgradec(tk, Xref, state_params, sensor_params, sensor_id):
     # Hk_til and Gi
     Gk = np.reshape([rg, ra, dec], (3,1))
     
-    Hk_til = np.zeros((3,6))
+    Hk_til = np.zeros((3,n))
     Hk_til[0,0] = drho_dx
     Hk_til[0,1] = drho_dy
     Hk_til[0,2] = drho_dz
@@ -593,6 +595,8 @@ def H_rgradec(tk, Xref, state_params, sensor_params, sensor_id):
 
 def H_radec(tk, Xref, state_params, sensor_params, sensor_id):
     
+    # Number of states
+    n = len(Xref)    
     
     # Compute sensor position in GCRF
     eop_alldata = sensor_params['eop_alldata']
@@ -644,7 +648,7 @@ def H_radec(tk, Xref, state_params, sensor_params, sensor_id):
     # Hk_til and Gi
     Gk = np.reshape([ra, dec], (2,1))
     
-    Hk_til = np.zeros((2,6))
+    Hk_til = np.zeros((2,n))
     Hk_til[0,0] = dra_dx
     Hk_til[0,1] = dra_dy
     Hk_til[1,0] = ddec_dx
