@@ -368,7 +368,10 @@ def ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         if delta_t > gap_seconds:        
             Gamma = np.zeros((n,q))
         else:
-            Gamma = delta_t * np.concatenate((np.eye(q)*delta_t/2., np.eye(q)))
+            Gamma = np.zeros((n,q))
+            Gamma[0:q,:] = (delta_t**2./2) * np.eye(q)
+            Gamma[q:2*q,:] = delta_t * np.eye(q)
+#            Gamma = delta_t * np.concatenate((np.eye(q)*delta_t/2., np.eye(q)))
 
         xbar = np.dot(phi, xhat_prior)
         Pbar = np.dot(phi, np.dot(P_prior, phi.T)) + np.dot(Gamma, np.dot(Q, Gamma.T))

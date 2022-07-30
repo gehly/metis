@@ -718,7 +718,7 @@ def ode_twobody_j2_drag(t, X, params):
 
     Returns
     ------
-    dX : 6 element array array
+    dX : n element array array
       state derivative vector
     
     '''
@@ -733,6 +733,9 @@ def ode_twobody_j2_drag(t, X, params):
 #    UTC0 = params['UTC0']
 #    eop_alldata = params['eop_alldata']
 #    XYs_df = params['XYs_df']
+    
+    # Number of states
+    n = len(X)
 
     # State Vector
     x = float(X[0])
@@ -741,13 +744,18 @@ def ode_twobody_j2_drag(t, X, params):
     dx = float(X[3])
     dy = float(X[4])
     dz = float(X[5])
+    
+    if n > 6:
+        beta = float(X[6])
+    else:
+        beta = Cd*A_m
 
     # Compute radius
     r_vect = np.array([[x], [y], [z]])
     r = np.linalg.norm(r_vect)
 
     # Compute drag component
-    if Cd == 0. or A_m == 0.:
+    if beta == 0.:
         x_drag = 0.
         y_drag = 0.
         z_drag = 0.
@@ -772,14 +780,14 @@ def ode_twobody_j2_drag(t, X, params):
         rho0, h0, H = astro.atmosphere_lookup(ht)
         
         # Calculate drag
-        drag = -0.5*A_m*Cd*rho0*exp(-(ht - h0)/H)
+        drag = -0.5*beta*rho0*exp(-(ht - h0)/H)
         x_drag = drag*va*va_x
         y_drag = drag*va*va_y
         z_drag = drag*va*va_z
     
 
     # Derivative vector
-    dX = np.zeros(6,)
+    dX = np.zeros(n,)
 
     dX[0] = dx
     dX[1] = dy
@@ -788,6 +796,9 @@ def ode_twobody_j2_drag(t, X, params):
     dX[3] = -GM*x/r**3. + x_drag - 1.5*J2*R**2.*GM*((x/r**5.) - (5.*x*z**2./r**7.))
     dX[4] = -GM*y/r**3. + y_drag - 1.5*J2*R**2.*GM*((y/r**5.) - (5.*y*z**2./r**7.))
     dX[5] = -GM*z/r**3. + z_drag - 1.5*J2*R**2.*GM*((3.*z/r**5.) - (5.*z**3./r**7.))
+    
+    # If additional states such as beta are included their first derivative
+    # is initialized to zero above
     
     return dX
 
@@ -966,8 +977,8 @@ def ode_twobody_j2_drag_stm(t, X, params):
     dX[4] = -GM*y/r**3. + y_drag - 1.5*J2*R**2.*GM*((y/r**5.) - (5.*y*z**2./r**7.))
     dX[5] = -GM*z/r**3. + z_drag - 1.5*J2*R**2.*GM*((3.*z/r**5.) - (5.*z**3./r**7.))
     
-    # If beta is included its first derivative is set to zero by initializing
-    # dX above
+    # If additional states such as beta are included their first derivative
+    # is initialized to zero above
 
     dX[n:] = dphi_v.flatten()
 

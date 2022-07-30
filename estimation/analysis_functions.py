@@ -173,6 +173,8 @@ def compute_orbit_errors(filter_output, full_state_output, truth_dict):
     resids0 = filter_output[meas_t0]['resids']
     n = len(Xo)
     p = len(resids0)
+    
+#    print('Estimated Initial State Xo', Xo)
 
     # Compute state errors
     X_err = np.zeros((n, len(full_state_output)))
@@ -189,6 +191,7 @@ def compute_orbit_errors(filter_output, full_state_output, truth_dict):
     sig_r = np.zeros(len(full_state_output),)
     sig_i = np.zeros(len(full_state_output),)
     sig_c = np.zeros(len(full_state_output),)
+    sig_beta = np.zeros(len(full_state_output),)
     
     meas_ind = 0 
     for kk in range(len(full_state_output)):
@@ -204,6 +207,9 @@ def compute_orbit_errors(filter_output, full_state_output, truth_dict):
         sig_dx[kk] = np.sqrt(P[3,3])
         sig_dy[kk] = np.sqrt(P[4,4])
         sig_dz[kk] = np.sqrt(P[5,5])
+        
+        if n > 6:
+            sig_beta[kk] = np.sqrt(P[6,6])
         
         # RIC Errors and Covariance
         rc_vect = X_true[0:3].reshape(3,1)
@@ -241,6 +247,11 @@ def compute_orbit_errors(filter_output, full_state_output, truth_dict):
     sig_i *= 1000.
     sig_c *= 1000.
     
+    if n > 6:
+        X_err[6,:] *= 1000.
+        X_err_meas[6,:] *= 1000.
+        sig_beta *= 1e6
+    
     if p == 2:
         resids *= (1./arcsec2rad)
     if p == 3:
@@ -264,6 +275,10 @@ def compute_orbit_errors(filter_output, full_state_output, truth_dict):
     print('In-Track [m]\t', '{0:0.2E}'.format(np.mean(X_err_ric[1,:])), '\t{0:0.2E}'.format(np.std(X_err_ric[1,:])))
     print('Cross-Track [m]\t', '{0:0.2E}'.format(np.mean(X_err_ric[2,:])), '\t{0:0.2E}'.format(np.std(X_err_ric[2,:])))
     print('')
+    
+    if n > 6:
+        print('Beta [m^2/kg]\t', '{0:0.2E}'.format(np.mean(X_err[6,:])), '\t{0:0.2E}'.format(np.std(X_err[6,:])))
+        print('')
     
     if p == 2:
         print('RA [arcsec]\t\t', '{0:0.2E}'.format(np.mean(resids[0,:])), '\t{0:0.2E}'.format(np.std(resids[0,:])))
@@ -349,6 +364,17 @@ def compute_orbit_errors(filter_output, full_state_output, truth_dict):
     plt.ylabel('Cross-Track [m]')
 
     plt.xlabel('Time [hours]')
+    
+    if n == 7:
+        plt.figure()
+        plt.plot(thrs, X_err[6,:], 'k.')
+        plt.plot(thrs_meas, X_err_meas[6,:], 'b.')
+        plt.plot(thrs, 3*sig_beta, 'k--')
+        plt.plot(thrs, -3*sig_beta, 'k--')
+        plt.ylabel('Beta [m^2/kg]')
+        plt.title('Additional Parameters')
+        
+        plt.xlabel('Time [hours]')
     
     
     # Residuals

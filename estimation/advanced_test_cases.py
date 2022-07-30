@@ -231,11 +231,21 @@ def sso_j2_drag_setup():
     tk_list = [UTC0 + timedelta(seconds=ti) for ti in tvec]
 
     # Inital State
+#    X_true = np.reshape([757.700301, 5222.606566, 4851.49977,
+#                         2.213250611, 4.678372741, -5.371314404], (6,1))
+#    P = np.diag([1., 1., 1., 1e-6, 1e-6, 1e-6])
+#    pert_vect = np.multiply(np.sqrt(np.diag(P)), np.random.randn(6))
+#    X_init = X_true + np.reshape(pert_vect, (6, 1))
+    
+    beta = state_params['Cd']*state_params['A_m']
     X_true = np.reshape([757.700301, 5222.606566, 4851.49977,
-                         2.213250611, 4.678372741, -5.371314404], (6,1))
-    P = np.diag([1., 1., 1., 1e-6, 1e-6, 1e-6])
-    pert_vect = np.multiply(np.sqrt(np.diag(P)), np.random.randn(6))
-    X_init = X_true + np.reshape(pert_vect, (6, 1))
+                         2.213250611, 4.678372741, -5.371314404, beta], (7,1))
+    P = np.diag([1., 1., 1., 1e-6, 1e-6, 1e-6, 1e-18])
+    pert_vect = np.multiply(np.sqrt(np.diag(P)), np.random.randn(7))
+    X_init = X_true + np.reshape(pert_vect, (7, 1))
+    
+    print(X_init)
+    
     
     # Check initial satellite location
     r_GCRF = X_true[0:3].reshape(3,1)
@@ -276,12 +286,13 @@ def sso_j2_drag_setup():
     meas_dict['Yk_list'] = []
     meas_dict['sensor_id_list'] = []
     X = X_true.copy()
+    n = len(X)
     for kk in range(len(tk_list)):
         
         if kk > 0:
             tin = [tk_list[kk-1], tk_list[kk]]
             tout, Xout = dyn.general_dynamics(X, tin, state_params, int_params)
-            X = Xout[-1,:].reshape(6, 1)
+            X = Xout[-1,:].reshape(n, 1)
         
         truth_dict[tk_list[kk]] = X
         
@@ -350,7 +361,7 @@ def sso_j2_drag_setup():
     
     print(meas_dict)
                 
-    setup_file = os.path.join('advanced_test', 'sso_j2_drag_setup.pkl')
+    setup_file = os.path.join('advanced_test', 'sso_j2_drag_beta_setup.pkl')
     pklFile = open( setup_file, 'wb' )
     pickle.dump( [state_dict, state_params, int_params, meas_fcn, meas_dict, sensor_params, truth_dict], pklFile, -1 )
     pklFile.close()
@@ -395,6 +406,6 @@ if __name__ == '__main__':
 
 #    geo_j2_setup()
     
-    sso_j2_drag_setup()
+#    sso_j2_drag_setup()
     
     execute_test()
