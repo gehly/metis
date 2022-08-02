@@ -612,7 +612,7 @@ def ode_twobody_ukf(t, X, params):
     GM = params['GM']
     
     # Initialize
-    dX = [0]*len(X)
+    dX = np.zeros(len(X),)
     n = int((-1 + np.sqrt(1. + 8.*len(X)))/4.)
 
     for ind in range(0, 2*n+1):

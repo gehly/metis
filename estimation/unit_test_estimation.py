@@ -264,8 +264,9 @@ def twobody_geo_setup():
     state_params['GM'] = GME
     state_params['radius_m'] = 1.
     state_params['albedo'] = 0.1
-    state_params['Q'] = 1e-12 * np.diag([1, 1, 1])
+    state_params['Q'] = 1e-16 * np.diag([1, 1, 1])
     state_params['gap_seconds'] = 900.
+    state_params['alpha'] = 1e-4
     
     # Integration function and additional settings
     int_params = {}
@@ -312,7 +313,7 @@ def twobody_geo_setup():
 
     # Generate truth and measurements
     truth_dict = {}
-    meas_fcn = est.H_radec
+    meas_fcn = mfunc.H_radec
     meas_dict = {}
     meas_dict['tk_list'] = []
     meas_dict['Yk_list'] = []
@@ -400,157 +401,160 @@ def twobody_geo_setup():
     return 
 
 
-def twobody_leo_setup():
-    
-    
-    # Retrieve latest EOP data from celestrak.com
-    eop_alldata = eop.get_celestrak_eop_alldata()
-        
-    # Retrieve polar motion data from file
-    XYs_df = eop.get_XYs2006_alldata()
-    
-    # Define state parameters
-    state_params = {}
-    state_params['GM'] = GME
-    state_params['radius_m'] = 1.
-    state_params['albedo'] = 0.1
-    state_params['laser_lim'] = 1e6
-    state_params['Q'] = 1e-12 * np.diag([1, 1, 1])
-    state_params['gap_seconds'] = 900.
-    
-    # Integration function and additional settings
-    int_params = {}
-    int_params['integrator'] = 'ode'
-    int_params['ode_integrator'] = 'dop853'
-    int_params['intfcn'] = dyn.ode_twobody
-    int_params['rtol'] = 1e-12
-    int_params['atol'] = 1e-12
-    int_params['time_format'] = 'datetime'
-
-    # Time vector
-    tvec = np.arange(0., 3600.*12. + 1., 10.)
-    UTC0 = datetime(2021, 6, 1, 0, 0, 0)
-    tk_list = [UTC0 + timedelta(seconds=ti) for ti in tvec]
-
-    # Inital State
-    elem = [7000., 0.01, 98., 0., 0., 0.]
-    X_true = np.reshape(astro.kep2cart(elem), (6,1))
-    P = np.diag([1., 1., 1., 1e-6, 1e-6, 1e-6])
-    pert_vect = np.multiply(np.sqrt(np.diag(P)), np.random.randn(6))
-    X_init = X_true + np.reshape(pert_vect, (6, 1))
-    
-    state_dict = {}
-    state_dict[tk_list[0]] = {}
-    state_dict[tk_list[0]]['X'] = X_init
-    state_dict[tk_list[0]]['P'] = P
-    
-    
-    # Sensor and measurement parameters
-    sensor_id_list = ['Zimmerwald Laser', 'Stromlo Laser', 'Arequipa Laser', 'Haleakala Laser', 'Yarragadee Laser']
-    sensor_params = sens.define_sensors(sensor_id_list)
-    sensor_params['eop_alldata'] = eop_alldata
-    sensor_params['XYs_df'] = XYs_df
-    
-    for sensor_id in sensor_id_list:
-        sensor_params[sensor_id]['meas_types'] = ['rg', 'ra', 'dec']
-        sigma_dict = {}
-        sigma_dict['rg'] = 0.001  # km
-        sigma_dict['ra'] = 5.*arcsec2rad   # rad
-        sigma_dict['dec'] = 5.*arcsec2rad  # rad
-        sensor_params[sensor_id]['sigma_dict'] = sigma_dict
-
-    # Generate truth and measurements
-    truth_dict = {}
-    meas_fcn = est.H_rgradec
-    meas_dict = {}
-    meas_dict['tk_list'] = []
-    meas_dict['Yk_list'] = []
-    meas_dict['sensor_id_list'] = []
-    X = X_true.copy()
-    for kk in range(len(tk_list)):
-        
-        if kk > 0:
-            tin = [tk_list[kk-1], tk_list[kk]]
-            tout, Xout = dyn.general_dynamics(X, tin, state_params, int_params)
-            X = Xout[-1,:].reshape(6, 1)
-        
-        truth_dict[tk_list[kk]] = X
-        
-        # Check visibility conditions and compute measurements
-        UTC = tk_list[kk]
-        EOP_data = eop.get_eop_data(eop_alldata, UTC)
-        
-        for sensor_id in sensor_id_list:
-            sensor = sensor_params[sensor_id]
-            sigma_dict = sensor['sigma_dict']
-            meas_types = sensor['meas_types']
-            if visfunc.check_visibility(X, state_params, sensor, UTC, EOP_data, XYs_df):
-                
-                # Compute measurements
-                Yk = mfunc.compute_measurement(X, state_params, sensor, UTC,
-                                         EOP_data, XYs_df, meas_types)
-                
-                for mtype in meas_types:
-                    mind = meas_types.index(mtype)
-                    Yk[mind] += np.random.randn()*sigma_dict[mtype]
-
-                meas_dict['tk_list'].append(UTC)
-                meas_dict['Yk_list'].append(Yk)
-                meas_dict['sensor_id_list'].append(sensor_id)
-                
-
-    # Plot data
-    tplot = [(tk - tk_list[0]).total_seconds()/3600. for tk in tk_list]
-    xplot = []
-    yplot = []
-    zplot = []
-    for tk in tk_list:
-        X = truth_dict[tk]
-        xplot.append(X[0])
-        yplot.append(X[1])
-        zplot.append(X[2])
-        
-    meas_tk = meas_dict['tk_list']
-    meas_tplot = [(tk - tk_list[0]).total_seconds()/3600. for tk in meas_tk]
-    meas_sensor_id = meas_dict['sensor_id_list']
-    meas_sensor_index = [sensor_id_list.index(sensor_id) for sensor_id in meas_sensor_id]
-    
-        
-    
-    plt.figure()
-    plt.subplot(3,1,1)
-    plt.plot(tplot, xplot, 'k.')
-    plt.ylabel('X [km]')
-    plt.subplot(3,1,2)
-    plt.plot(tplot, yplot, 'k.')
-    plt.ylabel('Y [km]')
-    plt.subplot(3,1,3)
-    plt.plot(tplot, zplot, 'k.')
-    plt.ylabel('Z [km]')
-    plt.xlabel('Time [hours]')
-    
-    plt.figure()
-    plt.plot(meas_tplot, meas_sensor_index, 'k.')
-    plt.xlabel('Time [hours]')
-    plt.xlim([0, 12])
-    plt.yticks([0, 1, 2, 3, 4], ['Zimmerwald', 'Stromlo', 'Arequipa', 'Haleakala', 'Yarragadee'])
-    plt.ylabel('Sensor ID')
-    
-                
-    plt.show()   
-    
-    print(meas_dict)
-                
-    setup_file = os.path.join('unit_test', 'twobody_leo_setup.pkl')
-    pklFile = open( setup_file, 'wb' )
-    pickle.dump( [state_dict, state_params, int_params, meas_fcn, meas_dict, sensor_params, truth_dict], pklFile, -1 )
-    pklFile.close()
-    
-    
-    return
+#def twobody_leo_setup():
+#    
+#    
+#    # Retrieve latest EOP data from celestrak.com
+#    eop_alldata = eop.get_celestrak_eop_alldata()
+#        
+#    # Retrieve polar motion data from file
+#    XYs_df = eop.get_XYs2006_alldata()
+#    
+#    # Define state parameters
+#    state_params = {}
+#    state_params['GM'] = GME
+#    state_params['radius_m'] = 1.
+#    state_params['albedo'] = 0.1
+#    state_params['laser_lim'] = 1e6
+#    state_params['Q'] = 1e-16 * np.diag([1, 1, 1])
+#    state_params['gap_seconds'] = 900.
+#    state_params['alpha'] = 1e-4
+#    
+#    # Integration function and additional settings
+#    int_params = {}
+#    int_params['integrator'] = 'ode'
+#    int_params['ode_integrator'] = 'dop853'
+#    int_params['intfcn'] = dyn.ode_twobody
+#    int_params['rtol'] = 1e-12
+#    int_params['atol'] = 1e-12
+#    int_params['time_format'] = 'datetime'
+#
+#    # Time vector
+#    tvec = np.arange(0., 3600.*12. + 1., 10.)
+#    UTC0 = datetime(2021, 6, 1, 0, 0, 0)
+#    tk_list = [UTC0 + timedelta(seconds=ti) for ti in tvec]
+#
+#    # Inital State
+#    elem = [7000., 0.01, 98., 0., 0., 0.]
+#    X_true = np.reshape(astro.kep2cart(elem), (6,1))
+#    P = np.diag([1., 1., 1., 1e-6, 1e-6, 1e-6])
+#    pert_vect = np.multiply(np.sqrt(np.diag(P)), np.random.randn(6))
+#    X_init = X_true + np.reshape(pert_vect, (6, 1))
+#    
+#    state_dict = {}
+#    state_dict[tk_list[0]] = {}
+#    state_dict[tk_list[0]]['X'] = X_init
+#    state_dict[tk_list[0]]['P'] = P
+#    
+#    
+#    # Sensor and measurement parameters
+#    sensor_id_list = ['Zimmerwald Laser', 'Stromlo Laser', 'Arequipa Laser', 'Haleakala Laser', 'Yarragadee Laser']
+#    sensor_params = sens.define_sensors(sensor_id_list)
+#    sensor_params['eop_alldata'] = eop_alldata
+#    sensor_params['XYs_df'] = XYs_df
+#    
+#    for sensor_id in sensor_id_list:
+#        sensor_params[sensor_id]['meas_types'] = ['rg', 'ra', 'dec']
+#        sigma_dict = {}
+#        sigma_dict['rg'] = 0.001  # km
+#        sigma_dict['ra'] = 5.*arcsec2rad   # rad
+#        sigma_dict['dec'] = 5.*arcsec2rad  # rad
+#        sensor_params[sensor_id]['sigma_dict'] = sigma_dict
+#
+#    # Generate truth and measurements
+#    truth_dict = {}
+#    meas_fcn = mfunc.H_rgradec
+#    meas_dict = {}
+#    meas_dict['tk_list'] = []
+#    meas_dict['Yk_list'] = []
+#    meas_dict['sensor_id_list'] = []
+#    X = X_true.copy()
+#    for kk in range(len(tk_list)):
+#        
+#        if kk > 0:
+#            tin = [tk_list[kk-1], tk_list[kk]]
+#            tout, Xout = dyn.general_dynamics(X, tin, state_params, int_params)
+#            X = Xout[-1,:].reshape(6, 1)
+#        
+#        truth_dict[tk_list[kk]] = X
+#        
+#        # Check visibility conditions and compute measurements
+#        UTC = tk_list[kk]
+#        EOP_data = eop.get_eop_data(eop_alldata, UTC)
+#        
+#        for sensor_id in sensor_id_list:
+#            sensor = sensor_params[sensor_id]
+#            sigma_dict = sensor['sigma_dict']
+#            meas_types = sensor['meas_types']
+#            if visfunc.check_visibility(X, state_params, sensor, UTC, EOP_data, XYs_df):
+#                
+#                # Compute measurements
+#                Yk = mfunc.compute_measurement(X, state_params, sensor, UTC,
+#                                         EOP_data, XYs_df, meas_types)
+#                
+#                for mtype in meas_types:
+#                    mind = meas_types.index(mtype)
+#                    Yk[mind] += np.random.randn()*sigma_dict[mtype]
+#
+#                meas_dict['tk_list'].append(UTC)
+#                meas_dict['Yk_list'].append(Yk)
+#                meas_dict['sensor_id_list'].append(sensor_id)
+#                
+#
+#    # Plot data
+#    tplot = [(tk - tk_list[0]).total_seconds()/3600. for tk in tk_list]
+#    xplot = []
+#    yplot = []
+#    zplot = []
+#    for tk in tk_list:
+#        X = truth_dict[tk]
+#        xplot.append(X[0])
+#        yplot.append(X[1])
+#        zplot.append(X[2])
+#        
+#    meas_tk = meas_dict['tk_list']
+#    meas_tplot = [(tk - tk_list[0]).total_seconds()/3600. for tk in meas_tk]
+#    meas_sensor_id = meas_dict['sensor_id_list']
+#    meas_sensor_index = [sensor_id_list.index(sensor_id) for sensor_id in meas_sensor_id]
+#    
+#        
+#    
+#    plt.figure()
+#    plt.subplot(3,1,1)
+#    plt.plot(tplot, xplot, 'k.')
+#    plt.ylabel('X [km]')
+#    plt.subplot(3,1,2)
+#    plt.plot(tplot, yplot, 'k.')
+#    plt.ylabel('Y [km]')
+#    plt.subplot(3,1,3)
+#    plt.plot(tplot, zplot, 'k.')
+#    plt.ylabel('Z [km]')
+#    plt.xlabel('Time [hours]')
+#    
+#    plt.figure()
+#    plt.plot(meas_tplot, meas_sensor_index, 'k.')
+#    plt.xlabel('Time [hours]')
+#    plt.xlim([0, 12])
+#    plt.yticks([0, 1, 2, 3, 4], ['Zimmerwald', 'Stromlo', 'Arequipa', 'Haleakala', 'Yarragadee'])
+#    plt.ylabel('Sensor ID')
+#    
+#                
+#    plt.show()   
+#    
+#    print(meas_dict)
+#                
+#    setup_file = os.path.join('unit_test', 'twobody_leo_setup.pkl')
+#    pklFile = open( setup_file, 'wb' )
+#    pickle.dump( [state_dict, state_params, int_params, meas_fcn, meas_dict, sensor_params, truth_dict], pklFile, -1 )
+#    pklFile.close()
+#    
+#    
+#    return
 
 
 def twobody_born_setup():
+    
+    # Use this for LEO test case (better measurement visibilty)
     
     
     # Retrieve latest EOP data from celestrak.com
@@ -567,6 +571,7 @@ def twobody_born_setup():
     state_params['laser_lim'] = 1e6
     state_params['Q'] = 1e-16 * np.diag([1, 1, 1])
     state_params['gap_seconds'] = 900.
+    state_params['alpha'] = 1e-4
     
     # Integration function and additional settings
     int_params = {}
@@ -624,7 +629,7 @@ def twobody_born_setup():
 
     # Generate truth and measurements
     truth_dict = {}
-    meas_fcn = est.H_rgradec
+    meas_fcn = mfunc.H_rgradec
     meas_dict = {}
     meas_dict['tk_list'] = []
     meas_dict['Yk_list'] = []
@@ -723,7 +728,7 @@ def twobody_born_setup():
 def execute_twobody_test():
     
         
-    setup_file = os.path.join('unit_test', 'twobody_geo_setup.pkl')
+    setup_file = os.path.join('unit_test', 'twobody_born_setup.pkl')
     
     pklFile = open(setup_file, 'rb' )
     data = pickle.load( pklFile )
@@ -737,136 +742,28 @@ def execute_twobody_test():
     pklFile.close()
         
     int_params['intfcn'] = dyn.ode_twobody_stm
-    state_params['Q'] = 1e-16 * np.diag([1, 1, 1])
+#    state_params['Q'] = 1e-16 * np.diag([1, 1, 1])
         
-#    filter_output, full_state_output = est.ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)    
-#    analysis.compute_orbit_errors(filter_output, full_state_output, truth_dict)
+    # Batch Test
+    filter_output, full_state_output = est.ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)    
+    analysis.compute_orbit_errors(filter_output, full_state_output, truth_dict)
     
     
+    # EKF Test
     filter_output, full_state_output = est.ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
     analysis.compute_orbit_errors(filter_output, filter_output, truth_dict)
     
     
-#    # Compute errors
-#    n = 6
-#    p = len(meas_dict['Yk_list'][0])
-#    X_err = np.zeros((n, len(filter_output)))
-#    resids = np.zeros((p, len(filter_output)))
-#    sig_x = np.zeros(len(filter_output),)
-#    sig_y = np.zeros(len(filter_output),)
-#    sig_z = np.zeros(len(filter_output),)
-#    sig_dx = np.zeros(len(filter_output),)
-#    sig_dy = np.zeros(len(filter_output),)
-#    sig_dz = np.zeros(len(filter_output),)
-#    
-#    tk_list = list(filter_output.keys())
-#    t0 = sorted(truth_dict.keys())[0]
-#    thrs = [(tk - t0).total_seconds()/3600. for tk in tk_list]
-#    for kk in range(len(filter_output)):
-#        tk = tk_list[kk]
-#        X = filter_output[tk]['X']
-#        P = filter_output[tk]['P']
-#        resids[:,kk] = filter_output[tk]['resids'].flatten()
-#        
-#        X_true = truth_dict[tk]
-#        X_err[:,kk] = (X - X_true).flatten()
-#        sig_x[kk] = np.sqrt(P[0,0])
-#        sig_y[kk] = np.sqrt(P[1,1])
-#        sig_z[kk] = np.sqrt(P[2,2])
-#        sig_dx[kk] = np.sqrt(P[3,3])
-#        sig_dy[kk] = np.sqrt(P[4,4])
-#        sig_dz[kk] = np.sqrt(P[5,5])
-#        
-#    plt.figure()
-#    plt.subplot(3,1,1)
-#    plt.plot(thrs, X_err[0,:], 'k.')
-#    plt.plot(thrs, 3*sig_x, 'k--')
-#    plt.plot(thrs, -3*sig_x, 'k--')
-#    plt.ylabel('X Err [km]')
-#    
-#    plt.subplot(3,1,2)
-#    plt.plot(thrs, X_err[1,:], 'k.')
-#    plt.plot(thrs, 3*sig_y, 'k--')
-#    plt.plot(thrs, -3*sig_y, 'k--')
-#    plt.ylabel('Y Err [km]')
-#    
-#    plt.subplot(3,1,3)
-#    plt.plot(thrs, X_err[2,:], 'k.')
-#    plt.plot(thrs, 3*sig_z, 'k--')
-#    plt.plot(thrs, -3*sig_z, 'k--')
-#    plt.ylabel('Z Err [km]')
-#
-#    plt.xlabel('Time [hours]')
-#    
-#    plt.figure()
-#    plt.subplot(3,1,1)
-#    plt.plot(thrs, X_err[3,:], 'k.')
-#    plt.plot(thrs, 3*sig_dx, 'k--')
-#    plt.plot(thrs, -3*sig_dx, 'k--')
-#    plt.ylabel('dX Err [km/s]')
-#    
-#    plt.subplot(3,1,2)
-#    plt.plot(thrs, X_err[4,:], 'k.')
-#    plt.plot(thrs, 3*sig_dy, 'k--')
-#    plt.plot(thrs, -3*sig_dy, 'k--')
-#    plt.ylabel('dY Err [km/s]')
-#    
-#    plt.subplot(3,1,3)
-#    plt.plot(thrs, X_err[5,:], 'k.')
-#    plt.plot(thrs, 3*sig_dz, 'k--')
-#    plt.plot(thrs, -3*sig_dz, 'k--')
-#    plt.ylabel('dZ Err [km/s]')
-#
-#    plt.xlabel('Time [hours]')
-#    
-#    plt.figure()
-#    
-#    if p == 3:
-#        plt.subplot(3,1,1)
-#        plt.plot(thrs, resids[0,:]*1000., 'k.')
-#        plt.ylabel('Range [m]')
-#        
-#        plt.subplot(3,1,2)
-#        plt.plot(thrs, resids[1,:]/arcsec2rad, 'k.')
-#        plt.ylabel('RA [arcsec]')
-#        
-#        plt.subplot(3,1,3)
-#        plt.plot(thrs, resids[2,:]/arcsec2rad, 'k.')
-#        plt.ylabel('DEC [arcsec]')
-#        
-#        plt.xlabel('Time [hours]')
-#        
-#    elif p == 2:
-#        
-#        plt.subplot(2,1,1)
-#        plt.plot(thrs, resids[0,:]/arcsec2rad, 'k.')
-#        plt.ylabel('RA [arcsec]')
-#        
-#        plt.subplot(2,1,2)
-#        plt.plot(thrs, resids[1,:]/arcsec2rad, 'k.')
-#        plt.ylabel('DEC [arcsec]')
-#        
-#        plt.xlabel('Time [hours]')
-#        
-#    
-#    plt.show()
+    # UKF Test
+    int_params['intfcn'] = dyn.ode_twobody_ukf
+    meas_fcn = mfunc.unscented_rgradec
+    filter_output, full_state_output = est.ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
+    analysis.compute_orbit_errors(filter_output, filter_output, truth_dict)
     
-        
-        
+
         
     
     return
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -877,7 +774,7 @@ if __name__ == '__main__':
     
 #    execute_linear1d_test()
     
-    execute_balldrop_test()
+#    execute_balldrop_test()
     
 #    twobody_geo_setup()
     
@@ -885,7 +782,7 @@ if __name__ == '__main__':
     
 #    twobody_born_setup()
     
-#    execute_twobody_test()
+    execute_twobody_test()
 
 
 

@@ -401,6 +401,72 @@ def H_rgradec(tk, Xref, state_params, sensor_params, sensor_id):
     return Hk_til, Gk, Rk
 
 
+def unscented_rgradec(tk, X, P, unscented_params, state_params, sensor_params, sensor_id):
+    
+    # Input parameters
+    gam = unscented_params['gam']
+    Wm = unscented_params['Wm']
+    diagWc = unscented_params['diagWc']
+    
+    # Compute sigma points
+    n = len(X)    
+    sqP = np.linalg.cholesky(P)
+    Xrep = np.tile(X, (1, n))
+    chi = np.concatenate((X, Xrep+(gam*sqP), Xrep-(gam*sqP)), axis=1) 
+    chi_diff = chi - np.dot(X, np.ones((1, (2*n+1))))
+    
+    # Compute sensor position in GCRF
+    eop_alldata = sensor_params['eop_alldata']
+    XYs_df = sensor_params['XYs_df']
+    EOP_data = eop.get_eop_data(eop_alldata, tk)
+    
+    sensor_kk = sensor_params[sensor_id]
+    sensor_itrf = sensor_kk['site_ecef']
+    sensor_gcrf, dum = coord.itrf2gcrf(sensor_itrf, np.zeros((3,1)), tk, EOP_data, XYs_df)
+    
+    # Measurement information    
+    meas_types = sensor_kk['meas_types']
+    sigma_dict = sensor_kk['sigma_dict']
+    p = len(meas_types)
+    Rk = np.zeros((p, p))
+    for ii in range(p):
+        mtype = meas_types[ii]
+        sig = sigma_dict[mtype]
+        Rk[ii,ii] = sig**2.
+    
+    # Compute transformed sigma points   
+    Y = np.zeros((p, (2*n+1)))
+    for jj in range(2*n+1):
+        
+        x = chi[0,jj]
+        y = chi[1,jj]
+        z = chi[2,jj]
+        
+        # Object location in GCRF
+        r_gcrf = np.reshape([x,y,z], (3,1))
+        
+        # Compute range and line of sight vector
+        rho_gcrf = r_gcrf - sensor_gcrf
+        rg = np.linalg.norm(rho_gcrf)
+        rho_hat_gcrf = rho_gcrf/rg
+        
+        ra = atan2(rho_hat_gcrf[1], rho_hat_gcrf[0]) #rad
+        dec = asin(rho_hat_gcrf[2])  #rad
+        
+        Y[0,jj] = rg
+        Y[1,jj] = ra
+        Y[2,jj] = dec
+        
+    # Compute mean and covariance
+    ybar = np.dot(Y, Wm.T)
+    ybar = np.reshape(ybar, (p, 1))
+    Y_diff = Y - np.dot(ybar, np.ones((1, (2*n+1))))
+    Pyy = np.dot(Y_diff, np.dot(diagWc, Y_diff.T)) + Rk
+    Pxy = np.dot(chi_diff,  np.dot(diagWc, Y_diff.T))
+
+    return ybar, Pyy, Pxy, Rk
+
+
 def H_radec(tk, Xref, state_params, sensor_params, sensor_id):
     
     # Number of states
@@ -465,6 +531,71 @@ def H_radec(tk, Xref, state_params, sensor_params, sensor_id):
     
     
     return Hk_til, Gk, Rk
+
+
+def unscented_radec(tk, X, P, unscented_params, state_params, sensor_params, sensor_id):
+    
+    # Input parameters
+    gam = unscented_params['gam']
+    Wm = unscented_params['Wm']
+    diagWc = unscented_params['diagWc']
+    
+    # Compute sigma points
+    n = len(X)    
+    sqP = np.linalg.cholesky(P)
+    Xrep = np.tile(X, (1, n))
+    chi = np.concatenate((X, Xrep+(gam*sqP), Xrep-(gam*sqP)), axis=1) 
+    chi_diff = chi - np.dot(X, np.ones((1, (2*n+1))))
+    
+    # Compute sensor position in GCRF
+    eop_alldata = sensor_params['eop_alldata']
+    XYs_df = sensor_params['XYs_df']
+    EOP_data = eop.get_eop_data(eop_alldata, tk)
+    
+    sensor_kk = sensor_params[sensor_id]
+    sensor_itrf = sensor_kk['site_ecef']
+    sensor_gcrf, dum = coord.itrf2gcrf(sensor_itrf, np.zeros((3,1)), tk, EOP_data, XYs_df)
+    
+    # Measurement information    
+    meas_types = sensor_kk['meas_types']
+    sigma_dict = sensor_kk['sigma_dict']
+    p = len(meas_types)
+    Rk = np.zeros((p, p))
+    for ii in range(p):
+        mtype = meas_types[ii]
+        sig = sigma_dict[mtype]
+        Rk[ii,ii] = sig**2.
+    
+    # Compute transformed sigma points   
+    Y = np.zeros((p, (2*n+1)))
+    for jj in range(2*n+1):
+        
+        x = chi[0,jj]
+        y = chi[1,jj]
+        z = chi[2,jj]
+        
+        # Object location in GCRF
+        r_gcrf = np.reshape([x,y,z], (3,1))
+        
+        # Compute range and line of sight vector
+        rho_gcrf = r_gcrf - sensor_gcrf
+        rg = np.linalg.norm(rho_gcrf)
+        rho_hat_gcrf = rho_gcrf/rg
+        
+        ra = atan2(rho_hat_gcrf[1], rho_hat_gcrf[0]) #rad
+        dec = asin(rho_hat_gcrf[2])  #rad
+        
+        Y[0,jj] = ra
+        Y[1,jj] = dec
+        
+    # Compute mean and covariance
+    ybar = np.dot(Y, Wm.T)
+    ybar = np.reshape(ybar, (p, 1))
+    Y_diff = Y - np.dot(ybar, np.ones((1, (2*n+1))))
+    Pyy = np.dot(Y_diff, np.dot(diagWc, Y_diff.T)) + Rk
+    Pxy = np.dot(chi_diff,  np.dot(diagWc, Y_diff.T))
+
+    return ybar, Pyy, Pxy, Rk
 
 
 def H_cwrho(tk, Xref, state_params, sensor_params, sensor_id):
