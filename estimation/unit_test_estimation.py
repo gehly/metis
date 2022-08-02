@@ -17,9 +17,10 @@ sys.path.append(metis_dir)
 import estimation.analysis_functions as analysis
 import estimation.estimation_functions as est
 import dynamics.dynamics_functions as dyn
+import sensors.measurement_functions as mfunc
 from sensors.sensors import define_sensors
 from sensors.visibility_functions import check_visibility
-from sensors.measurements import compute_measurement
+import sensors.measurement_functions as mfunc
 from utilities.astrodynamics import kep2cart
 from utilities.constants import GME, arcsec2rad
 from utilities.coordinate_systems import itrf2gcrf, gcrf2itrf, ecef2enu, ecef2latlonht
@@ -38,6 +39,7 @@ def linear_motion_setup():
     state_params = {}
     state_params['Q'] = np.diag([1e-8])
     state_params['gap_seconds'] = 100.
+    state_params['alpha'] = 1e-4
     
     # Integration function and additional settings
     int_params = {}
@@ -75,7 +77,7 @@ def linear_motion_setup():
     sensor_params[1]['sigma_dict'] = {}
     sensor_params[1]['sigma_dict']['rg'] = sig_rg
     sensor_params[1]['meas_types'] = ['rg']
-    meas_fcn = H_linear1d_rg
+    meas_fcn = mfunc.H_linear1d_rg
     outlier_inds = []
     X = X_true.copy()
     
@@ -102,27 +104,7 @@ def linear_motion_setup():
     return state_dict, state_params, int_params, meas_fcn, meas_dict, sensor_params, truth_dict
 
 
-def H_linear1d_rg(tk, Xref, state_params, sensor_params, sensor_id):
-    
-    # Break out state
-    x = float(Xref[0])
-    
-    # Measurement information
-    sensor_kk = sensor_params[sensor_id]
-    meas_types = sensor_kk['meas_types']
-    sigma_dict = sensor_kk['sigma_dict']
-    p = len(meas_types)
-    Rk = np.zeros((p, p))
-    for ii in range(p):
-        mtype = meas_types[ii]
-        sig = sigma_dict[mtype]
-        Rk[ii,ii] = sig**2.   
-    
-    # Hk_til and Gi
-    Hk_til = np.array([[1., 0.]])
-    Gk = np.array([[x]])
-    
-    return Hk_til, Gk, Rk
+
 
 
 
@@ -142,7 +124,11 @@ def execute_linear1d_test():
     filter_output, full_state_output = est.ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
     analysis.compute_linear1d_errors(filter_output, truth_dict)
         
-        
+    int_params['intfcn'] = dyn.ode_linear1d_ukf
+    meas_fcn = x
+    
+    
+    
         
     
     return
