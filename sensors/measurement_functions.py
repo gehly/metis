@@ -187,7 +187,7 @@ def ecef2azelrange_rad(r_sat, r_site):
 
 
 ###############################################################################
-# Estimation Measurement Functions
+# Generic Estimation Measurement Functions
 ###############################################################################
     
 
@@ -255,6 +255,82 @@ def unscented_linear1d_rg(tk, X, P, unscented_params, state_params, sensor_param
 
     return ybar, Pyy, Pxy, Rk
 
+
+def H_balldrop(tk, Xref, state_params, sensor_params, sensor_id):
+    
+    # Break out state
+    y = float(Xref[0])
+    dy = float(Xref[1])
+    
+    # Measurement information
+    sensor_kk = sensor_params[sensor_id]
+    meas_types = sensor_kk['meas_types']
+    sigma_dict = sensor_kk['sigma_dict']
+    p = len(meas_types)
+    Rk = np.zeros((p, p))
+    for ii in range(p):
+        mtype = meas_types[ii]
+        sig = sigma_dict[mtype]
+        Rk[ii,ii] = sig**2.   
+    
+    # Hk_til and Gi
+    Hk_til = np.diag([1.,1.])
+    Gk = np.array([[y],[dy]])
+    
+    return Hk_til, Gk, Rk
+
+
+def unscented_balldrop(tk, X, P, unscented_params, state_params, sensor_params, sensor_id):
+    
+    # Input parameters
+    gam = unscented_params['gam']
+    Wm = unscented_params['Wm']
+    diagWc = unscented_params['diagWc']
+    
+    # Compute sigma points
+    n = len(X)    
+    sqP = np.linalg.cholesky(P)
+    Xrep = np.tile(X, (1, n))
+    chi = np.concatenate((X, Xrep+(gam*sqP), Xrep-(gam*sqP)), axis=1) 
+    chi_diff = chi - np.dot(X, np.ones((1, (2*n+1))))
+    
+    # Measurement information
+    sensor_kk = sensor_params[sensor_id]
+    meas_types = sensor_kk['meas_types']
+    sigma_dict = sensor_kk['sigma_dict']
+    p = len(meas_types)
+    Rk = np.zeros((p, p))
+    for ii in range(p):
+        mtype = meas_types[ii]
+        sig = sigma_dict[mtype]
+        Rk[ii,ii] = sig**2.
+    
+    # Compute transformed sigma points   
+    Y = np.zeros((p, (2*n+1)))
+    for jj in range(2*n+1):
+        
+        y = chi[0,jj]
+        dy = chi[1,jj]
+        
+        Y[0,jj] = y
+        Y[1,jj] = dy
+        
+    # Compute mean and covariance
+    ybar = np.dot(Y, Wm.T)
+    ybar = np.reshape(ybar, (p, 1))
+    Y_diff = Y - np.dot(ybar, np.ones((1, (2*n+1))))
+    Pyy = np.dot(Y_diff, np.dot(diagWc, Y_diff.T)) + Rk
+    Pxy = np.dot(chi_diff,  np.dot(diagWc, Y_diff.T))
+
+    return ybar, Pyy, Pxy, Rk
+
+
+
+
+###############################################################################
+# Orbit Estimation Measurement Functions
+###############################################################################
+ 
 
 def H_rgradec(tk, Xref, state_params, sensor_params, sensor_id):
     

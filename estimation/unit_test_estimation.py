@@ -118,13 +118,17 @@ def execute_linear1d_test():
     filter_output, full_state_output = est.ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
     analysis.compute_linear1d_errors(filter_output, truth_dict)
     
+    
     # EKF Test
-    filter_output, full_state_output = est.ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
-    analysis.compute_linear1d_errors(filter_output, truth_dict)
+    ekf_output, full_state_output = est.ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
+    analysis.compute_linear1d_errors(ekf_output, truth_dict)
         
+    
+    # UKF Test
     int_params['intfcn'] = dyn.ode_linear1d_ukf
     meas_fcn = mfunc.unscented_linear1d_rg
-    
+    ukf_output, full_state_output = est.ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
+    analysis.compute_linear1d_errors(ukf_output, truth_dict)
     
     
         
@@ -143,6 +147,7 @@ def balldrop_setup():
     state_params['acc'] = acc
     state_params['Q'] = np.diag([1e-8])
     state_params['gap_seconds'] = 10.
+    state_params['alpha'] = 1e-4
     
     # Integration function and additional settings
     int_params = {}
@@ -181,7 +186,7 @@ def balldrop_setup():
     sensor_params[1]['sigma_dict']['y'] = sig_y
     sensor_params[1]['sigma_dict']['dy'] = sig_dy
     sensor_params[1]['meas_types'] = ['y', 'dy']
-    meas_fcn = H_balldrop
+    meas_fcn = mfunc.H_balldrop
     outlier_inds = []
     X = X_true.copy()
     
@@ -218,43 +223,26 @@ def execute_balldrop_test():
     int_params['intfcn'] = dyn.ode_balldrop_stm
     
     
-#    # Batch Test
-#    filter_output, full_state_output = est.ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
-#    analysis.compute_balldrop_errors(filter_output, truth_dict)
+    # Batch Test
+    filter_output, full_state_output = est.ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
+    analysis.compute_balldrop_errors(filter_output, truth_dict)
     
     # EKF Test
     filter_output, full_state_output = est.ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
     analysis.compute_balldrop_errors(filter_output, truth_dict)
         
-        
+    # UKF Test
+    int_params['intfcn'] = dyn.ode_balldrop_ukf
+    meas_fcn = mfunc.unscented_balldrop
+    filter_output, full_state_output = est.ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
+    analysis.compute_balldrop_errors(filter_output, truth_dict)
         
     
     return
 
 
 
-def H_balldrop(tk, Xref, state_params, sensor_params, sensor_id):
-    
-    # Break out state
-    y = float(Xref[0])
-    dy = float(Xref[1])
-    
-    # Measurement information
-    sensor_kk = sensor_params[sensor_id]
-    meas_types = sensor_kk['meas_types']
-    sigma_dict = sensor_kk['sigma_dict']
-    p = len(meas_types)
-    Rk = np.zeros((p, p))
-    for ii in range(p):
-        mtype = meas_types[ii]
-        sig = sigma_dict[mtype]
-        Rk[ii,ii] = sig**2.   
-    
-    # Hk_til and Gi
-    Hk_til = np.diag([1.,1.])
-    Gk = np.array([[y],[dy]])
-    
-    return Hk_til, Gk, Rk
+
 
 
 
@@ -887,9 +875,9 @@ if __name__ == '__main__':
     
     plt.close('all')
     
-    execute_linear1d_test()
+#    execute_linear1d_test()
     
-#    execute_balldrop_test()
+    execute_balldrop_test()
     
 #    twobody_geo_setup()
     

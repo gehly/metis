@@ -314,6 +314,28 @@ def ode_balldrop_stm(t, X, params):
     return dX
 
 
+def ode_balldrop_ukf(t, X, params):
+    
+    # Input data
+    acc = params['acc']
+    
+    # Initialize
+    dX = np.zeros(len(X),)
+    n = int((-1 + np.sqrt(1. + 8.*len(X)))/4.)
+
+    for ind in range(0, 2*n+1):
+
+        # Pull out relevant values from X
+        y = float(X[ind*n])
+        dy = float(X[ind*n + 1])
+
+        # Set components of dX
+        dX[ind*n] = dy
+        dX[ind*n + 1] = acc
+    
+    return dX
+
+
 ###############################################################################
 # Orbit Propagation Routines
 ###############################################################################
