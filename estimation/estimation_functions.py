@@ -402,7 +402,8 @@ def ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         # P1 = np.eye(n) - np.dot(Kk, Hk_til)
         # P = np.dot(P1, Pbar)
         
-        P = 0.5 * (P + P.T)
+        # Re-symmetric covariance
+#        P = 0.5 * (P + P.T)
         
         # Post-fit residuals and updated state
         resids = yk - np.dot(Hk_til, xhat)
@@ -556,13 +557,13 @@ def ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
     
     # State information
     state_tk = sorted(state_dict.keys())[-1]
-    Xo_ref = state_dict[state_tk]['X']
-    Po_bar = state_dict[state_tk]['P']
+    Xk = state_dict[state_tk]['X']
+    P = state_dict[state_tk]['P']
     Q = state_params['Q']
     gap_seconds = state_params['gap_seconds']
     time_format = int_params['time_format']
 
-    n = len(Xo_ref)
+    n = len(Xk)
     q = int(Q.shape[0])
     
     # Prior information about the distribution
@@ -591,16 +592,7 @@ def ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
     
     # Number of epochs
     L = len(tk_list)
-
-    # Initialize
-    xhat = np.zeros((n, 1))
-    P = Po_bar
-    Xref = Xo_ref
-    phi = np.identity(n)
-    phi0_v = np.reshape(phi, (n**2, 1))
-    conv_flag = False
-    count = 0
-    
+  
     # Loop over times
     for kk in range(L):
     
@@ -618,32 +610,26 @@ def ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
             delta_t = (tk - tk_prior)*86400.
         elif time_format == 'datetime':
             delta_t = (tk - tk_prior).total_seconds()
-            
-            
-        # Propagate to next time
-        # Initial Conditions for Integration Routine
-        Xref_prior = Xref
-        xhat_prior = xhat
-        P_prior = P
-        int0 = np.concatenate((Xref_prior, phi0_v))
 
-        # Integrate Xref and STM
+        # Compute sigma points matrix
+        sqP = np.linalg.cholesky(P)
+        Xrep = np.tile(Xk, (1, n))
+        chi = np.concatenate((Xk, Xrep+(gam*sqP), Xrep-(gam*sqP)), axis=1)
+        chi_v = np.reshape(chi, (n*(2*n+1), 1), order='F')
+        
+        # Propagate to next time
         if tk_prior == tk:
-            intout = int0.T
+            intout = chi_v.T
         else:
-            int0 = int0.flatten()
+            int0 = chi_v.flatten()
             tin = [tk_prior, tk]
             
             tout, intout = general_dynamics(int0, tin, state_params, int_params)
 
         # Extract values for later calculations
-        xout = intout[-1,:]
-        Xref = xout[0:n].reshape(n, 1)
-        phi_v = xout[n:].reshape(n**2, 1)
-        phi = np.reshape(phi_v, (n, n))
-        
-        # Time Update: a priori state and covar at tk
-        
+        chi_v = intout[-1,:]
+        chi = np.reshape(chi_v, (n, 2*n+1), order='F')
+       
         # State Noise Compensation
         # Zero out SNC for long time gaps
         if delta_t > gap_seconds:        
@@ -654,40 +640,49 @@ def ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
             Gamma[q:2*q,:] = delta_t * np.eye(q)
 #            Gamma = delta_t * np.concatenate((np.eye(q)*delta_t/2., np.eye(q)))
 
-        xbar = np.dot(phi, xhat_prior)
-        Pbar = np.dot(phi, np.dot(P_prior, phi.T)) + np.dot(Gamma, np.dot(Q, Gamma.T))
+        Xbar = np.dot(chi, Wm.T)
+        Xbar = np.reshape(Xbar, (n, 1))
+        chi_diff = chi - np.dot(Xbar, np.ones((1, (2*n+1))))
+        Pbar = np.dot(chi_diff, np.dot(diagWc, chi_diff.T)) + np.dot(Gamma, np.dot(Q, Gamma.T))
+
+#        # Recompute sigma points to incorporate process noise
+#        sqP = np.linalg.cholesky(Pbar)
+#        Xrep = np.tile(Xbar, (1, n))
+#        chi_bar = np.concatenate((Xbar, Xrep+(gam*sqP), Xrep-(gam*sqP)), axis=1) 
+#        chi_diff = chi_bar - np.dot(Xbar, np.ones((1, (2*n+1))))
         
         # Measurement Update: posterior state and covar at tk            
         # Retrieve measurement data
         Yk = Yk_list[kk]
         sensor_id = sensor_id_list[kk]
-
-        # Compute prefit residuals and  Kalman gain
-        Hk_til, Gk, Rk = meas_fcn(tk, Xref, state_params, sensor_params, sensor_id)
-        yk = Yk - Gk
         
-        K1 = np.dot(Pbar, Hk_til.T)
-        K2 = np.dot(Hk_til, np.dot(Pbar, Hk_til.T)) + Rk        
-        Kk = np.dot(K1, np.linalg.inv(K2))
+        # Computed measurements and covariance
+        # This step will recompute sigma points, thereby incorporating the
+        # process noise
+        ybar, Pyy, Pxy, Rk = meas_fcn(tk, Xbar, Pbar, state_params, sensor_params, sensor_id)
         
-        # Predicted residuals
-        Bk = yk - np.dot(Hk_til, xbar)
-        P_bk = K2
+        # Kalman gain and measurement update
+        Kk = np.dot(Pxy, np.linalg.inv(Pyy))
+        Xk = Xbar + np.dot(Kk, Yk-ybar)
         
-        # Measurement update (Joseph form of covariance)
-        xhat = xbar + np.dot(Kk, Bk)
-        P1 = np.eye(n) - np.dot(Kk, Hk_til)
+        # Basic covariance update
+#        P = Pbar - np.dot(K, np.dot(Pyy, K.T))
+        
+        # Joseph form
+        cholPbar = np.linalg.inv(np.linalg.cholesky(Pbar))
+        invPbar = np.dot(cholPbar.T, cholPbar)
+        P1 = (np.eye(n) - np.dot(np.dot(Kk, np.dot(Pyy, Kk.T)), invPbar))
         P2 = np.dot(Kk, np.dot(Rk, Kk.T))
         P = np.dot(P1, np.dot(Pbar, P1.T)) + P2
+
+        # Re-symmetric covariance     
+#        P = 0.5 * (P + P.T)
         
-        # P1 = np.eye(n) - np.dot(Kk, Hk_til)
-        # P = np.dot(P1, Pbar)
-        
-        P = 0.5 * (P + P.T)
+        # Recompute measurments using final state to get resids
+        ybar_post, dum, dum2, dum3 = meas_fcn(tk, Xk, P, state_params, sensor_params, sensor_id)
         
         # Post-fit residuals and updated state
-        resids = yk - np.dot(Hk_til, xhat)
-        Xk = Xref + xhat
+        resids = yk - ybar_post
         
         # Store output
         filter_output[tk] = {}
@@ -713,92 +708,14 @@ def ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         
 #        if kk > 2:
 #             mistake
-        
-        # Check convergence criteria and set flag to use EKF
-#        if kk > 10:
-        P_diff = np.trace(P)/np.trace(P_prior)
-#        print('\n')
-        print(kk)
-        print(P_diff)
-        
-#        if P_diff > 0.9 and P_diff < 1.0:
-#            conv_flag = True
-#        else:
-#            conv_flag = False
-        
-        if count > 5:
-            conv_flag = True
 
-        # Don't use EKF after big gaps
-        if delta_t > gap_seconds:
-            conv_flag = False
-            count = 0
-            
-        count += 1
-        
-
-        # After filter convergence, update reference trajectory
-        if conv_flag:
-            Xref = Xk
-            xhat = np.zeros((n, 1))
-            
-            
-    
             
     # TODO Generation of full_state_output not working correctly
     # Use filter_output for error analysis
     
     full_state_output = {}
             
-#    # Integrate over full time
-#    tk_truth = list(truth_dict.keys())
-#    Xk = Xo_ref.copy()
-#    Pk = Po_bar.copy()
-#    full_state_output = {}
-#    for kk in range(len(tk_truth)):
-#        
-#        # Current and previous time
-#        if kk == 0:
-#            tk_prior = state_tk
-#        else:
-#            tk_prior = tk_truth[kk-1]
-#            
-#        tk = tk_truth[kk]
-#        
-#        
-#        # If current time is in filter output, retrieve values from filter 
-#        # state
-#        if tk in filter_output:
-#            Xk = filter_output[tk]['X']
-#            Pk = filter_output[tk]['P']
-#        
-#        # If not, then integrate to get estimated state/covar for this time
-#        
-#            # Initial Conditions for Integration Routine
-#            Xk_prior = Xk.copy()
-#            Pk_prior = Pk.copy()
-#            int0 = np.concatenate((Xk_prior, phi0_v))
-#    
-#            # Integrate Xref and STM
-#            if tk_prior == tk:
-#                intout = int0.T
-#            else:
-#                int0 = int0.flatten()
-#                tin = [tk_prior, tk]
-#                
-#                tout, intout = general_dynamics(int0, tin, state_params, int_params)
-#
-#            # Extract values for later calculations
-#            xout = intout[-1,:]
-#            Xk = xout[0:n].reshape(n, 1)
-#            phi_v = xout[n:].reshape(n**2, 1)
-#            phi = np.reshape(phi_v, (n, n))
-#            Pk = np.dot(phi, np.dot(Pk_prior, phi.T))
-#        
-#        full_state_output[tk] = {}
-#        full_state_output[tk]['X'] = Xk
-#        full_state_output[tk]['P'] = Pk
-    
+
     
     return filter_output, full_state_output
 
