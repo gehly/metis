@@ -1,5 +1,5 @@
 import numpy as np
-from math import asin, atan2
+import math
 import sys
 import os
 import inspect
@@ -256,8 +256,8 @@ def ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
 def ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
            sensor_params, int_params):    
     '''
-    This function implements the linearized batch estimator for the least
-    squares cost function.
+    This function implements the linearized Extended Kalman Filter for the 
+    least squares cost function.
 
     Parameters
     ------
@@ -299,6 +299,287 @@ def ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
 
     n = len(Xo_ref)
     q = int(Q.shape[0])
+
+    # Initialize output
+    filter_output = {}
+
+    # Measurement times
+    tk_list = meas_dict['tk_list']
+    Yk_list = meas_dict['Yk_list']
+    sensor_id_list = meas_dict['sensor_id_list']
+    
+    # Number of epochs
+    L = len(tk_list)
+
+    # Initialize
+    xhat = np.zeros((n, 1))
+    P = Po_bar
+    Xref = Xo_ref
+    phi = np.identity(n)
+    phi0_v = np.reshape(phi, (n**2, 1))
+    conv_flag = False
+    count = 0
+    
+    # Loop over times
+    for kk in range(L):
+    
+        # Current and previous time
+        if kk == 0:
+            tk_prior = state_tk
+        else:
+            tk_prior = tk_list[kk-1]
+
+        tk = tk_list[kk]
+        
+        if time_format == 'seconds':
+            delta_t = tk - tk_prior
+        elif time_format == 'JD':
+            delta_t = (tk - tk_prior)*86400.
+        elif time_format == 'datetime':
+            delta_t = (tk - tk_prior).total_seconds()
+            
+            
+        # Propagate to next time
+        # Initial Conditions for Integration Routine
+        Xref_prior = Xref
+        xhat_prior = xhat
+        P_prior = P
+        int0 = np.concatenate((Xref_prior, phi0_v))
+
+        # Integrate Xref and STM
+        if tk_prior == tk:
+            intout = int0.T
+        else:
+            int0 = int0.flatten()
+            tin = [tk_prior, tk]
+            
+            tout, intout = general_dynamics(int0, tin, state_params, int_params)
+
+        # Extract values for later calculations
+        xout = intout[-1,:]
+        Xref = xout[0:n].reshape(n, 1)
+        phi_v = xout[n:].reshape(n**2, 1)
+        phi = np.reshape(phi_v, (n, n))
+        
+        # Time Update: a priori state and covar at tk
+        
+        # State Noise Compensation
+        # Zero out SNC for long time gaps
+        if delta_t > gap_seconds:        
+            Gamma = np.zeros((n,q))
+        else:
+            Gamma = np.zeros((n,q))
+            Gamma[0:q,:] = (delta_t**2./2) * np.eye(q)
+            Gamma[q:2*q,:] = delta_t * np.eye(q)
+#            Gamma = delta_t * np.concatenate((np.eye(q)*delta_t/2., np.eye(q)))
+
+        xbar = np.dot(phi, xhat_prior)
+        Pbar = np.dot(phi, np.dot(P_prior, phi.T)) + np.dot(Gamma, np.dot(Q, Gamma.T))
+        
+        # Measurement Update: posterior state and covar at tk            
+        # Retrieve measurement data
+        Yk = Yk_list[kk]
+        sensor_id = sensor_id_list[kk]
+
+        # Compute prefit residuals and  Kalman gain
+        Hk_til, Gk, Rk = meas_fcn(tk, Xref, state_params, sensor_params, sensor_id)
+        yk = Yk - Gk
+        
+        K1 = np.dot(Pbar, Hk_til.T)
+        K2 = np.dot(Hk_til, np.dot(Pbar, Hk_til.T)) + Rk        
+        Kk = np.dot(K1, np.linalg.inv(K2))
+        
+        # Predicted residuals
+        Bk = yk - np.dot(Hk_til, xbar)
+        P_bk = K2
+        
+        # Measurement update (Joseph form of covariance)
+        xhat = xbar + np.dot(Kk, Bk)
+        P1 = np.eye(n) - np.dot(Kk, Hk_til)
+        P2 = np.dot(Kk, np.dot(Rk, Kk.T))
+        P = np.dot(P1, np.dot(Pbar, P1.T)) + P2
+        
+        # P1 = np.eye(n) - np.dot(Kk, Hk_til)
+        # P = np.dot(P1, Pbar)
+        
+        P = 0.5 * (P + P.T)
+        
+        # Post-fit residuals and updated state
+        resids = yk - np.dot(Hk_til, xhat)
+        Xk = Xref + xhat
+        
+        # Store output
+        filter_output[tk] = {}
+        filter_output[tk]['X'] = Xk
+        filter_output[tk]['P'] = P
+        filter_output[tk]['resids'] = resids
+        
+#        print('\n')
+#        print('tk', tk)
+#        print('xbar', xbar)
+#        print('xhat', xhat)
+#        print('Xref', Xref)
+#        print('Xk', Xk)
+#        print('Yk', Yk)
+#        print('Hk_til', Hk_til)
+#        print('Kk', Kk)
+#        print('resids', resids)
+#        print('Gamma', Gamma)
+#        print('phi', phi)
+#        print('P_prior', P_prior)
+#        print('Pbar', Pbar)
+#        print('P', P)
+        
+#        if kk > 2:
+#             mistake
+        
+        # Check convergence criteria and set flag to use EKF
+#        if kk > 10:
+        P_diff = np.trace(P)/np.trace(P_prior)
+#        print('\n')
+        print(kk)
+        print(P_diff)
+        
+#        if P_diff > 0.9 and P_diff < 1.0:
+#            conv_flag = True
+#        else:
+#            conv_flag = False
+        
+        if count > 5:
+            conv_flag = True
+
+        # Don't use EKF after big gaps
+        if delta_t > gap_seconds:
+            conv_flag = False
+            count = 0
+            
+        count += 1
+        
+
+        # After filter convergence, update reference trajectory
+        if conv_flag:
+            Xref = Xk
+            xhat = np.zeros((n, 1))
+            
+            
+    
+            
+    # TODO Generation of full_state_output not working correctly
+    # Use filter_output for error analysis
+    
+    full_state_output = {}
+            
+#    # Integrate over full time
+#    tk_truth = list(truth_dict.keys())
+#    Xk = Xo_ref.copy()
+#    Pk = Po_bar.copy()
+#    full_state_output = {}
+#    for kk in range(len(tk_truth)):
+#        
+#        # Current and previous time
+#        if kk == 0:
+#            tk_prior = state_tk
+#        else:
+#            tk_prior = tk_truth[kk-1]
+#            
+#        tk = tk_truth[kk]
+#        
+#        
+#        # If current time is in filter output, retrieve values from filter 
+#        # state
+#        if tk in filter_output:
+#            Xk = filter_output[tk]['X']
+#            Pk = filter_output[tk]['P']
+#        
+#        # If not, then integrate to get estimated state/covar for this time
+#        
+#            # Initial Conditions for Integration Routine
+#            Xk_prior = Xk.copy()
+#            Pk_prior = Pk.copy()
+#            int0 = np.concatenate((Xk_prior, phi0_v))
+#    
+#            # Integrate Xref and STM
+#            if tk_prior == tk:
+#                intout = int0.T
+#            else:
+#                int0 = int0.flatten()
+#                tin = [tk_prior, tk]
+#                
+#                tout, intout = general_dynamics(int0, tin, state_params, int_params)
+#
+#            # Extract values for later calculations
+#            xout = intout[-1,:]
+#            Xk = xout[0:n].reshape(n, 1)
+#            phi_v = xout[n:].reshape(n**2, 1)
+#            phi = np.reshape(phi_v, (n, n))
+#            Pk = np.dot(phi, np.dot(Pk_prior, phi.T))
+#        
+#        full_state_output[tk] = {}
+#        full_state_output[tk]['X'] = Xk
+#        full_state_output[tk]['P'] = Pk
+    
+    
+    return filter_output, full_state_output
+
+
+def ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
+           sensor_params, int_params):    
+    '''
+    This function implements the Unscented Kalman Filter for the least
+    squares cost function.
+
+    Parameters
+    ------
+    state_dict : dictionary
+        initial state and covariance for filter execution
+    truth_dict : dictionary
+        true state at all times
+    meas_dict : dictionary
+        measurement data over time for the filter and parameters (noise, etc)
+    meas_fcn : function handle
+        function for measurements
+    state_params : dictionary
+        physical parameters and constants
+    sensor_params : dictionary
+        location, constraint, noise parameters of sensors
+    int_params : dictionary
+        numerical integration parameters
+
+    Returns
+    ------
+    filter_output : dictionary
+        output state, covariance, and post-fit residuals at measurement times
+    full_state_output : dictionary
+        output state and covariance at all truth times
+        
+    '''
+    
+    # State information
+    state_tk = sorted(state_dict.keys())[-1]
+    Xo_ref = state_dict[state_tk]['X']
+    Po_bar = state_dict[state_tk]['P']
+    Q = state_params['Q']
+    gap_seconds = state_params['gap_seconds']
+    time_format = int_params['time_format']
+
+    n = len(Xo_ref)
+    q = int(Q.shape[0])
+    
+    # Prior information about the distribution
+    pnorm = 2.
+    kurt = math.gamma(5./pnorm)*math.gamma(1./pnorm)/(math.gamma(3./pnorm)**2.)
+    beta = kurt - 1.
+    kappa = kurt - float(n)
+    
+    # Compute sigma point weights
+    alpha = state_params['alpha']
+    lam = alpha**2.*(n + kappa) - n
+    gam = np.sqrt(n + lam)
+    Wm = 1./(2.*(n + lam)) * np.ones(2*n,)
+    Wc = Wm.copy()
+    Wm = np.insert(Wm, 0, lam/(n + lam))
+    Wc = np.insert(Wc, 0, lam/(n + lam) + (1 - alpha**2 + beta))
+    diagWc = np.diag(Wc)
 
     # Initialize output
     filter_output = {}
