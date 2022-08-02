@@ -15,8 +15,6 @@ sys.path.append(metis_dir)
 
 import dynamics.numerical_integration as numint
 import utilities.astrodynamics as astro
-import utilities.coordinate_systems as coord
-import utilities.eop_functions as eop
 
 
 
@@ -237,9 +235,21 @@ def ode_linear1d_stm(t, X, params):
 def ode_linear1d_ukf(t, X, params):
     
     
+    # Initialize
+    dX = np.zeros(len(X),)
+    n = int((-1 + np.sqrt(1. + 8.*len(X)))/4.)
+
+    for ind in range(0, 2*n+1):
+
+        # Pull out relevant values from X
+        x = float(X[ind*n])
+        dx = float(X[ind*n + 1])
+
+        # Set components of dX
+        dX[ind*n] = dx
+        dX[ind*n + 1] = 0.
     
-    
-    return
+    return dX
 
 
 def ode_balldrop(t, X, params):

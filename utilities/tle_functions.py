@@ -21,7 +21,7 @@ metis_dir = current_dir[0:ind+5]
 sys.path.append(metis_dir)
 
 from sensors.sensors import define_sensors
-from sensors.measurements import ecef2azelrange
+from sensors.measurement_functions import ecef2azelrange
 from utilities.eop_functions import get_celestrak_eop_alldata
 from utilities.eop_functions import get_nutation_data
 from utilities.eop_functions import get_eop_data

@@ -12,8 +12,9 @@ ind = current_dir.find('metis')
 metis_dir = current_dir[0:ind+5]
 sys.path.append(metis_dir)
 
+import utilities.coordinate_systems as coord
 from utilities.constants import arcsec2rad
-from utilities.coordinate_systems import eci2ric
+
 
 
 
@@ -217,8 +218,8 @@ def compute_orbit_errors(filter_output, full_state_output, truth_dict):
         err_eci = X_err[0:3,kk].reshape(3,1)
         P_eci = P[0:3,0:3]
         
-        err_ric = eci2ric(rc_vect, vc_vect, err_eci)
-        P_ric = eci2ric(rc_vect, vc_vect, P_eci)
+        err_ric = coord.eci2ric(rc_vect, vc_vect, err_eci)
+        P_ric = coord.eci2ric(rc_vect, vc_vect, P_eci)
         X_err_ric[:,kk] = err_ric.flatten()
         sig_r[kk] = np.sqrt(P_ric[0,0])
         sig_i[kk] = np.sqrt(P_ric[1,1])

@@ -11,11 +11,10 @@ ind = current_dir.find('metis')
 metis_dir = current_dir[0:ind+5]
 sys.path.append(metis_dir)
 
-from sensors.brdf_models import compute_mapp
-from utilities.coordinate_systems import latlonht2ecef
-from utilities.coordinate_systems import itrf2gcrf
-from utilities.coordinate_systems import gcrf2itrf
-from utilities.coordinate_systems import ecef2enu
+#from sensors.brdf_models import compute_mapp
+import utilities.coordinate_systems as coord
+import utilities.eop_functions as eop
+
 
 
 def compute_measurement(X, state_params, sensor, UTC, EOP_data, XYs_df=[], meas_types=[],
@@ -27,7 +26,7 @@ def compute_measurement(X, state_params, sensor, UTC, EOP_data, XYs_df=[], meas_
     
     # Compute station location in GCRF
     sensor_itrf = sensor['site_ecef']
-    sensor_gcrf, dum = itrf2gcrf(sensor_itrf, np.zeros((3,1)), UTC, EOP_data,
+    sensor_gcrf, dum = coord.itrf2gcrf(sensor_itrf, np.zeros((3,1)), UTC, EOP_data,
                                  XYs_df)
     
 #    print('sensor_gcrf', sensor_gcrf)
@@ -40,9 +39,9 @@ def compute_measurement(X, state_params, sensor, UTC, EOP_data, XYs_df=[], meas_
     rho_hat_gcrf = (r_gcrf - sensor_gcrf)/rg
     
     # Rotate to ENU frame
-    rho_hat_itrf, dum = gcrf2itrf(rho_hat_gcrf, np.zeros((3,1)), UTC, EOP_data,
+    rho_hat_itrf, dum = coord.gcrf2itrf(rho_hat_gcrf, np.zeros((3,1)), UTC, EOP_data,
                                   XYs_df)
-    rho_hat_enu = ecef2enu(rho_hat_itrf, sensor_itrf)
+    rho_hat_enu = coord.ecef2enu(rho_hat_itrf, sensor_itrf)
     
     # Loop over measurement types
     Y = np.zeros((len(meas_types),1))
@@ -121,7 +120,7 @@ def ecef2azelrange(r_sat, r_site):
     rho_hat_ecef = rho_ecef/rg
 
     # Rotate to ENU
-    rho_hat_enu = ecef2enu(rho_hat_ecef, r_site)
+    rho_hat_enu = coord.ecef2enu(rho_hat_ecef, r_site)
 
     # Get components
     rho_x = float(rho_hat_enu[0])
@@ -169,7 +168,7 @@ def ecef2azelrange_rad(r_sat, r_site):
     rho_hat_ecef = rho_ecef/rg
 
     # Rotate to ENU
-    rho_hat_enu = ecef2enu(rho_hat_ecef, r_site)
+    rho_hat_enu = coord.ecef2enu(rho_hat_ecef, r_site)
 
     # Get components
     rho_x = float(rho_hat_enu[0])
@@ -215,6 +214,48 @@ def H_linear1d_rg(tk, Xref, state_params, sensor_params, sensor_id):
     return Hk_til, Gk, Rk
 
 
+def unscented_linear1d_rg(tk, X, P, unscented_params, state_params, sensor_params, sensor_id):
+    
+    # Input parameters
+    gam = unscented_params['gam']
+    Wm = unscented_params['Wm']
+    diagWc = unscented_params['diagWc']
+    
+    # Compute sigma points
+    n = len(X)    
+    sqP = np.linalg.cholesky(P)
+    Xrep = np.tile(X, (1, n))
+    chi = np.concatenate((X, Xrep+(gam*sqP), Xrep-(gam*sqP)), axis=1) 
+    chi_diff = chi - np.dot(X, np.ones((1, (2*n+1))))
+    
+    # Measurement information
+    sensor_kk = sensor_params[sensor_id]
+    meas_types = sensor_kk['meas_types']
+    sigma_dict = sensor_kk['sigma_dict']
+    p = len(meas_types)
+    Rk = np.zeros((p, p))
+    for ii in range(p):
+        mtype = meas_types[ii]
+        sig = sigma_dict[mtype]
+        Rk[ii,ii] = sig**2.
+    
+    # Compute transformed sigma points   
+    Y = np.zeros((p, (2*n+1)))
+    for jj in range(2*n+1):
+        
+        rg = chi[0,jj]
+        Y[0,jj] = rg
+        
+    # Compute mean and covariance
+    ybar = np.dot(Y, Wm.T)
+    ybar = np.reshape(ybar, (p, 1))
+    Y_diff = Y - np.dot(ybar, np.ones((1, (2*n+1))))
+    Pyy = np.dot(Y_diff, np.dot(diagWc, Y_diff.T)) + Rk
+    Pxy = np.dot(chi_diff,  np.dot(diagWc, Y_diff.T))
+
+    return ybar, Pyy, Pxy, Rk
+
+
 def H_rgradec(tk, Xref, state_params, sensor_params, sensor_id):
     
     # Number of states
@@ -223,11 +264,11 @@ def H_rgradec(tk, Xref, state_params, sensor_params, sensor_id):
     # Compute sensor position in GCRF
     eop_alldata = sensor_params['eop_alldata']
     XYs_df = sensor_params['XYs_df']
-    EOP_data = get_eop_data(eop_alldata, tk)
+    EOP_data = eop.get_eop_data(eop_alldata, tk)
     
     sensor_kk = sensor_params[sensor_id]
     sensor_itrf = sensor_kk['site_ecef']
-    sensor_gcrf, dum = itrf2gcrf(sensor_itrf, np.zeros((3,1)), tk, EOP_data, XYs_df)
+    sensor_gcrf, dum = coord.itrf2gcrf(sensor_itrf, np.zeros((3,1)), tk, EOP_data, XYs_df)
     
     # Measurement noise
     meas_types = sensor_kk['meas_types']
@@ -292,11 +333,11 @@ def H_radec(tk, Xref, state_params, sensor_params, sensor_id):
     # Compute sensor position in GCRF
     eop_alldata = sensor_params['eop_alldata']
     XYs_df = sensor_params['XYs_df']
-    EOP_data = get_eop_data(eop_alldata, tk)
+    EOP_data = eop.get_eop_data(eop_alldata, tk)
     
     sensor_kk = sensor_params[sensor_id]
     sensor_itrf = sensor_kk['site_ecef']
-    sensor_gcrf, dum = itrf2gcrf(sensor_itrf, np.zeros((3,1)), tk, EOP_data, XYs_df)
+    sensor_gcrf, dum = coord.itrf2gcrf(sensor_itrf, np.zeros((3,1)), tk, EOP_data, XYs_df)
     
     # Measurement noise
     meas_types = sensor_kk['meas_types']

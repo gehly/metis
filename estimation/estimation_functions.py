@@ -575,6 +575,10 @@ def ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
     Wm = np.insert(Wm, 0, lam/(n + lam))
     Wc = np.insert(Wc, 0, lam/(n + lam) + (1 - alpha**2 + beta))
     diagWc = np.diag(Wc)
+    unscented_params = {}
+    unscented_params['gam'] = gam
+    unscented_params['Wm'] = Wm
+    unscented_params['diagWc'] = diagWc
 
     # Initialize output
     filter_output = {}
@@ -651,9 +655,10 @@ def ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         sensor_id = sensor_id_list[kk]
         
         # Computed measurements and covariance
-        # This step will recompute sigma points, thereby incorporating the
+        # This step will recompute sigma points, thereby incorporating
         # process noise
-        ybar, Pyy, Pxy, Rk = meas_fcn(tk, Xbar, Pbar, state_params, sensor_params, sensor_id)
+        ybar, Pyy, Pxy, Rk = meas_fcn(tk, Xbar, Pbar, unscented_params, 
+                                      state_params, sensor_params, sensor_id)
         
         # Kalman gain and measurement update
         Kk = np.dot(Pxy, np.linalg.inv(Pyy))
@@ -662,6 +667,9 @@ def ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         # Basic covariance update
 #        P = Pbar - np.dot(K, np.dot(Pyy, K.T))
         
+        # Re-symmetric covariance     
+#        P = 0.5 * (P + P.T)
+        
         # Joseph form
         cholPbar = np.linalg.inv(np.linalg.cholesky(Pbar))
         invPbar = np.dot(cholPbar.T, cholPbar)
@@ -669,11 +677,11 @@ def ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         P2 = np.dot(Kk, np.dot(Rk, Kk.T))
         P = np.dot(P1, np.dot(Pbar, P1.T)) + P2
 
-        # Re-symmetric covariance     
-#        P = 0.5 * (P + P.T)
+        
         
         # Recompute measurments using final state to get resids
-        ybar_post, dum, dum2, dum3 = meas_fcn(tk, Xk, P, state_params, sensor_params, sensor_id)
+        ybar_post, dum, dum2, dum3 = meas_fcn(tk, Xk, P, unscented_params, 
+                                              state_params, sensor_params, sensor_id)
         
         # Post-fit residuals and updated state
         resids = Yk - ybar_post

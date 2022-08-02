@@ -13,10 +13,11 @@ ind = current_dir.find('metis')
 metis_dir = current_dir[0:ind+5]
 sys.path.append(metis_dir)
 
+
+import utilities.time_systems as timesys
+import utilities.ephemeris as eph
+import utilities.coordinate_systems as coord
 from utilities.constants import GME, J2E, Re, wE
-from utilities.time_systems import utcdt2ttjd, jd2cent
-from utilities.ephemeris import compute_sun_coords
-from utilities.eop_functions import get_celestrak_eop_alldata, get_eop_data
 
 
 ###############################################################################
@@ -290,13 +291,13 @@ def RAAN_to_LTAN(RAAN, UTC, EOP_data):
     '''
     
     # Compute TT in JD format
-    TT_JD = utcdt2ttjd(UTC, EOP_data['TAI_UTC'])
+    TT_JD = timesys.utcdt2ttjd(UTC, EOP_data['TAI_UTC'])
     
     # Compute TT in centuries since J2000 epoch
-    TT_cent = jd2cent(TT_JD)
+    TT_cent = timesys.jd2cent(TT_JD)
     
     # Compute apparent right ascension of the sun
-    sun_eci_geom, sun_eci_app = compute_sun_coords(TT_cent)
+    sun_eci_geom, sun_eci_app = eph.compute_sun_coords(TT_cent)
     sun_ra = atan2(sun_eci_app[1], sun_eci_app[0]) * 180./pi     # deg
     
     # Compute LTAN in decimal hours
@@ -328,13 +329,13 @@ def LTAN_to_RAAN(LTAN, UTC, EOP_data):
     '''
     
     # Compute TT in JD format
-    TT_JD = utcdt2ttjd(UTC, EOP_data['TAI_UTC'])
+    TT_JD = timesys.utcdt2ttjd(UTC, EOP_data['TAI_UTC'])
     
     # Compute TT in centuries since J2000 epoch
-    TT_cent = jd2cent(TT_JD)
+    TT_cent = timesys.jd2cent(TT_JD)
     
     # Compute apparent right ascension of the sun
-    sun_eci_geom, sun_eci_app = compute_sun_coords(TT_cent)
+    sun_eci_geom, sun_eci_app = eph.compute_sun_coords(TT_cent)
     sun_ra = atan2(sun_eci_app[1], sun_eci_app[0]) * 180./pi     # deg
     
     # Compute RAAN in degrees

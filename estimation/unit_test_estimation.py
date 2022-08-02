@@ -18,14 +18,12 @@ import estimation.analysis_functions as analysis
 import estimation.estimation_functions as est
 import dynamics.dynamics_functions as dyn
 import sensors.measurement_functions as mfunc
-from sensors.sensors import define_sensors
-from sensors.visibility_functions import check_visibility
-import sensors.measurement_functions as mfunc
-from utilities.astrodynamics import kep2cart
+import sensors.sensors as sens
+import sensors.visibility_functions as visfunc
+import utilities.astrodynamics as astro
+import utilities.coordinate_systems as coord
+import utilities.eop_functions as eop
 from utilities.constants import GME, arcsec2rad
-from utilities.coordinate_systems import itrf2gcrf, gcrf2itrf, ecef2enu, ecef2latlonht
-from utilities.eop_functions import get_celestrak_eop_alldata, get_eop_data
-from utilities.eop_functions import get_XYs2006_alldata
 
 
 
@@ -125,7 +123,7 @@ def execute_linear1d_test():
     analysis.compute_linear1d_errors(filter_output, truth_dict)
         
     int_params['intfcn'] = dyn.ode_linear1d_ukf
-    meas_fcn = x
+    meas_fcn = mfunc.unscented_linear1d_rg
     
     
     
@@ -268,10 +266,10 @@ def H_balldrop(tk, Xref, state_params, sensor_params, sensor_id):
 def twobody_geo_setup():
         
     # Retrieve latest EOP data from celestrak.com
-    eop_alldata = get_celestrak_eop_alldata()
+    eop_alldata = eop.get_celestrak_eop_alldata()
         
     # Retrieve polar motion data from file
-    XYs_df = get_XYs2006_alldata()
+    XYs_df = eop.get_XYs2006_alldata()
     
     # Define state parameters
     state_params = {}
@@ -299,7 +297,7 @@ def twobody_geo_setup():
 
     # Inital State
     elem = [42164.1, 0.001, 0., 90., 0., 0.]
-    X_true = np.reshape(kep2cart(elem), (6,1))
+    X_true = np.reshape(astro.kep2cart(elem), (6,1))
     P = np.diag([1., 1., 1., 1e-6, 1e-6, 1e-6])
     pert_vect = np.multiply(np.sqrt(np.diag(P)), np.random.randn(6))
     X_init = X_true + np.reshape(pert_vect, (6, 1))
@@ -312,7 +310,7 @@ def twobody_geo_setup():
     
     # Sensor and measurement parameters
     sensor_id_list = ['UNSW Falcon']
-    sensor_params = define_sensors(sensor_id_list)
+    sensor_params = sens.define_sensors(sensor_id_list)
     sensor_params['eop_alldata'] = eop_alldata
     sensor_params['XYs_df'] = XYs_df
     
@@ -343,14 +341,14 @@ def twobody_geo_setup():
         
         # Check visibility conditions and compute measurements
         UTC = tk_list[kk]
-        EOP_data = get_eop_data(eop_alldata, UTC)
+        EOP_data = eop.get_eop_data(eop_alldata, UTC)
         
         for sensor_id in sensor_id_list:
             sensor = sensor_params[sensor_id]
-            if check_visibility(X, state_params, sensor, UTC, EOP_data, XYs_df):
+            if visfunc.check_visibility(X, state_params, sensor, UTC, EOP_data, XYs_df):
                 
                 # Compute measurements
-                Yk = compute_measurement(X, state_params, sensor, UTC,
+                Yk = mfunc.compute_measurement(X, state_params, sensor, UTC,
                                          EOP_data, XYs_df,
                                          meas_types=sensor['meas_types'])
                 
@@ -418,10 +416,10 @@ def twobody_leo_setup():
     
     
     # Retrieve latest EOP data from celestrak.com
-    eop_alldata = get_celestrak_eop_alldata()
+    eop_alldata = eop.get_celestrak_eop_alldata()
         
     # Retrieve polar motion data from file
-    XYs_df = get_XYs2006_alldata()
+    XYs_df = eop.get_XYs2006_alldata()
     
     # Define state parameters
     state_params = {}
@@ -448,7 +446,7 @@ def twobody_leo_setup():
 
     # Inital State
     elem = [7000., 0.01, 98., 0., 0., 0.]
-    X_true = np.reshape(kep2cart(elem), (6,1))
+    X_true = np.reshape(astro.kep2cart(elem), (6,1))
     P = np.diag([1., 1., 1., 1e-6, 1e-6, 1e-6])
     pert_vect = np.multiply(np.sqrt(np.diag(P)), np.random.randn(6))
     X_init = X_true + np.reshape(pert_vect, (6, 1))
@@ -461,7 +459,7 @@ def twobody_leo_setup():
     
     # Sensor and measurement parameters
     sensor_id_list = ['Zimmerwald Laser', 'Stromlo Laser', 'Arequipa Laser', 'Haleakala Laser', 'Yarragadee Laser']
-    sensor_params = define_sensors(sensor_id_list)
+    sensor_params = sens.define_sensors(sensor_id_list)
     sensor_params['eop_alldata'] = eop_alldata
     sensor_params['XYs_df'] = XYs_df
     
@@ -492,16 +490,16 @@ def twobody_leo_setup():
         
         # Check visibility conditions and compute measurements
         UTC = tk_list[kk]
-        EOP_data = get_eop_data(eop_alldata, UTC)
+        EOP_data = eop.get_eop_data(eop_alldata, UTC)
         
         for sensor_id in sensor_id_list:
             sensor = sensor_params[sensor_id]
             sigma_dict = sensor['sigma_dict']
             meas_types = sensor['meas_types']
-            if check_visibility(X, state_params, sensor, UTC, EOP_data, XYs_df):
+            if visfunc.check_visibility(X, state_params, sensor, UTC, EOP_data, XYs_df):
                 
                 # Compute measurements
-                Yk = compute_measurement(X, state_params, sensor, UTC,
+                Yk = mfunc.compute_measurement(X, state_params, sensor, UTC,
                                          EOP_data, XYs_df, meas_types)
                 
                 for mtype in meas_types:
@@ -568,10 +566,10 @@ def twobody_born_setup():
     
     
     # Retrieve latest EOP data from celestrak.com
-    eop_alldata = get_celestrak_eop_alldata()
+    eop_alldata = eop.get_celestrak_eop_alldata()
         
     # Retrieve polar motion data from file
-    XYs_df = get_XYs2006_alldata()
+    XYs_df = eop.get_XYs2006_alldata()
     
     # Define state parameters
     state_params = {}
@@ -608,10 +606,10 @@ def twobody_born_setup():
     # Check initial satellite location
     r_GCRF = X_true[0:3].reshape(3,1)
     v_GCRF = X_true[3:6].reshape(3,1)
-    EOP_data = get_eop_data(eop_alldata, UTC0)
-    r_ecef, dum = gcrf2itrf(r_GCRF, v_GCRF, UTC0, EOP_data, XYs_df)
+    EOP_data = eop.get_eop_data(eop_alldata, UTC0)
+    r_ecef, dum = coord.gcrf2itrf(r_GCRF, v_GCRF, UTC0, EOP_data, XYs_df)
     
-    lat, lon, ht = ecef2latlonht(r_ecef)
+    lat, lon, ht = coord.ecef2latlonht(r_ecef)
     print(lat, lon, ht)
     
 #    mistake
@@ -624,7 +622,7 @@ def twobody_born_setup():
     
     # Sensor and measurement parameters
     sensor_id_list = ['Born s101', 'Born s337', 'Born s394']
-    sensor_params = define_sensors(sensor_id_list)
+    sensor_params = sens.define_sensors(sensor_id_list)
     sensor_params['eop_alldata'] = eop_alldata
     sensor_params['XYs_df'] = XYs_df
     
@@ -655,16 +653,16 @@ def twobody_born_setup():
         
         # Check visibility conditions and compute measurements
         UTC = tk_list[kk]
-        EOP_data = get_eop_data(eop_alldata, UTC)
+        EOP_data = eop.get_eop_data(eop_alldata, UTC)
         
         for sensor_id in sensor_id_list:
             sensor = sensor_params[sensor_id]
             sigma_dict = sensor['sigma_dict']
             meas_types = sensor['meas_types']
-            if check_visibility(X, state_params, sensor, UTC, EOP_data, XYs_df):
+            if visfunc.check_visibility(X, state_params, sensor, UTC, EOP_data, XYs_df):
                 
                 # Compute measurements
-                Yk = compute_measurement(X, state_params, sensor, UTC,
+                Yk = mfunc.compute_measurement(X, state_params, sensor, UTC,
                                          EOP_data, XYs_df, meas_types)
                 
                 for mtype in meas_types:
@@ -889,7 +887,7 @@ if __name__ == '__main__':
     
     plt.close('all')
     
-#    execute_linear1d_test()
+    execute_linear1d_test()
     
 #    execute_balldrop_test()
     
@@ -899,7 +897,7 @@ if __name__ == '__main__':
     
 #    twobody_born_setup()
     
-    execute_twobody_test()
+#    execute_twobody_test()
 
 
 
