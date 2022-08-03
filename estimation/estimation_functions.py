@@ -331,7 +331,7 @@ def unscented_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
     P = Po.copy()
     maxiters = 10
     diff = 1
-    conv_crit = 1e-4
+    conv_crit = 1e-5
     
     # Begin loop
     iters = 0

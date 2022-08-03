@@ -235,9 +235,14 @@ def execute_balldrop_test():
     filter_output, full_state_output = est.ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
     analysis.compute_balldrop_errors(filter_output, truth_dict)
         
-    # UKF Test
+    # Unscented Batch Test
     int_params['intfcn'] = dyn.ode_balldrop_ukf
     meas_fcn = mfunc.unscented_balldrop
+    
+    ubatch_output, full_state_output = est.unscented_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
+    analysis.compute_balldrop_errors(ubatch_output, truth_dict) 
+    
+    # UKF Test
     filter_output, full_state_output = est.ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
     analysis.compute_balldrop_errors(filter_output, truth_dict)
         
@@ -732,7 +737,7 @@ def twobody_born_setup():
 def execute_twobody_test():
     
         
-    setup_file = os.path.join('unit_test', 'twobody_born_setup.pkl')
+    setup_file = os.path.join('unit_test', 'twobody_geo_setup.pkl')
     
     pklFile = open(setup_file, 'rb' )
     data = pickle.load( pklFile )
@@ -758,9 +763,15 @@ def execute_twobody_test():
     analysis.compute_orbit_errors(filter_output, filter_output, truth_dict)
     
     
-    # UKF Test
+    # Unscented Batch Test
     int_params['intfcn'] = dyn.ode_twobody_ukf
-    meas_fcn = mfunc.unscented_rgradec
+    meas_fcn = mfunc.unscented_radec
+#    meas_fcn = mfunc.unscented_rgradec
+    
+    filter_output, full_state_output = est.unscented_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
+    analysis.compute_orbit_errors(filter_output, full_state_output, truth_dict)
+    
+    # UKF Tes    
     filter_output, full_state_output = est.ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
     analysis.compute_orbit_errors(filter_output, filter_output, truth_dict)
     
@@ -776,7 +787,7 @@ if __name__ == '__main__':
     
     plt.close('all')
     
-    execute_linear1d_test()
+#    execute_linear1d_test()
     
 #    execute_balldrop_test()
     
@@ -784,7 +795,7 @@ if __name__ == '__main__':
     
 #    twobody_born_setup()
     
-#    execute_twobody_test()
+    execute_twobody_test()
 
 
 
