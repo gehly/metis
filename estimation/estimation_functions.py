@@ -347,7 +347,7 @@ def unscented_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
 
         # Initialze values for this iteration
         # Reset P every iteration???
-        # P = Po.copy()
+        P = Po.copy()
         
         # Compute Sigma Points
         sqP = np.linalg.cholesky(P)
