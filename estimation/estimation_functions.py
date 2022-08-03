@@ -388,7 +388,7 @@ def unscented_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
             chi = np.reshape(chi_v, (n, 2*n+1), order='F')
             
             # Compute measurement for each sigma point
-            gamma_til_k = meas_fcn(tk, chi, state_params, sensor_params, sensor_id)
+            gamma_til_k, Rk = meas_fcn(tk, chi, state_params, sensor_params, sensor_id)
             ybar = np.dot(gamma_til_k, Wm.T)
             ybar = np.reshape(ybar, (p, 1))
             resids = Yk - ybar
@@ -437,10 +437,19 @@ def unscented_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         print('diff = ', diff)
 
     
+    
+    # Setup for full_state_output
+    Xo = X.copy()
+    Po = P.copy()
+    
+    # Compute Sigma Points
+    sqP = np.linalg.cholesky(Po)
+    Xrep = np.tile(Xo, (1, n))
+    chi0 = np.concatenate((Xo, Xrep+(gam*sqP), Xrep-(gam*sqP)), axis=1)
+    chi_v = np.reshape(chi0, (n*(2*n+1), 1), order='F')
+    
     # Integrate over full time
     tk_truth = list(truth_dict.keys())
-    phi_v = phi0_v.copy()
-    Xref = Xo_ref.copy()
     full_state_output = {}
     for kk in range(len(tk_truth)):
         
@@ -451,10 +460,9 @@ def unscented_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
             tk_prior = tk_truth[kk-1]
             
         tk = tk_truth[kk]
-        
+
         # Initial Conditions for Integration Routine
-        Xref_prior = Xref.copy()
-        int0 = np.concatenate((Xref_prior, phi_v))
+        int0 = chi_v.copy()
 
         # Integrate Xref and STM
         if tk_prior == tk:
@@ -466,17 +474,18 @@ def unscented_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
             tout, intout = dyn.general_dynamics(int0, tin, state_params, int_params)
 
         # Extract values for later calculations
-        xout = intout[-1,:]
-        Xref = xout[0:n].reshape(n, 1)
-        phi_v = xout[n:].reshape(n**2, 1)
-        phi = np.reshape(phi_v, (n, n))
-        P = np.dot(phi, np.dot(Po, phi.T))
+        chi_v = intout[-1,:]
+        chi = np.reshape(chi_v, (n, 2*n+1), order='F')
+    
+        # Store output
+        Xk = np.dot(chi, Wm.T)
+        Xk = np.reshape(Xk, (n, 1))
+        chi_diff = chi - np.dot(Xk, np.ones((1, (2*n+1))))
+        Pk = np.dot(chi_diff, np.dot(diagWc, chi_diff.T))
         
         full_state_output[tk] = {}
-        full_state_output[tk]['X'] = Xref
-        full_state_output[tk]['P'] = P
-        
-    
+        full_state_output[tk]['X'] = Xk
+        full_state_output[tk]['P'] = Pk    
 
     return filter_output, full_state_output
 
@@ -914,14 +923,12 @@ def ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         P2 = np.dot(Kk, np.dot(Rk, Kk.T))
         P = np.dot(P1, np.dot(Pbar, P1.T)) + P2
 
-        
-        
         # Recompute measurments using final state to get resids
         sqP = np.linalg.cholesky(P)
         Xrep = np.tile(Xk, (1, n))
         chi_k = np.concatenate((Xk, Xrep+(gam*sqP), Xrep-(gam*sqP)), axis=1)
-        gamma_til_k, Rk = meas_fcn(tk, chi_k, state_params, sensor_params, sensor_id)
-        ybar_post = np.dot(gamma_til_k, Wm.T)
+        gamma_til_post, dum = meas_fcn(tk, chi_k, state_params, sensor_params, sensor_id)
+        ybar_post = np.dot(gamma_til_post, Wm.T)
         ybar_post = np.reshape(ybar_post, (len(ybar), 1))
         
         # Post-fit residuals and updated state
