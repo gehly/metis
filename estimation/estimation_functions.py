@@ -1,4 +1,5 @@
 import numpy as np
+import scipy
 import math
 import sys
 import os
@@ -352,6 +353,7 @@ def unscented_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         Y_bar = np.zeros((2*N, 1))
         Y_til = np.zeros((2*N, 1))
         gamma_til_mat = np.zeros((2*N, 2*n+1))
+        Rk_list = []
         for kk in range(N):
             
 #            print('\nkk = ', kk)
@@ -367,6 +369,7 @@ def unscented_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
             # Read the next observation
             Yk = Yk_list[kk]
             sensor_id = sensor_id_list[kk]
+            p = len(Yk)
 
             # Initial Conditions for Integration Routine
             int0 = chi_v.copy()
@@ -384,66 +387,55 @@ def unscented_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
             chi_v = intout[-1,:]
             chi = np.reshape(chi_v, (n, 2*n+1), order='F')
             
-#            print('\n\n')
-#            print('Xref', Xref)
-
-            # Accumulate the normal equations
-            Hk_til, Gk, Rk = meas_fcn(tk, Xref, state_params, sensor_params, sensor_id)
-            yk = Yk - Gk
-            Hk = np.dot(Hk_til, phi)
-            cholRk = np.linalg.inv(np.linalg.cholesky(Rk))
-            invRk = np.dot(cholRk.T, cholRk)
-                        
-            Lambda += np.dot(Hk.T, np.dot(invRk, Hk))
-            N += np.dot(Hk.T, np.dot(invRk, yk))
+            # Compute measurement for each sigma point
+            gamma_til_k = meas_fcn(tk, chi, state_params, sensor_params, sensor_id)
+            ybar = np.dot(gamma_til_k, Wm.T)
+            ybar = np.reshape(ybar, (p, 1))
+            resids = Yk - ybar
+            
+            # Accumulate measurements and computed measurements
+            Y_til[meas_ind:meas_ind+p] = Yk
+            Y_bar[meas_ind:meas_ind+p] = ybar
+            gamma_til_mat[meas_ind:meas_ind+p, :] = gamma_til_k  
+            Rk_list.append(Rk)
             
             # Store output
-            resids_list.append(yk)
-            Xref_list.append(Xref)
-            phi_list.append(phi)
+            Xk = np.dot(chi, Wm.T)
+            Xk = np.reshape(Xk, (n, 1))
+            chi_diff = chi - np.dot(Xk, np.ones((1, (2*n+1))))
+            Pk = np.dot(chi_diff, np.dot(diagWc, chi_diff.T))
             
-            # print(kk)
-            # print(tk)
-            # print(int0)
-            # print(Xref)
-            # print(Yk)
-            # print(Gk)
-            # print(yk)
+            if tk not in filter_output:
+                filter_output[tk] = {}
+            filter_output[tk]['X'] = Xk
+            filter_output[tk]['P'] = Pk
+            filter_output[tk]['resids'] = resids
             
-            # if kk > 2:
-            #     mistake
+            # Increment measurement index
+            meas_ind += p
 
 
-        # print(Lambda)
-        # print(np.linalg.eig(Lambda))
+        # Compute covariances
+        Rk_full = scipy.linalg.block_diag(*Rk_list)
+        Y_diff = gamma_til_mat - np.dot(Y_bar, np.ones((1, 2*n+1)))
+        Pyy = np.dot(Y_diff, np.dot(diagWc, Y_diff.T)) + Rk_full
+        Pxy = np.dot(chi_diff0, np.dot(diagWc, Y_diff.T))        
 
+        # Compute Kalman Gain
+        cholPyy_inv = np.linalg.inv(np.linalg.cholesky(Pyy))
+        Pyy_inv = np.dot(cholPyy_inv.T, cholPyy_inv) 
+        
+#        K = np.dot(Pxy, np.linalg.inv(Pyy))
+        K = np.dot(Pxy, Pyy_inv)
 
-        # Solve the normal equations
-        cholLam_inv = np.linalg.inv(np.linalg.cholesky(Lambda))
-        Po = np.dot(cholLam_inv.T, cholLam_inv)     
-        xo_hat = np.dot(Po, N)
-        xo_hat_mag = np.linalg.norm(xo_hat)
-
-        # Update for next batch iteration
-        Xo_ref = Xo_ref + xo_hat
-        xo_bar = xo_bar - xo_hat
+        # Compute updated state and covariance    
+        X += np.dot(K, Y_til-Y_bar)
+        P = P - np.dot(K, np.dot(Pyy, K.T))
+        diff = np.linalg.norm(np.dot(K, Y_til-Y_bar))
 
         print('Iteration Number: ', iters)
-        print('xo_hat_mag = ', xo_hat_mag)
+        print('diff = ', diff)
 
-    # Form output
-    for kk in range(L):
-        tk = tk_list[kk]
-        X = Xref_list[kk]
-        resids = resids_list[kk]
-        phi = phi_list[kk]
-        P = np.dot(phi, np.dot(Po, phi.T))
-
-        filter_output[tk] = {}
-        filter_output[tk]['X'] = X
-        filter_output[tk]['P'] = P
-        filter_output[tk]['resids'] = resids
-        
     
     # Integrate over full time
     tk_truth = list(truth_dict.keys())
@@ -898,10 +890,10 @@ def ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         sensor_id = sensor_id_list[kk]
         
         # Computed measurements and covariance
-        Y_til, Rk = meas_fcn(tk, chi, state_params, sensor_params, sensor_id)
-        ybar = np.dot(Y_til, Wm.T)
+        gamma_til_k, Rk = meas_fcn(tk, chi, state_params, sensor_params, sensor_id)
+        ybar = np.dot(gamma_til_k, Wm.T)
         ybar = np.reshape(ybar, (len(ybar), 1))
-        Y_diff = Y_til - np.dot(ybar, np.ones((1, (2*n+1))))
+        Y_diff = gamma_til_k - np.dot(ybar, np.ones((1, (2*n+1))))
         Pyy = np.dot(Y_diff, np.dot(diagWc, Y_diff.T)) + Rk
         Pxy = np.dot(chi_diff,  np.dot(diagWc, Y_diff.T))
         
@@ -925,8 +917,12 @@ def ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         
         
         # Recompute measurments using final state to get resids
-        ybar_post, dum, dum2, dum3 = meas_fcn(tk, Xk, P, unscented_params, 
-                                              state_params, sensor_params, sensor_id)
+        sqP = np.linalg.cholesky(P)
+        Xrep = np.tile(Xk, (1, n))
+        chi_k = np.concatenate((Xk, Xrep+(gam*sqP), Xrep-(gam*sqP)), axis=1)
+        gamma_til_k, Rk = meas_fcn(tk, chi_k, state_params, sensor_params, sensor_id)
+        ybar_post = np.dot(gamma_til_k, Wm.T)
+        ybar_post = np.reshape(ybar_post, (len(ybar), 1))
         
         # Post-fit residuals and updated state
         resids = Yk - ybar_post

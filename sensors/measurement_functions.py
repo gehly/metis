@@ -231,13 +231,13 @@ def unscented_linear1d_rg(tk, chi, state_params, sensor_params, sensor_id):
         Rk[ii,ii] = sig**2.
     
     # Compute transformed sigma points   
-    Y_til = np.zeros((p, (2*n+1)))
+    gamma_til = np.zeros((p, (2*n+1)))
     for jj in range(2*n+1):
         
         rg = chi[0,jj]
-        Y_til[0,jj] = rg
+        gamma_til[0,jj] = rg
 
-    return Y_til, Rk
+    return gamma_til, Rk
 
 
 def H_balldrop(tk, Xref, state_params, sensor_params, sensor_id):
@@ -281,16 +281,16 @@ def unscented_balldrop(tk, chi, state_params, sensor_params, sensor_id):
         Rk[ii,ii] = sig**2.
     
     # Compute transformed sigma points   
-    Y_til = np.zeros((p, (2*n+1)))
+    gamma_til = np.zeros((p, (2*n+1)))
     for jj in range(2*n+1):
         
         y = chi[0,jj]
         dy = chi[1,jj]
         
-        Y_til[0,jj] = y
-        Y_til[1,jj] = dy
+        gamma_til[0,jj] = y
+        gamma_til[1,jj] = dy
 
-    return Y_til, Rk
+    return gamma_til, Rk
 
 
 
@@ -394,7 +394,7 @@ def unscented_rgradec(tk, chi, state_params, sensor_params, sensor_id):
         Rk[ii,ii] = sig**2.
     
     # Compute transformed sigma points   
-    Y_til = np.zeros((p, (2*n+1)))
+    gamma_til = np.zeros((p, (2*n+1)))
     for jj in range(2*n+1):
         
         x = chi[0,jj]
@@ -412,12 +412,12 @@ def unscented_rgradec(tk, chi, state_params, sensor_params, sensor_id):
         ra = atan2(rho_hat_gcrf[1], rho_hat_gcrf[0]) #rad
         dec = asin(rho_hat_gcrf[2])  #rad
         
-        Y_til[0,jj] = rg
-        Y_til[1,jj] = ra
-        Y_til[2,jj] = dec
+        gamma_til[0,jj] = rg
+        gamma_til[1,jj] = ra
+        gamma_til[2,jj] = dec
 
 
-    return Y_til, Rk
+    return gamma_til, Rk
 
 
 def H_radec(tk, Xref, state_params, sensor_params, sensor_id):
@@ -511,7 +511,7 @@ def unscented_radec(tk, chi, state_params, sensor_params, sensor_id):
         Rk[ii,ii] = sig**2.
     
     # Compute transformed sigma points   
-    Y_til = np.zeros((p, (2*n+1)))
+    gamma_til = np.zeros((p, (2*n+1)))
     for jj in range(2*n+1):
         
         x = chi[0,jj]
@@ -529,10 +529,10 @@ def unscented_radec(tk, chi, state_params, sensor_params, sensor_id):
         ra = atan2(rho_hat_gcrf[1], rho_hat_gcrf[0]) #rad
         dec = asin(rho_hat_gcrf[2])  #rad
         
-        Y_til[0,jj] = ra
-        Y_til[1,jj] = dec
+        gamma_til[0,jj] = ra
+        gamma_til[1,jj] = dec
 
-    return Y_til, Rk
+    return gamma_til, Rk
 
 
 def H_cwrho(tk, Xref, state_params, sensor_params, sensor_id):
