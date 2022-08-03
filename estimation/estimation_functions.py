@@ -189,18 +189,18 @@ def ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         print('Iteration Number: ', iters)
         print('xo_hat_mag = ', xo_hat_mag)
 
-    # Form output
-    for kk in range(N):
-        tk = tk_list[kk]
-        X = Xref_list[kk]
-        resids = resids_list[kk]
-        phi = phi_list[kk]
-        P = np.dot(phi, np.dot(Po, phi.T))
-
-        filter_output[tk] = {}
-        filter_output[tk]['X'] = X
-        filter_output[tk]['P'] = P
-        filter_output[tk]['resids'] = resids
+#    # Form output
+#    for kk in range(N):
+#        tk = tk_list[kk]
+#        X = Xref_list[kk]
+#        resids = resids_list[kk]
+#        phi = phi_list[kk]
+#        P = np.dot(phi, np.dot(Po, phi.T))
+#
+#        filter_output[tk] = {}
+#        filter_output[tk]['X'] = X
+#        filter_output[tk]['P'] = P
+#        filter_output[tk]['resids'] = resids
         
     
     # Integrate over full time
@@ -242,6 +242,11 @@ def ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         full_state_output[tk]['X'] = Xref
         full_state_output[tk]['P'] = P
         
+        if tk in tk_list:
+            filter_output[tk] = {}
+            filter_output[tk]['X'] = Xref
+            filter_output[tk]['P'] = P
+            filter_output[tk]['resids'] = resids_list[tk_list.index(tk)]
     
 
     return filter_output, full_state_output
@@ -314,6 +319,9 @@ def unscented_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
     tk_list = meas_dict['tk_list']
     Yk_list = meas_dict['Yk_list']
     sensor_id_list = meas_dict['sensor_id_list']
+    nmeas = sum([len(Yk) for Yk in Yk_list])
+    
+#    print('nmeas', nmeas)
 
     # Number of epochs
     N = len(tk_list)
@@ -323,7 +331,7 @@ def unscented_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
     P = Po.copy()
     maxiters = 10
     diff = 1
-    conv_crit = 1e-5
+    conv_crit = 1e-4
     
     # Begin loop
     iters = 0
@@ -350,10 +358,11 @@ def unscented_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
 
         # Loop over times
         meas_ind = 0
-        Y_bar = np.zeros((2*N, 1))
-        Y_til = np.zeros((2*N, 1))
-        gamma_til_mat = np.zeros((2*N, 2*n+1))
+        Y_bar = np.zeros((nmeas, 1))
+        Y_til = np.zeros((nmeas, 1))
+        gamma_til_mat = np.zeros((nmeas, 2*n+1))
         Rk_list = []
+        resids_list = []
         for kk in range(N):
             
 #            print('\nkk = ', kk)
@@ -400,16 +409,19 @@ def unscented_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
             Rk_list.append(Rk)
             
             # Store output
-            Xk = np.dot(chi, Wm.T)
-            Xk = np.reshape(Xk, (n, 1))
-            chi_diff = chi - np.dot(Xk, np.ones((1, (2*n+1))))
-            Pk = np.dot(chi_diff, np.dot(diagWc, chi_diff.T))
+            resids_list.append(resids)
             
-            if tk not in filter_output:
-                filter_output[tk] = {}
-            filter_output[tk]['X'] = Xk
-            filter_output[tk]['P'] = Pk
-            filter_output[tk]['resids'] = resids
+            
+#            Xk = np.dot(chi, Wm.T)
+#            Xk = np.reshape(Xk, (n, 1))
+#            chi_diff = chi - np.dot(Xk, np.ones((1, (2*n+1))))
+#            Pk = np.dot(chi_diff, np.dot(diagWc, chi_diff.T))
+#            
+#            if tk not in filter_output:
+#                filter_output[tk] = {}
+#            filter_output[tk]['X'] = Xk
+#            filter_output[tk]['P'] = Pk
+#            filter_output[tk]['resids'] = resids
             
             # Increment measurement index
             meas_ind += p
@@ -418,19 +430,36 @@ def unscented_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         # Compute covariances
         Rk_full = scipy.linalg.block_diag(*Rk_list)
         Y_diff = gamma_til_mat - np.dot(Y_bar, np.ones((1, 2*n+1)))
+        
+#        print(Rk_full.shape)
+#        print(gamma_til_mat.shape)
+#        print(Y_diff.shape)
+#        
+#        mistake
+        
         Pyy = np.dot(Y_diff, np.dot(diagWc, Y_diff.T)) + Rk_full
         Pxy = np.dot(chi_diff0, np.dot(diagWc, Y_diff.T))        
 
         # Compute Kalman Gain
         cholPyy_inv = np.linalg.inv(np.linalg.cholesky(Pyy))
         Pyy_inv = np.dot(cholPyy_inv.T, cholPyy_inv) 
+        K = np.dot(Pxy, Pyy_inv)
         
 #        K = np.dot(Pxy, np.linalg.inv(Pyy))
-        K = np.dot(Pxy, Pyy_inv)
+        
 
         # Compute updated state and covariance    
         X += np.dot(K, Y_til-Y_bar)
-        P = P - np.dot(K, np.dot(Pyy, K.T))
+#        P = P - np.dot(K, np.dot(Pyy, K.T))
+        
+        # Joseph Form        
+        cholPbar = np.linalg.inv(np.linalg.cholesky(P))
+        invPbar = np.dot(cholPbar.T, cholPbar)
+        P1 = (np.eye(n) - np.dot(np.dot(K, np.dot(Pyy, K.T)), invPbar))
+        P2 = np.dot(K, np.dot(Rk_full, K.T))
+        P = np.dot(P1, np.dot(P, P1.T)) + P2
+        
+        
         diff = np.linalg.norm(np.dot(K, Y_til-Y_bar))
 
         print('Iteration Number: ', iters)
@@ -485,7 +514,13 @@ def unscented_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         
         full_state_output[tk] = {}
         full_state_output[tk]['X'] = Xk
-        full_state_output[tk]['P'] = Pk    
+        full_state_output[tk]['P'] = Pk
+        
+        if tk in tk_list:
+            filter_output[tk] = {}
+            filter_output[tk]['X'] = Xk
+            filter_output[tk]['P'] = Pk
+            filter_output[tk]['resids'] = resids_list[tk_list.index(tk)]
 
     return filter_output, full_state_output
 
@@ -674,10 +709,10 @@ def ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         
         # Check convergence criteria and set flag to use EKF
 #        if kk > 10:
-        P_diff = np.trace(P)/np.trace(P_prior)
+#        P_diff = np.trace(P)/np.trace(P_prior)
 #        print('\n')
-        print(kk)
-        print(P_diff)
+#        print(kk)
+#        print(P_diff)
         
 #        if P_diff > 0.9 and P_diff < 1.0:
 #            conv_flag = True
@@ -899,7 +934,7 @@ def ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         sensor_id = sensor_id_list[kk]
         
         # Computed measurements and covariance
-        gamma_til_k, Rk = meas_fcn(tk, chi, state_params, sensor_params, sensor_id)
+        gamma_til_k, Rk = meas_fcn(tk, chi_bar, state_params, sensor_params, sensor_id)
         ybar = np.dot(gamma_til_k, Wm.T)
         ybar = np.reshape(ybar, (len(ybar), 1))
         Y_diff = gamma_til_k - np.dot(ybar, np.ones((1, (2*n+1))))
@@ -942,20 +977,16 @@ def ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         
 #        print('\n')
 #        print('tk', tk)
-#        print('xbar', xbar)
-#        print('xhat', xhat)
-#        print('Xref', Xref)
+#        print('Xbar', Xbar)
 #        print('Xk', Xk)
 #        print('Yk', Yk)
-#        print('Hk_til', Hk_til)
+#        print('ybar', ybar)
+#        print('ybar_post', ybar_post)
 #        print('Kk', Kk)
 #        print('resids', resids)
-#        print('Gamma', Gamma)
-#        print('phi', phi)
-#        print('P_prior', P_prior)
 #        print('Pbar', Pbar)
 #        print('P', P)
-        
+#        
 #        if kk > 2:
 #             mistake
 

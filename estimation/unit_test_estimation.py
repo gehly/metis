@@ -124,9 +124,13 @@ def execute_linear1d_test():
     analysis.compute_linear1d_errors(ekf_output, truth_dict)
         
     
-    # UKF Test
+    # Unscented Batch Test
     int_params['intfcn'] = dyn.ode_linear1d_ukf
     meas_fcn = mfunc.unscented_linear1d_rg
+    ubatch_output, full_state_output = est.unscented_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
+    analysis.compute_linear1d_errors(ubatch_output, truth_dict)    
+    
+    # UKF Test
     ukf_output, full_state_output = est.ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
     analysis.compute_linear1d_errors(ukf_output, truth_dict)
     
@@ -772,17 +776,15 @@ if __name__ == '__main__':
     
     plt.close('all')
     
-#    execute_linear1d_test()
+    execute_linear1d_test()
     
 #    execute_balldrop_test()
     
 #    twobody_geo_setup()
     
-#    twobody_leo_setup()
-    
 #    twobody_born_setup()
     
-    execute_twobody_test()
+#    execute_twobody_test()
 
 
 
