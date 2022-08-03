@@ -71,7 +71,7 @@ def ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
     sensor_id_list = meas_dict['sensor_id_list']
 
     # Number of epochs
-    L = len(tk_list)
+    N = len(tk_list)
 
     # Initialize
     maxiters = 10
@@ -101,10 +101,10 @@ def ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         phi_v = phi0_v.copy()
         Xref = Xo_ref.copy()
         Lambda = invPo_bar.copy()
-        N = np.dot(Lambda, xo_bar)
+        Nstate = np.dot(Lambda, xo_bar)
 
         # Loop over times
-        for kk in range(L):
+        for kk in range(N):
             
 #            print('\nkk = ', kk)
             
@@ -140,6 +140,249 @@ def ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
             Xref = xout[0:n].reshape(n, 1)
             phi_v = xout[n:].reshape(n**2, 1)
             phi = np.reshape(phi_v, (n, n))
+            
+#            print('\n\n')
+#            print('Xref', Xref)
+
+            # Accumulate the normal equations
+            Hk_til, Gk, Rk = meas_fcn(tk, Xref, state_params, sensor_params, sensor_id)
+            yk = Yk - Gk
+            Hk = np.dot(Hk_til, phi)
+            cholRk = np.linalg.inv(np.linalg.cholesky(Rk))
+            invRk = np.dot(cholRk.T, cholRk)
+                        
+            Lambda += np.dot(Hk.T, np.dot(invRk, Hk))
+            Nstate += np.dot(Hk.T, np.dot(invRk, yk))
+            
+            # Store output
+            resids_list.append(yk)
+            Xref_list.append(Xref)
+            phi_list.append(phi)
+            
+            # print(kk)
+            # print(tk)
+            # print(int0)
+            # print(Xref)
+            # print(Yk)
+            # print(Gk)
+            # print(yk)
+            
+            # if kk > 2:
+            #     mistake
+
+
+        # print(Lambda)
+        # print(np.linalg.eig(Lambda))
+
+
+        # Solve the normal equations
+        cholLam_inv = np.linalg.inv(np.linalg.cholesky(Lambda))
+        Po = np.dot(cholLam_inv.T, cholLam_inv)     
+        xo_hat = np.dot(Po, Nstate)
+        xo_hat_mag = np.linalg.norm(xo_hat)
+
+        # Update for next batch iteration
+        Xo_ref = Xo_ref + xo_hat
+        xo_bar = xo_bar - xo_hat
+
+        print('Iteration Number: ', iters)
+        print('xo_hat_mag = ', xo_hat_mag)
+
+    # Form output
+    for kk in range(N):
+        tk = tk_list[kk]
+        X = Xref_list[kk]
+        resids = resids_list[kk]
+        phi = phi_list[kk]
+        P = np.dot(phi, np.dot(Po, phi.T))
+
+        filter_output[tk] = {}
+        filter_output[tk]['X'] = X
+        filter_output[tk]['P'] = P
+        filter_output[tk]['resids'] = resids
+        
+    
+    # Integrate over full time
+    tk_truth = list(truth_dict.keys())
+    phi_v = phi0_v.copy()
+    Xref = Xo_ref.copy()
+    full_state_output = {}
+    for kk in range(len(tk_truth)):
+        
+        # Current and previous time
+        if kk == 0:
+            tk_prior = state_tk
+        else:
+            tk_prior = tk_truth[kk-1]
+            
+        tk = tk_truth[kk]
+        
+        # Initial Conditions for Integration Routine
+        Xref_prior = Xref.copy()
+        int0 = np.concatenate((Xref_prior, phi_v))
+
+        # Integrate Xref and STM
+        if tk_prior == tk:
+            intout = int0.T
+        else:
+            int0 = int0.flatten()
+            tin = [tk_prior, tk]
+            
+            tout, intout = dyn.general_dynamics(int0, tin, state_params, int_params)
+
+        # Extract values for later calculations
+        xout = intout[-1,:]
+        Xref = xout[0:n].reshape(n, 1)
+        phi_v = xout[n:].reshape(n**2, 1)
+        phi = np.reshape(phi_v, (n, n))
+        P = np.dot(phi, np.dot(Po, phi.T))
+        
+        full_state_output[tk] = {}
+        full_state_output[tk]['X'] = Xref
+        full_state_output[tk]['P'] = P
+        
+    
+
+    return filter_output, full_state_output
+
+
+def unscented_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
+                    sensor_params, int_params):
+    '''
+    This function implements the unscented batch estimator for the least
+    squares cost function.
+
+    Parameters
+    ------
+    state_dict : dictionary
+        initial state and covariance for filter execution
+    truth_dict : dictionary
+        true state at all times
+    meas_dict : dictionary
+        measurement data over time for the filter and parameters (noise, etc)
+    meas_fcn : function handle
+        function for measurements
+    state_params : dictionary
+        physical parameters of spacecraft and central body
+    sensor_params : dictionary
+        location, constraint, noise parameters of sensors
+    int_params : dictionary
+        numerical integration parameters
+
+    Returns
+    ------
+    filter_output : dictionary
+        output state, covariance, and post-fit residuals at measurement times
+    full_state_output : dictionary
+        output state and covariance at all truth times
+        
+    '''
+
+    # State information
+    state_tk = sorted(state_dict.keys())[-1]
+    Xo = state_dict[state_tk]['X']
+    Po = state_dict[state_tk]['P']
+
+    # Setup
+    n = len(Xo)
+    
+    # Prior information about the distribution
+    pnorm = 2.
+    kurt = math.gamma(5./pnorm)*math.gamma(1./pnorm)/(math.gamma(3./pnorm)**2.)
+    beta = kurt - 1.
+    kappa = kurt - float(n)
+    
+    # Compute sigma point weights
+    alpha = state_params['alpha']
+    lam = alpha**2.*(n + kappa) - n
+    gam = np.sqrt(n + lam)
+    Wm = 1./(2.*(n + lam)) * np.ones(2*n,)
+    Wc = Wm.copy()
+    Wm = np.insert(Wm, 0, lam/(n + lam))
+    Wc = np.insert(Wc, 0, lam/(n + lam) + (1 - alpha**2 + beta))
+    diagWc = np.diag(Wc)
+    unscented_params = {}
+    unscented_params['gam'] = gam
+    unscented_params['Wm'] = Wm
+    unscented_params['diagWc'] = diagWc
+
+    # Initialize output
+    filter_output = {}
+
+    # Measurement times
+    tk_list = meas_dict['tk_list']
+    Yk_list = meas_dict['Yk_list']
+    sensor_id_list = meas_dict['sensor_id_list']
+
+    # Number of epochs
+    N = len(tk_list)
+
+    # Initialize 
+    X = Xo.copy()
+    P = Po.copy()
+    maxiters = 10
+    diff = 1
+    conv_crit = 1e-5
+    
+    # Begin loop
+    iters = 0
+    while diff > conv_crit:
+
+        # Increment loop counter and exit if necessary
+        iters += 1
+        if iters > maxiters:
+            iters -= 1
+            print('Solution did not converge in ', iters, ' iterations')
+            print('Last diff magnitude: ', diff)
+            break
+
+        # Initialze values for this iteration
+        # Reset P every iteration???
+        # P = Po.copy()
+        
+        # Compute Sigma Points
+        sqP = np.linalg.cholesky(P)
+        Xrep = np.tile(X, (1, n))
+        chi0 = np.concatenate((X, Xrep+(gam*sqP), Xrep-(gam*sqP)), axis=1)
+        chi_v = np.reshape(chi0, (n*(2*n+1), 1), order='F')  
+        chi_diff0 = chi0 - np.dot(X, np.ones((1, 2*n+1)))
+
+        # Loop over times
+        meas_ind = 0
+        Y_bar = np.zeros((2*N, 1))
+        Y_til = np.zeros((2*N, 1))
+        gamma_til_mat = np.zeros((2*N, 2*n+1))
+        for kk in range(N):
+            
+#            print('\nkk = ', kk)
+            
+            # Current and previous time
+            if kk == 0:
+                tk_prior = state_tk
+            else:
+                tk_prior = tk_list[kk-1]
+
+            tk = tk_list[kk]
+
+            # Read the next observation
+            Yk = Yk_list[kk]
+            sensor_id = sensor_id_list[kk]
+
+            # Initial Conditions for Integration Routine
+            int0 = chi_v.copy()
+
+            # Integrate Xref and STM
+            if tk_prior == tk:
+                intout = int0.T
+            else:
+                int0 = int0.flatten()
+                tin = [tk_prior, tk]
+                
+                tout, intout = dyn.general_dynamics(int0, tin, state_params, int_params)
+
+            # Extract values for later calculations
+            chi_v = intout[-1,:]
+            chi = np.reshape(chi_v, (n, 2*n+1), order='F')
             
 #            print('\n\n')
 #            print('Xref', Xref)
@@ -303,7 +546,7 @@ def ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
     sensor_id_list = meas_dict['sensor_id_list']
     
     # Number of epochs
-    L = len(tk_list)
+    N = len(tk_list)
 
     # Initialize
     xhat = np.zeros((n, 1))
@@ -315,7 +558,7 @@ def ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
     count = 0
     
     # Loop over times
-    for kk in range(L):
+    for kk in range(N):
     
         # Current and previous time
         if kk == 0:
@@ -589,10 +832,10 @@ def ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
     sensor_id_list = meas_dict['sensor_id_list']
     
     # Number of epochs
-    L = len(tk_list)
+    N = len(tk_list)
   
     # Loop over times
-    for kk in range(L):
+    for kk in range(N):
     
         # Current and previous time
         if kk == 0:
@@ -643,11 +886,11 @@ def ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         chi_diff = chi - np.dot(Xbar, np.ones((1, (2*n+1))))
         Pbar = np.dot(chi_diff, np.dot(diagWc, chi_diff.T)) + np.dot(Gamma, np.dot(Q, Gamma.T))
 
-#        # Recompute sigma points to incorporate process noise
-#        sqP = np.linalg.cholesky(Pbar)
-#        Xrep = np.tile(Xbar, (1, n))
-#        chi_bar = np.concatenate((Xbar, Xrep+(gam*sqP), Xrep-(gam*sqP)), axis=1) 
-#        chi_diff = chi_bar - np.dot(Xbar, np.ones((1, (2*n+1))))
+        # Recompute sigma points to incorporate process noise
+        sqP = np.linalg.cholesky(Pbar)
+        Xrep = np.tile(Xbar, (1, n))
+        chi_bar = np.concatenate((Xbar, Xrep+(gam*sqP), Xrep-(gam*sqP)), axis=1) 
+        chi_diff = chi_bar - np.dot(Xbar, np.ones((1, (2*n+1))))
         
         # Measurement Update: posterior state and covar at tk            
         # Retrieve measurement data
@@ -655,10 +898,12 @@ def ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         sensor_id = sensor_id_list[kk]
         
         # Computed measurements and covariance
-        # This step will recompute sigma points, thereby incorporating
-        # process noise
-        ybar, Pyy, Pxy, Rk = meas_fcn(tk, Xbar, Pbar, unscented_params, 
-                                      state_params, sensor_params, sensor_id)
+        Y_til, Rk = meas_fcn(tk, chi, state_params, sensor_params, sensor_id)
+        ybar = np.dot(Y_til, Wm.T)
+        ybar = np.reshape(ybar, (len(ybar), 1))
+        Y_diff = Y_til - np.dot(ybar, np.ones((1, (2*n+1))))
+        Pyy = np.dot(Y_diff, np.dot(diagWc, Y_diff.T)) + Rk
+        Pxy = np.dot(chi_diff,  np.dot(diagWc, Y_diff.T))
         
         # Kalman gain and measurement update
         Kk = np.dot(Pxy, np.linalg.inv(Pyy))
@@ -723,10 +968,6 @@ def ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
 
 
 
-###############################################################################
-# Measurement Functions
-###############################################################################
-    
 
 
 

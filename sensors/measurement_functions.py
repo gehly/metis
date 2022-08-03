@@ -214,19 +214,10 @@ def H_linear1d_rg(tk, Xref, state_params, sensor_params, sensor_id):
     return Hk_til, Gk, Rk
 
 
-def unscented_linear1d_rg(tk, X, P, unscented_params, state_params, sensor_params, sensor_id):
+def unscented_linear1d_rg(tk, chi, state_params, sensor_params, sensor_id):
     
-    # Input parameters
-    gam = unscented_params['gam']
-    Wm = unscented_params['Wm']
-    diagWc = unscented_params['diagWc']
-    
-    # Compute sigma points
-    n = len(X)    
-    sqP = np.linalg.cholesky(P)
-    Xrep = np.tile(X, (1, n))
-    chi = np.concatenate((X, Xrep+(gam*sqP), Xrep-(gam*sqP)), axis=1) 
-    chi_diff = chi - np.dot(X, np.ones((1, (2*n+1))))
+    # Number of states
+    n = int(chi.shape[0])
     
     # Measurement information
     sensor_kk = sensor_params[sensor_id]
@@ -240,20 +231,13 @@ def unscented_linear1d_rg(tk, X, P, unscented_params, state_params, sensor_param
         Rk[ii,ii] = sig**2.
     
     # Compute transformed sigma points   
-    Y = np.zeros((p, (2*n+1)))
+    Y_til = np.zeros((p, (2*n+1)))
     for jj in range(2*n+1):
         
         rg = chi[0,jj]
-        Y[0,jj] = rg
-        
-    # Compute mean and covariance
-    ybar = np.dot(Y, Wm.T)
-    ybar = np.reshape(ybar, (p, 1))
-    Y_diff = Y - np.dot(ybar, np.ones((1, (2*n+1))))
-    Pyy = np.dot(Y_diff, np.dot(diagWc, Y_diff.T)) + Rk
-    Pxy = np.dot(chi_diff,  np.dot(diagWc, Y_diff.T))
+        Y_til[0,jj] = rg
 
-    return ybar, Pyy, Pxy, Rk
+    return Y_til, Rk
 
 
 def H_balldrop(tk, Xref, state_params, sensor_params, sensor_id):
@@ -280,19 +264,10 @@ def H_balldrop(tk, Xref, state_params, sensor_params, sensor_id):
     return Hk_til, Gk, Rk
 
 
-def unscented_balldrop(tk, X, P, unscented_params, state_params, sensor_params, sensor_id):
+def unscented_balldrop(tk, chi, state_params, sensor_params, sensor_id):
     
-    # Input parameters
-    gam = unscented_params['gam']
-    Wm = unscented_params['Wm']
-    diagWc = unscented_params['diagWc']
-    
-    # Compute sigma points
-    n = len(X)    
-    sqP = np.linalg.cholesky(P)
-    Xrep = np.tile(X, (1, n))
-    chi = np.concatenate((X, Xrep+(gam*sqP), Xrep-(gam*sqP)), axis=1) 
-    chi_diff = chi - np.dot(X, np.ones((1, (2*n+1))))
+    # Number of states
+    n = int(chi.shape[0])
     
     # Measurement information
     sensor_kk = sensor_params[sensor_id]
@@ -306,23 +281,16 @@ def unscented_balldrop(tk, X, P, unscented_params, state_params, sensor_params, 
         Rk[ii,ii] = sig**2.
     
     # Compute transformed sigma points   
-    Y = np.zeros((p, (2*n+1)))
+    Y_til = np.zeros((p, (2*n+1)))
     for jj in range(2*n+1):
         
         y = chi[0,jj]
         dy = chi[1,jj]
         
-        Y[0,jj] = y
-        Y[1,jj] = dy
-        
-    # Compute mean and covariance
-    ybar = np.dot(Y, Wm.T)
-    ybar = np.reshape(ybar, (p, 1))
-    Y_diff = Y - np.dot(ybar, np.ones((1, (2*n+1))))
-    Pyy = np.dot(Y_diff, np.dot(diagWc, Y_diff.T)) + Rk
-    Pxy = np.dot(chi_diff,  np.dot(diagWc, Y_diff.T))
+        Y_til[0,jj] = y
+        Y_til[1,jj] = dy
 
-    return ybar, Pyy, Pxy, Rk
+    return Y_til, Rk
 
 
 
@@ -401,19 +369,10 @@ def H_rgradec(tk, Xref, state_params, sensor_params, sensor_id):
     return Hk_til, Gk, Rk
 
 
-def unscented_rgradec(tk, X, P, unscented_params, state_params, sensor_params, sensor_id):
+def unscented_rgradec(tk, chi, state_params, sensor_params, sensor_id):
     
-    # Input parameters
-    gam = unscented_params['gam']
-    Wm = unscented_params['Wm']
-    diagWc = unscented_params['diagWc']
-    
-    # Compute sigma points
-    n = len(X)    
-    sqP = np.linalg.cholesky(P)
-    Xrep = np.tile(X, (1, n))
-    chi = np.concatenate((X, Xrep+(gam*sqP), Xrep-(gam*sqP)), axis=1) 
-    chi_diff = chi - np.dot(X, np.ones((1, (2*n+1))))
+    # Number of states
+    n = int(chi.shape[0])
     
     # Compute sensor position in GCRF
     eop_alldata = sensor_params['eop_alldata']
@@ -435,7 +394,7 @@ def unscented_rgradec(tk, X, P, unscented_params, state_params, sensor_params, s
         Rk[ii,ii] = sig**2.
     
     # Compute transformed sigma points   
-    Y = np.zeros((p, (2*n+1)))
+    Y_til = np.zeros((p, (2*n+1)))
     for jj in range(2*n+1):
         
         x = chi[0,jj]
@@ -453,18 +412,12 @@ def unscented_rgradec(tk, X, P, unscented_params, state_params, sensor_params, s
         ra = atan2(rho_hat_gcrf[1], rho_hat_gcrf[0]) #rad
         dec = asin(rho_hat_gcrf[2])  #rad
         
-        Y[0,jj] = rg
-        Y[1,jj] = ra
-        Y[2,jj] = dec
-        
-    # Compute mean and covariance
-    ybar = np.dot(Y, Wm.T)
-    ybar = np.reshape(ybar, (p, 1))
-    Y_diff = Y - np.dot(ybar, np.ones((1, (2*n+1))))
-    Pyy = np.dot(Y_diff, np.dot(diagWc, Y_diff.T)) + Rk
-    Pxy = np.dot(chi_diff,  np.dot(diagWc, Y_diff.T))
+        Y_til[0,jj] = rg
+        Y_til[1,jj] = ra
+        Y_til[2,jj] = dec
 
-    return ybar, Pyy, Pxy, Rk
+
+    return Y_til, Rk
 
 
 def H_radec(tk, Xref, state_params, sensor_params, sensor_id):
@@ -533,19 +486,10 @@ def H_radec(tk, Xref, state_params, sensor_params, sensor_id):
     return Hk_til, Gk, Rk
 
 
-def unscented_radec(tk, X, P, unscented_params, state_params, sensor_params, sensor_id):
+def unscented_radec(tk, chi, state_params, sensor_params, sensor_id):
     
-    # Input parameters
-    gam = unscented_params['gam']
-    Wm = unscented_params['Wm']
-    diagWc = unscented_params['diagWc']
-    
-    # Compute sigma points
-    n = len(X)    
-    sqP = np.linalg.cholesky(P)
-    Xrep = np.tile(X, (1, n))
-    chi = np.concatenate((X, Xrep+(gam*sqP), Xrep-(gam*sqP)), axis=1) 
-    chi_diff = chi - np.dot(X, np.ones((1, (2*n+1))))
+    # Number of states
+    n = int(chi.shape[0])
     
     # Compute sensor position in GCRF
     eop_alldata = sensor_params['eop_alldata']
@@ -567,7 +511,7 @@ def unscented_radec(tk, X, P, unscented_params, state_params, sensor_params, sen
         Rk[ii,ii] = sig**2.
     
     # Compute transformed sigma points   
-    Y = np.zeros((p, (2*n+1)))
+    Y_til = np.zeros((p, (2*n+1)))
     for jj in range(2*n+1):
         
         x = chi[0,jj]
@@ -585,17 +529,10 @@ def unscented_radec(tk, X, P, unscented_params, state_params, sensor_params, sen
         ra = atan2(rho_hat_gcrf[1], rho_hat_gcrf[0]) #rad
         dec = asin(rho_hat_gcrf[2])  #rad
         
-        Y[0,jj] = ra
-        Y[1,jj] = dec
-        
-    # Compute mean and covariance
-    ybar = np.dot(Y, Wm.T)
-    ybar = np.reshape(ybar, (p, 1))
-    Y_diff = Y - np.dot(ybar, np.ones((1, (2*n+1))))
-    Pyy = np.dot(Y_diff, np.dot(diagWc, Y_diff.T)) + Rk
-    Pxy = np.dot(chi_diff,  np.dot(diagWc, Y_diff.T))
+        Y_til[0,jj] = ra
+        Y_til[1,jj] = dec
 
-    return ybar, Pyy, Pxy, Rk
+    return Y_til, Rk
 
 
 def H_cwrho(tk, Xref, state_params, sensor_params, sensor_id):
