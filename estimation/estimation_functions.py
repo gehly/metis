@@ -70,6 +70,7 @@ def ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
     tk_list = meas_dict['tk_list']
     Yk_list = meas_dict['Yk_list']
     sensor_id_list = meas_dict['sensor_id_list']
+    nmeas = sum([len(Yk) for Yk in Yk_list])
 
     # Number of epochs
     N = len(tk_list)
@@ -84,8 +85,11 @@ def ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
     # Begin Loop
     iters = 0
     xo_hat_mag = 1
-    conv_crit = 1e-5
-    while xo_hat_mag > conv_crit:
+    rms_prior = 1e6
+    xhat_crit = 1e-5
+    rms_crit = 1e-4
+    conv_flag = False    
+    while not conv_flag:
 
         # Increment loop counter and exit if necessary
         iters += 1
@@ -99,12 +103,13 @@ def ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         Xref_list = []
         phi_list = []
         resids_list = []
+        resids_sum = 0.
         phi_v = phi0_v.copy()
         Xref = Xo_ref.copy()
         Lambda = invPo_bar.copy()
         Nstate = np.dot(Lambda, xo_bar)
 
-        # Loop over times
+        # Loop over times        
         for kk in range(N):
             
 #            print('\nkk = ', kk)
@@ -159,6 +164,7 @@ def ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
             resids_list.append(yk)
             Xref_list.append(Xref)
             phi_list.append(phi)
+            resids_sum += float(np.dot(yk.T, np.dot(invRk, yk)))
             
             # print(kk)
             # print(tk)
@@ -185,9 +191,23 @@ def ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         # Update for next batch iteration
         Xo_ref = Xo_ref + xo_hat
         xo_bar = xo_bar - xo_hat
+        
+        # Evaluate xo_hat_mag and resids for convergence
+#        if xo_hat_mag < xhat_crit:
+#            conv_flag = True
+            
+        resids_rms = np.sqrt(resids_sum/nmeas)
+        resids_diff = abs(resids_rms - rms_prior)/rms_prior
+        if resids_diff < rms_crit:
+            conv_flag = True
+            
+        rms_prior = float(resids_rms)
+        
 
         print('Iteration Number: ', iters)
         print('xo_hat_mag = ', xo_hat_mag)
+        print('resids_rms = ', resids_rms)
+        print('resids_diff = ', resids_diff)
 
 #    # Form output
 #    for kk in range(N):
@@ -330,19 +350,22 @@ def unscented_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
     X = Xo.copy()
     P = Po.copy()
     maxiters = 10
-    diff = 1
-    conv_crit = 1e-5
+    xdiff = 1
+    rms_prior = 1e6
+    xdiff_crit = 1e-5
+    rms_crit = 1e-4
+    conv_flag = False 
     
     # Begin loop
     iters = 0
-    while diff > conv_crit:
+    while not conv_flag:
 
         # Increment loop counter and exit if necessary
         iters += 1
         if iters > maxiters:
             iters -= 1
             print('Solution did not converge in ', iters, ' iterations')
-            print('Last diff magnitude: ', diff)
+            print('Last xdiff magnitude: ', xdiff)
             break
 
         # Initialze values for this iteration
@@ -363,6 +386,7 @@ def unscented_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         gamma_til_mat = np.zeros((nmeas, 2*n+1))
         Rk_list = []
         resids_list = []
+        resids_sum = 0.
         for kk in range(N):
             
 #            print('\nkk = ', kk)
@@ -401,6 +425,8 @@ def unscented_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
             ybar = np.dot(gamma_til_k, Wm.T)
             ybar = np.reshape(ybar, (p, 1))
             resids = Yk - ybar
+            cholRk = np.linalg.inv(np.linalg.cholesky(Rk))
+            invRk = np.dot(cholRk.T, cholRk)
             
             # Accumulate measurements and computed measurements
             Y_til[meas_ind:meas_ind+p] = Yk
@@ -410,6 +436,7 @@ def unscented_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
             
             # Store output
             resids_list.append(resids)
+            resids_sum += float(np.dot(resids.T, np.dot(invRk, resids)))
             
             
 #            Xk = np.dot(chi, Wm.T)
@@ -460,10 +487,24 @@ def unscented_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         P = np.dot(P1, np.dot(P, P1.T)) + P2
         
         
-        diff = np.linalg.norm(np.dot(K, Y_til-Y_bar))
+        xdiff = np.linalg.norm(np.dot(K, Y_til-Y_bar))
+        
+        # Evaluate xo_hat_mag and resids for convergence
+#        if xdiff < xdiff_crit:
+#            conv_flag = True
+            
+        resids_rms = np.sqrt(resids_sum/nmeas)
+        resids_diff = abs(resids_rms - rms_prior)/rms_prior
+        if resids_diff < rms_crit:
+            conv_flag = True
+            
+        rms_prior = float(resids_rms)
+        
 
         print('Iteration Number: ', iters)
-        print('diff = ', diff)
+        print('xdiff = ', xdiff)
+        print('resids_rms = ', resids_rms)
+        print('resids_diff = ', resids_diff)
 
     
     

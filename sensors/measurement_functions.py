@@ -412,6 +412,22 @@ def unscented_rgradec(tk, chi, state_params, sensor_params, sensor_id):
         ra = atan2(rho_hat_gcrf[1], rho_hat_gcrf[0]) #rad
         dec = asin(rho_hat_gcrf[2])  #rad
         
+        # Store quadrant info of mean sigma point        
+        if jj == 0:
+            quad = 0
+            if ra > pi/2.:
+                quad = 2
+            if ra < -pi/2.:
+                quad = 3
+                
+        # Check and update quadrant of subsequent sigma points
+        else:
+            if quad == 2 and ra < 0.:
+                ra += 2.*pi
+            if quad == 3 and ra > 0.:
+                ra -= 2.*pi
+                
+        # Form Output
         gamma_til[0,jj] = rg
         gamma_til[1,jj] = ra
         gamma_til[2,jj] = dec
@@ -528,6 +544,23 @@ def unscented_radec(tk, chi, state_params, sensor_params, sensor_id):
         
         ra = atan2(rho_hat_gcrf[1], rho_hat_gcrf[0]) #rad
         dec = asin(rho_hat_gcrf[2])  #rad
+        
+        # Store quadrant info of mean sigma point        
+        if jj == 0:
+            quad = 0
+            if ra > pi/2.:
+                quad = 2
+            if ra < -pi/2.:
+                quad = 3
+                
+        # Check and update quadrant of subsequent sigma points
+        else:
+            if quad == 2 and ra < 0.:
+                ra += 2.*pi
+            if quad == 3 and ra > 0.:
+                ra -= 2.*pi
+                
+        # Form Output
         
         gamma_til[0,jj] = ra
         gamma_til[1,jj] = dec

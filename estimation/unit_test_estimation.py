@@ -737,7 +737,7 @@ def twobody_born_setup():
 def execute_twobody_test():
     
         
-    setup_file = os.path.join('unit_test', 'twobody_geo_setup.pkl')
+    setup_file = os.path.join('unit_test', 'twobody_born_setup.pkl')
     
     pklFile = open(setup_file, 'rb' )
     data = pickle.load( pklFile )
@@ -754,26 +754,27 @@ def execute_twobody_test():
 #    state_params['Q'] = 1e-16 * np.diag([1, 1, 1])
         
     # Batch Test
-    filter_output, full_state_output = est.ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)    
-    analysis.compute_orbit_errors(filter_output, full_state_output, truth_dict)
+#    filter_output, full_state_output = est.ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)    
+#    analysis.compute_orbit_errors(filter_output, full_state_output, truth_dict)
     
     
     # EKF Test
-    filter_output, full_state_output = est.ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
-    analysis.compute_orbit_errors(filter_output, filter_output, truth_dict)
+#    filter_output, full_state_output = est.ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
+#    analysis.compute_orbit_errors(filter_output, filter_output, truth_dict)
     
     
     # Unscented Batch Test
     int_params['intfcn'] = dyn.ode_twobody_ukf
-    meas_fcn = mfunc.unscented_radec
-#    meas_fcn = mfunc.unscented_rgradec
+#    meas_fcn = mfunc.unscented_radec
+    meas_fcn = mfunc.unscented_rgradec
+    state_params['alpha'] = 1e-4
     
     filter_output, full_state_output = est.unscented_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
     analysis.compute_orbit_errors(filter_output, full_state_output, truth_dict)
     
     # UKF Tes    
-    filter_output, full_state_output = est.ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
-    analysis.compute_orbit_errors(filter_output, filter_output, truth_dict)
+#    filter_output, full_state_output = est.ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
+#    analysis.compute_orbit_errors(filter_output, filter_output, truth_dict)
     
 
         
