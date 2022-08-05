@@ -120,11 +120,17 @@ def unit_test_sp3_reader():
     qzs2_norad = 42738
     qzs3_norad = 42917
     qzs4_norad = 42965
+    qzs1r_norad = 49336
     
-    qzs3_sp3_id = 'PJ07'
+    # These mappings produce errors on the km level
+    # QZS-1 appears to be retired as of 2022
+    qzs1r_sp3_id = 'PJ04'
+    qzs2_sp3_id = 'PJ02'    
+    qzs3_sp3_id = 'PJ07'    
+    qzs4_sp3_id = 'PJ03'    
     
-    norad_id = qzs3_norad
-    sp3_id = qzs3_sp3_id
+    norad_id = qzs4_norad
+    sp3_id = qzs4_sp3_id
     
     # Convert SP3 data to UTC and ECI
     gps_list = sp3_dict[sp3_id]['gps_time']
@@ -143,6 +149,7 @@ def unit_test_sp3_reader():
         UTC_list.append(UTC) # + timedelta(seconds=clock)
         
         # Convert to GCRF
+        EOP_data = eop.get_eop_data(eop_alldata, UTC)
         sp3_eci, dum = coord.itrf2gcrf(sp3_ecef, np.zeros((3,1)), UTC, EOP_data, XYs_df)
         ECI_list.append(sp3_eci)
         
@@ -200,6 +207,8 @@ def unit_test_sp3_reader():
 
 
 if __name__ == '__main__':
+    
+    plt.close('all')
     
     unit_test_sp3_reader()
     
