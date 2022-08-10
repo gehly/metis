@@ -255,6 +255,8 @@ def compute_orbit_errors(filter_output, full_state_output, truth_dict):
         X_err_meas[6,:] *= 1000.
         sig_beta *= 1e6
     
+    if p == 1:
+        resids[0,:] *= 1000.
     if p == 2:
         resids *= (1./arcsec2rad)
     if p == 3:
@@ -283,6 +285,9 @@ def compute_orbit_errors(filter_output, full_state_output, truth_dict):
         print('Beta [m^2/kg]\t', '{0:0.2E}'.format(np.mean(X_err[6,:])), '\t{0:0.2E}'.format(np.std(X_err[6,:])))
         print('')
     
+    if p == 1:
+        print('Range [m]\t\t', '{0:0.2E}'.format(np.mean(resids[0,:])), '\t{0:0.2E}'.format(np.std(resids[0,:])))
+        
     if p == 2:
         print('RA [arcsec]\t\t', '{0:0.2E}'.format(np.mean(resids[0,:])), '\t{0:0.2E}'.format(np.std(resids[0,:])))
         print('DEC [arcsec]\t', '{0:0.2E}'.format(np.mean(resids[1,:])), '\t{0:0.2E}'.format(np.std(resids[1,:])))
@@ -382,6 +387,10 @@ def compute_orbit_errors(filter_output, full_state_output, truth_dict):
     
     # Residuals
     plt.figure()
+    if p == 1:
+        plt.plot(thrs_meas, resids[0,:], 'k.')
+        plt.ylabel('Range [m]')       
+        plt.xlabel('Time [hours]')
     
     if p == 2:
         
@@ -558,6 +567,8 @@ def compute_real_orbit_errors(filter_output, full_state_output, truth_dict, nora
         X_err_meas[6,:] *= 1000.
         sig_beta *= 1e6
     
+    if p == 1:
+        resids[0,:] *= 1000.
     if p == 2:
         resids *= (1./arcsec2rad)
     if p == 3:
@@ -596,6 +607,9 @@ def compute_real_orbit_errors(filter_output, full_state_output, truth_dict, nora
     if n > 6:
         print('Beta [m^2/kg]\t', '{0:0.2E}'.format(np.mean(X_err[6,:])), '\t{0:0.2E}'.format(np.std(X_err[6,:])))
         print('')
+        
+    if p == 1:
+        print('Range [m]\t\t', '{0:0.2E}'.format(np.mean(resids[0,:])), '\t{0:0.2E}'.format(np.std(resids[0,:])))
     
     if p == 2:
         print('RA [arcsec]\t\t', '{0:0.2E}'.format(np.mean(resids[0,:])), '\t{0:0.2E}'.format(np.std(resids[0,:])))
@@ -714,6 +728,7 @@ def compute_real_orbit_errors(filter_output, full_state_output, truth_dict, nora
     
     # Residuals
     plt.figure()
+    
     
     if p == 2:
         

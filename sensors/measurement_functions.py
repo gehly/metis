@@ -415,9 +415,9 @@ def unscented_rgradec(tk, chi, state_params, sensor_params, sensor_id):
         # Store quadrant info of mean sigma point        
         if jj == 0:
             quad = 0
-            if ra > pi/2.:
+            if ra > pi/2. and ra < pi:
                 quad = 2
-            if ra < -pi/2.:
+            if ra < -pi/2. and ra > -pi:
                 quad = 3
                 
         # Check and update quadrant of subsequent sigma points
@@ -548,9 +548,9 @@ def unscented_radec(tk, chi, state_params, sensor_params, sensor_id):
         # Store quadrant info of mean sigma point        
         if jj == 0:
             quad = 0
-            if ra > pi/2.:
+            if ra > pi/2. and ra < pi:
                 quad = 2
-            if ra < -pi/2.:
+            if ra < -pi/2. and ra > -pi:
                 quad = 3
                 
         # Check and update quadrant of subsequent sigma points
@@ -564,6 +564,52 @@ def unscented_radec(tk, chi, state_params, sensor_params, sensor_id):
         
         gamma_til[0,jj] = ra
         gamma_til[1,jj] = dec
+
+    return gamma_til, Rk
+
+
+def unscented_rg(tk, chi, state_params, sensor_params, sensor_id):
+    
+    # Number of states
+    n = int(chi.shape[0])
+    
+    # Compute sensor position in GCRF
+    eop_alldata = sensor_params['eop_alldata']
+    XYs_df = sensor_params['XYs_df']
+    EOP_data = eop.get_eop_data(eop_alldata, tk)
+    
+    sensor_kk = sensor_params[sensor_id]
+    sensor_itrf = sensor_kk['site_ecef']
+    sensor_gcrf, dum = coord.itrf2gcrf(sensor_itrf, np.zeros((3,1)), tk, EOP_data, XYs_df)
+    
+    # Measurement information    
+    meas_types = sensor_kk['meas_types']
+    sigma_dict = sensor_kk['sigma_dict']
+    p = len(meas_types)
+    Rk = np.zeros((p, p))
+    for ii in range(p):
+        mtype = meas_types[ii]
+        sig = sigma_dict[mtype]
+        Rk[ii,ii] = sig**2.
+    
+    # Compute transformed sigma points   
+    gamma_til = np.zeros((p, (2*n+1)))
+    for jj in range(2*n+1):
+        
+        x = chi[0,jj]
+        y = chi[1,jj]
+        z = chi[2,jj]
+        
+        # Object location in GCRF
+        r_gcrf = np.reshape([x,y,z], (3,1))
+        
+        # Compute range and line of sight vector
+        rho_gcrf = r_gcrf - sensor_gcrf
+        rg = np.linalg.norm(rho_gcrf)
+                
+        # Form Output
+        gamma_til[0,jj] = rg
+
 
     return gamma_til, Rk
 

@@ -769,6 +769,37 @@ def execute_twobody_test():
     meas_fcn = mfunc.unscented_rgradec
     state_params['alpha'] = 1e-4
     
+    
+#    meas_fcn = mfunc.unscented_radec
+#    sensor_id_list = ['Born s101', 'Born s337', 'Born s394']
+#    for sensor_id in sensor_id_list:
+#        sensor_params[sensor_id]['meas_types'] = ['ra', 'dec']
+#        sigma_dict = {}
+##        sigma_dict['rg'] = 0.001  # km
+#        sigma_dict['ra'] = 5.*arcsec2rad   # rad
+#        sigma_dict['dec'] = 5.*arcsec2rad  # rad
+#        sensor_params[sensor_id]['sigma_dict'] = sigma_dict
+#        
+#    Yk_list = meas_dict['Yk_list']
+#    Yk_list2 = [Yk[1:3] for Yk in Yk_list]
+#    meas_dict['Yk_list'] = Yk_list2
+        
+    meas_fcn = mfunc.unscented_rg
+    sensor_id_list = ['Born s101', 'Born s337', 'Born s394']
+    for sensor_id in sensor_id_list:
+        sensor_params[sensor_id]['meas_types'] = ['rg']
+        sigma_dict = {}
+        sigma_dict['rg'] = 0.001  # km
+#        sigma_dict['ra'] = 5.*arcsec2rad   # rad
+#        sigma_dict['dec'] = 5.*arcsec2rad  # rad
+        sensor_params[sensor_id]['sigma_dict'] = sigma_dict
+        
+    Yk_list = meas_dict['Yk_list']
+    Yk_list2 = [Yk[0] for Yk in Yk_list]
+    meas_dict['Yk_list'] = Yk_list2
+    
+    
+    
     filter_output, full_state_output = est.unscented_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
     analysis.compute_orbit_errors(filter_output, full_state_output, truth_dict)
     

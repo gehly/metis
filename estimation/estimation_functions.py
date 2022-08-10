@@ -4,6 +4,7 @@ import math
 import sys
 import os
 import inspect
+import matplotlib.pyplot as plt
 
 filename = inspect.getframeinfo(inspect.currentframe()).filename
 current_dir = os.path.dirname(os.path.abspath(filename))
@@ -13,6 +14,8 @@ metis_dir = current_dir[0:ind+5]
 sys.path.append(metis_dir)
 
 import dynamics.dynamics_functions as dyn
+
+from utilities.constants import arcsec2rad
 
 
 
@@ -60,6 +63,7 @@ def ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
     # Setup
     cholPo = np.linalg.inv(np.linalg.cholesky(Po_bar))
     invPo_bar = np.dot(cholPo.T, cholPo)
+    Xo_ref_print = Xo_ref.copy()
 
     n = len(Xo_ref)
 
@@ -206,8 +210,34 @@ def ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
 
         print('Iteration Number: ', iters)
         print('xo_hat_mag = ', xo_hat_mag)
+        print('delta-X = ', xo_hat)
+        print('Xo', Xo_ref_print)
+        print('X', Xo_ref)
         print('resids_rms = ', resids_rms)
         print('resids_diff = ', resids_diff)
+        
+        # DEBUG
+        t_hrs = [(tt - tk_list[0]).total_seconds()/3600. for tt in tk_list]
+        rg_resids = [res[0]*1000. for res in resids_list]
+        ra_resids = [res[1]*(1./arcsec2rad) for res in resids_list]
+        dec_resids = [res[2]*(1./arcsec2rad) for res in resids_list]
+        
+        plt.figure()
+        plt.subplot(3,1,1)
+        plt.plot(t_hrs, rg_resids, 'k.')
+        plt.ylabel('Range [m]')
+        plt.subplot(3,1,2)
+        plt.plot(t_hrs, ra_resids, 'k.')
+        plt.ylabel('RA [arcsec]')
+        plt.subplot(3,1,3)
+        plt.plot(t_hrs, dec_resids, 'k.')
+        plt.ylabel('DEC [arcsec]')
+        plt.xlabel('Time [hours]')
+        
+        plt.show()
+        
+#        if iters > 1:
+#            mistake
 
 #    # Form output
 #    for kk in range(N):
@@ -503,8 +533,34 @@ def unscented_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
 
         print('Iteration Number: ', iters)
         print('xdiff = ', xdiff)
+        print('delta-X = ', np.dot(K, Y_til-Y_bar))
+        print('Xo', Xo)
+        print('X', X)
         print('resids_rms = ', resids_rms)
         print('resids_diff = ', resids_diff)
+        
+#        # DEBUG
+#        t_hrs = [(tt - tk_list[0]).total_seconds()/3600. for tt in tk_list]
+#        rg_resids = [res[0]*1000. for res in resids_list]
+#        ra_resids = [res[1]*(1./arcsec2rad) for res in resids_list]
+#        dec_resids = [res[2]*(1./arcsec2rad) for res in resids_list]
+#        
+#        plt.figure()
+#        plt.subplot(3,1,1)
+#        plt.plot(t_hrs, rg_resids, 'k.')
+#        plt.ylabel('Range [m]')
+#        plt.subplot(3,1,2)
+#        plt.plot(t_hrs, ra_resids, 'k.')
+#        plt.ylabel('RA [arcsec]')
+#        plt.subplot(3,1,3)
+#        plt.plot(t_hrs, dec_resids, 'k.')
+#        plt.ylabel('DEC [arcsec]')
+#        plt.xlabel('Time [hours]')
+#        
+#        plt.show()
+#        
+#        if iters > 3:
+#            mistake
 
     
     
