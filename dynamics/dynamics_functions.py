@@ -15,8 +15,6 @@ sys.path.append(metis_dir)
 
 import dynamics.numerical_integration as numint
 import utilities.astrodynamics as astro
-import utilities.coordinate_systems as coord
-import utilities.eop_functions as eop
 
 
 
@@ -234,6 +232,26 @@ def ode_linear1d_stm(t, X, params):
     return dX
 
 
+def ode_linear1d_ukf(t, X, params):
+    
+    
+    # Initialize
+    dX = np.zeros(len(X),)
+    n = int((-1 + np.sqrt(1. + 8.*len(X)))/4.)
+
+    for ind in range(0, 2*n+1):
+
+        # Pull out relevant values from X
+        x = float(X[ind*n])
+        dx = float(X[ind*n + 1])
+
+        # Set components of dX
+        dX[ind*n] = dx
+        dX[ind*n + 1] = 0.
+    
+    return dX
+
+
 def ode_balldrop(t, X, params):
     '''
     This function works with ode to propagate an object moving under constant
@@ -293,6 +311,28 @@ def ode_balldrop_stm(t, X, params):
     dX[1] = acc
     dX[n:] = dphi_v.flatten()
 
+    return dX
+
+
+def ode_balldrop_ukf(t, X, params):
+    
+    # Input data
+    acc = params['acc']
+    
+    # Initialize
+    dX = np.zeros(len(X),)
+    n = int((-1 + np.sqrt(1. + 8.*len(X)))/4.)
+
+    for ind in range(0, 2*n+1):
+
+        # Pull out relevant values from X
+        y = float(X[ind*n])
+        dy = float(X[ind*n + 1])
+
+        # Set components of dX
+        dX[ind*n] = dy
+        dX[ind*n + 1] = acc
+    
     return dX
 
 
@@ -572,7 +612,7 @@ def ode_twobody_ukf(t, X, params):
     GM = params['GM']
     
     # Initialize
-    dX = [0]*len(X)
+    dX = np.zeros(len(X),)
     n = int((-1 + np.sqrt(1. + 8.*len(X)))/4.)
 
     for ind in range(0, 2*n+1):

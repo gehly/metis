@@ -18,7 +18,7 @@ sys.path.append(metis_dir)
 import estimation.analysis_functions as analysis
 import estimation.estimation_functions as est
 import dynamics.dynamics_functions as dyn
-import sensors.measurements as measfunc
+import sensors.measurement_functions as mfunc
 import sensors.sensors as sens
 import sensors.visibility_functions as visfunc
 import utilities.astrodynamics as astro
@@ -125,7 +125,7 @@ def geo_j2_setup():
             if visfunc.check_visibility(X, state_params, sensor, UTC, EOP_data, XYs_df):
                 
                 # Compute measurements
-                Yk = measfunc.compute_measurement(X, state_params, sensor, UTC,
+                Yk = mfunc.compute_measurement(X, state_params, sensor, UTC,
                                                   EOP_data, XYs_df,
                                                   meas_types=sensor['meas_types'])
                 
@@ -307,7 +307,7 @@ def sso_j2_drag_setup():
             if visfunc.check_visibility(X, state_params, sensor, UTC, EOP_data, XYs_df):
                 
                 # Compute measurements
-                Yk = measfunc.compute_measurement(X, state_params, sensor, UTC,
+                Yk = mfunc.compute_measurement(X, state_params, sensor, UTC,
                                          EOP_data, XYs_df, meas_types)
                 
                 for mtype in meas_types:
