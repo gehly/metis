@@ -38,6 +38,7 @@ def linear_motion_setup():
     state_params['Q'] = np.diag([1e-8])
     state_params['gap_seconds'] = 100.
     state_params['alpha'] = 1e-4
+    state_params['pnorm'] = 1.2
     
     # Integration function and additional settings
     int_params = {}
@@ -118,6 +119,10 @@ def execute_linear1d_test():
     filter_output, full_state_output = est.ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
     analysis.compute_linear1d_errors(filter_output, truth_dict)
     
+    # Lp-norm Batch Test
+    filter_output, full_state_output = est.lp_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
+    analysis.compute_linear1d_errors(filter_output, truth_dict)
+    
     
     # EKF Test
     ekf_output, full_state_output = est.ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
@@ -152,6 +157,7 @@ def balldrop_setup():
     state_params['Q'] = np.diag([1e-8])
     state_params['gap_seconds'] = 10.
     state_params['alpha'] = 1e-4
+    state_params['pnorm'] = 1.2
     
     # Integration function and additional settings
     int_params = {}
@@ -231,20 +237,24 @@ def execute_balldrop_test():
     filter_output, full_state_output = est.ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
     analysis.compute_balldrop_errors(filter_output, truth_dict)
     
-    # EKF Test
-    filter_output, full_state_output = est.ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
+    # Lp-norm Batch Test
+    filter_output, full_state_output = est.lp_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
     analysis.compute_balldrop_errors(filter_output, truth_dict)
-        
-    # Unscented Batch Test
-    int_params['intfcn'] = dyn.ode_balldrop_ukf
-    meas_fcn = mfunc.unscented_balldrop
     
-    ubatch_output, full_state_output = est.unscented_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
-    analysis.compute_balldrop_errors(ubatch_output, truth_dict) 
-    
-    # UKF Test
-    filter_output, full_state_output = est.ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
-    analysis.compute_balldrop_errors(filter_output, truth_dict)
+#    # EKF Test
+#    filter_output, full_state_output = est.ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
+#    analysis.compute_balldrop_errors(filter_output, truth_dict)
+#        
+#    # Unscented Batch Test
+#    int_params['intfcn'] = dyn.ode_balldrop_ukf
+#    meas_fcn = mfunc.unscented_balldrop
+#    
+#    ubatch_output, full_state_output = est.unscented_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
+#    analysis.compute_balldrop_errors(ubatch_output, truth_dict) 
+#    
+#    # UKF Test
+#    filter_output, full_state_output = est.ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
+#    analysis.compute_balldrop_errors(filter_output, truth_dict)
         
     
     return
@@ -312,9 +322,18 @@ def twobody_geo_setup():
     sensor_params['eop_alldata'] = eop_alldata
     sensor_params['XYs_df'] = XYs_df
     
+#    for sensor_id in sensor_id_list:
+#        sensor_params[sensor_id]['meas_types'] = ['ra', 'dec']
+#        sigma_dict = {}
+#        sigma_dict['ra'] = 5.*arcsec2rad   # rad
+#        sigma_dict['dec'] = 5.*arcsec2rad  # rad
+#        sensor_params[sensor_id]['sigma_dict'] = sigma_dict
+#    print(sensor_params)
+    
     for sensor_id in sensor_id_list:
-        sensor_params[sensor_id]['meas_types'] = ['ra', 'dec']
+        sensor_params[sensor_id]['meas_types'] = ['rg', 'ra', 'dec']
         sigma_dict = {}
+        sigma_dict['rg'] = 0.001  # km
         sigma_dict['ra'] = 5.*arcsec2rad   # rad
         sigma_dict['dec'] = 5.*arcsec2rad  # rad
         sensor_params[sensor_id]['sigma_dict'] = sigma_dict
@@ -400,7 +419,7 @@ def twobody_geo_setup():
     
     print(meas_dict)
                 
-    setup_file = os.path.join('unit_test', 'twobody_geo_setup.pkl')
+    setup_file = os.path.join('unit_test', 'twobody_geo_setup_rgradec.pkl')
     pklFile = open( setup_file, 'wb' )
     pickle.dump( [state_dict, state_params, int_params, meas_fcn, meas_dict, sensor_params, truth_dict], pklFile, -1 )
     pklFile.close()
@@ -718,7 +737,7 @@ def twobody_born_setup():
     
     print(meas_dict)
                 
-    setup_file = os.path.join('unit_test', 'twobody_born_setup.pkl')
+    setup_file = os.path.join('unit_test', 'twobody_born_setup2.pkl')
     pklFile = open( setup_file, 'wb' )
     pickle.dump( [state_dict, state_params, int_params, meas_fcn, meas_dict, sensor_params, truth_dict], pklFile, -1 )
     pklFile.close()
@@ -784,19 +803,19 @@ def execute_twobody_test():
 #    Yk_list2 = [Yk[1:3] for Yk in Yk_list]
 #    meas_dict['Yk_list'] = Yk_list2
         
-    meas_fcn = mfunc.unscented_rg
-    sensor_id_list = ['Born s101', 'Born s337', 'Born s394']
-    for sensor_id in sensor_id_list:
-        sensor_params[sensor_id]['meas_types'] = ['rg']
-        sigma_dict = {}
-        sigma_dict['rg'] = 0.001  # km
-#        sigma_dict['ra'] = 5.*arcsec2rad   # rad
-#        sigma_dict['dec'] = 5.*arcsec2rad  # rad
-        sensor_params[sensor_id]['sigma_dict'] = sigma_dict
-        
-    Yk_list = meas_dict['Yk_list']
-    Yk_list2 = [Yk[0] for Yk in Yk_list]
-    meas_dict['Yk_list'] = Yk_list2
+#    meas_fcn = mfunc.unscented_rg
+#    sensor_id_list = ['Born s101', 'Born s337', 'Born s394']
+#    for sensor_id in sensor_id_list:
+#        sensor_params[sensor_id]['meas_types'] = ['rg']
+#        sigma_dict = {}
+#        sigma_dict['rg'] = 0.001  # km
+##        sigma_dict['ra'] = 5.*arcsec2rad   # rad
+##        sigma_dict['dec'] = 5.*arcsec2rad  # rad
+#        sensor_params[sensor_id]['sigma_dict'] = sigma_dict
+#        
+#    Yk_list = meas_dict['Yk_list']
+#    Yk_list2 = [Yk[0] for Yk in Yk_list]
+#    meas_dict['Yk_list'] = Yk_list2
     
     
     
@@ -821,13 +840,13 @@ if __name__ == '__main__':
     
 #    execute_linear1d_test()
     
-#    execute_balldrop_test()
+    execute_balldrop_test()
     
 #    twobody_geo_setup()
     
 #    twobody_born_setup()
     
-    execute_twobody_test()
+#    execute_twobody_test()
 
 
 
