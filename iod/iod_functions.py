@@ -35,6 +35,8 @@ def multirev_lambert(r0_vect, rf_vect, tof, m, GM, transfer_type, branch):
     Lancaster and Blanchard [2], and Gooding [3]. This code is written 
     following a MATLAB version written by Rody Oldenhuis, copyright below.
     
+    Source code from https://github.com/rodyo/FEX-Lambert
+    
     Parameters
     ------
     r0_vect : 3x1 numpy array
@@ -105,46 +107,19 @@ def multirev_lambert(r0_vect, rf_vect, tof, m, GM, transfer_type, branch):
     
     '''
     
-    
+    # Fast Lambert
+    v0_vect, vf_vect, extremal_distances, exit_flag = \
+        fast_lambert(r0_vect, rf_vect, tof, m, GM, transfer_type, branch)
+        
+    # If not successful, run robust solver
+    if exit_flag < 0:
+        v0_vect, vf_vect, extremal_distances, exit_flag = \
+            robust_lambert(r0_vect, rf_vect, tof, m, GM, transfer_type, branch)
     
             
 
 
 
-#err = inf;  iterations = 0; xnew = 0;
-#    while (err > tol)
-#        % increment number of iterations
-#        iterations = iterations + 1;
-#        % new x
-#        xnew = (x1*y2 - y1*x2) / (y2-y1);
-#        % copy-pasted code (for performance)
-        if m == 0, x = exp(xnew) - 1; else x = atan(xnew)*2/pi; end
-        a = a_min/(1 - x^2);
-        if (x < 1) % ellipse
-            beta = longway * 2*asin(sqrt((s-c)/2/a));
-            % make 100.4% sure it's in (-1 <= xx <= +1)
-            alfa = 2*acos( max(-1, min(1, x)) );
-        else % hyperbola
-            alfa = 2*acosh(x);
-            beta = longway * 2*asinh(sqrt((s-c)/(-2*a)));
-        end
-        % evaluate the time of flight via Lagrange expression
-        if (a > 0)
-            tof = a*sqrt(a)*((alfa - sin(alfa)) - (beta-sin(beta)) + 2*pi*m);
-        else
-            tof = -a*sqrt(-a)*((sinh(alfa) - alfa) - (sinh(beta) - beta));
-        end
-        % new value of y
-        if m ==0, ynew = log(tof) - logt; else ynew = tof - tf; end
-        % save previous and current values for the next iterarion
-        % (prevents getting stuck between two values)
-        x1 = x2;  x2 = xnew;
-        y1 = y2;  y2 = ynew;
-        % update error
-        err = abs(x1 - xnew);
-        % escape clause
-        if (iterations > 15), bad = true; break; end
-    end
 
     
     
@@ -153,10 +128,8 @@ def multirev_lambert(r0_vect, rf_vect, tof, m, GM, transfer_type, branch):
 
 def fast_lambert(r0_vect, rf_vect, tof, m, GM, transfer_type, branch):
     '''
-    This function implements two methods to solve Lambert's Problem, a fast 
-    method developed by Dr Izzo of ESA and a robust method based on work by
-    Lancaster and Blanchard [2], and Gooding [3]. This code is written 
-    following a MATLAB version written by Rody Oldenhuis, copyright below.
+    This function implements a computationally efficient but less robust 
+    approach to solve Lambert's Problem developed by Dario Izzo (ESA).
     
     Parameters
     ------
@@ -193,13 +166,13 @@ def fast_lambert(r0_vect, rf_vect, tof, m, GM, transfer_type, branch):
     rf_vect = np.reshape(rf_vect, (3,1))
     
     # Normalize units
-    r0 = np.linalg.norm(r0)
+    r0 = np.linalg.norm(r0_vect)
     v0 = np.sqrt(GM/r0)
     T = r0/v0
     
     r0_vect = r0_vect/r0
     rf_vect = rf_vect/r0
-    tf = tf/T
+    tf = tof/T
     logt = math.log(tf)
     
     # Check non-dimensional geometry
@@ -300,15 +273,15 @@ def fast_lambert(r0_vect, rf_vect, tof, m, GM, transfer_type, branch):
             
         # Evaluate time of flight via Lagrange expression
         if a > 0.:
-            tof = a*np.sqrt(a)*((alpha - math.sin(alpha) - (beta - math.sin(beta)) + 2.*math.pi*m))
+            tof_new = a*np.sqrt(a)*((alpha - math.sin(alpha) - (beta - math.sin(beta)) + 2.*math.pi*m))
         else:
-            tof = -a*np.sqrt(-a)*((math.sinh(alpha) - alpha) - (math.sinh(beta) - beta))
+            tof_new = -a*np.sqrt(-a)*((math.sinh(alpha) - alpha) - (math.sinh(beta) - beta))
             
         # New value of y
         if m == 0:
-            ynew = math.log(tof) - logt
+            ynew = math.log(tof_new) - logt
         else:
-            ynew = tof - tf
+            ynew = tof_new - tf
             
         # Save previous and current values for next iteration
         x1 = x2
@@ -365,113 +338,94 @@ def fast_lambert(r0_vect, rf_vect, tof, m, GM, transfer_type, branch):
     cross1 = np.cross(ih, r0_vect)
     cross2 = np.cross(ih, rf_vect)
     
-    # Radial and tangential directions for departure velocity
+    # Radial and tangential components for initial velocity
+    Vr1 = 1./eta/np.sqrt(a_min) * (2.*Lambda*a_min - Lambda - x*eta)
+    Vt1 = np.sqrt(rf_norm/a_min/eta2 * math.sin(dth/2.)**2.)
     
+    # Radial and tangential components for final velocity
+    Vt2 = Vt1/rf_norm
+    Vr2 = (Vt1 - Vt2)/math.tan(dth/2.) - Vr1
+    
+    # Velocity vectors
+    v0_vect = (Vr1*r0_vect + Vt1*cross1)*V
+    vf_vect = (Vr2*rf_vect_hat + Vt2*cross2)*V
+    
+    # Exit flag - success
+    exit_flag = 1
+
+    # Compute min/max distance to central body
+    extremal_distances = \
+        compute_minmax_dist(r0_vect*r0, r0, rf_vect*r0, rf_norm*r0, dth, a*r0, 
+                            v0_vect, vf_vect, m, GM)
+    
+    
+    return v0_vect, vf_vect, extremal_distances, exit_flag
 
 
-
-
-
-
-
-
-
-    % unit vector for normalized [r2vec]
-    r2n = r2vec/mr2vec;
-
-    % cross-products
-    % don't use cross() (emlmex() would try to compile it, and this way it
-    % also does not create any additional overhead)
-    crsprd1 = [ih(2)*r1vec(3)-ih(3)*r1vec(2),...
-               ih(3)*r1vec(1)-ih(1)*r1vec(3),...
-               ih(1)*r1vec(2)-ih(2)*r1vec(1)];
-    crsprd2 = [ih(2)*r2n(3)-ih(3)*r2n(2),...
-               ih(3)*r2n(1)-ih(1)*r2n(3),...
-               ih(1)*r2n(2)-ih(2)*r2n(1)];
-
-    % radial and tangential directions for departure velocity
-    Vr1 = 1/eta/sqrt(a_min) * (2*Lambda*a_min - Lambda - x*eta);
-    Vt1 = sqrt(mr2vec/a_min/eta2 * sin(dth/2)^2);
-
-    % radial and tangential directions for arrival velocity
-    Vt2 = Vt1/mr2vec;
-    Vr2 = (Vt1 - Vt2)/tan(dth/2) - Vr1;
-
-    % terminal velocities
-    V1 = (Vr1*r1vec + Vt1*crsprd1)*V;
-    V2 = (Vr2*r2n + Vt2*crsprd2)*V;
-
-    % exitflag
-    exitflag = 1; % (success)
-
-    % also compute minimum distance to central body
-    % NOTE: use un-transformed vectors again!
-    extremal_distances = ...
-        minmax_distances(r1vec*r1, r1, r2vec*r1, mr2vec*r1, dth, a*r1, V1, V2, m, muC);
+def robust_lambert(r0_vect, rf_vect, tof, m, GM, transfer_type, branch):
+    '''
+    This function implements a robust method to solve Lambert's Problem based 
+    on work by Lancaster and Blanchard, and Gooding. 
+    
+    Parameters
+    ------
+    r0_vect : 3x1 numpy array
+        position vector at t0 [km]
+    rf_vect : 3x1 numpy array
+        position vector at tf [km]
+    tof : float
+        time of flight [sec]
+    m : int
+        number of complete orbit revolutions
+    GM : float
+        graviational parameter of central body [km^3/s^2]
         
-        
-        
+    Returns
+    ------
+    v0_vect : 3x1 numpy array
+        velocity vector at t0 [km/s]
+    vf_vect : 3x1 numpy array
+        velocity vector at tf [km/s]
+    extremal_distances : list
+        min and max distance from central body during orbit [km]
+    exit_flag : int
+        +1 : success
+        -1 : fail
+    '''
     
     
     
+    # Initialize and normalize values
+    r0_vect = np.reshape(r0_vect, (3,1))
+    rf_vect = np.reshape(rf_vect, (3,1))
+    tol     = 1e-12                            % optimum for numerical noise v.s. actual precision
+    r0      = np.linalg.norm(r0_vect)              % magnitude of r1vec
+    rf      = np.linalg.norm(rf_vect)              % magnitude of r2vec
+    r0_hat  = r0_vect/r0                        % unit vector of r1vec
+    rf_hat  = rf_vect/rf                         % unit vector of r2vec
+    crsprod = np.cross(r0_vect, rf_vect);           % cross product of r1vec and r2vec
+    mcrsprd = sqrt(crsprod*crsprod.');          % magnitude of that cross product
+    th1unit = cross(crsprod/mcrsprd, r1unit);   % unit vectors in the tangential-directions
+    th2unit = cross(crsprod/mcrsprd, r2unit);
+    % make 100.4% sure it's in (-1 <= x <= +1)
+    dth = acos( max(-1, min(1, (r1vec*r2vec.')/r1/r2)) ); % turn angle
+
+    % if the long way was selected, the turn-angle must be negative
+    % to take care of the direction of final velocity
+    longway = sign(tf); tf = abs(tf);
+    if (longway < 0), dth = dth-2*pi; end
+
+    % left-branch
+    leftbranch = sign(m); m = abs(m);
+
+    % define constants
+    c  = sqrt(r1^2 + r2^2 - 2*r1*r2*cos(dth));
+    s  = (r1 + r2 + c) / 2;
+    T  = sqrt(8*muC/s^3) * tf;
+    q  = sqrt(r1*r2)/s * cos(dth/2);
     
     
     
-    
-    
-
-
-    % Calculate psi
-    if (x < 1) % ellipse
-        beta = longway * 2*asin(sqrt((s-c)/2/a));
-        % make 100.4% sure it's in (-1 <= xx <= +1)
-        alfa = 2*acos( max(-1, min(1, x)) );
-        psi  = (alfa-beta)/2;
-        eta2 = 2*a*sin(psi)^2/s;
-        eta  = sqrt(eta2);
-    else       % hyperbola
-        beta = longway * 2*asinh(sqrt((c-s)/2/a));
-        alfa = 2*acosh(x);
-        psi  = (alfa-beta)/2;
-        eta2 = -2*a*sinh(psi)^2/s;
-        eta  = sqrt(eta2);
-    end
-
-    % unit of the normalized normal vector
-    ih = longway * nrmunit;
-
-    % unit vector for normalized [r2vec]
-    r2n = r2vec/mr2vec;
-
-    % cross-products
-    % don't use cross() (emlmex() would try to compile it, and this way it
-    % also does not create any additional overhead)
-    crsprd1 = [ih(2)*r1vec(3)-ih(3)*r1vec(2),...
-               ih(3)*r1vec(1)-ih(1)*r1vec(3),...
-               ih(1)*r1vec(2)-ih(2)*r1vec(1)];
-    crsprd2 = [ih(2)*r2n(3)-ih(3)*r2n(2),...
-               ih(3)*r2n(1)-ih(1)*r2n(3),...
-               ih(1)*r2n(2)-ih(2)*r2n(1)];
-
-    % radial and tangential directions for departure velocity
-    Vr1 = 1/eta/sqrt(a_min) * (2*Lambda*a_min - Lambda - x*eta);
-    Vt1 = sqrt(mr2vec/a_min/eta2 * sin(dth/2)^2);
-
-    % radial and tangential directions for arrival velocity
-    Vt2 = Vt1/mr2vec;
-    Vr2 = (Vt1 - Vt2)/tan(dth/2) - Vr1;
-
-    % terminal velocities
-    V1 = (Vr1*r1vec + Vt1*crsprd1)*V;
-    V2 = (Vr2*r2n + Vt2*crsprd2)*V;
-
-    % exitflag
-    exitflag = 1; % (success)
-
-    % also compute minimum distance to central body
-    % NOTE: use un-transformed vectors again!
-    extremal_distances = ...
-        minmax_distances(r1vec*r1, r1, r2vec*r1, mr2vec*r1, dth, a*r1, V1, V2, m, muC);
     
     
     return v0_vect, vf_vect, extremal_distances, exit_flag
