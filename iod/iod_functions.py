@@ -191,10 +191,15 @@ def fast_lambert(r0_vect, rf_vect, tof, m, GM, transfer_type, branch):
     s = (1. + rf_norm + c)/2.                                   # semi-parameter
     a_min = s/2.                                                # min energy ellipse SMA
     Lambda = np.sqrt(rf_norm)*math.cos(dth/2.)/s                # Lambda parameter from Battin
-    r_cross_vect = np.cross(r0_vect, rf_vect)
+
+    r_cross_vect = np.array([[float(r0_vect[1]*rf_vect[2] - r0_vect[2]*rf_vect[1])],
+                             [float(r0_vect[2]*rf_vect[0] - r0_vect[0]*rf_vect[2])],
+                             [float(r0_vect[0]*rf_vect[1] - r0_vect[1]*rf_vect[0])]])
+
     r_cross = np.linalg.norm(r_cross_vect)
     r_cross_hat = r_cross_vect/r_cross                          # unit vector
-    
+
+
     # Setup initial values
     if m == 0:
         
@@ -335,8 +340,18 @@ def fast_lambert(r0_vect, rf_vect, tof, m, GM, transfer_type, branch):
     rf_vect_hat = rf_vect/rf_norm
     
     # Cross products
-    cross1 = np.cross(ih, r0_vect)
-    cross2 = np.cross(ih, rf_vect)
+#    cross1 = np.cross(ih, r0_vect)
+#    cross2 = np.cross(ih, rf_vect)
+    
+    cross1 = np.array([[float(ih[1]*r0_vect[2] - ih[2]*r0_vect[1])],
+                       [float(ih[2]*r0_vect[0] - ih[0]*r0_vect[2])],
+                       [float(ih[0]*r0_vect[1] - ih[1]*r0_vect[0])]])
+    
+    cross2 = np.array([[float(ih[1]*rf_vect[2] - ih[2]*rf_vect[1])],
+                       [float(ih[2]*rf_vect[0] - ih[0]*rf_vect[2])],
+                       [float(ih[0]*rf_vect[1] - ih[1]*rf_vect[0])]])
+    
+    
     
     # Radial and tangential components for initial velocity
     Vr1 = 1./eta/np.sqrt(a_min) * (2.*Lambda*a_min - Lambda - x*eta)
@@ -347,88 +362,90 @@ def fast_lambert(r0_vect, rf_vect, tof, m, GM, transfer_type, branch):
     Vr2 = (Vt1 - Vt2)/math.tan(dth/2.) - Vr1
     
     # Velocity vectors
-    v0_vect = (Vr1*r0_vect + Vt1*cross1)*V
-    vf_vect = (Vr2*rf_vect_hat + Vt2*cross2)*V
+    v0_vect = (Vr1*r0_vect + Vt1*cross1)*v0
+    vf_vect = (Vr2*rf_vect_hat + Vt2*cross2)*v0
     
     # Exit flag - success
     exit_flag = 1
 
     # Compute min/max distance to central body
-    extremal_distances = \
-        compute_minmax_dist(r0_vect*r0, r0, rf_vect*r0, rf_norm*r0, dth, a*r0, 
-                            v0_vect, vf_vect, m, GM)
+#    extremal_distances = \
+#        compute_minmax_dist(r0_vect*r0, r0, rf_vect*r0, rf_norm*r0, dth, a*r0, 
+#                            v0_vect, vf_vect, m, GM)
+    
+    extremal_distances = [0.,0.]
     
     
     return v0_vect, vf_vect, extremal_distances, exit_flag
 
 
-def robust_lambert(r0_vect, rf_vect, tof, m, GM, transfer_type, branch):
-    '''
-    This function implements a robust method to solve Lambert's Problem based 
-    on work by Lancaster and Blanchard, and Gooding. 
-    
-    Parameters
-    ------
-    r0_vect : 3x1 numpy array
-        position vector at t0 [km]
-    rf_vect : 3x1 numpy array
-        position vector at tf [km]
-    tof : float
-        time of flight [sec]
-    m : int
-        number of complete orbit revolutions
-    GM : float
-        graviational parameter of central body [km^3/s^2]
-        
-    Returns
-    ------
-    v0_vect : 3x1 numpy array
-        velocity vector at t0 [km/s]
-    vf_vect : 3x1 numpy array
-        velocity vector at tf [km/s]
-    extremal_distances : list
-        min and max distance from central body during orbit [km]
-    exit_flag : int
-        +1 : success
-        -1 : fail
-    '''
-    
-    
-    
-    # Initialize and normalize values
-    r0_vect = np.reshape(r0_vect, (3,1))
-    rf_vect = np.reshape(rf_vect, (3,1))
-    tol     = 1e-12                            % optimum for numerical noise v.s. actual precision
-    r0      = np.linalg.norm(r0_vect)              % magnitude of r1vec
-    rf      = np.linalg.norm(rf_vect)              % magnitude of r2vec
-    r0_hat  = r0_vect/r0                        % unit vector of r1vec
-    rf_hat  = rf_vect/rf                         % unit vector of r2vec
-    crsprod = np.cross(r0_vect, rf_vect);           % cross product of r1vec and r2vec
-    mcrsprd = sqrt(crsprod*crsprod.');          % magnitude of that cross product
-    th1unit = cross(crsprod/mcrsprd, r1unit);   % unit vectors in the tangential-directions
-    th2unit = cross(crsprod/mcrsprd, r2unit);
-    % make 100.4% sure it's in (-1 <= x <= +1)
-    dth = acos( max(-1, min(1, (r1vec*r2vec.')/r1/r2)) ); % turn angle
-
-    % if the long way was selected, the turn-angle must be negative
-    % to take care of the direction of final velocity
-    longway = sign(tf); tf = abs(tf);
-    if (longway < 0), dth = dth-2*pi; end
-
-    % left-branch
-    leftbranch = sign(m); m = abs(m);
-
-    % define constants
-    c  = sqrt(r1^2 + r2^2 - 2*r1*r2*cos(dth));
-    s  = (r1 + r2 + c) / 2;
-    T  = sqrt(8*muC/s^3) * tf;
-    q  = sqrt(r1*r2)/s * cos(dth/2);
-    
-    
-    
-    
-    
-    return v0_vect, vf_vect, extremal_distances, exit_flag
+#def robust_lambert(r0_vect, rf_vect, tof, m, GM, transfer_type, branch):
+#    '''
+#    This function implements a robust method to solve Lambert's Problem based 
+#    on work by Lancaster and Blanchard, and Gooding. 
+#    
+#    Parameters
+#    ------
+#    r0_vect : 3x1 numpy array
+#        position vector at t0 [km]
+#    rf_vect : 3x1 numpy array
+#        position vector at tf [km]
+#    tof : float
+#        time of flight [sec]
+#    m : int
+#        number of complete orbit revolutions
+#    GM : float
+#        graviational parameter of central body [km^3/s^2]
+#        
+#    Returns
+#    ------
+#    v0_vect : 3x1 numpy array
+#        velocity vector at t0 [km/s]
+#    vf_vect : 3x1 numpy array
+#        velocity vector at tf [km/s]
+#    extremal_distances : list
+#        min and max distance from central body during orbit [km]
+#    exit_flag : int
+#        +1 : success
+#        -1 : fail
+#    '''
+#    
+#    
+#    
+#    # Initialize and normalize values
+#    r0_vect = np.reshape(r0_vect, (3,1))
+#    rf_vect = np.reshape(rf_vect, (3,1))
+#    tol     = 1e-12                            % optimum for numerical noise v.s. actual precision
+#    r0      = np.linalg.norm(r0_vect)              % magnitude of r1vec
+#    rf      = np.linalg.norm(rf_vect)              % magnitude of r2vec
+#    r0_hat  = r0_vect/r0                        % unit vector of r1vec
+#    rf_hat  = rf_vect/rf                         % unit vector of r2vec
+#    crsprod = np.cross(r0_vect, rf_vect);           % cross product of r1vec and r2vec
+#    mcrsprd = sqrt(crsprod*crsprod.');          % magnitude of that cross product
+#    th1unit = cross(crsprod/mcrsprd, r1unit);   % unit vectors in the tangential-directions
+#    th2unit = cross(crsprod/mcrsprd, r2unit);
+#    % make 100.4% sure it's in (-1 <= x <= +1)
+#    dth = acos( max(-1, min(1, (r1vec*r2vec.')/r1/r2)) ); % turn angle
+#
+#    % if the long way was selected, the turn-angle must be negative
+#    % to take care of the direction of final velocity
+#    longway = sign(tf); tf = abs(tf);
+#    if (longway < 0), dth = dth-2*pi; end
+#
+#    % left-branch
+#    leftbranch = sign(m); m = abs(m);
+#
+#    % define constants
+#    c  = sqrt(r1^2 + r2^2 - 2*r1*r2*cos(dth));
+#    s  = (r1 + r2 + c) / 2;
+#    T  = sqrt(8*muC/s^3) * tf;
+#    q  = sqrt(r1*r2)/s * cos(dth/2);
+#    
+#    
+#    
+#    
+#    
+#    return v0_vect, vf_vect, extremal_distances, exit_flag
 
 
 def gauss_iod(tk_list, Yk_list, sensor_params):
