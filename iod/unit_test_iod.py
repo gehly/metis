@@ -55,6 +55,7 @@ def lambert_test():
     # Propagate several orbit fractions
     elem0 = astro.cart2kep(Xo)
     a = float(elem0[0])
+    print('a', a)
     theta0 = float(elem0[5])
     P = 2.*math.pi*np.sqrt(a**3./GM)
     fraction_list = [0., 0.2, 0.8, 1.2, 1.8, 10.2, 10.8]
