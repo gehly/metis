@@ -399,7 +399,8 @@ def robust_lambert(r0_vect, rf_vect, tof, m, GM, transfer_type, branch):
         min and max distance from central body during orbit [km]
     exit_flag : int
         +1 : success
-        -1 : fail
+        -1 : no solution exists
+        -2 : fail (could not determine if a solution exists)
     '''
     
     
@@ -426,13 +427,6 @@ def robust_lambert(r0_vect, rf_vect, tof, m, GM, transfer_type, branch):
     # Check for Type I (short) or II (long) transfer and adjust
     if transfer_type == 2:
         dtheta = dtheta - 2.*math.pi
-    
-    
-    
-
-#    % left-branch
-#    leftbranch = sign(m); m = abs(m);
-
     
     # Define constants
     c = np.sqrt(r0**2. + rf**2. - 2.*r0*rf*math.cos(dtheta))
@@ -478,7 +472,7 @@ def robust_lambert(r0_vect, rf_vect, tof, m, GM, transfer_type, branch):
         # Determine minimum Tp(x)
         xMpi = 4./(3.*math.pi*(2.*m + 1.))
         if phr < math.pi:
-            xM0 = xMpi*(phr/pi)**(1./8.)
+            xM0 = xMpi*(phr/math.pi)**(1./8.)
         elif phr > math.pi:
             xM0 = xMpi*(2. - (2. - phr/math.pi)**(1./8.))
         else:
@@ -570,72 +564,67 @@ def robust_lambert(r0_vect, rf_vect, tof, m, GM, transfer_type, branch):
     # (Halley's method)
     x = x0
     Tx = np.inf
-    iters = 0
+    iters = 0    
+    while abs(Tx) > tol:
+        
+        # Increment counter
+        iters += 1
+        
+        # Compute function value and first two derivatives
+        Tx, Tp, Tpp, dum = LancasterBlanchard(x, q, m)
+        
+        # Find the root of the difference between the function value T_x and
+        # the required time T
+        Tx = Tx - T
+        
+        # New value of x
+        xp = float(x)
+        x = x - 2.*Tx*Tp/(2.*Tp**2. - Tx*Tpp)
+        
+        # Escape clause
+        if math.fmod(iters, 7):
+            x = (xp + x)/2.
+            
+        # Halley's method might fail
+        if iters > 25:
+            exit_flag = -2
+            return v0_vect, vf_vect, extremal_distances, exit_flag
+            
     
+    # Calculate terminal velocities
+    gamma = np.sqrt(GM*s/2.)
+    if c == 0.:
+        sigma = 1.
+        rho = 0.
+        z = abs(x)
+    else:
+        sigma = 2.*np.sqrt(r0*rf/(c**2.)) * math.sin(dtheta/2.)
+        rho = (r0 - rf)/c
+        z = np.sqrt(1. + q**2.*(x**2. - 1.))
+        
+    # Radial components
+    Vr0 = gamma*((q*z - x) - rho*(q*z + x)) / r0    
+    Vrf = -gamma*((q*z - x) + rho*(q*z + x)) / rf
+    v0_radial = Vr0*r0_hat
+    vf_radial = Vrf*rf_hat
     
+    # Tangential components
+    Vt0 = sigma * gamma * (z + q*x) / r0
+    Vtf = sigma * gamma * (z + q*x) / rf
+    v0_tan = Vt0*t0_hat
+    vf_tan = Vtf*tf_hat
     
+    # Cartesian velocity
+    v0_vect = v0_radial + v0_tan
+    vf_vect = vf_radial + vf_tan
     
-    % find root of Lancaster & Blancard's function
-    % --------------------------------------------
-
-    % (Halley's method)
-    x = x0; Tx = inf; iterations = 0;
-    while abs(Tx) > tol
-        % iterations
-        iterations = iterations + 1;
-        % compute function value, and first two derivatives
-        [Tx, Tp, Tpp] = LancasterBlanchard(x, q, m);
-        % find the root of the *difference* between the
-        % function value [T_x] and the required time [T]
-        Tx = Tx - T;
-        % new value of x
-        xp = x;
-        x  = x - 2*Tx*Tp ./ (2*Tp^2 - Tx*Tpp);
-        % escape clause
-        if mod(iterations, 7), x = (xp+x)/2; end
-        % Halley's method might fail
-        if iterations > 25, exitflag = -2; return; end
-    end
-
-    % calculate terminal velocities
-    % -----------------------------
-
-    % constants required for this calculation
-    gamma = sqrt(muC*s/2);
-    if (c == 0)
-        sigma = 1;
-        rho   = 0;
-        z     = abs(x);
-    else
-        sigma = 2*sqrt(r1*r2/(c^2)) * sin(dth/2);
-        rho   = (r1 - r2)/c;
-        z     = sqrt(1 + q^2*(x^2 - 1));
-    end
-
-    % radial component
-    Vr1    = +gamma*((q*z - x) - rho*(q*z + x)) / r1;
-    Vr1vec = Vr1*r1unit;
-    Vr2    = -gamma*((q*z - x) + rho*(q*z + x)) / r2;
-    Vr2vec = Vr2*r2unit;
-
-    % tangential component
-    Vtan1    = sigma * gamma * (z + q*x) / r1;
-    Vtan1vec = Vtan1 * th1unit;
-    Vtan2    = sigma * gamma * (z + q*x) / r2;
-    Vtan2vec = Vtan2 * th2unit;
-
-    % Cartesian velocity
-    V1 = Vtan1vec + Vr1vec;
-    V2 = Vtan2vec + Vr2vec;
-
-    % exitflag
-    exitflag = 1; % (success)
-
-    % also determine minimum/maximum distance
-    a = s/2/(1 - x^2); % semi-major axis
-    extremal_distances = minmax_distances(r1vec, r1, r1vec, r2, dth, a, V1, V2, m, muC);
-
+    # Final outputs
+    a = s/2./(1. - x**2.)
+    extremal_distances = \
+        compute_extremal_dist(r0_vect, rf_vect, v0_vect, vf_vect, dtheta, a, m,
+                              GM, transfer_type)
     
+    exit_flag = 1
     
     
     return v0_vect, vf_vect, extremal_distances, exit_flag
