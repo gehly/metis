@@ -177,20 +177,20 @@ def fast_lambert(r0_vect, rf_vect, tof, m, GM, transfer_type, branch):
     
     # Check non-dimensional geometry
     rf_norm = np.linalg.norm(rf_vect)
-    dth = math.acos(max(-1, min(1, np.dot(r0_vect.T, rf_vect)/rf_norm)))
+    dtheta = math.acos(max(-1, min(1, np.dot(r0_vect.T, rf_vect)/rf_norm)))
     
     
     # Check for Type I (short) or II (long) transfer and adjust
     type_factor = 1.
     if transfer_type == 2:
-        dth = 2.*math.pi - dth
+        dtheta = 2.*math.pi - dtheta
         type_factor = -1.
         
     # Derived non-dimensional quantities
-    c = np.sqrt(1. + rf_norm**2. - 2.*rf_norm*math.cos(dth))    # chord
+    c = np.sqrt(1. + rf_norm**2. - 2.*rf_norm*math.cos(dtheta)) # chord
     s = (1. + rf_norm + c)/2.                                   # semi-parameter
     a_min = s/2.                                                # min energy ellipse SMA
-    Lambda = np.sqrt(rf_norm)*math.cos(dth/2.)/s                # Lambda parameter from Battin
+    Lambda = np.sqrt(rf_norm)*math.cos(dtheta/2.)/s             # Lambda parameter from Battin
 
     r_cross_vect = np.array([[float(r0_vect[1]*rf_vect[2] - r0_vect[2]*rf_vect[1])],
                              [float(r0_vect[2]*rf_vect[0] - r0_vect[0]*rf_vect[2])],
@@ -337,29 +337,27 @@ def fast_lambert(r0_vect, rf_vect, tof, m, GM, transfer_type, branch):
     ih = type_factor*r_cross_hat
     
     # Unit vector for rf_vect
+    r0_vect_hat = r0_vect/np.linalg.norm(r0_vect)
     rf_vect_hat = rf_vect/rf_norm
     
-    # Cross products
-#    cross1 = np.cross(ih, r0_vect)
-#    cross2 = np.cross(ih, rf_vect)
+    # Cross products    
+    cross1 = np.array([[float(ih[1]*r0_vect_hat[2] - ih[2]*r0_vect_hat[1])],
+                       [float(ih[2]*r0_vect_hat[0] - ih[0]*r0_vect_hat[2])],
+                       [float(ih[0]*r0_vect_hat[1] - ih[1]*r0_vect_hat[0])]])
     
-    cross1 = np.array([[float(ih[1]*r0_vect[2] - ih[2]*r0_vect[1])],
-                       [float(ih[2]*r0_vect[0] - ih[0]*r0_vect[2])],
-                       [float(ih[0]*r0_vect[1] - ih[1]*r0_vect[0])]])
-    
-    cross2 = np.array([[float(ih[1]*rf_vect[2] - ih[2]*rf_vect[1])],
-                       [float(ih[2]*rf_vect[0] - ih[0]*rf_vect[2])],
-                       [float(ih[0]*rf_vect[1] - ih[1]*rf_vect[0])]])
+    cross2 = np.array([[float(ih[1]*rf_vect_hat[2] - ih[2]*rf_vect_hat[1])],
+                       [float(ih[2]*rf_vect_hat[0] - ih[0]*rf_vect_hat[2])],
+                       [float(ih[0]*rf_vect_hat[1] - ih[1]*rf_vect_hat[0])]])
     
     
     
     # Radial and tangential components for initial velocity
     Vr1 = 1./eta/np.sqrt(a_min) * (2.*Lambda*a_min - Lambda - x*eta)
-    Vt1 = np.sqrt(rf_norm/a_min/eta2 * math.sin(dth/2.)**2.)
+    Vt1 = np.sqrt(rf_norm/a_min/eta2 * math.sin(dtheta/2.)**2.)
     
     # Radial and tangential components for final velocity
     Vt2 = Vt1/rf_norm
-    Vr2 = (Vt1 - Vt2)/math.tan(dth/2.) - Vr1
+    Vr2 = (Vt1 - Vt2)/math.tan(dtheta/2.) - Vr1
     
     # Velocity vectors
     v0_vect = (Vr1*r0_vect + Vt1*cross1)*v0
@@ -369,13 +367,10 @@ def fast_lambert(r0_vect, rf_vect, tof, m, GM, transfer_type, branch):
     exit_flag = 1
 
     # Compute min/max distance to central body
-#    extremal_distances = \
-#        compute_minmax_dist(r0_vect*r0, r0, rf_vect*r0, rf_norm*r0, dth, a*r0, 
-#                            v0_vect, vf_vect, m, GM)
-    
-    extremal_distances = [0.,0.]
-    
-    
+    extremal_distances = \
+        compute_extremal_dist(r0_vect*r0, rf_vect*r0, v0_vect, vf_vect, dtheta,
+                              a*r0, m, GM, transfer_type)
+       
     return v0_vect, vf_vect, extremal_distances, exit_flag
 
 
@@ -446,6 +441,84 @@ def fast_lambert(r0_vect, rf_vect, tof, m, GM, transfer_type, branch):
 #    
 #    
 #    return v0_vect, vf_vect, extremal_distances, exit_flag
+    
+
+def compute_extremal_dist(r0_vect, rf_vect, v0_vect, vf_vect, dtheta, a, m, GM,
+                          transfer_type):
+    '''
+    
+    '''
+    
+    # Default, min/max of r0, rf
+    r0 = np.linalg.norm(r0_vect)
+    rf = np.linalg.norm(rf_vect)
+    r0_vect_hat = r0_vect/r0
+    rf_vect_hat = rf_vect/rf
+    minimum_distance = min(r0, rf)
+    maximum_distance = max(r0, rf)
+
+    # Eccentricity vector 
+    h0_vect = np.array([[float(r0_vect[1]*v0_vect[2] - r0_vect[2]*v0_vect[1])],
+                        [float(r0_vect[2]*v0_vect[0] - r0_vect[0]*v0_vect[2])],
+                        [float(r0_vect[0]*v0_vect[1] - r0_vect[1]*v0_vect[0])]])
+    
+    cross1 =  np.array([[float(v0_vect[1]*h0_vect[2] - v0_vect[2]*h0_vect[1])],
+                        [float(v0_vect[2]*h0_vect[0] - v0_vect[0]*h0_vect[2])],
+                        [float(v0_vect[0]*h0_vect[1] - v0_vect[1]*h0_vect[0])]])
+    
+    e0_vect = cross1/GM - r0_vect/r0
+    e = np.linalg.norm(e0_vect)
+    e0_vect_hat = e0_vect/e
+    
+    # Apses
+    periapsis = a*(1. - e)
+    apoapsis = np.inf
+    if e < 1.:
+        apoapsis = a*(1. + e)
+        
+    # Check if the trajectory goes through periapsis
+    if m > 0:
+        
+        # Multirev case, must be elliptical and pass through both periapsis and
+        # apoapsis
+        minimum_distance = periapsis
+        maximum_distance = apoapsis
+        
+    else:
+        
+        # Compute true anomaly at t0 and tf
+        pm0 = np.sign(r0*r0*np.dot(e0_vect.T, v0_vect) - np.dot(r0_vect.T, e0_vect)*np.dot(r0_vect.T, v0_vect))
+        pmf = np.sign(rf*rf*np.dot(e0_vect.T, vf_vect) - np.dot(rf_vect.T, e0_vect)*np.dot(rf_vect.T, vf_vect))
+
+        theta0 = pm0 * math.acos(max(-1, min(1, np.dot(r0_vect_hat.T, e0_vect_hat))))
+        thetaf = pmf * math.acos(max(-1, min(1, np.dot(rf_vect_hat.T, e0_vect_hat))))
+        
+        if theta0*thetaf < 0.:
+            
+            # Initial and final positions are on opposite sides of symmetry axis
+            # Minimum and maximum distance depends on dtheta and true anomalies
+            if abs(abs(theta0) + abs(thetaf) - dtheta) < 5.*np.finfo(float).eps:
+                minimum_distance = periapsis
+            
+            # This condition can only be false for elliptic cases, and if it is
+            # false, the orbit has passed through apoapsis
+            else:
+                maximum_distance = apoapsis
+                
+        else:
+            
+            # Initial and final positions are on the same side of symmetry axis
+            # If it is a Type II transfer (longway) then the object must
+            # pass through both periapsis and apoapsis
+            if transfer_type == 2:
+                minimum_distance = periapsis
+                if e < 1.:
+                    maximum_distance = apoapsis
+                    
+                    
+    extremal_distances = [minimum_distance, maximum_distance]
+
+    return extremal_distances
 
 
 def gauss_iod(tk_list, Yk_list, sensor_params):

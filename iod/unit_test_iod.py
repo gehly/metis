@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 import pickle
 import os
 import inspect
+import time
 
 filename = inspect.getframeinfo(inspect.currentframe()).filename
 current_dir = os.path.dirname(os.path.abspath(filename))
@@ -83,9 +84,12 @@ def lambert_test():
     transfer_type = 1
     branch = 'right'
     
+    start_time = time.time()
     
     v0_vect, vf_vect, extremal_distances, exit_flag = \
         iod.fast_lambert(r0_vect, rf_vect, tof, m, GM, transfer_type, branch)
+        
+    print('fast_lambert time', time.time() - start_time)
 
     
     print(v0_vect)
@@ -101,3 +105,10 @@ if __name__ == '__main__':
     
     
     lambert_test()
+    
+    
+    
+    
+    
+    
+    
