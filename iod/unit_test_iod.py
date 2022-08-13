@@ -35,6 +35,7 @@ def lambert_test():
     # Define state parameters
     state_params = {}
     state_params['GM'] = GME
+    GM = state_params['GM']
 
     
     # Integration function and additional settings
@@ -52,7 +53,14 @@ def lambert_test():
                      2.213250611, 4.678372741, -5.371314404], (6,1))
     
     # Propagate several orbit fractions
-    tvec = np.asarray([0., 20.*60., 70.*60.])
+    elem0 = astro.cart2kep(Xo)
+    a = float(elem0[0])
+    theta0 = float(elem0[5])
+    P = 2.*math.pi*np.sqrt(a**3./GM)
+    fraction_list = [0., 0.2, 0.8, 1.2, 1.8, 10.2, 10.8]
+    
+    
+    tvec = np.asarray([frac*P for frac in fraction_list])
     UTC0 = datetime(1999, 10, 4, 1, 45, 0)
     tk_list = [UTC0 + timedelta(seconds=ti) for ti in tvec]
     
@@ -73,35 +81,70 @@ def lambert_test():
     print(truth_dict)
     
     # Setup and run Lambert Solvers
-    GM = state_params['GM']
-    t0 = tk_list[0]
-    tf = tk_list[1]
-    tof = (tf - t0).total_seconds()
-    r0_vect = truth_dict[t0][0:3]
-    rf_vect = truth_dict[tf][0:3]
-    
-    m = 0
-    transfer_type = 1
-    branch = 'right'
-    
-    start_time = time.time()
-    
-    v0_vect, vf_vect, extremal_distances, exit_flag = \
-        iod.fast_lambert(r0_vect, rf_vect, tof, m, GM, transfer_type, branch)
+    t0 = tk_list[0]    
+    for kk in range(1,len(fraction_list)):
         
-    print('fast_lambert time', time.time() - start_time)
+        frac = fraction_list[kk]        
+        tf = tk_list[kk]
+        tof = (tf - t0).total_seconds()
+        r0_true = truth_dict[t0][0:3]
+        v0_true = truth_dict[t0][3:6]
+        rf_true = truth_dict[tf][0:3]
+        vf_true = truth_dict[tf][3:6]
+        
+        elemf = astro.cart2kep(truth_dict[tf])
+        thetaf = float(elemf[5])
+        
+        # Get m, transfer type, and branch
+        d, m = math.modf(frac)        
+        m = int(m)
+        
+        dtheta = thetaf - theta0
+        if dtheta < 0.:
+            dtheta += 360.
+            
+        if dtheta < 180.:
+            transfer_type = 1
+            branch = 'right'
+        else:
+            transfer_type = 2
+            branch = 'left'
+            
+        print('')
+        print(kk)
+        print('tof [hours]', tof/3600.)
+        print('dtheta', dtheta)
+        print('transfer_type', transfer_type)
+        print('branch', branch)
+            
+        
+        start_time = time.time()
+        
+        v0_vect, vf_vect, extremal_distances, exit_flag = \
+            iod.fast_lambert(r0_true, rf_true, tof, m, GM, transfer_type, branch)
+            
+        fast_lambert_time = time.time() - start_time
+        
+        v0_err = v0_vect - v0_true
+        vf_err = vf_vect - vf_true
+        
+        print(v0_err)
+        print(vf_err)
+        
+        start_time = time.time()
+        
+        v0_vect, vf_vect, extremal_distances, exit_flag = \
+            iod.robust_lambert(r0_true, rf_true, tof, m, GM, transfer_type, branch)
+            
+        robust_lambert_time = time.time() - start_time
+        
+        v0_err = v0_vect - v0_true
+        vf_err = vf_vect - vf_true
+        
+        print(v0_err)
+        print(vf_err)
+        
 
-    
-    print(v0_vect)
-    print(vf_vect)
-    print(extremal_distances)
-    print(exit_flag)
-    
-    v0_err = v0_vect - truth_dict[t0][3:6]
-    vf_err = vf_vect - truth_dict[tf][3:6]
-    
-    print(v0_err)
-    print(vf_err)
     
     
     return
@@ -194,7 +237,7 @@ def test_LancasterBlanchard():
 if __name__ == '__main__':
     
     
-#    lambert_test()
+    lambert_test()
     
 #    test_sigmax()
     
