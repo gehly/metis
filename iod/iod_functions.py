@@ -35,7 +35,7 @@ def lambert_iod():
 
 
 
-def izzo_lambert(r1_vect, r2_vect, tof, GM):
+def izzo_lambert(r1_vect, r2_vect, tof, GM, maxiters=35, rtol=1e-8):
     
     # Input checking
     assert tof > 0
@@ -47,7 +47,7 @@ def izzo_lambert(r1_vect, r2_vect, tof, GM):
     
     r1 = np.linalg.norm(r1_vect)
     r2 = np.linalg.norm(r2_vect)
-    c = np.linalg.norm(c)
+    c = np.linalg.norm(c_vect)
     
     s = 0.5 * (r1 + r2 + c)
     
@@ -78,9 +78,10 @@ def izzo_lambert(r1_vect, r2_vect, tof, GM):
     # Correct transfer angle parameter and tangential vectors if required
 #    ll, i_t1, i_t2 = (ll, i_t1, i_t2) if prograde else (-ll, -i_t1, -i_t2)
     
+    # Compute non-dimensional time of flight T
     T = np.sqrt(2*GM/s**3.) * tof
     
-    x_list, y_list = find_xy(lam, T)
+    x_list, y_list = find_xy(lam, T, maxiters, rtol)
     
     
     
@@ -91,16 +92,24 @@ def izzo_lambert(r1_vect, r2_vect, tof, GM):
 
 
 
-def find_xy(lam, T):
+def find_xy(lam, T, maxiters=35, rtol=1e-8):
     
     # Check inputs
     assert abs(lam) <= 1.
     assert T > 0.  # note error in Izzo paper
     
-
+    # Compute maximum number of complete revolutions that would fit in 
+    # the simplest sense T_0M = T_00 + M*pi
     M_max = int(np.floor(T / math.pi))
+    
+    # Evaluate non-dimensional time of flight T
+    # T(x=0) denoted T_0M
+    # T_00 is T_0 for single revolution (M=0) case  
+    # T_0M = T_00 + M*pi
     T_00 = math.acos(lam) + lam*np.sqrt(1. - lam**2.)
     
+    # Check if input T is less than minimum T required for M_max revolutions
+    # If so, reduce M_max by 1
     if T < (T_00 + M_max*math.pi) and M_max > 0:
         
         # Start Halley iterations from x=0, T=To and find T_min(M_max)
@@ -108,6 +117,25 @@ def find_xy(lam, T):
         
         if T < T_min:
             M_max -= 1
+            
+    # Compute T(x=1) parabolic case (Izzo Eq 21)
+    T_1 = (2./3.) * (1. - lam**3.)
+    
+    # Form initial guess for single revolution case (Izzo Eq 30)
+    if T >= T_00:
+        x_0 = (T_00/T)**(2./3.) - 1.
+    elif T < T_1:
+        x_0 = (5./2.) * (T_1*(T_1 - T))/(T*(1.-lam**5.)) + 1.
+    else:        
+        # Modified initial condition from poliastro
+        # https://github.com/poliastro/poliastro/issues/1362
+        x_0 = np.exp(np.log(2.) * np.log(T / T_00) / np.log(T_1 / T_00)) - 1.
+        
+    # Run Householder iterations for x_0 to get x,y
+    x, exit_flag = householder(x_0, T, lam, maxiters, rtol)
+    y = np.sqrt(1. - lam**2.*(1. - x**2.))
+    
+    
     
     
     
@@ -159,6 +187,31 @@ def halley(x0, T0, lam, M, maxiters=35, tol=1e-8):
             exit_flag = -1
             break
 
+    return x, exit_flag
+
+
+def householder(x0, T_star, lam, M, maxiters=35, tol=1e-8):
+    
+    diff = 1.
+    iters = 0
+    exit_flag = 1
+    while diff > tol:
+        
+        T_x = compute_T(x0, lam, M)
+        f_x = T_x - T_star
+        dT, ddT, dddT = compute_T_der(x0, T_x, lam)
+        
+        x = x0 - f_x*((dT**2. - f_x*ddT/2.)/(dT*(dT**2. - f_x*ddT) + dddT*f_x**2./6.))
+    
+        diff = abs(x - x0)
+        x0 = float(x)
+        iters += 1
+        
+        if iters > maxiters:
+            exit_flag = -1
+            break
+    
+    
     return x, exit_flag
 
 
