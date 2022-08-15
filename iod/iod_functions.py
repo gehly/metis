@@ -43,7 +43,7 @@ def izzo_lambert(r1_vect, r2_vect, tof, GM, maxiters=35, rtol=1e-8):
     # Compute chord and unit vectors
     r1_vect = np.reshape(r1_vect, (3,1))
     r2_vect = np.reshape(r2_vect, (3,1))
-    c_vect = rf_vect - r0_vect
+    c_vect = r2_vect - r1_vect
     
     r1 = np.linalg.norm(r1_vect)
     r2 = np.linalg.norm(r2_vect)
@@ -81,10 +81,33 @@ def izzo_lambert(r1_vect, r2_vect, tof, GM, maxiters=35, rtol=1e-8):
     # Compute non-dimensional time of flight T
     T = np.sqrt(2*GM/s**3.) * tof
     
-    x_list, y_list = find_xy(lam, T, maxiters, rtol)
+    # Compute all possible x,y values that fit T
+    x_list, y_list, M_list = find_xy(lam, T, maxiters, rtol)
     
+    # Compute constants
+    gamma = np.sqrt(GM*s/2.)
+    rho = (r1 - r2)/c
+    sigma = np.sqrt(1. - rho**2.)
     
-    
+    # Loop over x,y values and compute output velocities
+    v1_list = []
+    v2_list = []
+    for ii in range(len(x_list)):
+        xi = x_list[ii]
+        yi = y_list[ii]
+        
+        Vr1 =  gamma*((lam*yi - xi) - rho*(lam*yi + xi))/r1
+        Vr2 = -gamma*((lam*yi - xi) - rho*(lam*yi + xi))/r2
+        Vt1 =  gamma*sigma*(yi + lam*xi)/r1
+        Vt2 =  gamma*sigma*(yi + lam*xi)/r2
+        
+        v1_vect = Vr1*ihat_r1 + Vt1*ihat_t1
+        v2_vect = Vr2*ihat_r2 + Vt2*ihat_t2
+        
+        v1_list.append(v1_vect)
+        v2_list.append(v2_vect)
+        
+        
     
     
     return v1_list, v2_list, M_list
@@ -97,6 +120,11 @@ def find_xy(lam, T, maxiters=35, rtol=1e-8):
     # Check inputs
     assert abs(lam) <= 1.
     assert T > 0.  # note error in Izzo paper
+    
+    # Initialize output
+    x_list = []
+    y_list = []
+    M_list = []
     
     # Compute maximum number of complete revolutions that would fit in 
     # the simplest sense T_0M = T_00 + M*pi
@@ -115,7 +143,7 @@ def find_xy(lam, T, maxiters=35, rtol=1e-8):
         # Start Halley iterations from x=0, T=To and find T_min(M_max)
         dum, T_min, exit_flag = compute_T_min(lam, M_max, maxiters, rtol)
         
-        if T < T_min:
+        if T < T_min and exit_flag == 1:
             M_max -= 1
             
     # Compute T(x=1) parabolic case (Izzo Eq 21)
@@ -131,17 +159,39 @@ def find_xy(lam, T, maxiters=35, rtol=1e-8):
         # https://github.com/poliastro/poliastro/issues/1362
         x_0 = np.exp(np.log(2.) * np.log(T / T_00) / np.log(T_1 / T_00)) - 1.
         
-    # Run Householder iterations for x_0 to get x,y
-    x, exit_flag = householder(x_0, T, lam, maxiters, rtol)
-    y = np.sqrt(1. - lam**2.*(1. - x**2.))
+    # Run Householder iterations for x_0 to get x,y for single rev case
+    M = 0
+    x, exit_flag = householder(x_0, T, lam, M, maxiters, rtol)
+    if exit_flag == 1:
+        y = np.sqrt(1. - lam**2.*(1. - x**2.))
+        x_list.append(x)
+        y_list.append(y)
+        M_list.append(M)
     
+    # Loop over M values and compute x,y using Householder iterations
+    for M in range(1,M_max+1):
+        
+        # Form initial x0_l and x0_r from Izzo Eq 31
+        x0_l = (((M*math.pi + math.pi)/(8.*T))**(2./3.) - 1.)/(((M*math.pi + math.pi)/(8.*T))**(2./3.) + 1.)
+        x0_r = (((8.*T)/(M*math.pi))**(2./3.) - 1.)/(((8.*T)/(M*math.pi))**(2./3.) + 1.)
     
-    
-    
-    
-    
-   
-    
+        # Run Householder iterations for x0_l and x0_r for multirev cases
+        xl, exit_flag = householder(x0_l, T, lam, M, maxiters, rtol)
+        
+        if exit_flag == 1:
+            yl = np.sqrt(1. - lam**2.*(1. - xl**2.))
+            x_list.append(xl)
+            y_list.append(yl)
+            M_list.append(M)
+        
+        xr, exit_flag = householder(x0_r, T, lam, M, maxiters, rtol)
+        
+        if exit_flag == 1:
+            yr = np.sqrt(1. - lam**2.*(1. - xr**2.))
+            x_list.append(xr)
+            y_list.append(yr)
+            M_list.append(M)
+
     return x_list, y_list
 
 
