@@ -49,19 +49,30 @@ def izzo_lambert(r1_vect, r2_vect, tof, GM, maxiters=35, rtol=1e-8):
     r2 = np.linalg.norm(r2_vect)
     c = np.linalg.norm(c_vect)
     
+    # Compute values to reconstruct output
     s = 0.5 * (r1 + r2 + c)
+    gamma = np.sqrt(GM*s/2.)
+    rho = (r1 - r2)/c
+    sigma = np.sqrt(1. - rho**2.)
     
     ihat_r1 = r1_vect/r1
     ihat_r2 = r2_vect/r2
-    ihat_h = np.cross(ihat_r1.flatten(), ihat_r2.flatten())
-    ihat_h = np.reshape(ihat_h, (3,1))
+    ihat_h = np.cross(ihat_r1, ihat_r2, axis=0)
+
+    # Renormalize (cross product of unit vectors not necessarily unit length)
+    ihat_h = ihat_h/np.linalg.norm(ihat_h)
     
     lam2 = 1. - (c/s)
     lam = np.sqrt(lam2)
     
     # Compute unit vectors (note error in Izzo paper)
     direction = float(r1_vect[0]*r2_vect[1] - r1_vect[1]*r2_vect[0])
-    if direction < 0.:
+    print(direction)
+    print(ihat_h[2])
+#    mistake
+    
+#    if direction < 0.:
+    if False:
         lam = -1.*lam
         ihat_t1 = np.cross(ihat_r1.flatten(), ihat_h.flatten())
         ihat_t2 = np.cross(ihat_r2.flatten(), ihat_h.flatten())
@@ -73,6 +84,15 @@ def izzo_lambert(r1_vect, r2_vect, tof, GM, maxiters=35, rtol=1e-8):
     ihat_t1 = np.reshape(ihat_t1, (3,1))
     ihat_t2 = np.reshape(ihat_t2, (3,1))
     
+    print('Computed Vectors')
+    print('ihat_r1', ihat_r1)
+    print('ihat_t1', ihat_t1)
+    print('ihat_r2', ihat_r2)
+    print('ihat_t2', ihat_t2)
+    print('ihat_h', ihat_h)
+    
+#    mistake
+    
     # Additional correction may be needed for Type I or Type II transfers
     
     # Correct transfer angle parameter and tangential vectors if required
@@ -80,14 +100,10 @@ def izzo_lambert(r1_vect, r2_vect, tof, GM, maxiters=35, rtol=1e-8):
     
     # Compute non-dimensional time of flight T
     T = np.sqrt(2*GM/s**3.) * tof
+
     
     # Compute all possible x,y values that fit T
     x_list, y_list, M_list = find_xy(lam, T, maxiters, rtol)
-    
-    # Compute constants
-    gamma = np.sqrt(GM*s/2.)
-    rho = (r1 - r2)/c
-    sigma = np.sqrt(1. - rho**2.)
     
     # Loop over x,y values and compute output velocities
     v1_list = []
@@ -97,22 +113,23 @@ def izzo_lambert(r1_vect, r2_vect, tof, GM, maxiters=35, rtol=1e-8):
         yi = y_list[ii]
         
         Vr1 =  gamma*((lam*yi - xi) - rho*(lam*yi + xi))/r1
-        Vr2 = -gamma*((lam*yi - xi) - rho*(lam*yi + xi))/r2
+        Vr2 = -gamma*((lam*yi - xi) + rho*(lam*yi + xi))/r2
         Vt1 =  gamma*sigma*(yi + lam*xi)/r1
         Vt2 =  gamma*sigma*(yi + lam*xi)/r2
+        
+        print('Vr1', Vr1)
+        print('Vt1', Vt1)
+        print('Vr2', Vr2)
+        print('Vt2', Vt2)
         
         v1_vect = Vr1*ihat_r1 + Vt1*ihat_t1
         v2_vect = Vr2*ihat_r2 + Vt2*ihat_t2
         
         v1_list.append(v1_vect)
         v2_list.append(v2_vect)
-        
-        
-    
+
     
     return v1_list, v2_list, M_list
-
-
 
 
 def find_xy(lam, T, maxiters=35, rtol=1e-8):
@@ -130,15 +147,24 @@ def find_xy(lam, T, maxiters=35, rtol=1e-8):
     # the simplest sense T_0M = T_00 + M*pi
     M_max = int(np.floor(T / math.pi))
     
+    print('lam', lam)
+    print('T', T)
+    print('M_max', M_max)
+#    mistake
+    
     # Evaluate non-dimensional time of flight T
     # T(x=0) denoted T_0M
     # T_00 is T_0 for single revolution (M=0) case  
     # T_0M = T_00 + M*pi
     T_00 = math.acos(lam) + lam*np.sqrt(1. - lam**2.)
     
+    print('T_00', T_00)
+    
     # Check if input T is less than minimum T required for M_max revolutions
     # If so, reduce M_max by 1
     if T < (T_00 + M_max*math.pi) and M_max > 0:
+        
+        print('check M_max should be reduced')
         
         # Start Halley iterations from x=0, T=To and find T_min(M_max)
         dum, T_min, exit_flag = compute_T_min(lam, M_max, maxiters, rtol)
@@ -148,16 +174,21 @@ def find_xy(lam, T, maxiters=35, rtol=1e-8):
             
     # Compute T(x=1) parabolic case (Izzo Eq 21)
     T_1 = (2./3.) * (1. - lam**3.)
+    print('T_1', T_1)
     
     # Form initial guess for single revolution case (Izzo Eq 30)
     if T >= T_00:
         x_0 = (T_00/T)**(2./3.) - 1.
+        print('first x0', x_0)
     elif T < T_1:
         x_0 = (5./2.) * (T_1*(T_1 - T))/(T*(1.-lam**5.)) + 1.
+        print('second x0', x_0)
     else:        
         # Modified initial condition from poliastro
         # https://github.com/poliastro/poliastro/issues/1362
         x_0 = np.exp(np.log(2.) * np.log(T / T_00) / np.log(T_1 / T_00)) - 1.
+        print('third x0', x_0)
+        
         
     # Run Householder iterations for x_0 to get x,y for single rev case
     M = 0
@@ -167,10 +198,13 @@ def find_xy(lam, T, maxiters=35, rtol=1e-8):
         x_list.append(x)
         y_list.append(y)
         M_list.append(M)
+        
+        print(x, y, M)
     
     # Loop over M values and compute x,y using Householder iterations
     for M in range(1,M_max+1):
         
+
         # Form initial x0_l and x0_r from Izzo Eq 31
         x0_l = (((M*math.pi + math.pi)/(8.*T))**(2./3.) - 1.)/(((M*math.pi + math.pi)/(8.*T))**(2./3.) + 1.)
         x0_r = (((8.*T)/(M*math.pi))**(2./3.) - 1.)/(((8.*T)/(M*math.pi))**(2./3.) + 1.)
@@ -192,7 +226,7 @@ def find_xy(lam, T, maxiters=35, rtol=1e-8):
             y_list.append(yr)
             M_list.append(M)
 
-    return x_list, y_list
+    return x_list, y_list, M_list
 
 
 
@@ -252,6 +286,11 @@ def householder(x0, T_star, lam, M, maxiters=35, tol=1e-8):
         dT, ddT, dddT = compute_T_der(x0, T_x, lam)
         
         x = x0 - f_x*((dT**2. - f_x*ddT/2.)/(dT*(dT**2. - f_x*ddT) + dddT*f_x**2./6.))
+        
+        print('iters', iters)
+        print('T_x', T_x)
+        print('T_star', T_star)
+        print('x', x)
     
         diff = abs(x - x0)
         x0 = float(x)

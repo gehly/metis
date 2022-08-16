@@ -66,7 +66,7 @@ def lambert_test():
     tk_list = [UTC0 + timedelta(seconds=ti) for ti in tvec]
     
     
-    # Generate truth and measurements
+    # Generate truth fata
     truth_dict = {}
     X = Xo.copy()
     for kk in range(len(tk_list)):
@@ -117,38 +117,117 @@ def lambert_test():
         print('dtheta', dtheta)
         print('transfer_type', transfer_type)
         print('branch', branch)
-            
         
-        start_time = time.time()
+        print('\n')
         
-        v0_vect, vf_vect, extremal_distances, exit_flag = \
-            iod.fast_lambert(r0_true, rf_true, tof, m, GM, transfer_type, branch)
-            
-        fast_lambert_time = time.time() - start_time
+        # Compute truth data
+        # Compute RIC direction and velocity components at t0
+        print('Initial Vectors and Velocity')
+        v0_ric = eci2ric(r0_true, v0_true, v0_true)
+        print('v0_ric', v0_ric)
+        print('V1r', float(v0_ric[0]))
+        print('V1t', float(v0_ric[1]))
         
-        v0_err = v0_vect - v0_true
-        vf_err = vf_vect - vf_true
+        print('Final Vectors and Velocity')
+        vf_ric = eci2ric(rf_true, vf_true, vf_true)
+        print('vf_ric', vf_ric)
+        print('V2r', float(vf_ric[0]))
+        print('V2t', float(vf_ric[1]))
         
-        print(v0_err)
-        print(vf_err)
         
-        start_time = time.time()
         
-        v0_vect, vf_vect, extremal_distances, exit_flag = \
-            iod.robust_lambert(r0_true, rf_true, tof, m, GM, transfer_type, branch)
-            
-        robust_lambert_time = time.time() - start_time
+        v0_list, vf_list, M_list = iod.izzo_lambert(r0_true, rf_true, tof, GM)
         
-        v0_err = v0_vect - v0_true
-        vf_err = vf_vect - vf_true
+        print('\n')
+        print('v0_list', v0_list)
+        print('vf_list', vf_list)
+        print('v0_true', v0_true)
+        print('vf_true', vf_true)
         
-        print(v0_err)
-        print(vf_err)
         
+        mistake
+        
+#        start_time = time.time()
+#        
+#        v0_vect, vf_vect, extremal_distances, exit_flag = \
+#            iod.fast_lambert(r0_true, rf_true, tof, m, GM, transfer_type, branch)
+#            
+#        fast_lambert_time = time.time() - start_time
+#        
+#        v0_err = v0_vect - v0_true
+#        vf_err = vf_vect - vf_true
+#        
+#        print(v0_err)
+#        print(vf_err)
+#        
+#        start_time = time.time()
+#        
+#        v0_vect, vf_vect, extremal_distances, exit_flag = \
+#            iod.robust_lambert(r0_true, rf_true, tof, m, GM, transfer_type, branch)
+#            
+#        robust_lambert_time = time.time() - start_time
+#        
+#        v0_err = v0_vect - v0_true
+#        vf_err = vf_vect - vf_true
+#        
+#        print(v0_err)
+#        print(vf_err)
+#        
 
     
     
     return
+
+
+def eci2ric(rc_vect, vc_vect, Q_eci=[]):
+    '''
+    This function computes the rotation from ECI to RIC and rotates input
+    Q_eci (vector or matrix) to RIC.
+
+    Parameters
+    ------
+    rc_vect : 3x1 numpy array
+      position vector of chief (or truth) orbit in ECI
+    vc_vect : 3x1 numpy array
+      velocity vector of chief (or truth) orbit in ECI
+    Q_eci : 3x1 or 3x3 numpy array
+      vector or matrix in ECI
+
+    Returns
+    ------
+    Q_ric : 3x1 or 3x3 numpy array
+      vector or matrix in RIC
+    '''
+    
+    # Reshape inputs
+    rc_vect = rc_vect.reshape(3,1)
+    vc_vect = vc_vect.reshape(3,1)
+
+    # Compute transformation matrix to Hill (RIC) frame
+    rc = np.linalg.norm(rc_vect)
+    OR = rc_vect/rc
+    h_vect = np.cross(rc_vect, vc_vect, axis=0)
+    h = np.linalg.norm(h_vect)
+    OH = h_vect/h
+    OT = np.cross(OH, OR, axis=0)
+    
+    print('OR', OR)
+    print('OH', OH)
+    print('OT', OT)
+
+    ON = np.concatenate((OR.T, OT.T, OH.T))
+
+    # Rotate Q_eci as appropriate for vector or matrix
+    if len(Q_eci) == 0:
+        Q_ric = ON
+    elif np.size(Q_eci) == 3:
+        Q_eci = Q_eci.reshape(3,1)
+        Q_ric = np.dot(ON, Q_eci)
+    else:
+        Q_ric = np.dot(np.dot(ON, Q_eci), ON.T)
+
+    return Q_ric
+
 
 
 def test_sigmax():
