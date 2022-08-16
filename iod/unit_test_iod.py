@@ -52,6 +52,8 @@ def lambert_test():
     Xo = np.reshape([757.700301, 5222.606566, 4851.49977,
                      2.213250611, 4.678372741, -5.371314404], (6,1))
     
+    retrograde_flag = True
+    
     # Propagate several orbit fractions
     elem0 = astro.cart2kep(Xo)
     a = float(elem0[0])
@@ -83,7 +85,8 @@ def lambert_test():
     
     # Setup and run Lambert Solvers
     t0 = tk_list[0]    
-    for kk in range(1,len(fraction_list)):
+#    for kk in range(1,len(fraction_list)):
+    for kk in range(2,3):
         
         frac = fraction_list[kk]        
         tf = tk_list[kk]
@@ -133,20 +136,22 @@ def lambert_test():
         print('vf_ric', vf_ric)
         print('V2r', float(vf_ric[0]))
         print('V2t', float(vf_ric[1]))
+        print('\n')
         
+        start_time = time.time()
         
+        v0_list, vf_list, M_list = iod.izzo_lambert(r0_true, rf_true, tof, GM, retrograde_flag)
         
-        v0_list, vf_list, M_list = iod.izzo_lambert(r0_true, rf_true, tof, GM)
+        izzo_time = time.time() - start_time
         
         print('\n')
+        print('izzo time', izzo_time)
         print('v0_list', v0_list)
         print('vf_list', vf_list)
         print('v0_true', v0_true)
         print('vf_true', vf_true)
         
-        
-        mistake
-        
+      
 #        start_time = time.time()
 #        
 #        v0_vect, vf_vect, extremal_distances, exit_flag = \

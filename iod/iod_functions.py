@@ -35,7 +35,7 @@ def lambert_iod():
 
 
 
-def izzo_lambert(r1_vect, r2_vect, tof, GM, maxiters=35, rtol=1e-8):
+def izzo_lambert(r1_vect, r2_vect, tof, GM, retrograde_flag, maxiters=35, rtol=1e-8):
     
     # Input checking
     assert tof > 0
@@ -66,24 +66,22 @@ def izzo_lambert(r1_vect, r2_vect, tof, GM, maxiters=35, rtol=1e-8):
     lam = np.sqrt(lam2)
     
     # Compute unit vectors (note error in Izzo paper)
-    direction = float(r1_vect[0]*r2_vect[1] - r1_vect[1]*r2_vect[0])
-    print(direction)
-    print(ihat_h[2])
-#    mistake
-    
-#    if direction < 0.:
-    if False:
-        lam = -1.*lam
-        ihat_t1 = np.cross(ihat_r1.flatten(), ihat_h.flatten())
-        ihat_t2 = np.cross(ihat_r2.flatten(), ihat_h.flatten())
+    if float(ihat_h[2]) < 0.:
+        lam = -lam
+        ihat_t1 = np.cross(ihat_r1, ihat_h, axis=0)
+        ihat_t2 = np.cross(ihat_r2, ihat_h, axis=0)
         
     else:
-        ihat_t1 = np.cross(ihat_h.flatten(), ihat_r1.flatten())
-        ihat_t2 = np.cross(ihat_h.flatten(), ihat_r2.flatten())
+        ihat_t1 = np.cross(ihat_h, ihat_r1, axis=0)
+        ihat_t2 = np.cross(ihat_h, ihat_r2, axis=0)
         
-    ihat_t1 = np.reshape(ihat_t1, (3,1))
-    ihat_t2 = np.reshape(ihat_t2, (3,1))
+    # Correction for retrograde orbits
+    if retrograde_flag:
+        lam = -lam
+        ihat_t1 = -ihat_t1
+        ihat_t2 = -ihat_t2
     
+
     print('Computed Vectors')
     print('ihat_r1', ihat_r1)
     print('ihat_t1', ihat_t1)
@@ -169,8 +167,14 @@ def find_xy(lam, T, maxiters=35, rtol=1e-8):
         # Start Halley iterations from x=0, T=To and find T_min(M_max)
         dum, T_min, exit_flag = compute_T_min(lam, M_max, maxiters, rtol)
         
+        print('x_T_min', dum)
+        print('T_min', T_min)
+        print('exit_flag', exit_flag)
+        
         if T < T_min and exit_flag == 1:
             M_max -= 1
+            
+    print('New M_max', M_max)
             
     # Compute T(x=1) parabolic case (Izzo Eq 21)
     T_1 = (2./3.) * (1. - lam**3.)
@@ -200,7 +204,7 @@ def find_xy(lam, T, maxiters=35, rtol=1e-8):
         M_list.append(M)
         
         print(x, y, M)
-    
+
     # Loop over M values and compute x,y using Householder iterations
     for M in range(1,M_max+1):
         
@@ -243,7 +247,7 @@ def compute_T_min(lam, M, maxiters=35, rtol=1e-8):
             # Choose x_i > 0 to avoid problems at lam = -1
             x_i = 0.1
             T_i = compute_T(x_i, lam, M)
-            x_T_min, exit_flag = halley(x_i, T_i, lam, maxiters, rtol)
+            x_T_min, exit_flag = halley(x_i, T_i, lam, M, maxiters, rtol)
             T_min = compute_T(x_T_min, lam, M)
             
     
@@ -251,6 +255,8 @@ def compute_T_min(lam, M, maxiters=35, rtol=1e-8):
 
 
 def halley(x0, T0, lam, M, maxiters=35, tol=1e-8):
+    
+    print('\nHalley iterations')
     
     diff = 1.
     iters = 0
@@ -262,6 +268,9 @@ def halley(x0, T0, lam, M, maxiters=35, tol=1e-8):
         
         # Halley step, cubic
         x = x0 - 2.*dT*ddT/(2.*ddT**2. - dT*dddT)
+        
+        print('iters', iters)
+        print('x', x)
         
         diff = abs(x - x0)
         x0 = float(x)
@@ -275,6 +284,8 @@ def halley(x0, T0, lam, M, maxiters=35, tol=1e-8):
 
 
 def householder(x0, T_star, lam, M, maxiters=35, tol=1e-8):
+    
+    print('\nHouseholder iterations')
     
     diff = 1.
     iters = 0
