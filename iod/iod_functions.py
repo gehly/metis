@@ -16,6 +16,7 @@ sys.path.append(metis_dir)
 import dynamics.numerical_integration as numint
 import utilities.astrodynamics as astro
 
+from utilities.constants import Re
 
 ###############################################################################
 # Classical (Deterministic) Methods
@@ -35,7 +36,7 @@ def lambert_iod():
 
 
 
-def izzo_lambert(r1_vect, r2_vect, tof, GM, retrograde_flag, maxiters=35, rtol=1e-8):
+def izzo_lambert(r1_vect, r2_vect, tof, GM, R=Re, results_flag='all', maxiters=35, rtol=1e-8):
     
     # Input checking
     assert tof > 0
@@ -76,7 +77,7 @@ def izzo_lambert(r1_vect, r2_vect, tof, GM, retrograde_flag, maxiters=35, rtol=1
         ihat_t2 = np.cross(ihat_h, ihat_r2, axis=0)
         
     # Correction for retrograde orbits
-    if retrograde_flag:
+    if results_flag == 'retrograde':
         lam = -lam
         ihat_t1 = -ihat_t1
         ihat_t2 = -ihat_t2
@@ -98,7 +99,6 @@ def izzo_lambert(r1_vect, r2_vect, tof, GM, retrograde_flag, maxiters=35, rtol=1
     
     # Compute non-dimensional time of flight T
     T = np.sqrt(2*GM/s**3.) * tof
-
     
     # Compute all possible x,y values that fit T
     x_list, y_list, M_list = find_xy(lam, T, maxiters, rtol)
@@ -106,9 +106,11 @@ def izzo_lambert(r1_vect, r2_vect, tof, GM, retrograde_flag, maxiters=35, rtol=1
     # Loop over x,y values and compute output velocities
     v1_list = []
     v2_list = []
+    del_inds = []
     for ii in range(len(x_list)):
         xi = x_list[ii]
         yi = y_list[ii]
+        Mi = M_list[ii]
         
         Vr1 =  gamma*((lam*yi - xi) - rho*(lam*yi + xi))/r1
         Vr2 = -gamma*((lam*yi - xi) + rho*(lam*yi + xi))/r2
@@ -123,10 +125,63 @@ def izzo_lambert(r1_vect, r2_vect, tof, GM, retrograde_flag, maxiters=35, rtol=1
         v1_vect = Vr1*ihat_r1 + Vt1*ihat_t1
         v2_vect = Vr2*ihat_r2 + Vt2*ihat_t2
         
+        # Check for valid radius of periapsis
+        rp = compute_rp(r1_vect, v1_vect, GM)
+        if rp < R:
+            print('rp less than R', rp, R)
+            del_inds.append(ii)
+            continue
+        
         v1_list.append(v1_vect)
         v2_list.append(v2_vect)
-
+        
+    del_inds = sorted(del_inds, reverse=True)
+    for ind in del_inds:
+        del M_list[ind]
+        
+    # If it is desired to produce all possible cases, repeat execution for
+    # retrograde cases (previous results cover prograde cases)
+    if results_flag == 'all':
+        lam = -lam
+        ihat_t1 = -ihat_t1
+        ihat_t2 = -ihat_t2
+        
+    # Compute all possible x,y values that fit T
+    x_list2, y_list2, M_list2 = find_xy(lam, T, maxiters, rtol)
     
+    # Loop over x,y values and compute output velocities
+    for ii in range(len(x_list2)):
+        xi = x_list2[ii]
+        yi = y_list2[ii]
+        Mi = M_list2[ii]
+        
+        Vr1 =  gamma*((lam*yi - xi) - rho*(lam*yi + xi))/r1
+        Vr2 = -gamma*((lam*yi - xi) + rho*(lam*yi + xi))/r2
+        Vt1 =  gamma*sigma*(yi + lam*xi)/r1
+        Vt2 =  gamma*sigma*(yi + lam*xi)/r2
+        
+        print('Vr1', Vr1)
+        print('Vt1', Vt1)
+        print('Vr2', Vr2)
+        print('Vt2', Vt2)
+        
+        v1_vect = Vr1*ihat_r1 + Vt1*ihat_t1
+        v2_vect = Vr2*ihat_r2 + Vt2*ihat_t2
+        
+        # Check for valid radius of periapsis
+        rp = compute_rp(r1_vect, v1_vect, GM)
+        if rp < R:
+            print('rp less than R', rp, R)
+            continue
+        
+        v1_list.append(v1_vect)
+        v2_list.append(v2_vect)
+        M_list.append(Mi)
+        
+    # Compute and check extremal distances
+    
+    
+
     return v1_list, v2_list, M_list
 
 
@@ -255,6 +310,16 @@ def compute_T_min(lam, M, maxiters=35, rtol=1e-8):
 
 
 def halley(x0, T0, lam, M, maxiters=35, tol=1e-8):
+    '''
+    
+    Note, the poliastro code uses T0 to compute the derivates in each 
+    iteration, while this code uses an updated value of T to do so. Izzo paper
+    just says to start from T0, but I'm pretty sure updating T is the right
+    way to proceed.
+    
+    Furthermore, poliastro Householder iterations do use the updated T value
+    in each iteration, so makes sense to also do so here.
+    '''
     
     print('\nHalley iterations')
     
@@ -270,7 +335,12 @@ def halley(x0, T0, lam, M, maxiters=35, tol=1e-8):
         x = x0 - 2.*dT*ddT/(2.*ddT**2. - dT*dddT)
         
         print('iters', iters)
+        print('x0', x0)
         print('x', x)
+        print('dT', dT)
+        print('ddT', ddT)
+        print('dddT', dddT)
+        
         
         diff = abs(x - x0)
         x0 = float(x)
@@ -322,6 +392,8 @@ def compute_T(x, lam, M):
     '''
     
     y = np.sqrt(1. - lam**2.*(1. - x**2.))
+    
+    print('Compute_T, y', y)
     
     # Izzo Eq 20
     if M == 0 and x > np.sqrt(0.6) and x < np.sqrt(1.4):
@@ -401,7 +473,109 @@ def compute_hypergeom_2F1(a, b, c, d):
             ii += 1
 
 
+def compute_rp(r_vect, v_vect, GM):
+    '''
+    
+    
+    '''
+    
+    r = np.linalg.norm(r_vect)
+    v = np.linalg.norm(v_vect)
+    
+    # Semi-major axis
+    a = 1./(2./r - v**2./GM)
+    
+    # Eccentricity vector 
+    h_vect = np.cross(r_vect, v_vect, axis=0)
+    cross1 = np.cross(v_vect, h_vect, axis=0)
 
+    e_vect = cross1/GM - r_vect/r
+    e = np.linalg.norm(e_vect)
+    
+    rp = a*(1. - e)
+    
+    return rp
+
+
+def compute_extremal_dist(r0_vect, rf_vect, v0_vect, vf_vect, dtheta, M, lam, GM):
+    '''
+    
+    '''
+    
+    # Default, min/max of r0, rf
+    r0 = np.linalg.norm(r0_vect)
+    v0 = np.linalg.norm(v0_vect)
+    rf = np.linalg.norm(rf_vect)
+    r0_vect_hat = r0_vect/r0
+    rf_vect_hat = rf_vect/rf
+    minimum_distance = min(r0, rf)
+    maximum_distance = max(r0, rf)
+    
+    # Semi-major axis
+    a = 1./(2./r0 - v0**2./GM)
+
+    # Eccentricity vector 
+    h0_vect = np.array([[float(r0_vect[1]*v0_vect[2] - r0_vect[2]*v0_vect[1])],
+                        [float(r0_vect[2]*v0_vect[0] - r0_vect[0]*v0_vect[2])],
+                        [float(r0_vect[0]*v0_vect[1] - r0_vect[1]*v0_vect[0])]])
+    
+    cross1 =  np.array([[float(v0_vect[1]*h0_vect[2] - v0_vect[2]*h0_vect[1])],
+                        [float(v0_vect[2]*h0_vect[0] - v0_vect[0]*h0_vect[2])],
+                        [float(v0_vect[0]*h0_vect[1] - v0_vect[1]*h0_vect[0])]])
+    
+    e0_vect = cross1/GM - r0_vect/r0
+    e = np.linalg.norm(e0_vect)
+    e0_vect_hat = e0_vect/e
+    
+    # Apses
+    periapsis = a*(1. - e)
+    apoapsis = np.inf
+    if e < 1.:
+        apoapsis = a*(1. + e)
+        
+    # Check if the trajectory goes through periapsis
+    if M > 0:
+        
+        # Multirev case, must be elliptical and pass through both periapsis and
+        # apoapsis
+        minimum_distance = periapsis
+        maximum_distance = apoapsis
+        
+    else:
+        
+        # Compute true anomaly at t0 and tf
+        pm0 = np.sign(r0*r0*np.dot(e0_vect.T, v0_vect) - np.dot(r0_vect.T, e0_vect)*np.dot(r0_vect.T, v0_vect))
+        pmf = np.sign(rf*rf*np.dot(e0_vect.T, vf_vect) - np.dot(rf_vect.T, e0_vect)*np.dot(rf_vect.T, vf_vect))
+
+        theta0 = pm0 * math.acos(max(-1, min(1, np.dot(r0_vect_hat.T, e0_vect_hat))))
+        thetaf = pmf * math.acos(max(-1, min(1, np.dot(rf_vect_hat.T, e0_vect_hat))))
+        
+        if theta0*thetaf < 0.:
+            
+            # Initial and final positions are on opposite sides of symmetry axis
+            # Minimum and maximum distance depends on dtheta and true anomalies
+            if abs(abs(theta0) + abs(thetaf) - dtheta) < 5.*np.finfo(float).eps:
+                minimum_distance = periapsis
+            
+            # This condition can only be false for elliptic cases, and if it is
+            # false, the orbit has passed through apoapsis
+            else:
+                maximum_distance = apoapsis
+                
+        else:
+            
+            # Initial and final positions are on the same side of symmetry axis
+            # If it is a Type II transfer (longway) then the object must
+            # pass through both periapsis and apoapsis
+            if lam < 0.:
+                minimum_distance = periapsis
+                if e < 1.:
+                    maximum_distance = apoapsis
+                    
+                    
+    extremal_distances = [minimum_distance, maximum_distance]
+
+    return extremal_distances
 
 
 
@@ -1197,82 +1371,7 @@ def compute_hypergeom_2F1(a, b, c, d):
 #    return  sig, dsigdx, d2sigdx2, d3sigdx3
     
 
-def compute_extremal_dist(r0_vect, rf_vect, v0_vect, vf_vect, dtheta, a, m, GM,
-                          transfer_type):
-    '''
-    
-    '''
-    
-    # Default, min/max of r0, rf
-    r0 = np.linalg.norm(r0_vect)
-    rf = np.linalg.norm(rf_vect)
-    r0_vect_hat = r0_vect/r0
-    rf_vect_hat = rf_vect/rf
-    minimum_distance = min(r0, rf)
-    maximum_distance = max(r0, rf)
 
-    # Eccentricity vector 
-    h0_vect = np.array([[float(r0_vect[1]*v0_vect[2] - r0_vect[2]*v0_vect[1])],
-                        [float(r0_vect[2]*v0_vect[0] - r0_vect[0]*v0_vect[2])],
-                        [float(r0_vect[0]*v0_vect[1] - r0_vect[1]*v0_vect[0])]])
-    
-    cross1 =  np.array([[float(v0_vect[1]*h0_vect[2] - v0_vect[2]*h0_vect[1])],
-                        [float(v0_vect[2]*h0_vect[0] - v0_vect[0]*h0_vect[2])],
-                        [float(v0_vect[0]*h0_vect[1] - v0_vect[1]*h0_vect[0])]])
-    
-    e0_vect = cross1/GM - r0_vect/r0
-    e = np.linalg.norm(e0_vect)
-    e0_vect_hat = e0_vect/e
-    
-    # Apses
-    periapsis = a*(1. - e)
-    apoapsis = np.inf
-    if e < 1.:
-        apoapsis = a*(1. + e)
-        
-    # Check if the trajectory goes through periapsis
-    if m > 0:
-        
-        # Multirev case, must be elliptical and pass through both periapsis and
-        # apoapsis
-        minimum_distance = periapsis
-        maximum_distance = apoapsis
-        
-    else:
-        
-        # Compute true anomaly at t0 and tf
-        pm0 = np.sign(r0*r0*np.dot(e0_vect.T, v0_vect) - np.dot(r0_vect.T, e0_vect)*np.dot(r0_vect.T, v0_vect))
-        pmf = np.sign(rf*rf*np.dot(e0_vect.T, vf_vect) - np.dot(rf_vect.T, e0_vect)*np.dot(rf_vect.T, vf_vect))
-
-        theta0 = pm0 * math.acos(max(-1, min(1, np.dot(r0_vect_hat.T, e0_vect_hat))))
-        thetaf = pmf * math.acos(max(-1, min(1, np.dot(rf_vect_hat.T, e0_vect_hat))))
-        
-        if theta0*thetaf < 0.:
-            
-            # Initial and final positions are on opposite sides of symmetry axis
-            # Minimum and maximum distance depends on dtheta and true anomalies
-            if abs(abs(theta0) + abs(thetaf) - dtheta) < 5.*np.finfo(float).eps:
-                minimum_distance = periapsis
-            
-            # This condition can only be false for elliptic cases, and if it is
-            # false, the orbit has passed through apoapsis
-            else:
-                maximum_distance = apoapsis
-                
-        else:
-            
-            # Initial and final positions are on the same side of symmetry axis
-            # If it is a Type II transfer (longway) then the object must
-            # pass through both periapsis and apoapsis
-            if transfer_type == 2:
-                minimum_distance = periapsis
-                if e < 1.:
-                    maximum_distance = apoapsis
-                    
-                    
-    extremal_distances = [minimum_distance, maximum_distance]
-
-    return extremal_distances
 
 
 def gauss_iod(tk_list, Yk_list, sensor_params):

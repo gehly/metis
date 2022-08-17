@@ -25,7 +25,7 @@ import sensors.visibility_functions as visfunc
 import utilities.astrodynamics as astro
 import utilities.coordinate_systems as coord
 import utilities.eop_functions as eop
-from utilities.constants import GME, arcsec2rad
+from utilities.constants import GME, Re, arcsec2rad
 
 
 
@@ -52,7 +52,7 @@ def lambert_test():
     Xo = np.reshape([757.700301, 5222.606566, 4851.49977,
                      2.213250611, 4.678372741, -5.371314404], (6,1))
     
-    retrograde_flag = True
+    results_flag = 'all'
     
     # Propagate several orbit fractions
     elem0 = astro.cart2kep(Xo)
@@ -86,7 +86,7 @@ def lambert_test():
     # Setup and run Lambert Solvers
     t0 = tk_list[0]    
 #    for kk in range(1,len(fraction_list)):
-    for kk in range(2,3):
+    for kk in range(3,4):
         
         frac = fraction_list[kk]        
         tf = tk_list[kk]
@@ -140,7 +140,7 @@ def lambert_test():
         
         start_time = time.time()
         
-        v0_list, vf_list, M_list = iod.izzo_lambert(r0_true, rf_true, tof, GM, retrograde_flag)
+        v0_list, vf_list, M_list = iod.izzo_lambert(r0_true, rf_true, tof, GM, Re, results_flag)
         
         izzo_time = time.time() - start_time
         
@@ -151,6 +151,89 @@ def lambert_test():
         print('v0_true', v0_true)
         print('vf_true', vf_true)
         
+        # Propagate output to ensure it achieves the right final position
+        
+        rf_err_list = []
+        v0_err_list = []
+        vf_err_list = []
+        for ii in range(len(M_list)):
+            
+            v0_ii = v0_list[ii]
+            vf_ii = vf_list[ii]
+            M_ii = M_list[ii]
+                        
+            X_test = np.concatenate((r0_true, v0_ii), axis=0)
+            
+            tin = [t0, tf]
+            tout, Xout = dyn.general_dynamics(X_test, tin, state_params, int_params)
+            X = Xout[-1,:].reshape(6, 1)
+            
+            rf_test = X[0:3].reshape(3,1)
+            vf_test = X[3:6].reshape(3,1)
+            
+            if np.linalg.norm(vf_test - vf_ii) > 1e-8:
+                print(vf_test)
+                print(vf_ii)
+                print(np.linalg.norm(vf_test - vf_ii))
+                mistake
+            
+            print('')
+            print('rf_test', rf_test)
+            print('rf_true', rf_true)
+            print('vf_test', vf_test)
+            print('vf_true', vf_true)
+            
+            
+            rf_err = np.linalg.norm(rf_test - rf_true)
+            v0_err = np.linalg.norm(v0_ii - v0_true)
+            vf_err = np.linalg.norm(vf_ii - vf_true)
+            
+            rf_err_list.append(rf_err)
+            v0_err_list.append(v0_err)
+            vf_err_list.append(vf_err)
+            
+            
+#            rbg = (colors[ii], colors[ii], colors[ii])
+#            
+#            plt.subplot(3,1,1)
+#            plt.plot(M_ii, rf_err, 'o', color=rbg)
+#            
+#            plt.subplot(3,1,2)
+#            plt.plot(M_ii, v0_err, 'o', color=rbg)
+#            
+#            plt.subplot(3,1,3)
+#            plt.plot(M_ii, vf_err, 'o', color=rbg)
+            
+            
+#        colors = np.linspace(0, 1, len(M_list))
+        colors = np.random.rand(len(M_list),3)
+        
+        plt.figure()
+        
+        plt.subplot(3,1,1)
+        for ii in range(len(M_list)):            
+            rbg = (colors[ii,0], colors[ii,1], colors[ii,2])
+            plt.plot(M_list[ii], rf_err_list[ii], 'o', color=rbg)
+        plt.ylabel('Final Pos [km]')
+        if max(rf_err_list) < 1.:
+            plt.ylim([0., 1])
+        
+        plt.subplot(3,1,2)
+        for ii in range(len(M_list)):            
+            rbg = (colors[ii,0], colors[ii,1], colors[ii,2])
+            plt.plot(M_list[ii], v0_err_list[ii], 'o', color=rbg)
+        plt.ylabel('Initial Vel [km/s]')
+        
+        plt.subplot(3,1,3)
+        for ii in range(len(M_list)):            
+            rbg = (colors[ii,0], colors[ii,1], colors[ii,2])
+            plt.plot(M_list[ii], vf_err_list[ii], 'o', color=rbg)
+        plt.ylabel('Final Vel [km/s]')
+
+
+
+        plt.show()
+
       
 #        start_time = time.time()
 #        
@@ -320,6 +403,8 @@ def test_LancasterBlanchard():
 
 
 if __name__ == '__main__':
+    
+    plt.close('all')
     
     
     lambert_test()
