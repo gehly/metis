@@ -36,7 +36,8 @@ def lambert_iod():
 
 
 
-def izzo_lambert(r1_vect, r2_vect, tof, GM, R=Re, results_flag='all', maxiters=35, rtol=1e-8):
+def izzo_lambert(r1_vect, r2_vect, tof, GM, R=Re, results_flag='all',
+                 periapsis_check=True, maxiters=35, rtol=1e-8):
     
     # Input checking
     assert tof > 0
@@ -101,16 +102,16 @@ def izzo_lambert(r1_vect, r2_vect, tof, GM, R=Re, results_flag='all', maxiters=3
     T = np.sqrt(2*GM/s**3.) * tof
     
     # Compute all possible x,y values that fit T
-    x_list, y_list, M_list = find_xy(lam, T, maxiters, rtol)
+    x_list1, y_list1, M_list1 = find_xy(lam, T, maxiters, rtol)
     
     # Loop over x,y values and compute output velocities
     v1_list = []
     v2_list = []
-    del_inds = []
-    for ii in range(len(x_list)):
-        xi = x_list[ii]
-        yi = y_list[ii]
-        Mi = M_list[ii]
+    M_list = []
+    for ii in range(len(x_list1)):
+        xi = x_list1[ii]
+        yi = y_list1[ii]
+        Mi = M_list1[ii]
         
         Vr1 =  gamma*((lam*yi - xi) - rho*(lam*yi + xi))/r1
         Vr2 = -gamma*((lam*yi - xi) + rho*(lam*yi + xi))/r2
@@ -127,17 +128,15 @@ def izzo_lambert(r1_vect, r2_vect, tof, GM, R=Re, results_flag='all', maxiters=3
         
         # Check for valid radius of periapsis
         rp = compute_rp(r1_vect, v1_vect, GM)
-        if rp < R:
+        if periapsis_check and rp < R:
             print('rp less than R', rp, R)
-            del_inds.append(ii)
             continue
         
         v1_list.append(v1_vect)
         v2_list.append(v2_vect)
+        M_list.append(Mi)
         
-    del_inds = sorted(del_inds, reverse=True)
-    for ind in del_inds:
-        del M_list[ind]
+
         
     # If it is desired to produce all possible cases, repeat execution for
     # retrograde cases (previous results cover prograde cases)
@@ -146,39 +145,38 @@ def izzo_lambert(r1_vect, r2_vect, tof, GM, R=Re, results_flag='all', maxiters=3
         ihat_t1 = -ihat_t1
         ihat_t2 = -ihat_t2
         
-    # Compute all possible x,y values that fit T
-    x_list2, y_list2, M_list2 = find_xy(lam, T, maxiters, rtol)
-    
-    # Loop over x,y values and compute output velocities
-    for ii in range(len(x_list2)):
-        xi = x_list2[ii]
-        yi = y_list2[ii]
-        Mi = M_list2[ii]
+        # Compute all possible x,y values that fit T
+        x_list2, y_list2, M_list2 = find_xy(lam, T, maxiters, rtol)
         
-        Vr1 =  gamma*((lam*yi - xi) - rho*(lam*yi + xi))/r1
-        Vr2 = -gamma*((lam*yi - xi) + rho*(lam*yi + xi))/r2
-        Vt1 =  gamma*sigma*(yi + lam*xi)/r1
-        Vt2 =  gamma*sigma*(yi + lam*xi)/r2
+        # Loop over x,y values and compute output velocities
+        for ii in range(len(x_list2)):
+            xi = x_list2[ii]
+            yi = y_list2[ii]
+            Mi = M_list2[ii]
+            
+            Vr1 =  gamma*((lam*yi - xi) - rho*(lam*yi + xi))/r1
+            Vr2 = -gamma*((lam*yi - xi) + rho*(lam*yi + xi))/r2
+            Vt1 =  gamma*sigma*(yi + lam*xi)/r1
+            Vt2 =  gamma*sigma*(yi + lam*xi)/r2
+            
+            print('Vr1', Vr1)
+            print('Vt1', Vt1)
+            print('Vr2', Vr2)
+            print('Vt2', Vt2)
+            
+            v1_vect = Vr1*ihat_r1 + Vt1*ihat_t1
+            v2_vect = Vr2*ihat_r2 + Vt2*ihat_t2
+            
+            # Check for valid radius of periapsis
+            rp = compute_rp(r1_vect, v1_vect, GM)
+            if periapsis_check and rp < R:
+                print('rp less than R', rp, R)
+                continue
+            
+            v1_list.append(v1_vect)
+            v2_list.append(v2_vect)
+            M_list.append(Mi)
         
-        print('Vr1', Vr1)
-        print('Vt1', Vt1)
-        print('Vr2', Vr2)
-        print('Vt2', Vt2)
-        
-        v1_vect = Vr1*ihat_r1 + Vt1*ihat_t1
-        v2_vect = Vr2*ihat_r2 + Vt2*ihat_t2
-        
-        # Check for valid radius of periapsis
-        rp = compute_rp(r1_vect, v1_vect, GM)
-        if rp < R:
-            print('rp less than R', rp, R)
-            continue
-        
-        v1_list.append(v1_vect)
-        v2_list.append(v2_vect)
-        M_list.append(Mi)
-        
-    # Compute and check extremal distances
     
     
 

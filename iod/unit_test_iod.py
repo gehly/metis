@@ -40,11 +40,12 @@ def lambert_test():
     
     # Integration function and additional settings
     int_params = {}
-    int_params['integrator'] = 'ode'
-    int_params['ode_integrator'] = 'dop853'
+    int_params['integrator'] = 'solve_ivp'
+    int_params['ode_integrator'] = 'DOP853'
     int_params['intfcn'] = dyn.ode_twobody
     int_params['rtol'] = 1e-12
     int_params['atol'] = 1e-12
+    int_params['step'] = 10.
     int_params['time_format'] = 'datetime'
     
     # Initial object state vector
@@ -53,6 +54,7 @@ def lambert_test():
                      2.213250611, 4.678372741, -5.371314404], (6,1))
     
     results_flag = 'all'
+    periapsis_check = True
     
     # Propagate several orbit fractions
     elem0 = astro.cart2kep(Xo)
@@ -86,7 +88,7 @@ def lambert_test():
     # Setup and run Lambert Solvers
     t0 = tk_list[0]    
 #    for kk in range(1,len(fraction_list)):
-    for kk in range(3,4):
+    for kk in range(6,7):
         
         frac = fraction_list[kk]        
         tf = tk_list[kk]
@@ -140,7 +142,7 @@ def lambert_test():
         
         start_time = time.time()
         
-        v0_list, vf_list, M_list = iod.izzo_lambert(r0_true, rf_true, tof, GM, Re, results_flag)
+        v0_list, vf_list, M_list = iod.izzo_lambert(r0_true, rf_true, tof, GM, Re, results_flag, periapsis_check)
         
         izzo_time = time.time() - start_time
         
@@ -151,6 +153,10 @@ def lambert_test():
         print('v0_true', v0_true)
         print('vf_true', vf_true)
         
+        print('')
+        print('M_list', M_list)
+        print('len M_list', len(M_list))
+        
         # Propagate output to ensure it achieves the right final position
         
         rf_err_list = []
@@ -160,16 +166,49 @@ def lambert_test():
             
             v0_ii = v0_list[ii]
             vf_ii = vf_list[ii]
-            M_ii = M_list[ii]
+#            M_ii = M_list[ii]
                         
             X_test = np.concatenate((r0_true, v0_ii), axis=0)
+            elem_test = astro.cart2kep(X_test, GM)
             
             tin = [t0, tf]
+#            print('tin', tin)
+#            print('tof [hours]', tof/3600.)
+            
+#            tin = [t0 + timedelta(seconds=tii) for tii in np.arange(0, tof, 10)]
+#            tin.append(tf)
+#            print('tf', tf)
+#            print('tin[-1]', tin[-1])
+#            mistake
+            
             tout, Xout = dyn.general_dynamics(X_test, tin, state_params, int_params)
             X = Xout[-1,:].reshape(6, 1)
             
+#            print('tof diff', tout[-1] - tof)
+            print('tout', tout)
+            print('X', X)
+            
             rf_test = X[0:3].reshape(3,1)
             vf_test = X[3:6].reshape(3,1)
+            
+            # Check analytic orbit prediction
+            Xout2 = astro.element_conversion(X_test, 1, 1, GM, tof)
+            print('Xout2', Xout2)
+            
+            
+            print('')
+            print('ii', ii)
+            print('Mi', M_list[ii])
+            print('rf_test', rf_test)
+            print('rf_true', rf_true)
+            print('vf_test', vf_test)
+            print('vf_true', vf_true)
+            
+            print('')
+            print('X_test', X_test)
+            print('elem_test', elem_test)
+            print('v0_ii', v0_ii)
+            print('vf_ii', vf_ii)
             
             if np.linalg.norm(vf_test - vf_ii) > 1e-8:
                 print(vf_test)
@@ -177,11 +216,7 @@ def lambert_test():
                 print(np.linalg.norm(vf_test - vf_ii))
                 mistake
             
-            print('')
-            print('rf_test', rf_test)
-            print('rf_true', rf_true)
-            print('vf_test', vf_test)
-            print('vf_true', vf_true)
+            
             
             
             rf_err = np.linalg.norm(rf_test - rf_true)
@@ -215,6 +250,7 @@ def lambert_test():
             rbg = (colors[ii,0], colors[ii,1], colors[ii,2])
             plt.plot(M_list[ii], rf_err_list[ii], 'o', color=rbg)
         plt.ylabel('Final Pos [km]')
+        plt.title('Lambert Pos/Vel Errors')
         if max(rf_err_list) < 1.:
             plt.ylim([0., 1])
         
@@ -412,6 +448,8 @@ if __name__ == '__main__':
 #    test_sigmax()
     
 #    test_LancasterBlanchard()
+    
+
     
     
     
