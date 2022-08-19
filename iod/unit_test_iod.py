@@ -4,9 +4,11 @@ import matplotlib.pyplot as plt
 import sys
 from datetime import datetime, timedelta
 import pickle
+import csv
 import os
 import inspect
 import time
+from astroquery.jplhorizons import Horizons
 
 filename = inspect.getframeinfo(inspect.currentframe()).filename
 current_dir = os.path.dirname(os.path.abspath(filename))
@@ -25,6 +27,8 @@ import sensors.visibility_functions as visfunc
 import utilities.astrodynamics as astro
 import utilities.coordinate_systems as coord
 import utilities.eop_functions as eop
+import utilities.time_systems as timesys
+
 from utilities.constants import GME, Re, arcsec2rad
 
 
@@ -679,6 +683,312 @@ def test_LancasterBlanchard():
     return
 
 
+def retrieve_jpl_vector_table(output_file, obj_id, start_dt, stop_dt, step, location='@0', id_type='majorbody'):
+    '''
+    This function retrieves ephemeris data from the JPL Horizons database using
+    the astroquery module of astropy in a vector table format.
+    
+    Parameters
+    ------
+    obj_id : string
+        unique identifier for target object
+    start_dt : string
+        date and time of start epoch formatted 'YYYY-MM-DD [HH:MM:SS]'
+        time system [CT = TDB]
+    stop_dt : string
+        date and time of stop epoch formatted 'YYYY-MM-DD [HH:MM:SS]'
+        time system [CT = TDB]
+    step : string
+        interval for retrieval with units, e.g. '10m' or '3h' or '1d'
+    location : string, optional
+        origin of coordinate system from which position/velocity measured
+        (default = '@0' Solar System Barycenter)
+        (use '500' for geocentric)
+    id_type : string, optional
+        further specification of identity to aid in disambiguation
+        (default = 'majorbody')  
+    
+    Object ID and Type
+    ------    
+    The use of id_type in combination with obj_id is important.  For major
+    bodies, e.g. planets and moons, the following id list applies:
+        
+    10 : Sun
+            
+    199 : Mercury
+    
+    299 : Venus
+    
+    399 : Earth [Geocenter]
+    
+    499 : Mars
+    
+    599 : Jupiter
+    
+    699 : Saturn
+    
+    799 : Uranus
+    
+    899 : Neptune
+    
+    999 : Pluto
+    
+    If you use these obj_id values without specifying id_type='majorbody' it
+    will return values for a different object!!
+    
+    Returns
+    ------
+    vec_table : astropy vector table
+        date, time, position, velocity and other values for the requested
+        object at each requested time [CT=TDB, km, km/s]    
+    
+    References
+    ------
+    https://ssd.jpl.nasa.gov/?horizons_tutorial
+    https://astroquery.readthedocs.io/en/latest/jplhorizons/jplhorizons.html
+    
+    '''
+    
+    # Run query
+    obj = Horizons(id=obj_id, id_type=id_type, location=location, epochs={'start':start_dt, 'stop':stop_dt, 'step':step})
+    vec_table = obj.vectors()
+
+    # Convert to km, km/s    
+    vec_table['x'].convert_unit_to('km')
+    vec_table['y'].convert_unit_to('km')
+    vec_table['z'].convert_unit_to('km')
+    vec_table['vx'].convert_unit_to('km/s')
+    vec_table['vy'].convert_unit_to('km/s')
+    vec_table['vz'].convert_unit_to('km/s')
+    
+    # Generate output file    
+    with open(output_file, 'w', newline='') as csvfile:
+        filewriter = csv.writer(csvfile)
+        filewriter.writerow(['Julian Date', 'x [km]', 'y [km]', 'z [km]', 'vx [km/s]', 'vy [km/s]', 'vz [km/s]'])
+    
+        for ii in range(len(list(vec_table['x']))):
+                
+                date = vec_table['datetime_jd'][ii]
+                x = vec_table['x'][ii]
+                y = vec_table['y'][ii]
+                z = vec_table['z'][ii]
+                vx = vec_table['vx'][ii]
+                vy = vec_table['vy'][ii]
+                vz = vec_table['vz'][ii]
+                                
+                output_row = [date, x, y, z, vx, vy, vz]                
+                filewriter.writerow(output_row)
+    
+    return vec_table
+
+
+def generate_porkchop_data(launch_file, arrival_file, GM, R, min_tof, max_tof, output_file):
+    '''
+    This function generates a porkchop plot of the total v_infinity cost of
+    transfer between two celestial objects for a range of launch and arrival
+    times.  The function takes CSV files as input, containing the dates and
+    position/velocity data of the celestial objects.
+    
+    Parameters
+    ------
+    launch_file : string
+        file path and name containing data for launch object
+    arrival_file : string
+        file path and name containing data for arrival object
+    GM : float
+        gravitational parameter of central body [km^3/s^2]
+    min_tof : float
+        minimum time of flight to consider [days]
+    max_tof : float
+        maximum time of flight to consider [days]
+    output_File : string
+        file path and name to save porkchop data for plotting
+        
+    '''
+    
+    # Read input CSV data
+    with open(launch_file, newline='') as csvfile:
+        filereader = csv.reader(csvfile)
+        ii = 0
+        launch_JD = []
+        launch_state = []
+        for row in filereader:
+            if ii == 0:
+                ii += 1
+                continue
+            
+            launch_JD.append(float(row[0]))
+            state_vect = np.reshape([float(row[1]), float(row[2]),
+                                     float(row[3]), float(row[4]),
+                                     float(row[5]), float(row[6])], (6,1))
+            launch_state.append(state_vect)
+
+            
+            
+    with open(arrival_file, newline='') as csvfile:
+        filereader = csv.reader(csvfile)
+        ii = 0
+        arrival_JD = []
+        arrival_state = []
+        for row in filereader:
+            if ii == 0:
+                ii += 1
+                continue
+            
+            arrival_JD.append(float(row[0]))
+            state_vect = np.reshape([float(row[1]), float(row[2]),
+                                     float(row[3]), float(row[4]),
+                                     float(row[5]), float(row[6])], (6,1))
+            arrival_state.append(state_vect)
+            
+    
+    # Loop over launch dates
+    launch_vinf = np.zeros((len(launch_JD), len(arrival_JD)))
+    arrival_vinf = np.zeros((len(launch_JD), len(arrival_JD)))
+    for ii in range(len(launch_JD)):
+        JD_ii = launch_JD[ii]
+        state_ii = launch_state[ii]
+        
+        # Loop over arrival dates
+        for jj in range(len(arrival_JD)):
+            JD_jj = arrival_JD[jj]
+            state_jj = arrival_state[jj]
+            
+            # Skip cases where transfer time exceeds user input boundaries
+            if (JD_jj - JD_ii) < min_tof or (JD_jj - JD_ii) > max_tof:
+                continue
+            
+            # Compute difference in anomaly angle to check Type I or Type II
+            launch_elem = astro.cart2kep(state_ii, GM)
+            arrival_elem = astro.cart2kep(state_jj, GM)
+            
+            launch_anomaly = sum(launch_elem[3:6]) % 360
+            arrival_anomaly = sum(arrival_elem[3:6]) % 360
+            diff = (arrival_anomaly - launch_anomaly) % 360
+            
+            print('\n')
+            print(ii, jj)
+            print(state_ii)
+            print(launch_elem)
+            print(launch_anomaly, arrival_anomaly, diff)
+            print(JD_jj - JD_ii)
+            
+
+                
+            # Call the Lambert solver
+            r1 = state_ii[0:3]
+            r2 = state_jj[0:3]
+            tof = (JD_jj - JD_ii)*86400.
+            v1_list, v2_list, M_list = iod.izzo_lambert(r1, r2, tof, GM, R, 
+                                                        results_flag='prograde',
+                                                        periapsis_check=True, 
+                                                        maxiters=35, rtol=1e-8)
+            
+            if 0 not in M_list:
+                continue
+            
+            ind = M_list.index(0)
+            v1 = v1_list[ind]
+            v2 = v2_list[ind]
+            
+            # Compute the v_infinity values and store
+            launch_vinf[ii,jj] = np.linalg.norm(v1 - state_ii[3:6])
+            arrival_vinf[ii,jj] = np.linalg.norm(v2 - state_jj[3:6])
+            
+            print(v1, v2)
+            print(launch_vinf[ii,jj], arrival_vinf[ii,jj])
+                
+            
+    # Generate plot
+    total_vinf = launch_vinf + arrival_vinf
+    
+    pklFile = open( output_file , 'wb' )
+    pickle.dump( [launch_JD, arrival_JD, launch_vinf, arrival_vinf, total_vinf], pklFile, -1 )
+    pklFile.close()
+    
+    
+    
+    return
+
+
+def plot_porkchop_data(vinf_file, min_tof, max_tof):
+    
+    plt.close('all')
+    
+    pklFile = open(vinf_file, 'rb')
+    data = pickle.load(pklFile)
+    launch_JD = data[0]
+    arrival_JD = data[1]
+    launch_vinf = data[2]
+    arrival_vinf = data[3]
+    total_vinf = data[4]
+    pklFile.close()
+    
+    launch_dt = [timesys.jd2dt(jd) for jd in launch_JD]
+    
+    # Compute TOF for x-axis
+    nrow = total_vinf.shape[0]
+    ncol = total_vinf.shape[1]
+    plot_tof = np.arange(min_tof, max_tof+0.1, 1.)
+    plot_vinf = np.zeros((nrow, len(plot_tof)))
+    for ii in range(nrow):
+        for jj in range(ncol):
+            
+            if total_vinf[ii,jj] > 0. and total_vinf[ii,jj] < 30.:
+                tof = arrival_JD[jj] - launch_JD[ii]
+                tof_ind = list(plot_tof).index(tof)
+                plot_vinf[ii, tof_ind] = total_vinf[ii,jj]
+                
+                
+    
+    fig1, ax1 = plt.subplots()
+    levels = list(np.arange(3,31,3))
+    cs = ax1.contourf(plot_tof, launch_dt, plot_vinf, levels)
+#    ax1.set_ylim([2455375, 2454930])
+    ax1.set_ylim([datetime(2029, 12, 31), datetime(2020, 1, 1)])
+    
+    ax1.set_xlabel('Time of Flight [days]')
+    ax1.set_ylabel('Launch Date')
+
+    cbar = fig1.colorbar(cs)
+    cbar.ax.set_ylabel('Total Vinf [km/s]')
+    
+    plt.show()
+    
+    
+    return
+
+
+def porkchop_plot_demo():
+    
+    # Retrieve data for Earth
+    earth_data = retrieve_jpl_vector_table('earth_2020_2030.csv', '399', '2020-01-01 00:00:00', '2029-12-31 00:00:00', '1d', location='@0', id_type='majorbody')
+  
+    print(earth_data)
+    
+    # Retrieve data for Mars
+    mars_data = retrieve_jpl_vector_table('mars_2020_2030.csv', '499', '2020-01-01 00:00:00', '2029-12-31 00:00:00', '1d', location='@0', id_type='majorbody')
+  
+    print(mars_data)
+    
+    
+    launch_file = 'earth_2020_2030.csv'
+    arrival_file = 'mars_2020_2030.csv'
+    vinf_file = 'earth_mars.pkl'
+    GM = 1.32712440018e11
+    R = 1e6
+    min_tof = 60.
+    max_tof = 500.
+    generate_porkchop_data(launch_file, arrival_file, GM, R, min_tof, max_tof, vinf_file)
+    
+    
+    plot_porkchop_data(vinf_file, min_tof, max_tof)
+    
+    
+    
+    return
+
+
 if __name__ == '__main__':
     
     plt.close('all')
@@ -686,7 +996,9 @@ if __name__ == '__main__':
     
 #    lambert_test()
     
-    lambert_test_hyperbolic()
+#    lambert_test_hyperbolic()
+    
+    porkchop_plot_demo()
     
 #    test_sigmax()
     
