@@ -16,7 +16,7 @@ sys.path.append(metis_dir)
 import dynamics.numerical_integration as numint
 import utilities.astrodynamics as astro
 
-from utilities.constants import Re
+from utilities.constants import Re, GME
 
 ###############################################################################
 # Classical (Deterministic) Methods
@@ -36,8 +36,70 @@ def lambert_iod():
 
 
 
-def izzo_lambert(r1_vect, r2_vect, tof, GM, R=Re, results_flag='all',
+def izzo_lambert(r1_vect, r2_vect, tof, GM=GME, R=Re, results_flag='all',
                  periapsis_check=True, maxiters=35, rtol=1e-8):
+    '''
+    This function implements a solution to the twobody orbit boundary value
+    problem (Lambert's Problem). Given initial and final position vectors and
+    the time of flight, the method will compute the initial and final velocity
+    vectors, which constitute a complete description of the orbit for all 
+    times. The method is suitable for all orbit types and orbit regimes, and 
+    works for single revolution and multiple revolution (elliptical orbit) 
+    cases. For any given instance of Lambert's Problem, there may be multiple
+    solutions that fit the boundary values and time of flight, with different
+    number of orbit revolutions and orbiting in prograde or retrograde 
+    directions. The function outputs all possible orbits that fit the 
+    boundary conditions by default, but can be restricted to consider only
+    prograde or retrogade orbits.    
+    
+    The method does not include any effects of perturbing forces.
+    
+    Parameters
+    ------
+    r1_vect : 3x1 numpy array
+        initial position vector in inertial coordinates [km]
+    r2_vect : 3x1 numpy array
+        final position vector in inertial coordinates [km]
+    tof : float
+        time of flight between r1_vect and r2_vect [sec]
+    GM : float, optional
+        gravitational parameter of central body (default=GME) [km^3/s^2]        
+    R : float, optional
+        radius of central body (default=Re) [km]
+    results_flag : string, optional
+        flag to determine what results to output 
+        ('prograde', 'retrograde', or 'all', default='all')
+    periapsis_check : boolean, optional
+        flag to determine whether to check the orbit does not intersect the
+        central body (rp > R) (default=True)
+    maxiters : int, optional
+        maximum number of iterations for the Halley and Householder 
+        root-finding steps (default=35)
+    rtol : float, optional
+        convergence tolerance for the Halley and Householder root-finding 
+        steps (default=1e-8)
+        
+    Returns
+    ------
+    v1_list : list
+        list of 3x1 numpy arrays corresponding to valid initial velocity
+        vectors in inertial coordinates [km/s]    
+    v2_list : list
+        list of 3x1 numpy arrays corresponding to valid final velocity 
+        vectors in inertial coordinates [km/s]    
+    M_list : list
+        list of integer number of revolutions corresponding to initial/final
+        velocity vector solutions
+        
+    Reference
+    ------
+    [1] Izzo, D. "Revisiting Lambert's Problem," CMDA 2015
+    
+    [2] Rodrigues, J.L.C. et al., Poliastro distribution 
+    (DOI 10.5281/zenodo.6817189) identifies several bugs and improvements, 
+    e.g. https://github.com/poliastro/poliastro/issues/1362
+    
+    '''
     
     # Input checking
     assert tof > 0
@@ -53,19 +115,17 @@ def izzo_lambert(r1_vect, r2_vect, tof, GM, R=Re, results_flag='all',
     
     # Compute values to reconstruct output
     s = 0.5 * (r1 + r2 + c)
+    lam2 = 1. - (c/s)
+    lam = np.sqrt(lam2)
     gamma = np.sqrt(GM*s/2.)
     rho = (r1 - r2)/c
     sigma = np.sqrt(1. - rho**2.)
-    
+
+    # Renormalize (cross product of unit vectors not necessarily unit length)
     ihat_r1 = r1_vect/r1
     ihat_r2 = r2_vect/r2
     ihat_h = np.cross(ihat_r1, ihat_r2, axis=0)
-
-    # Renormalize (cross product of unit vectors not necessarily unit length)
     ihat_h = ihat_h/np.linalg.norm(ihat_h)
-    
-    lam2 = 1. - (c/s)
-    lam = np.sqrt(lam2)
     
     # Compute unit vectors (note error in Izzo paper)
     if float(ihat_h[2]) < 0.:
@@ -82,21 +142,6 @@ def izzo_lambert(r1_vect, r2_vect, tof, GM, R=Re, results_flag='all',
         lam = -lam
         ihat_t1 = -ihat_t1
         ihat_t2 = -ihat_t2
-    
-
-    print('Computed Vectors')
-    print('ihat_r1', ihat_r1)
-    print('ihat_t1', ihat_t1)
-    print('ihat_r2', ihat_r2)
-    print('ihat_t2', ihat_t2)
-    print('ihat_h', ihat_h)
-    
-#    mistake
-    
-    # Additional correction may be needed for Type I or Type II transfers
-    
-    # Correct transfer angle parameter and tangential vectors if required
-#    ll, i_t1, i_t2 = (ll, i_t1, i_t2) if prograde else (-ll, -i_t1, -i_t2)
     
     # Compute non-dimensional time of flight T
     T = np.sqrt(2*GM/s**3.) * tof
@@ -118,25 +163,17 @@ def izzo_lambert(r1_vect, r2_vect, tof, GM, R=Re, results_flag='all',
         Vt1 =  gamma*sigma*(yi + lam*xi)/r1
         Vt2 =  gamma*sigma*(yi + lam*xi)/r2
         
-        print('Vr1', Vr1)
-        print('Vt1', Vt1)
-        print('Vr2', Vr2)
-        print('Vt2', Vt2)
-        
         v1_vect = Vr1*ihat_r1 + Vt1*ihat_t1
         v2_vect = Vr2*ihat_r2 + Vt2*ihat_t2
         
         # Check for valid radius of periapsis
         rp = compute_rp(r1_vect, v1_vect, GM)
         if periapsis_check and rp < R:
-            print('rp less than R', rp, R)
             continue
         
         v1_list.append(v1_vect)
         v2_list.append(v2_vect)
         M_list.append(Mi)
-        
-
         
     # If it is desired to produce all possible cases, repeat execution for
     # retrograde cases (previous results cover prograde cases)
@@ -159,31 +196,51 @@ def izzo_lambert(r1_vect, r2_vect, tof, GM, R=Re, results_flag='all',
             Vt1 =  gamma*sigma*(yi + lam*xi)/r1
             Vt2 =  gamma*sigma*(yi + lam*xi)/r2
             
-            print('Vr1', Vr1)
-            print('Vt1', Vt1)
-            print('Vr2', Vr2)
-            print('Vt2', Vt2)
-            
             v1_vect = Vr1*ihat_r1 + Vt1*ihat_t1
             v2_vect = Vr2*ihat_r2 + Vt2*ihat_t2
             
             # Check for valid radius of periapsis
             rp = compute_rp(r1_vect, v1_vect, GM)
             if periapsis_check and rp < R:
-                print('rp less than R', rp, R)
                 continue
             
             v1_list.append(v1_vect)
             v2_list.append(v2_vect)
             M_list.append(Mi)
-        
-    
-    
+
 
     return v1_list, v2_list, M_list
 
 
 def find_xy(lam, T, maxiters=35, rtol=1e-8):
+    '''
+    This function computes all possible x,y values that fit the input orbit
+    non-dimensional time of flight T.
+    
+    Parameters
+    ------
+    lam : float
+        non-dimensional orbit parameter in range [-1, 1]
+        lam > 0 for theta [0,pi] and lam < 0 for theta [pi, 2pi]
+    T : float
+        non-dimensional time of flight
+    maxiters : int, optional
+        maximum number of iterations for the Halley and Householder 
+        root-finding steps (default=35)
+    rtol : float, optional
+        convergence tolerance for the Halley and Householder root-finding 
+        steps (default=1e-8)
+    
+    Returns
+    ------
+    x_list : list
+        all x values that fit boundary conditions
+    y_list : list
+        all y values that fit boundary conditions
+    M_list : list
+        all integer orbit revolutions that fit boundary conditions
+    
+    '''
     
     # Check inputs
     assert abs(lam) <= 1.
@@ -198,54 +255,36 @@ def find_xy(lam, T, maxiters=35, rtol=1e-8):
     # the simplest sense T_0M = T_00 + M*pi
     M_max = int(np.floor(T / math.pi))
     
-    print('lam', lam)
-    print('T', T)
-    print('M_max', M_max)
-#    mistake
-    
     # Evaluate non-dimensional time of flight T
     # T(x=0) denoted T_0M
     # T_00 is T_0 for single revolution (M=0) case  
     # T_0M = T_00 + M*pi
     T_00 = math.acos(lam) + lam*np.sqrt(1. - lam**2.)
     
-    print('T_00', T_00)
-    
     # Check if input T is less than minimum T required for M_max revolutions
     # If so, reduce M_max by 1
     if T < (T_00 + M_max*math.pi) and M_max > 0:
         
-        print('check M_max should be reduced')
-        
         # Start Halley iterations from x=0, T=To and find T_min(M_max)
         dum, T_min, exit_flag = compute_T_min(lam, M_max, maxiters, rtol)
-        
-        print('x_T_min', dum)
-        print('T_min', T_min)
-        print('exit_flag', exit_flag)
         
         if T < T_min and exit_flag == 1:
             M_max -= 1
             
-    print('New M_max', M_max)
-            
     # Compute T(x=1) parabolic case (Izzo Eq 21)
     T_1 = (2./3.) * (1. - lam**3.)
-    print('T_1', T_1)
     
     # Form initial guess for single revolution case (Izzo Eq 30)
     if T >= T_00:
         x_0 = (T_00/T)**(2./3.) - 1.
-        print('first x0', x_0)
+
     elif T < T_1:
         x_0 = (5./2.) * (T_1*(T_1 - T))/(T*(1.-lam**5.)) + 1.
-        print('second x0', x_0)
+
     else:        
         # Modified initial condition from poliastro
         # https://github.com/poliastro/poliastro/issues/1362
-        x_0 = np.exp(np.log(2.) * np.log(T / T_00) / np.log(T_1 / T_00)) - 1.
-        print('third x0', x_0)
-        
+        x_0 = np.exp(np.log(2.) * np.log(T / T_00) / np.log(T_1 / T_00)) - 1.        
         
     # Run Householder iterations for x_0 to get x,y for single rev case
     M = 0
@@ -255,16 +294,16 @@ def find_xy(lam, T, maxiters=35, rtol=1e-8):
         x_list.append(x)
         y_list.append(y)
         M_list.append(M)
-        
-        print(x, y, M)
 
     # Loop over M values and compute x,y using Householder iterations
-    for M in range(1,M_max+1):
-        
+    for M in range(1,M_max+1):        
 
         # Form initial x0_l and x0_r from Izzo Eq 31
-        x0_l = (((M*math.pi + math.pi)/(8.*T))**(2./3.) - 1.)/(((M*math.pi + math.pi)/(8.*T))**(2./3.) + 1.)
-        x0_r = (((8.*T)/(M*math.pi))**(2./3.) - 1.)/(((8.*T)/(M*math.pi))**(2./3.) + 1.)
+        x0_l = (((M*math.pi + math.pi)/(8.*T))**(2./3.) - 1.) * \
+            1./(((M*math.pi + math.pi)/(8.*T))**(2./3.) + 1.)
+            
+        x0_r = (((8.*T)/(M*math.pi))**(2./3.) - 1.) * \
+            1./(((8.*T)/(M*math.pi))**(2./3.) + 1.)
     
         # Run Householder iterations for x0_l and x0_r for multirev cases
         xl, exit_flag = householder(x0_l, T, lam, M, maxiters, rtol)
@@ -288,6 +327,34 @@ def find_xy(lam, T, maxiters=35, rtol=1e-8):
 
 
 def compute_T_min(lam, M, maxiters=35, rtol=1e-8):
+    '''
+    This function computes the minimum non-dimensional time of flight for a
+    given number of integer orbit revolutions.
+    
+    Parameters
+    ------
+    lam : float
+        non-dimensional orbit parameter in range [-1, 1]
+        lam > 0 for theta [0,pi] and lam < 0 for theta [pi, 2pi]
+    M : int
+        integer number of complete orbit revolutions traversed
+    maxiters : int, optional
+        maximum number of iterations for the Halley and Householder 
+        root-finding steps (default=35)
+    rtol : float, optional
+        convergence tolerance for the Halley and Householder root-finding 
+        steps (default=1e-8)
+        
+    Results
+    ------
+    x_T_min : float
+        x value corresponding to T_min
+    T_min : float
+        minimum possible non-dimensional time of flight 
+    exit_flag : int
+        pass/fail criteria for Halley iterations (1 = pass, -1 = fail)    
+    
+    '''
     
     if lam == 1.:
         x_T_min = 0.
@@ -309,6 +376,8 @@ def compute_T_min(lam, M, maxiters=35, rtol=1e-8):
 
 def halley(x0, T0, lam, M, maxiters=35, tol=1e-8):
     '''
+    This function uses Halley iterations to solve the root finding problem to
+    determine x that will minimize T.    
     
     Note, the poliastro code uses T0 to compute the derivates in each 
     iteration, while this code uses an updated value of T to do so. Izzo paper
@@ -316,10 +385,36 @@ def halley(x0, T0, lam, M, maxiters=35, tol=1e-8):
     way to proceed.
     
     Furthermore, poliastro Householder iterations do use the updated T value
-    in each iteration, so makes sense to also do so here.
-    '''
+    in each iteration, so makes sense to also do so here. The only application
+    of the Halley iterations is to determine if M_max needs to be reduced by
+    1, so it is pretty low consequence either way.
     
-    print('\nHalley iterations')
+    Parameters
+    ------
+    x0 : float
+        initial guess at x value
+    T0 : float
+        initial guess at T value    
+    lam : float
+        non-dimensional orbit parameter in range [-1, 1]
+        lam > 0 for theta [0,pi] and lam < 0 for theta [pi, 2pi]
+    M : int
+        integer number of complete orbit revolutions traversed
+    maxiters : int, optional
+        maximum number of iterations for the Halley and Householder 
+        root-finding steps (default=35)
+    rtol : float, optional
+        convergence tolerance for the Halley and Householder root-finding 
+        steps (default=1e-8)
+        
+    Returns
+    ------
+    x : float
+        x value corresponding to T_min
+    exit_flag : int
+        pass/fail criteria for Halley iterations (1 = pass, -1 = fail)   
+
+    '''
     
     diff = 1.
     iters = 0
@@ -331,14 +426,6 @@ def halley(x0, T0, lam, M, maxiters=35, tol=1e-8):
         
         # Halley step, cubic
         x = x0 - 2.*dT*ddT/(2.*ddT**2. - dT*dddT)
-        
-        print('iters', iters)
-        print('x0', x0)
-        print('x', x)
-        print('dT', dT)
-        print('ddT', ddT)
-        print('dddT', dddT)
-        
         
         diff = abs(x - x0)
         x0 = float(x)
@@ -352,8 +439,35 @@ def halley(x0, T0, lam, M, maxiters=35, tol=1e-8):
 
 
 def householder(x0, T_star, lam, M, maxiters=35, tol=1e-8):
+    '''
+    This function uses Halley iterations to solve the root-finding problem
+    to find x corresponding to the input non-dimensional time of flight T_star.
     
-    print('\nHouseholder iterations')
+    Parameters
+    ------
+    x0 : float
+        initial guess at x value
+    T_star : float
+        desired value of T   
+    lam : float
+        non-dimensional orbit parameter in range [-1, 1]
+        lam > 0 for theta [0,pi] and lam < 0 for theta [pi, 2pi]
+    M : int
+        integer number of complete orbit revolutions traversed
+    maxiters : int, optional
+        maximum number of iterations for the Halley and Householder 
+        root-finding steps (default=35)
+    rtol : float, optional
+        convergence tolerance for the Halley and Householder root-finding 
+        steps (default=1e-8)
+        
+    Returns
+    ------
+    x : float
+        x value corresponding to T_star
+    exit_flag : int
+        pass/fail criteria for Halley iterations (1 = pass, -1 = fail) 
+    '''
     
     diff = 1.
     iters = 0
@@ -364,12 +478,8 @@ def householder(x0, T_star, lam, M, maxiters=35, tol=1e-8):
         f_x = T_x - T_star
         dT, ddT, dddT = compute_T_der(x0, T_x, lam)
         
-        x = x0 - f_x*((dT**2. - f_x*ddT/2.)/(dT*(dT**2. - f_x*ddT) + dddT*f_x**2./6.))
-        
-        print('iters', iters)
-        print('T_x', T_x)
-        print('T_star', T_star)
-        print('x', x)
+        x = x0 - f_x*((dT**2. - f_x*ddT/2.)/
+                      (dT*(dT**2. - f_x*ddT) + dddT*f_x**2./6.))
     
         diff = abs(x - x0)
         x0 = float(x)
@@ -378,20 +488,34 @@ def householder(x0, T_star, lam, M, maxiters=35, tol=1e-8):
         if iters > maxiters:
             exit_flag = -1
             break
-    
-    
+
     return x, exit_flag
 
 
 def compute_T(x, lam, M):
     '''
-    Izzo Eq 18 and Eq 20 for case x close to 1
+    This function computes the non-dimensional time of flight T corresponding
+    to x, lam, and M. The computations use Izzo Eq 18 and Eq 20 for the case x 
+    close to 1 (determination of "close" condition from poliastro).
+    
+    Parameters
+    ------
+    x : float
+        non-dimensional coordinate
+    lam : float
+        non-dimensional orbit parameter in range [-1, 1]
+        lam > 0 for theta [0,pi] and lam < 0 for theta [pi, 2pi]
+    M : int
+        integer number of complete orbit revolutions traversed    
+    
+    Returns
+    ------
+    T : float
+        non-dimensional time of flight    
     
     '''
     
     y = np.sqrt(1. - lam**2.*(1. - x**2.))
-    
-    print('Compute_T, y', y)
     
     # Izzo Eq 20
     if M == 0 and x > np.sqrt(0.6) and x < np.sqrt(1.4):
@@ -403,23 +527,44 @@ def compute_T(x, lam, M):
     # Izzo Eq 18
     else:
         psi = compute_psi(x, y, lam)
-        T = (1./(1. - x**2.)) * ((psi + M*math.pi)/np.sqrt(abs(1. - x**2.)) - x + lam*y)
+        T = (1./(1. - x**2.)) * ((psi + M*math.pi)/
+             np.sqrt(abs(1. - x**2.)) - x + lam*y)
     
     return T
 
 
 def compute_T_der(x, T, lam):
     '''
-    Izzo Eq 22
+    This function computes the first three derivatives of T(x) wrt x used for
+    the root-finding functions. The formulas come from Izzo Eq 22 with the
+    note that there are issues for issues for cases where lam^2 = 1, x = 0 
+    and for x = 1.
     
-    See LancasterBlanchard function for alternate forumlation and 
+    See LancasterBlanchard function (archive) for alternate forumlation and 
     exception handling.
     
-    Issues for lam^2 = 1, x = 0
-    and x = 1
+    Parameters
+    ------
+    x : float
+        non-dimensional coordinate
+    T : float
+        non-dimensional time of flight 
+    lam : float
+        non-dimensional orbit parameter in range [-1, 1]
+        lam > 0 for theta [0,pi] and lam < 0 for theta [pi, 2pi]
+    
+    Returns
+    ------
+    dT : float
+        first derivative dT/dx
+    ddT : float
+        second derivative d2T/dx2
+    dddT : float
+        third derivative d3t/dx3
     
     '''
     
+    # Izzo Eq 22
     y    = np.sqrt(1. - lam**2.*(1. - x**2.))
     dT   = (1./(1. - x**2.)) * (3.*T*x - 2. + 2.*lam**3.*(x/y))
     ddT  = (1./(1. - x**2.)) * (3.*T + 5.*x*dT + 2.*(1. - lam**2.)*(lam**3./y**3.))
@@ -430,7 +575,22 @@ def compute_T_der(x, T, lam):
 
 def compute_psi(x, y, lam):
     '''
-    This function computes psi using Izzo Eq 17
+    This function computes psi using Izzo Eq 17.
+    
+    Parameters
+    ------
+    x : float
+        non-dimensional coordinate
+    y : float
+        non-dimensional coordinate
+    lam : float
+        non-dimensional orbit parameter in range [-1, 1]
+        lam > 0 for theta [0,pi] and lam < 0 for theta [pi, 2pi]
+        
+    Returns
+    ------
+    psi : float
+        auxiliary angle [rad]
     
     '''
     
@@ -454,6 +614,24 @@ def compute_psi(x, y, lam):
 
 
 def compute_hypergeom_2F1(a, b, c, d):
+    '''
+    Hypergeometric series function 2F1 adapted from poliastro code.
+    
+    Parameters
+    ------
+    a, b, c, d : float
+        input numbers for series calculation, require |d| < 1
+        
+    Returns
+    ------
+    res : float
+        hypergeometric series evaluated at given input values    
+    
+    Reference
+    ------
+    https://en.wikipedia.org/wiki/Hypergeometric_function
+    
+    '''
     
     
     if d >= 1.0:
@@ -473,10 +651,26 @@ def compute_hypergeom_2F1(a, b, c, d):
 
 def compute_rp(r_vect, v_vect, GM):
     '''
+    This function computes the radius of periapsis for a given position and
+    velocity vector.
     
+    Parameters
+    ------
+    r_vect : 3x1 numpy array
+        inertial position vector [km]
+    v_vect  : 3x1 numpy array
+        inertial velocity vector [km/s]
+    GM : float
+        gravitational parameter of central body [km^3/s^2]
+        
+    Returns
+    ------
+    rp : float
+        radius of periapsis [km]
     
     '''
-    
+    r_vect = np.reshape(r_vect, (3,1))
+    v_vect = np.reshape(v_vect, (3,1))
     r = np.linalg.norm(r_vect)
     v = np.linalg.norm(v_vect)
     
@@ -495,879 +689,6 @@ def compute_rp(r_vect, v_vect, GM):
     return rp
 
 
-def compute_extremal_dist(r0_vect, rf_vect, v0_vect, vf_vect, dtheta, M, lam, GM):
-    '''
-    
-    '''
-    
-    # Default, min/max of r0, rf
-    r0 = np.linalg.norm(r0_vect)
-    v0 = np.linalg.norm(v0_vect)
-    rf = np.linalg.norm(rf_vect)
-    r0_vect_hat = r0_vect/r0
-    rf_vect_hat = rf_vect/rf
-    minimum_distance = min(r0, rf)
-    maximum_distance = max(r0, rf)
-    
-    # Semi-major axis
-    a = 1./(2./r0 - v0**2./GM)
-
-    # Eccentricity vector 
-    h0_vect = np.array([[float(r0_vect[1]*v0_vect[2] - r0_vect[2]*v0_vect[1])],
-                        [float(r0_vect[2]*v0_vect[0] - r0_vect[0]*v0_vect[2])],
-                        [float(r0_vect[0]*v0_vect[1] - r0_vect[1]*v0_vect[0])]])
-    
-    cross1 =  np.array([[float(v0_vect[1]*h0_vect[2] - v0_vect[2]*h0_vect[1])],
-                        [float(v0_vect[2]*h0_vect[0] - v0_vect[0]*h0_vect[2])],
-                        [float(v0_vect[0]*h0_vect[1] - v0_vect[1]*h0_vect[0])]])
-    
-    e0_vect = cross1/GM - r0_vect/r0
-    e = np.linalg.norm(e0_vect)
-    e0_vect_hat = e0_vect/e
-    
-    # Apses
-    periapsis = a*(1. - e)
-    apoapsis = np.inf
-    if e < 1.:
-        apoapsis = a*(1. + e)
-        
-    # Check if the trajectory goes through periapsis
-    if M > 0:
-        
-        # Multirev case, must be elliptical and pass through both periapsis and
-        # apoapsis
-        minimum_distance = periapsis
-        maximum_distance = apoapsis
-        
-    else:
-        
-        # Compute true anomaly at t0 and tf
-        pm0 = np.sign(r0*r0*np.dot(e0_vect.T, v0_vect) - np.dot(r0_vect.T, e0_vect)*np.dot(r0_vect.T, v0_vect))
-        pmf = np.sign(rf*rf*np.dot(e0_vect.T, vf_vect) - np.dot(rf_vect.T, e0_vect)*np.dot(rf_vect.T, vf_vect))
-
-        theta0 = pm0 * math.acos(max(-1, min(1, np.dot(r0_vect_hat.T, e0_vect_hat))))
-        thetaf = pmf * math.acos(max(-1, min(1, np.dot(rf_vect_hat.T, e0_vect_hat))))
-        
-        if theta0*thetaf < 0.:
-            
-            # Initial and final positions are on opposite sides of symmetry axis
-            # Minimum and maximum distance depends on dtheta and true anomalies
-            if abs(abs(theta0) + abs(thetaf) - dtheta) < 5.*np.finfo(float).eps:
-                minimum_distance = periapsis
-            
-            # This condition can only be false for elliptic cases, and if it is
-            # false, the orbit has passed through apoapsis
-            else:
-                maximum_distance = apoapsis
-                
-        else:
-            
-            # Initial and final positions are on the same side of symmetry axis
-            # If it is a Type II transfer (longway) then the object must
-            # pass through both periapsis and apoapsis
-            if lam < 0.:
-                minimum_distance = periapsis
-                if e < 1.:
-                    maximum_distance = apoapsis
-                    
-                    
-    extremal_distances = [minimum_distance, maximum_distance]
-
-    return extremal_distances
-
-
-
-
-
-#def battin_lambert(r1_vect, r2_vect, tof, GM, transfer_type):
-#    '''
-#    
-#    
-#    '''
-#    
-#    # Compute chord and unit vectors
-#    r1_vect = np.reshape(r1_vect, (3,1))
-#    r2_vect = np.reshape(r2_vect, (3,1))
-#    c_vect = r2_vect - r1_vect
-#    
-#    r1 = np.linalg.norm(r1_vect)
-#    r2 = np.linalg.norm(r2_vect)
-#    c = np.linalg.norm(c)
-#    
-#    s = 0.5 * (r1 + r2 + c)
-#    eps = (r2 - r1)/r1
-#    
-#    if transfer_type == 1:
-#        t_m = 1.
-#    elif transfer_type == 2:
-#        t_m = -1.
-#    
-#    # Difference in true anomaly angle
-#    cos_dtheta = np.dot(r1_vect.T, r2_vect)/(r1*r2)
-#    sin_dtheta = t_m * np.sqrt(1. - cos_dtheta**2.)
-#    dtheta = math.atan2(sin_dtheta, cos_dtheta)
-#    if dtheta < 0.:
-#        dtheta += 2.*math.pi
-#    
-#    
-#    tan2_2w = (eps**2./4.)/(np.sqrt(r2/r1) + (r2/r1)*(2. + np.sqrt(r2/r1)))
-#    r_op = np.sqrt(r1*r2)*(math.cos(dtheta/4.)**2. + tan2_2w)
-#    
-#    if dtheta < math.pi:
-#        l = (math.sin(dtheta/4.)**2. + tan2_2w)/(math.sin(dtheta/4.)**2. + tan2_2w + math.cos(dtheta/2.))
-#    else:
-#        l = (math.cos(dtheta/4.)**2. + tan2_2w - math.cos(dtheta/2.))/(math.cos(dtheta/4.)**2. + tan2_2w)
-#        
-#    m = GM*tof**2./(8.*r_op**3.)
-#    
-#    # Let x = l for elliptical orbit, else x = 0
-#    x = l
-#    
-#    
-#    diff = 1.
-#    tol = 1e-12
-#    while diff > tol:
-#        
-#        eta = x/(np.sqrt(1. + x) + 1)**2.
-#        zeta = compute_zeta(x, eta)
-#        
-#    
-#    
-#    
-#    
-#    
-#    return v1_vect, v2_vect
-#
-#
-#
-#
-#
-#def compute_zeta(x, eta):
-#    
-#    for nn in range(4, 10):
-#        c_n = nn**2./((2.*nn)**2. - 1.)
-#        
-#    
-#    nn = 10
-#    frac = 1.
-#    while nn > 4:
-#        cn = nn**2./((2.*nn)**2. - 1.)
-#        denom = 1 + cn*eta
-#        
-#        
-#        
-#        
-#        
-#    
-#    
-#    return
-
-
-
-#def multirev_lambert(r0_vect, rf_vect, tof, m, GM, transfer_type, branch):
-#    '''
-#    This function implements two methods to solve Lambert's Problem, a fast 
-#    method developed by Dr Izzo of ESA and a robust method based on work by
-#    Lancaster and Blanchard [2], and Gooding [3]. This code is written 
-#    following a MATLAB version written by Rody Oldenhuis, copyright below.
-#    
-#    Source code from https://github.com/rodyo/FEX-Lambert
-#    
-#    Parameters
-#    ------
-#    r0_vect : 3x1 numpy array
-#        position vector at t0 [km]
-#    rf_vect : 3x1 numpy array
-#        position vector at tf [km]
-#    tof : float
-#        time of flight [sec]
-#    m : int
-#        number of complete orbit revolutions
-#    GM : float
-#        graviational parameter of central body [km^3/s^2]
-#        
-#    Returns
-#    ------
-#    v0_vect : 3x1 numpy array
-#        velocity vector at t0 [km/s]
-#    vf_vect : 3x1 numpy array
-#        velocity vector at tf [km/s]
-#    extremal_distances : list
-#        min and max distance from central body during orbit [km]
-#    exit_flag : int
-#        +1 : success
-#        -1 : problem has no solution
-#        -2 : both algorithms failed (should not occur)
-#        
-#    References
-#    ------
-#    [1] Izzo, D. ESA Advanced Concepts team. Code used available in MGA.M, on
-#         http://www.esa.int/gsp/ACT/inf/op/globopt.htm. Last retreived Nov, 2009.
-#         (broken link)
-#     
-#    [2] Lancaster, E.R. and Blanchard, R.C. "A unified form of Lambert's theorem."
-#         NASA technical note TN D-5368,1969.
-#     
-#    [3] Gooding, R.H. "A procedure for the solution of Lambert's orbital boundary-value
-#         problem. Celestial Mechanics and Dynamical Astronomy, 48:145-165,1990.
-#    
-#    
-#    Copyright
-#    ------
-#    Copyright (c) 2018, Rody Oldenhuis
-#    All rights reserved.
-#    
-#    Redistribution and use in source and binary forms, with or without
-#    modification, are permitted provided that the following conditions are met:
-#    
-#    1. Redistributions of source code must retain the above copyright notice, this
-#       list of conditions and the following disclaimer.
-#    2. Redistributions in binary form must reproduce the above copyright notice,
-#       this list of conditions and the following disclaimer in the documentation
-#       and/or other materials provided with the distribution.
-#    
-#    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-#    ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-#    WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-#    DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
-#    ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-#    (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-#    LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-#    ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-#    (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-#    SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-#    
-#    The views and conclusions contained in the software and documentation are those
-#    of the authors and should not be interpreted as representing official policies,
-#    either expressed or implied, of this project.
-#    
-#    '''
-#    
-#    # Fast Lambert
-#    v0_vect, vf_vect, extremal_distances, exit_flag = \
-#        fast_lambert(r0_vect, rf_vect, tof, m, GM, transfer_type, branch)
-#        
-#    # If not successful, run robust solver
-#    if exit_flag < 0:
-#        v0_vect, vf_vect, extremal_distances, exit_flag = \
-#            robust_lambert(r0_vect, rf_vect, tof, m, GM, transfer_type, branch)
-#    
-#            
-#
-#
-#
-#
-#    
-#    
-#    return v0_vect, vf_vect, extremal_distances, exit_flag
-
-
-
-#
-#def fast_lambert(r0_vect, rf_vect, tof, m, GM, transfer_type, branch):
-#    '''
-#    This function implements a computationally efficient but less robust 
-#    approach to solve Lambert's Problem developed by Dario Izzo (ESA).
-#    
-#    Parameters
-#    ------
-#    r0_vect : 3x1 numpy array
-#        position vector at t0 [km]
-#    rf_vect : 3x1 numpy array
-#        position vector at tf [km]
-#    tof : float
-#        time of flight [sec]
-#    m : int
-#        number of complete orbit revolutions
-#    GM : float
-#        graviational parameter of central body [km^3/s^2]
-#        
-#    Returns
-#    ------
-#    v0_vect : 3x1 numpy array
-#        velocity vector at t0 [km/s]
-#    vf_vect : 3x1 numpy array
-#        velocity vector at tf [km/s]
-#    extremal_distances : list
-#        min and max distance from central body during orbit [km]
-#    exit_flag : int
-#        +1 : success
-#        -1 : fail
-#    '''
-#    
-#        
-#    # Initialize
-#    tol = 1e-14
-#    max_iters = 15
-#    exit_flag = -1
-#    r0_vect = np.reshape(r0_vect, (3,1))
-#    rf_vect = np.reshape(rf_vect, (3,1))
-#    
-#    # Normalize units
-#    r0 = np.linalg.norm(r0_vect)
-#    v0 = np.sqrt(GM/r0)
-#    T = r0/v0
-#    
-#    r0_vect = r0_vect/r0
-#    rf_vect = rf_vect/r0
-#    tf = tof/T
-#    logt = math.log(tf)
-#    
-#    # Check non-dimensional geometry
-#    rf_norm = np.linalg.norm(rf_vect)
-#    dtheta = math.acos(max(-1, min(1, np.dot(r0_vect.T, rf_vect)/rf_norm)))
-#    
-#    # Check for Type I (short) or II (long) transfer and adjust
-#    type_factor = 1.
-#    if transfer_type == 2:
-#        dtheta = 2.*math.pi - dtheta
-#        type_factor = -1.
-#        
-#    # Derived non-dimensional quantities
-#    c = np.sqrt(1. + rf_norm**2. - 2.*rf_norm*math.cos(dtheta)) # chord
-#    s = (1. + rf_norm + c)/2.                                   # semi-parameter
-#    a_min = s/2.                                                # min energy ellipse SMA
-#    Lambda = np.sqrt(rf_norm)*math.cos(dtheta/2.)/s             # Lambda parameter from Battin
-#
-#    r_cross_vect = np.array([[float(r0_vect[1]*rf_vect[2] - r0_vect[2]*rf_vect[1])],
-#                             [float(r0_vect[2]*rf_vect[0] - r0_vect[0]*rf_vect[2])],
-#                             [float(r0_vect[0]*rf_vect[1] - r0_vect[1]*rf_vect[0])]])
-#
-#    r_cross = np.linalg.norm(r_cross_vect)
-#    r_cross_hat = r_cross_vect/r_cross                          # unit vector
-#
-#    # Setup initial values
-#    if m == 0:
-#        
-#        # Single revolution (1 solution)
-#        inn1 = -0.5233              # first initial guess
-#        inn2 = 0.5233               # second initial guess
-#        x1 = math.log(1. + inn1)    # transformed first initial guess
-#        x2 = math.log(1. + inn2)    # transformed first second guess
-#        
-#    else:
-#        
-#        # Multirev case, select right or left branch
-#        if branch == 'left':
-#            inn1 = -0.5234          # first initial guess
-#            inn2 = -0.2234          # second initial guess
-#        
-#        if branch == 'right':
-#            inn1 = 0.7234           # first initial guess
-#            inn2 = 0.5234           # second initial guess
-#            
-#        x1 = math.tan(inn1 + math.pi/2.)    # transformed first initial guess
-#        x2 = math.tan(inn2 + math.pi/2.)    # transformed first second guess     
-#        
-#    # Initial guess
-#    xx = np.array([inn1, inn2])
-#    aa = a_min/(1. - np.multiply(xx, xx))
-#    bbeta = np.asarray([type_factor * 2. * math.asin(np.sqrt((s-c)/2./ai)) for ai in aa])
-#    aalpha = np.asarray([2.*math.acos(xi) for xi in xx])
-#    
-#    # Evaluate the time of flight via Lagrange expression
-#    alpha_term = aalpha - np.asarray([math.sin(ai) for ai in aalpha])
-#    beta_term = bbeta - np.asarray([math.sin(bi) for bi in bbeta])
-#    y_term = alpha_term - beta_term + 2.*math.pi*m
-#    
-#    y12 = np.multiply(aa, np.multiply(np.sqrt(aa), y_term))
-#    
-#    # Initial estimate for y
-#    if m == 0:
-#        y1 = math.log(y12[0]) - logt
-#        y2 = math.log(y12[1]) - logt
-#    else:
-#        y1 = float(y12[0]) - tf
-#        y2 = float(y12[0]) - tf
-#        
-#    # Solve for x
-#    # Newton-Raphson iteration
-#    err = 1e6
-#    iters = 0
-#    xnew = 0.
-#    while err > tol:
-#        
-#        # Increment iterations
-#        iters += 1
-#        
-#        # Compute xnew
-#        xnew = (x1*y2 - y1*x2)/(y2 - y1)
-#        
-#        if m == 0:
-#            x = math.exp(xnew) - 1.
-#        else:
-#            x = math.atan(xnew)*2./math.pi
-#        
-#        a = a_min/(1. - x**2.)
-#        
-#        # Ellipse
-#        if x < 1.:
-#            beta = type_factor * 2.*math.asin(np.sqrt((s-c)/2./a))
-#            alpha = 2.*math.acos(max(-1., min(1., x)))
-#        
-#        # Hyperbola
-#        else:
-#            beta = type_factor * 2.*math.asinh(np.sqrt((s-c)/(-2.*a)))
-#            alpha = 2.*math.acosh(x)
-#            
-#            
-#        # Evaluate time of flight via Lagrange expression
-#        if a > 0.:
-#            tof_new = a*np.sqrt(a)*((alpha - math.sin(alpha) - (beta - math.sin(beta)) + 2.*math.pi*m))
-#        else:
-#            tof_new = -a*np.sqrt(-a)*((math.sinh(alpha) - alpha) - (math.sinh(beta) - beta))
-#            
-#        # New value of y
-#        if m == 0:
-#            ynew = math.log(tof_new) - logt
-#        else:
-#            ynew = tof_new - tf
-#            
-#        # Save previous and current values for next iteration
-#        x1 = x2
-#        x2 = xnew
-#        y1 = y2
-#        y2 = ynew
-#        err = abs(x1 - xnew)
-#        
-#        # Exit condition
-#        if iters > max_iters:
-#            exit_flag = -1
-#            break
-#        
-#    # Convert converged value of x
-#    if m == 0:
-#        x = math.exp(xnew) - 1.
-#    else:
-#        x = math.atan(xnew)*2./math.pi
-#        
-#    # The solution has been evaluated in terms of log(x+1) or tan(x*pi/2), we
-#    # now need the conic. As for transfer angles near to pi the Lagrange-
-#    # coefficients technique goes singular (dg approaches a zero/zero that is
-#    # numerically bad) we here use a different technique for those cases. When
-#    # the transfer angle is exactly equal to pi, then the ih unit vector is not
-#    # determined. The remaining equations, though, are still valid.
-#    
-#    # Solution for semi-major axis
-#    a = a_min/(1. - x**2.)
-#    
-#    # Calculate psi
-#    # Ellipse
-#    if x < 1.:
-#        beta = type_factor * 2.*math.asin(np.sqrt((s-c)/2./a))
-#        alpha = 2.*math.acos(max(-1., min(1., x)))
-#        psi = (alpha - beta)/2.
-#        eta2 = 2.*a*math.sin(psi)**2./s
-#        eta = np.sqrt(eta2)
-#        
-#    # Hyperbola
-#    else:
-#        beta = type_factor * 2.*math.asinh(np.sqrt((s-c)/(-2.*a)))
-#        alpha = 2.*math.acosh(x)
-#        psi = (alpha - beta)/2.
-#        eta2 = -2.*a*math.sinh(psi)**2./s
-#        eta = np.sqrt(eta2)
-#        
-#    # Unit of normalized unit vector
-#    ih = type_factor*r_cross_hat
-#    
-#    # Unit vector for rf_vect
-#    r0_vect_hat = r0_vect/np.linalg.norm(r0_vect)
-#    rf_vect_hat = rf_vect/rf_norm
-#    
-#    # Cross products    
-#    cross1 = np.array([[float(ih[1]*r0_vect_hat[2] - ih[2]*r0_vect_hat[1])],
-#                       [float(ih[2]*r0_vect_hat[0] - ih[0]*r0_vect_hat[2])],
-#                       [float(ih[0]*r0_vect_hat[1] - ih[1]*r0_vect_hat[0])]])
-#    
-#    cross2 = np.array([[float(ih[1]*rf_vect_hat[2] - ih[2]*rf_vect_hat[1])],
-#                       [float(ih[2]*rf_vect_hat[0] - ih[0]*rf_vect_hat[2])],
-#                       [float(ih[0]*rf_vect_hat[1] - ih[1]*rf_vect_hat[0])]])
-#    
-#    
-#    
-#    # Radial and tangential components for initial velocity
-#    Vr1 = 1./eta/np.sqrt(a_min) * (2.*Lambda*a_min - Lambda - x*eta)
-#    Vt1 = np.sqrt(rf_norm/a_min/eta2 * math.sin(dtheta/2.)**2.)
-#    
-#    # Radial and tangential components for final velocity
-#    Vt2 = Vt1/rf_norm
-#    Vr2 = (Vt1 - Vt2)/math.tan(dtheta/2.) - Vr1
-#    
-#    # Velocity vectors
-#    v0_vect = (Vr1*r0_vect + Vt1*cross1)*v0
-#    vf_vect = (Vr2*rf_vect_hat + Vt2*cross2)*v0
-#    
-#    # Exit flag - success
-#    exit_flag = 1
-#
-#    # Compute min/max distance to central body
-#    extremal_distances = \
-#        compute_extremal_dist(r0_vect*r0, rf_vect*r0, v0_vect, vf_vect, dtheta,
-#                              a*r0, m, GM, transfer_type)
-#       
-#    return v0_vect, vf_vect, extremal_distances, exit_flag
-#
-#
-#def robust_lambert(r0_vect, rf_vect, tof, m, GM, transfer_type, branch):
-#    '''
-#    This function implements a robust method to solve Lambert's Problem based 
-#    on work by Lancaster and Blanchard, and Gooding. 
-#    
-#    Parameters
-#    ------
-#    r0_vect : 3x1 numpy array
-#        position vector at t0 [km]
-#    rf_vect : 3x1 numpy array
-#        position vector at tf [km]
-#    tof : float
-#        time of flight [sec]
-#    m : int
-#        number of complete orbit revolutions
-#    GM : float
-#        graviational parameter of central body [km^3/s^2]
-#        
-#    Returns
-#    ------
-#    v0_vect : 3x1 numpy array
-#        velocity vector at t0 [km/s]
-#    vf_vect : 3x1 numpy array
-#        velocity vector at tf [km/s]
-#    extremal_distances : list
-#        min and max distance from central body during orbit [km]
-#    exit_flag : int
-#        +1 : success
-#        -1 : no solution exists
-#        -2 : fail (could not determine if a solution exists)
-#    '''
-#    
-#    
-#    
-#    # Initialize and normalize values
-#    r0_vect = np.reshape(r0_vect, (3,1))
-#    rf_vect = np.reshape(rf_vect, (3,1))
-#    tol = 1e-12                            # optimum for numerical noise v.s. actual precision
-#    r0 = np.linalg.norm(r0_vect)              
-#    rf = np.linalg.norm(rf_vect)              
-#    r0_hat = r0_vect/r0                        
-#    rf_hat = rf_vect/rf                         
-#    cross_r0rf = np.reshape(np.cross(r0_vect.flatten(), rf_vect.flatten()), (3,1))
-#    cross_mag = np.linalg.norm(cross_r0rf)
-#    cross_r0rf_hat = cross_r0rf/cross_mag
-#    
-#    # Compute unit vectors in tangential direction
-#    t0_hat = np.reshape(np.cross(cross_r0rf_hat.flatten(), r0_hat.flatten()), (3,1))
-#    tf_hat = np.reshape(np.cross(cross_r0rf_hat.flatten(), rf_hat.flatten()), (3,1))
-#    
-#    # Compute turn angle
-#    dtheta = math.acos(max(-1, min(1, np.dot(r0_hat.T, rf_hat))))
-#    
-#    # Check for Type I (short) or II (long) transfer and adjust
-#    if transfer_type == 2:
-#        dtheta = dtheta - 2.*math.pi
-#    
-#    # Define constants
-#    c = np.sqrt(r0**2. + rf**2. - 2.*r0*rf*math.cos(dtheta))
-#    s = (r0 + rf + c)/2.
-#    T = np.sqrt(8.*GM/s**3.) * tof
-#    q = np.sqrt(r0*rf)/s * math.cos(dtheta/2.)
-#    
-#    # General formulae for initial values (Gooding)
-#    T0, dT0, ddT0, dddT0 = LancasterBlanchard(0., q, m)
-#    Td = T0 - T
-#    phr = math.fmod(2.*math.atan2(1. - q**2., 2.*q), 2.*math.pi)
-#    
-#    # Initial output
-#    v0_vect = np.reshape([np.nan]*3, (3,1))
-#    vf_vect = np.reshape([np.nan]*3, (3,1))
-#    extremal_distances = [np.nan]*2
-#    
-#    # Single revolution case
-#    if m == 0:
-#        x01 = T0*Td/4./T
-#        if Td > 0.:
-#            x0 = x01
-#        else:
-#            x01 = Td/(4. - Td)
-#            x02 = -np.sqrt(-Td/(T + T0/2.))
-#            W = x01 + 1.7*np.sqrt(2. - phr/math.pi)
-#            if W >= 0.:
-#                x03 = x01
-#            else:
-#                x03 = x01 + (-W)**(1./16.)*(x02 - x01)
-#            
-#            Lambda = 1. + x03*(1. + x01)/2. - 0.03*x03**2.*np.sqrt(1. + x01)
-#            x0 = Lambda*x03
-#            
-#        # This estimate might not give a solution
-#        if x0 < -1.:
-#            exit_flag = -1
-#            return v0_vect, vf_vect, extremal_distances, exit_flag
-#        
-#    # Multi-revolution case
-#    else:
-#        
-#        # Determine minimum Tp(x)
-#        xMpi = 4./(3.*math.pi*(2.*m + 1.))
-#        if phr < math.pi:
-#            xM0 = xMpi*(phr/math.pi)**(1./8.)
-#        elif phr > math.pi:
-#            xM0 = xMpi*(2. - (2. - phr/math.pi)**(1./8.))
-#        else:
-#            xM0 = 0.
-#            
-#        # Use Halley's method
-#        xM = xM0
-#        Tp = np.inf
-#        iters = 0
-#        while abs(Tp) < tol:
-#            
-#            # Increment counter
-#            iters += 1
-#            
-#            # Compute first three derivatives
-#            dum, Tp, Tpp, Tppp = LancasterBlanchard(xM, q, m)
-#            
-#            # New value of xM
-#            xMp = float(xM)
-#            xM = xM - 2.*Tp*Tpp / (2.*Tpp**2. - Tp*Tppp)
-#            
-#            # Escape clause
-#            if math.fmod(iters, 7):
-#                xM = (xMp + xM)/2.
-#            
-#            # The method might fail
-#            if iters > 25:
-#                exit_flag = -2
-#                return v0_vect, vf_vect, extremal_distances, exit_flag
-#            
-#        # xM should be elliptic (-1 < x < 1)
-#        # This should be impossible to go wrong
-#        if xM < -1. or xM > 1.:
-#            exit_flag = -1
-#            return v0_vect, vf_vect, extremal_distances, exit_flag
-#        
-#        # Corresponding time
-#        TM, dum1, dum2, dum3 = LancasterBlanchard(xM, q, m)
-#        
-#        # T should lie above the minimum T
-#        if TM > T:
-#            exit_flag = -1
-#            return v0_vect, vf_vect, extremal_distances, exit_flag
-#        
-#        
-#        # Find two initial values for second solution (again with lambda-type patch)
-#        
-#        # Initial values
-#        TmTM = T - TM
-#        T0mTM = T0 - TM
-#        dum1, Tp, Tpp, dum2 = LancasterBlanchard(xM, q, m)
-#        
-#        # First estimate (only if left branch)
-#        if branch == 'left':
-#            x = np.sqrt(TmTM/(Tpp/2. + TmTM/(1.-xM)**2.))
-#            W = xM + x
-#            W = 4.*W/(4. + TmTM) + (1. - W)**2.
-#            x0 = x*(1. - (1. + m + (dtheta - 1./2.)) / (1. + 0.15*m)*x*(W/2. + 0.03*x*np.sqrt(W))) + xM
-#            
-#            # First estimate might not be able to yield possible solution
-#            if x0 > 1.:
-#                exit_flag = -1
-#                return v0_vect, vf_vect, extremal_distances, exit_flag
-#        
-#        # Second estimate
-#        else:
-#            if Td > 0.:
-#                x0 = xM - np.sqrt(TM/(Tpp/2. - TmTM*(Tpp/2./T0mTM - 1./xM**2.)))
-#            else:
-#                x00 = Td/(4. - Td)
-#                W = x00 + 1.7*np.sqrt(2.*(1. - phr))
-#                if W >= 0.:
-#                    x03 = x00
-#                else:
-#                    x03 = x00 - np.sqrt((-W)**(1./8.))*(x00 + np.sqrt(-Td/(1.5*T0 - Td)))
-#                W = 4./(4. - Td)
-#                Lambda = (1. + (1. + m + 0.24*(dtheta - 1./2.)) / (1. + 0.15*m)*x03*(W/2. - 0.03*x03*np.sqrt(W)))
-#                x0 = x03*Lambda
-#                
-#            # Estimate might not give solution
-#            if x0 < -1.:
-#                exit_flag = -1
-#                return v0_vect, vf_vect, extremal_distances, exit_flag
-#        
-#    
-#    
-#    
-#    # Find root of Lancaster and Blanchard's function
-#    # (Halley's method)
-#    x = x0
-#    Tx = np.inf
-#    iters = 0    
-#    while abs(Tx) > tol:
-#        
-#        # Increment counter
-#        iters += 1
-#        
-#        # Compute function value and first two derivatives
-#        Tx, Tp, Tpp, dum = LancasterBlanchard(x, q, m)
-#        
-#        # Find the root of the difference between the function value T_x and
-#        # the required time T
-#        Tx = Tx - T
-#        
-#        # New value of x
-#        xp = float(x)
-#        x = x - 2.*Tx*Tp/(2.*Tp**2. - Tx*Tpp)
-#        
-#        # Escape clause
-#        if math.fmod(iters, 7):
-#            x = (xp + x)/2.
-#            
-#        # Halley's method might fail
-#        if iters > 25:
-#            exit_flag = -2
-#            return v0_vect, vf_vect, extremal_distances, exit_flag
-#            
-#    
-#    # Calculate terminal velocities
-#    gamma = np.sqrt(GM*s/2.)
-#    if c == 0.:
-#        sigma = 1.
-#        rho = 0.
-#        z = abs(x)
-#    else:
-#        sigma = 2.*np.sqrt(r0*rf/(c**2.)) * math.sin(dtheta/2.)
-#        rho = (r0 - rf)/c
-#        z = np.sqrt(1. + q**2.*(x**2. - 1.))
-#        
-#    # Radial components
-#    Vr0 = gamma*((q*z - x) - rho*(q*z + x)) / r0    
-#    Vrf = -gamma*((q*z - x) + rho*(q*z + x)) / rf
-#    v0_radial = Vr0*r0_hat
-#    vf_radial = Vrf*rf_hat
-#    
-#    # Tangential components
-#    Vt0 = sigma * gamma * (z + q*x) / r0
-#    Vtf = sigma * gamma * (z + q*x) / rf
-#    v0_tan = Vt0*t0_hat
-#    vf_tan = Vtf*tf_hat
-#    
-#    # Cartesian velocity
-#    v0_vect = v0_radial + v0_tan
-#    vf_vect = vf_radial + vf_tan
-#    
-#    # Final outputs
-#    a = s/2./(1. - x**2.)
-#    extremal_distances = \
-#        compute_extremal_dist(r0_vect, rf_vect, v0_vect, vf_vect, dtheta, a, m,
-#                              GM, transfer_type)
-#    
-#    exit_flag = 1
-#    
-#    
-#    return v0_vect, vf_vect, extremal_distances, exit_flag
-#
-#
-#def LancasterBlanchard(x, q, m):
-#    
-#    # Verify input
-#    if x < -1.:
-#        x = abs(x) - 2.
-#    elif x == -1.:
-#        x += np.finfo(float).eps
-#        
-#    # Compute parameter E
-#    E = x*x - 1.
-#    
-#    # Compute T(x) and derivatives
-#    if x == 1:
-#        
-#        # Parabolic, solutions known exactly
-#        T = (4./3.)*(1. - q**3.)
-#        Tp = (4./5.)*(q**5. - 1.)
-#        Tpp = Tp + (120./70.)*(1. - q**7.)
-#        Tppp = 3.*(Tpp - Tp) + (2400./1080.)*(q**9. - 1.)
-#        
-#    elif abs(x-1) < 1e-2:
-#        
-#        # Near-parabolic, compute with series
-#        sig1, dsigdx1, d2sigdx21, d3sigdx31 = compute_sigmax(-E)
-#        sig2, dsigdx2, d2sigdx22, d3sigdx32 = compute_sigmax(-E*q*q)
-#        
-#        T = sig1 - q**3.*sig2
-#        Tp = 2.*x*(q**5.*dsigdx2 - dsigdx1)
-#        Tpp = Tp/x + 4.*x**2.*(d2sigdx21 - q**7.*d2sigdx22)
-#        Tppp = 3.*(Tpp-Tp/x)/x + 8.*x*x*(q**9.*d3sigdx32 - d3sigdx31)
-#        
-#    else:
-#        
-#        # All other cases
-#        y = np.sqrt(abs(E))
-#        z = np.sqrt(1. + q**2.*E)
-#        f = y*(z - q*x)
-#        g = x*z - q*E
-#        
-#        if E < 0.:
-#            d = math.atan2(f, g) + math.pi*m
-#        elif E == 0.:
-#            d = 0.
-#        else:
-#            d = math.log(max(0., (f+g)))
-#            
-#
-#        T = 2.*(x - q*z - d/y)/E
-#        Tp = (4. - 4.*q**3.*x/z - 3.*x*T)/E
-#        Tpp = (-4.*q**3./z * (1. - q**2.*x**2./z**2.) - 3.*T - 3.*x*Tp)/E
-#        Tppp = (4.*q**3./z**2.*((1. - q**2.*x**2./z**2.) + 2.*q**2.*x/z**2.*(z - x)) - 8.*Tp - 7.*x*Tpp)/E
-#
-#    return T, Tp, Tpp, Tppp
-#    
-#
-#def compute_sigmax(y):
-#    '''
-#    
-#    '''
-#    
-#    # Twenty-five factors more than enough for 16-digit precision
-#    an = [4.000000000000000e-001, 2.142857142857143e-001, 4.629629629629630e-002,
-#          6.628787878787879e-003, 7.211538461538461e-004, 6.365740740740740e-005,
-#          4.741479925303455e-006, 3.059406328320802e-007, 1.742836409255060e-008,
-#          8.892477331109578e-010, 4.110111531986532e-011, 1.736709384841458e-012,
-#          6.759767240041426e-014, 2.439123386614026e-015, 8.203411614538007e-017,
-#          2.583771576869575e-018, 7.652331327976716e-020, 2.138860629743989e-021,
-#          5.659959451165552e-023, 1.422104833817366e-024, 3.401398483272306e-026,
-#          7.762544304774155e-028, 1.693916882090479e-029, 3.541295006766860e-031,
-#          7.105336187804402e-033]
-#    
-#
-#    # powers of y
-#    powers = [y**exponent for exponent in range(1, 26)]
-#    
-#    # Vectorize
-#    powers = np.reshape(powers, (25, 1))
-#    an = np.reshape(an, (25, 1))
-#    deriv_factors = np.reshape(range(1,26), (25,1))
-#    deriv2_factors = np.reshape(range(0,25), (25,1))
-#    deriv3_factors = np.reshape(range(-1, 24), (25,1))
-#
-#    # sigma itself
-#    sig = float(4./3. + np.dot(powers.T, an))
-#
-#    # dsigma / dx (derivative)
-#    first_der = np.reshape(np.insert(powers, 0, 1), (26, 1))
-#    dsigdx = float(np.dot(np.multiply(deriv_factors, first_der[0:25]).T, an))
-#
-#    # d2sigma / dx2 (second derivative)
-#    second_der = np.reshape(np.insert(powers, 0, np.array([1./y, 1.])), (27, 1))
-#    d2sigdx2 = float(np.dot(np.multiply(np.multiply(deriv_factors, deriv2_factors), second_der[0:25]).T, an))
-#    
-#    # d3sigma / dx3 (third derivative)
-#    third_der = np.reshape(np.insert(powers, 0, np.array([1./y/y, 1./y, 1.])), (28, 1))
-#    d3sigdx3 = float(np.dot(np.multiply(np.multiply(np.multiply(deriv_factors, deriv2_factors), deriv3_factors), third_der[0:25]).T, an))
-#
-#    
-#    return  sig, dsigdx, d2sigdx2, d3sigdx3
-    
 
 
 

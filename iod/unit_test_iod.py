@@ -104,7 +104,7 @@ def lambert_test():
     # Setup and run Lambert Solvers
     t0 = tk_list[0]    
 #    for kk in range(1,len(fraction_list)):
-    for kk in range(7,8):
+    for kk in range(3,4):
         
         frac = fraction_list[kk]        
         tf = tk_list[kk]
@@ -164,6 +164,7 @@ def lambert_test():
         
         print('\n')
         print('izzo time', izzo_time)
+
         print('v0_list', v0_list)
         print('vf_list', vf_list)
         print('v0_true', v0_true)
@@ -683,9 +684,9 @@ if __name__ == '__main__':
     plt.close('all')
     
     
-    lambert_test()
+#    lambert_test()
     
-#    lambert_test_hyperbolic()
+    lambert_test_hyperbolic()
     
 #    test_sigmax()
     
