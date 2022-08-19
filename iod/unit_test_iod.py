@@ -53,6 +53,22 @@ def lambert_test():
     Xo = np.reshape([757.700301, 5222.606566, 4851.49977,
                      2.213250611, 4.678372741, -5.371314404], (6,1))
     
+    
+    # MEO Orbit
+#    elem0 = [26560., 0.001,55, 0., 0., 0.]
+#    Xo = astro.kep2cart(elem0, GM)
+    
+    # HEO Molniya Orbit
+#    Xo = np.reshape([2.88824880e3, -7.73903934e2, -5.97116199e3, 2.64414431,
+#                     9.86808092, 0.0], (6,1))
+    
+    
+    # GEO Orbit
+#    elem0 = [42164.2, 0.001, 0.01, 0., 0., 0.]
+#    Xo = astro.kep2cart(elem0, GM)
+    
+    
+    
     results_flag = 'all'
     periapsis_check = True
     
@@ -62,7 +78,7 @@ def lambert_test():
     print('a', a)
     theta0 = float(elem0[5])
     P = 2.*math.pi*np.sqrt(a**3./GM)
-    fraction_list = [0., 0.2, 0.8, 1.2, 1.8, 10.2, 10.8]
+    fraction_list = [0., 0.2, 0.8, 1.2, 1.8, 10.2, 10.8, 50.2]
     
     
     tvec = np.asarray([frac*P for frac in fraction_list])
@@ -88,7 +104,7 @@ def lambert_test():
     # Setup and run Lambert Solvers
     t0 = tk_list[0]    
 #    for kk in range(1,len(fraction_list)):
-    for kk in range(6,7):
+    for kk in range(7,8):
         
         frac = fraction_list[kk]        
         tf = tk_list[kk]
@@ -210,7 +226,7 @@ def lambert_test():
             print('v0_ii', v0_ii)
             print('vf_ii', vf_ii)
             
-            if np.linalg.norm(vf_test - vf_ii) > 1e-8:
+            if np.linalg.norm(vf_test - vf_ii) > 1e-6:
                 print(vf_test)
                 print(vf_ii)
                 print(np.linalg.norm(vf_test - vf_ii))
@@ -298,6 +314,230 @@ def lambert_test():
 #        print(vf_err)
 #        
 
+    
+    
+    return
+
+
+def lambert_test_hyperbolic():
+    
+     # Define state parameters
+    state_params = {}
+    state_params['GM'] = GME
+    GM = state_params['GM']
+
+    
+    # Integration function and additional settings
+    int_params = {}
+    int_params['integrator'] = 'solve_ivp'
+    int_params['ode_integrator'] = 'DOP853'
+    int_params['intfcn'] = dyn.ode_twobody
+    int_params['rtol'] = 1e-12
+    int_params['atol'] = 1e-12
+    int_params['step'] = 10.
+    int_params['time_format'] = 'datetime'
+    
+    # Hyperbolic Orbit
+    vinf = 1.
+    rp = Re + 500.
+    a = -GM/vinf**2.
+    e = 1. + rp*vinf**2./GM
+    elem0 = [a, e, 10., 10., 10., 10.]
+    theta0 = elem0[5]
+    Xo = astro.kep2cart(elem0, GM)
+    
+    
+    results_flag = 'all'
+    periapsis_check = True
+    
+    
+    tvec = [0., 1000.]
+    UTC0 = datetime(1999, 10, 4, 1, 45, 0)
+    tk_list = [UTC0 + timedelta(seconds=ti) for ti in tvec]
+    
+    
+    # Generate truth fata
+    truth_dict = {}
+    X = Xo.copy()
+    for kk in range(len(tk_list)):
+        
+        if kk > 0:
+            tin = [tk_list[kk-1], tk_list[kk]]
+            tout, Xout = dyn.general_dynamics(X, tin, state_params, int_params)
+            X = Xout[-1,:].reshape(6, 1)
+        
+        truth_dict[tk_list[kk]] = X
+        
+        
+    print(truth_dict)
+    
+    # Setup and run Lambert Solvers
+    t0 = tk_list[0]    
+    tf = tk_list[-1]
+
+            
+    tof = (tf - t0).total_seconds()
+    r0_true = truth_dict[t0][0:3]
+    v0_true = truth_dict[t0][3:6]
+    rf_true = truth_dict[tf][0:3]
+    vf_true = truth_dict[tf][3:6]
+    
+    elemf = astro.cart2kep(truth_dict[tf])
+    thetaf = float(elemf[5])
+    
+           
+    print('')
+    print(kk)
+    print('tof [hours]', tof/3600.)
+    print('dtheta [deg]', thetaf - theta0)
+    print('\n')
+    
+    # Compute truth data
+    # Compute RIC direction and velocity components at t0
+    print('Initial Vectors and Velocity')
+    v0_ric = eci2ric(r0_true, v0_true, v0_true)
+    print('v0_ric', v0_ric)
+    print('V1r', float(v0_ric[0]))
+    print('V1t', float(v0_ric[1]))
+    
+    print('Final Vectors and Velocity')
+    vf_ric = eci2ric(rf_true, vf_true, vf_true)
+    print('vf_ric', vf_ric)
+    print('V2r', float(vf_ric[0]))
+    print('V2t', float(vf_ric[1]))
+    print('\n')
+    
+    start_time = time.time()
+    
+    v0_list, vf_list, M_list = iod.izzo_lambert(r0_true, rf_true, tof, GM, Re, results_flag, periapsis_check)
+    
+    izzo_time = time.time() - start_time
+    
+    print('\n')
+    print('izzo time', izzo_time)
+    print('v0_list', v0_list)
+    print('vf_list', vf_list)
+    print('v0_true', v0_true)
+    print('vf_true', vf_true)
+    
+    print('')
+    print('M_list', M_list)
+    print('len M_list', len(M_list))
+    
+    # Propagate output to ensure it achieves the right final position
+    
+    rf_err_list = []
+    v0_err_list = []
+    vf_err_list = []
+    for ii in range(len(M_list)):
+        
+        v0_ii = v0_list[ii]
+        vf_ii = vf_list[ii]
+#            M_ii = M_list[ii]
+                    
+        X_test = np.concatenate((r0_true, v0_ii), axis=0)
+        elem_test = astro.cart2kep(X_test, GM)
+        
+        tin = [t0, tf]
+#            print('tin', tin)
+#            print('tof [hours]', tof/3600.)
+        
+#            tin = [t0 + timedelta(seconds=tii) for tii in np.arange(0, tof, 10)]
+#            tin.append(tf)
+#            print('tf', tf)
+#            print('tin[-1]', tin[-1])
+#            mistake
+        
+        tout, Xout = dyn.general_dynamics(X_test, tin, state_params, int_params)
+        X = Xout[-1,:].reshape(6, 1)
+        
+#            print('tof diff', tout[-1] - tof)
+        print('tout', tout)
+        print('X', X)
+        
+        rf_test = X[0:3].reshape(3,1)
+        vf_test = X[3:6].reshape(3,1)
+        
+        # Check analytic orbit prediction
+        Xout2 = astro.element_conversion(X_test, 1, 1, GM, tof)
+        print('Xout2', Xout2)
+        
+        
+        print('')
+        print('ii', ii)
+        print('Mi', M_list[ii])
+        print('rf_test', rf_test)
+        print('rf_true', rf_true)
+        print('vf_test', vf_test)
+        print('vf_true', vf_true)
+        
+        print('')
+        print('X_test', X_test)
+        print('elem_test', elem_test)
+        print('v0_ii', v0_ii)
+        print('vf_ii', vf_ii)
+        
+        if np.linalg.norm(vf_test - vf_ii) > 1e-6:
+            print(vf_test)
+            print(vf_ii)
+            print(np.linalg.norm(vf_test - vf_ii))
+            mistake
+        
+        
+        
+        
+        rf_err = np.linalg.norm(rf_test - rf_true)
+        v0_err = np.linalg.norm(v0_ii - v0_true)
+        vf_err = np.linalg.norm(vf_ii - vf_true)
+        
+        rf_err_list.append(rf_err)
+        v0_err_list.append(v0_err)
+        vf_err_list.append(vf_err)
+        
+        
+#            rbg = (colors[ii], colors[ii], colors[ii])
+#            
+#            plt.subplot(3,1,1)
+#            plt.plot(M_ii, rf_err, 'o', color=rbg)
+#            
+#            plt.subplot(3,1,2)
+#            plt.plot(M_ii, v0_err, 'o', color=rbg)
+#            
+#            plt.subplot(3,1,3)
+#            plt.plot(M_ii, vf_err, 'o', color=rbg)
+        
+        
+#        colors = np.linspace(0, 1, len(M_list))
+    colors = np.random.rand(len(M_list),3)
+    
+    plt.figure()
+    
+    plt.subplot(3,1,1)
+    for ii in range(len(M_list)):            
+        rbg = (colors[ii,0], colors[ii,1], colors[ii,2])
+        plt.plot(M_list[ii], rf_err_list[ii], 'o', color=rbg)
+    plt.ylabel('Final Pos [km]')
+    plt.title('Lambert Pos/Vel Errors')
+    if max(rf_err_list) < 1.:
+        plt.ylim([0., 1])
+    
+    plt.subplot(3,1,2)
+    for ii in range(len(M_list)):            
+        rbg = (colors[ii,0], colors[ii,1], colors[ii,2])
+        plt.plot(M_list[ii], v0_err_list[ii], 'o', color=rbg)
+    plt.ylabel('Initial Vel [km/s]')
+    
+    plt.subplot(3,1,3)
+    for ii in range(len(M_list)):            
+        rbg = (colors[ii,0], colors[ii,1], colors[ii,2])
+        plt.plot(M_list[ii], vf_err_list[ii], 'o', color=rbg)
+    plt.ylabel('Final Vel [km/s]')
+
+
+
+    plt.show()
+    
+    
     
     
     return
@@ -444,6 +684,8 @@ if __name__ == '__main__':
     
     
     lambert_test()
+    
+#    lambert_test_hyperbolic()
     
 #    test_sigmax()
     
