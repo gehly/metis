@@ -15,6 +15,9 @@ sys.path.append(metis_dir)
 
 import dynamics.numerical_integration as numint
 import utilities.astrodynamics as astro
+import utilities.coordinate_systems as coord
+import utilities.eop_functions as eop
+import utilities.time_systems as timesys
 
 from utilities.constants import Re, GME
 
@@ -24,12 +27,12 @@ from utilities.constants import Re, GME
 
 
 ###############################################################################
-# Lambert Solvers 
+# Lambert Solvers (2PBVP)
 ###############################################################################
 
 
 
-def lambert_iod():
+def lambert_iod(tk_list, Yk_list, sensor_params):
     
     
     return
@@ -631,8 +634,7 @@ def compute_hypergeom_2F1(a, b, c, d):
     ------
     https://en.wikipedia.org/wiki/Hypergeometric_function
     
-    '''
-    
+    '''    
     
     if d >= 1.0:
         return np.inf
@@ -690,16 +692,227 @@ def compute_rp(r_vect, v_vect, GM):
 
 
 
+###############################################################################
+# Angles-Only IOD Methods
+###############################################################################
 
 
+def gauss_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
+                     time_format='datetime', eop_alldata=[], XYs_df=[]):
+    '''
+    
+    
+    single revolution only
+    no perturbations
+    
+    
+    References
+    ------
+    [1] Vallado, D., "Fundamentals of Astrodynamics and Applications," 4th ed,
+        2013. (Algorithm 52)
+    
+    '''
+    
+    # Constants
+    GM = GME
+    
+    # Retrieve/load EOP and polar motion data if needed
+    if len(eop_alldata) == 0:        
+        eop_alldata = eop.get_celestrak_eop_alldata()
+        
+    if len(XYs_df) == 0:
+        XYs_df = eop.get_XYs2006_alldata()            
+    
+    # Compute time parameters from given input
+    if time_format == 'datetime':
+        UTC_list = tk_list
 
-def gauss_iod(tk_list, Yk_list, sensor_params):
+    elif time_format == 'JD':
+        JD_list = tk_list
+        UTC_list = [timesys.jd2dt(JD) for JD in JD_list]
+    
+    # For each measurement, compute the associated sensor location and 
+    # line of sight vector in ECI
+    Lmat = np.zeros((3,3))
+    Rmat = np.zeros((3,3))
+    for kk in range(len(tk_list)):
+        
+        # Retrieve current values
+        UTC = UTC_list[kk]
+        Yk = Yk_list[kk]
+        sensor_id = sensor_id_list[kk]
+        site_ecef = sensor_params[sensor_id]['site_ecef']
+        meas_types = sensor_params[sensor_id]['meas_types']
+        
+        # Compute sensor location in ECI
+        EOP_data = eop.get_eop_data(eop_alldata, UTC)
+        site_eci, dum = coord.itrf2gcrf(site_ecef, np.zeros((3,1)), UTC,
+                                        EOP_data, XYs_df)
+        
+        # Compute measurement line of sight vector in ECI
+        if 'ra' in meas_types and 'dec' in meas_types:
+            ra = Yk[meas_types.index('ra')]
+            dec = Yk[meas_types.index('dec')]
+            
+            rho_hat_eci = np.array([[math.cos(dec)*math.cos(ra)],
+                                    [math.cos(dec)*math.sin(ra)],
+                                    [math.sin(dec)]])
+    
+        elif 'az' in meas_types and 'el' in meas_types:
+            az = Yk[meas_types.index('az')]
+            el = Yk[meas_types.index('el')]
+            
+            rho_hat_enu = np.array([[math.cos(el)*math.sin(az)],
+                                    [math.cos(el)*math.cos(az)],
+                                    [math.sin(el)]])
+    
+            rho_hat_ecef = coord.enu2ecef(rho_hat_enu, site_ecef)
+            
+            rho_hat_eci, dum = coord.itrf2gcrf(rho_hat_ecef, np.zeros((3,1)),
+                                               UTC, EOP_data, XYs_df)
+            
+        
+        # Store values in columns of L and R
+        Lmat[:,kk] = rho_hat_eci.flatten()
+        Rmat[:,kk] = site_eci.flatten()
+         
+    # Calculations to set up root-finding problem
+    tau1 = (UTC_list[0] - UTC_list[1]).total_seconds()
+    tau3 = (UTC_list[2] - UTC_list[1]).total_seconds() 
+    
+    a1 =  tau3/(tau3 - tau1)
+    a3 = -tau1/(tau3 - tau1)
+    a1u =  tau3*((tau3 - tau1)**2. - tau3**2.)/(6.*(tau3 - tau1))
+    a3u = -tau1*((tau3 - tau1)**2. - tau1**2.)/(6.*(tau3 - tau1))
+    
+    M = np.dot(np.linalg.inv(Lmat), Rmat)
+    d1 = M[1,0]*a1 - M[1,1] + M[1,2]*a3
+    d2 = M[1,0]*a1u + M[1,2]*a3u
+    
+    
+    # LOS and site ECI vectors
+    L1_vect = Lmat[:,0].reshape(3,1)
+    R1_vect = Rmat[:,0].reshape(3,1)
+    L2_vect = Lmat[:,1].reshape(3,1)
+    R2_vect = Rmat[:,1].reshape(3,1)
+    L3_vect = Lmat[:,2].reshape(3,1)
+    R3_vect = Rmat[:,2].reshape(3,1)    
+    
+    C = float(np.dot(L2_vect.T, R2_vect))
+    
+    # Solve for r2
+    poly2 = np.array([1., 0., -(d1**2. + 2.*C*d1 + np.linalg.norm(R2_vect)**2.),
+                      0., 0., -2.*GM*(C*d2 + d1*d2), 0., 0., -GM**2.*d2**2.])
+    roots2 = np.roots(poly2)
+    
+    # Find positive real roots
+    real_inds = list(np.where(np.isreal(roots2))[0])
+    r2_list = [roots2[ind] for ind in real_inds if roots2[ind] > 0.]
+        
+    if len(r2_list) != 1:
+        print(r2_list)
+        print(poly2)
+        print(roots2)
+        print(real_inds)
+        exit_flag = -1
+    
+    r2 = float(r2_list[0])
+    
+    # Solve for position vectors
+    u = GM/(r2**3.)
+    c1 = a1 + a1u*u
+    c2 = -1.
+    c3 = a3 + a3u*u
+    
+    c_vect = -np.array([[c1], [c2], [c3]])
+    crho_vect = np.dot(M, c_vect)
+    rho1 = float(crho_vect[0])/c1
+    rho2 = float(crho_vect[1])/c2
+    rho3 = float(crho_vect[2])/c3
+    
+    while True:
+    
+        r1_vect = rho1*L1_vect + R1_vect
+        r2_vect = rho2*L2_vect + R2_vect
+        r3_vect = rho3*L3_vect + R3_vect
+        
+        # Try Gibbs to compute v2_vect
+        v2_vect, exit_flag = gibbs_iod(r1_vect, r2_vect, r3_vect, GM)
+    
+        # If Gibbs failed, try Herrick-Gibbs
+        if not (exit_flag == 1):
+            v2_vect, exit_flag = herrick_gibbs_iod(r1_vect, r2_vect, r3_vect, GM)
+            
     
     
     return
 
 
-def gooding_iod():
+def gibbs_iod(r1_vect, r2_vect, r3_vect, GM):
+    '''
+    
+    
+    
+    
+    References
+    ------
+    [1] Vallado, D., "Fundamentals of Astrodynamics and Applications," 4th ed,
+        2013. (Algorithm 54)
+    
+    '''
+    
+    # Initialize output
+    v2_vect = np.zeros((3,1))
+    
+    # Compute cross products
+    z12_vect = np.cross(r1_vect, r2_vect, axis=0)
+    z23_vect = np.cross(r2_vect, r3_vect, axis=0)
+    z31_vect = np.cross(r3_vect, r1_vect, axis=0)
+    
+    # Compute vector magnitudes
+    r1 = np.linalg.norm(r1_vect)
+    r2 = np.linalg.norm(r2_vect)
+    r3 = np.linalg.norm(r3_vect)
+    z23 = np.linalg.norm(z23_vect)
+    
+    # Test for coplanar
+    alpha_cop = math.pi/2. - math.acos(float(np.dot(z23_vect.T, r1_vect))/(z23*r1))
+    alpha_12 = math.acos(float(np.dot(r1_vect.T, r2_vect))/(r1*r2))
+    alpha_23 = math.acos(float(np.dot(r2_vect.T, r3_vect))/(r2*r3))
+
+    if abs(alpha_cop) > 5.*math.pi/180.:
+        exit_flag = -1
+        return v2_vect, exit_flag
+        
+    if alpha_12 < 5.*math.pi/180.:
+        exit_flag = -2
+        return v2_vect, exit_flag
+    
+    if alpha_23 < 5.*math.pi/180.:
+        exit_flag = -3
+        return v2_vect, exit_flag
+        
+    # Compute vectors    
+    N = r1*z23_vect + r2*z31_vect + r3*z12_vect
+    D = z12_vect + z23_vect + z31_vect
+    S = (r2 - r3)*r1_vect + (r3 - r1)*r2_vect + (r1 - r2)*r3_vect
+    B = np.cross(D, r2_vect, axis=0)
+    
+    Lg = np.sqrt(GM/(np.linalg.norm(N)*np.linalg.norm(D)))
+    
+    v2_vect = Lg/r2*B + Lg*S
+    exit_flag = 1
+    
+    return v2_vect, exit_flag
+
+
+def herrick_gibbs_iod(r1_vect, r2_vect, r3_vect, GM):
+    
+    
+    return v2_vect, exit_flag
+
+
+def gooding_angles_iod():
     
     
     return
