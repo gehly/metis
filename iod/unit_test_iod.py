@@ -989,16 +989,109 @@ def porkchop_plot_demo():
     return
 
 
+def unit_test_gibbs_iod():
+    
+    # Vallado Test Case (Example 7-3)
+    r1_vect = np.reshape([0., 0., 6378.137], (3,1))
+    r2_vect = np.reshape([0., -4464.696, -5102.509], (3,1))
+    r3_vect = np.reshape([0., 5740.323, 3189.068], (3,1))
+    
+    GM = GME
+    v2_vect = iod.gibbs_iod(r1_vect, r2_vect, r3_vect, GM)
+    
+    print(v2_vect)
+    
+    return
+
+
+def unit_test_herrick_gibbs_iod():
+    
+    # Vallado Test Case (Example 7-4)
+    r1_vect = np.reshape([3419.85564, 6019.82602, 2784.60022], (3,1))
+    r2_vect = np.reshape([2935.91195, 6326.18324, 2660.59584], (3,1))
+    r3_vect = np.reshape([2434.95202, 6597.38674, 2521.52311], (3,1))
+    
+    UTC0 = datetime(2022, 1, 1, 12, 0, 0)
+    UTC1 = UTC0 + timedelta(seconds=76.48)
+    UTC2 = UTC0 + timedelta(seconds=153.04)
+    UTC_list = [UTC0, UTC1, UTC2]
+    
+    GM = GME
+    v2_vect = iod.herrick_gibbs_iod(r1_vect, r2_vect, r3_vect, UTC_list, GM)
+    
+    print(v2_vect)
+    
+    return
+
+
+def unit_test_gauss_iod():
+    
+    # Vallado Test Case (Example 7-2)
+    UTC2 = datetime(2012, 8, 20, 11, 48, 28)
+    r2_true = np.reshape([6356.486034, 5290.5322578, 6511.396979], (3,1))
+    v2_true = np.reshape([-4.172948, 4.776550, 1.720271], (3,1))
+    
+    # Observations
+    UTC1 = datetime(2012, 8, 20, 11, 40, 28)
+    UTC3 = datetime(2012, 8, 20, 11, 52, 28)
+    
+    Y1 = np.array([[0.939913*math.pi/180.],
+                   [18.667717*math.pi/180.]])
+    
+    Y2 = np.array([[45.025748*math.pi/180.],
+                   [35.664741*math.pi/180.]])
+    
+    Y3 = np.array([[67.886655*math.pi/180.],
+                   [36.996583*math.pi/180.]])
+    
+    # Sensor parameters
+    sensor_id = 'Vallado 7-2'
+    lat = 40.
+    lon = -110.
+    ht = 2.
+    
+    site_ecef = coord.latlonht2ecef(lat, lon, ht)
+    
+    sensor_params = {}
+    sensor_params[sensor_id] = {}
+    sensor_params[sensor_id]['site_ecef'] = site_ecef
+    sensor_params[sensor_id]['meas_types'] = ['ra', 'dec']
+    
+    # Form inputs
+    UTC_list = [UTC1, UTC2, UTC3]
+    Yk_list = [Y1, Y2, Y3]
+    sensor_id_list = [sensor_id]*3
+    
+    # Execute function
+    UTC2, r2_vect, v2_vect, exit_flag = \
+        iod.gauss_angles_iod(UTC_list, Yk_list, sensor_id_list, sensor_params)
+        
+    print('')
+    print('r2_vect', r2_vect)
+    print('r2_true', r2_true)
+    print('v2_vect', v2_vect)
+    print('v2_true', v2_true)
+                                                             
+    
+    return
+
+
 if __name__ == '__main__':
     
     plt.close('all')
+    
+#    unit_test_gibbs_iod()
+    
+#    unit_test_herrick_gibbs_iod()
+    
+    unit_test_gauss_iod()
     
     
 #    lambert_test()
     
 #    lambert_test_hyperbolic()
     
-    porkchop_plot_demo()
+#    porkchop_plot_demo()
     
 #    test_sigmax()
     

@@ -170,7 +170,7 @@ def izzo_lambert(r1_vect, r2_vect, tof, GM=GME, R=Re, results_flag='all',
         v2_vect = Vr2*ihat_r2 + Vt2*ihat_t2
         
         # Check for valid radius of periapsis
-        rp = compute_rp(r1_vect, v1_vect, GM)
+        rp = astro.compute_rp(r1_vect, v1_vect, GM)
         if periapsis_check and rp < R:
             continue
         
@@ -203,7 +203,7 @@ def izzo_lambert(r1_vect, r2_vect, tof, GM=GME, R=Re, results_flag='all',
             v2_vect = Vr2*ihat_r2 + Vt2*ihat_t2
             
             # Check for valid radius of periapsis
-            rp = compute_rp(r1_vect, v1_vect, GM)
+            rp = astro.compute_rp(r1_vect, v1_vect, GM)
             if periapsis_check and rp < R:
                 continue
             
@@ -651,44 +651,7 @@ def compute_hypergeom_2F1(a, b, c, d):
             ii += 1
 
 
-def compute_rp(r_vect, v_vect, GM):
-    '''
-    This function computes the radius of periapsis for a given position and
-    velocity vector.
-    
-    Parameters
-    ------
-    r_vect : 3x1 numpy array
-        inertial position vector [km]
-    v_vect  : 3x1 numpy array
-        inertial velocity vector [km/s]
-    GM : float
-        gravitational parameter of central body [km^3/s^2]
-        
-    Returns
-    ------
-    rp : float
-        radius of periapsis [km]
-    
-    '''
-    r_vect = np.reshape(r_vect, (3,1))
-    v_vect = np.reshape(v_vect, (3,1))
-    r = np.linalg.norm(r_vect)
-    v = np.linalg.norm(v_vect)
-    
-    # Semi-major axis
-    a = 1./(2./r - v**2./GM)
-    
-    # Eccentricity vector 
-    h_vect = np.cross(r_vect, v_vect, axis=0)
-    cross1 = np.cross(v_vect, h_vect, axis=0)
 
-    e_vect = cross1/GM - r_vect/r
-    e = np.linalg.norm(e_vect)
-    
-    rp = a*(1. - e)
-    
-    return rp
 
 
 
@@ -701,8 +664,10 @@ def gauss_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
                      time_format='datetime', eop_alldata=[], XYs_df=[]):
     '''
     
+    works best for angle separation less than 60 deg, very well for less than
+    10 deg
     
-    single revolution only
+    single revolution only?
     no perturbations
     
     
@@ -730,6 +695,9 @@ def gauss_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
     elif time_format == 'JD':
         JD_list = tk_list
         UTC_list = [timesys.jd2dt(JD) for JD in JD_list]
+        
+    # Output time
+    UTC2 = UTC_list[1]
     
     # For each measurement, compute the associated sensor location and 
     # line of sight vector in ECI
@@ -775,6 +743,9 @@ def gauss_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
         # Store values in columns of L and R
         Lmat[:,kk] = rho_hat_eci.flatten()
         Rmat[:,kk] = site_eci.flatten()
+        
+    print('Lmat', Lmat)
+    print('Rmat', Rmat)
          
     # Calculations to set up root-finding problem
     tau1 = (UTC_list[0] - UTC_list[1]).total_seconds()
@@ -816,7 +787,13 @@ def gauss_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
         print(real_inds)
         exit_flag = -1
     
-    r2 = float(r2_list[0])
+    r2 = float(np.real(r2_list[0]))
+    
+    print(poly2)
+    print(roots2)
+    print(real_inds)
+    print(r2_list)
+    print(r2)
     
     # Solve for position vectors
     u = GM/(r2**3.)
@@ -824,35 +801,129 @@ def gauss_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
     c2 = -1.
     c3 = a3 + a3u*u
     
+    print('c1', c1)
+    print('c3', c3)
+    
     c_vect = -np.array([[c1], [c2], [c3]])
     crho_vect = np.dot(M, c_vect)
     rho1 = float(crho_vect[0])/c1
     rho2 = float(crho_vect[1])/c2
     rho3 = float(crho_vect[2])/c3
     
-    while True:
+    # Method can be iterated to improve performance
+    exit_flag = 1
     
-        r1_vect = rho1*L1_vect + R1_vect
-        r2_vect = rho2*L2_vect + R2_vect
-        r3_vect = rho3*L3_vect + R3_vect
+#    # Initialize for loop execution
+#    rho_diff = 1e6
+#    tol = 1e-5
+#    maxiters = 50
+#    iters = 0
+#    exit_flag = 1
+#    while rho_diff > tol:
+#        
+#        # Exit loop
+#        if iters > maxiters:
+#            print('Loop failed to converge in ' + iters + 'iterations!')
+#            print('rho_diff', rho_diff)
+#            exit_flag = -1
+#            break
         
-        # Try Gibbs to compute v2_vect
-        v2_vect, exit_flag = gibbs_iod(r1_vect, r2_vect, r3_vect, GM)
+#        # Store values for comparison
+#        rho_vect_prev = np.reshape([rho1, rho2, rho3], (3,1))        
     
-        # If Gibbs failed, try Herrick-Gibbs
-        if not (exit_flag == 1):
-            v2_vect, exit_flag = herrick_gibbs_iod(r1_vect, r2_vect, r3_vect, GM)
-            
+    # Compute position vectors and magnitudes for each time
+    r1_vect = rho1*L1_vect + R1_vect
+    r2_vect = rho2*L2_vect + R2_vect
+    r3_vect = rho3*L3_vect + R3_vect
+    r1 = np.linalg.norm(r1_vect)
+    r2 = np.linalg.norm(r2_vect)
+    r3 = np.linalg.norm(r3_vect)
+    
+#    # Compute angles between each observation
+#    alpha_12 = math.acos(float(np.dot(r1_vect.T, r2_vect))/(r1*r2))
+#    alpha_23 = math.acos(float(np.dot(r2_vect.T, r3_vect))/(r2*r3))
+    
+    # Try Gibbs to compute v2_vect
+    v2_vect, gibbs_exit = gibbs_iod(r1_vect, r2_vect, r3_vect, GM)
+
+    # If Gibbs failed, try Herrick-Gibbs
+    if not (gibbs_exit == 1):
+        v2_vect, hg_exit = herrick_gibbs_iod(r1_vect, r2_vect, r3_vect, 
+                                             UTC_list, GM)
     
     
-    return
+#    print('r1_vect', r1_vect)
+#    print('r2_vect', r2_vect)
+#    print('r3_vect', r3_vect)
+#    print('v2_vect', v2_vect)
+    
+#    # Compute semi-latus rectum
+#    p = astro.compute_p(r2_vect, v2_vect, GM)
+#    
+#    # Compute f and g functions
+#    f1 = 1. - (r1/p)*(1. - math.cos(alpha_12))
+#    f3 = 1. - (r3/p)*(1. - math.cos(alpha_23))
+#    g1 = (r1*r2*math.sin(alpha_12))/np.sqrt(GM*p)
+#    g3 = (r3*r2*math.sin(alpha_23))/np.sqrt(GM*p)
+#    
+#    # Compute updated slant range values
+#    c1 = g3/(f1*g3 - f3*g1)
+#    c3 = -g1/(f1*g3 - f3*g1)
+#    
+#    print('c1', c1)
+#    print('c3', c3)
+#    
+#    c_vect = -np.array([[c1], [c2], [c3]])
+#    crho_vect = np.dot(M, c_vect)
+#    rho1 = float(crho_vect[0])/c1
+#    rho2 = float(crho_vect[1])/c2
+#    rho3 = float(crho_vect[2])/c3
+#    
+#    # Check for convergence
+#    rho_vect = np.reshape([rho1, rho2, rho3], (3,1))
+#    rho_diff = np.linalg.norm(rho_vect - rho_vect_prev)
+#    
+#    print('rho_vect', rho_vect)
+#    print('rho_vect_prev', rho_vect_prev)
+#    mistake
+#    
+#    print('iters', iters)
+#    print('rho_diff', rho_diff)
+        
+#        # Increment loop count
+#        iters += 1
+
+    return UTC2, r2_vect, v2_vect, exit_flag
 
 
-def gibbs_iod(r1_vect, r2_vect, r3_vect, GM):
+def gibbs_iod(r1_vect, r2_vect, r3_vect, GM=GME):
     '''
+    This function solves Gibbs Problem, which finds a Keplerian orbit solution
+    to fit three, time-sequential (t1 < t2 < t3), co-planar position vectors. 
+    The method outputs the velocity vector at the middle time.
     
+    Note this applies in single revolution cases only and does not include
+    perturbing forces. The method can be used in the final step of Gauss 
+    angles-only IOD provided the angular separation between the position 
+    vectors is large enough. In particular, if the separation is less than 1 
+    degree the method does not work well and Herrick-Gibbs should be used 
+    instead.
     
-    
+    Parameters
+    ------
+    r1_vect : 3x1 numpy array
+        inertial position vector at time t1 [km]
+    r2_vect : 3x1 numpy array
+        inertial position vector at time t2 [km]
+    r3_vect : 3x1 numpy array
+        inertial position vector at time t3 [km]
+    GM : float, optional
+        gravitational parameter (default=GME) [km^3/s^2]
+        
+    Returns
+    ------
+    v2_vect : 3x1 numpy array
+        inertial velocity vector at time t2 [km/s]
     
     References
     ------
@@ -884,13 +955,14 @@ def gibbs_iod(r1_vect, r2_vect, r3_vect, GM):
         exit_flag = -1
         return v2_vect, exit_flag
         
-    if alpha_12 < 5.*math.pi/180.:
+    if (alpha_12 < 5.*math.pi/180.) and (alpha_23 < 5.*math.pi/180.):
         exit_flag = -2
         return v2_vect, exit_flag
-    
-    if alpha_23 < 5.*math.pi/180.:
-        exit_flag = -3
-        return v2_vect, exit_flag
+        
+    print(z23_vect)
+    print(alpha_cop*180/math.pi)
+    print(alpha_12*180/math.pi)
+    print(alpha_23*180/math.pi)
         
     # Compute vectors    
     N = r1*z23_vect + r2*z31_vect + r3*z12_vect
@@ -906,7 +978,87 @@ def gibbs_iod(r1_vect, r2_vect, r3_vect, GM):
     return v2_vect, exit_flag
 
 
-def herrick_gibbs_iod(r1_vect, r2_vect, r3_vect, GM):
+def herrick_gibbs_iod(r1_vect, r2_vect, r3_vect,UTC_list, GM=GME):
+    '''
+    This function solves Gibbs Problem for small angles to finds a Keplerian 
+    orbit solution to fit three, time-sequential (t1 < t2 < t3), co-planar 
+    position vectors. The method outputs the velocity vector at the middle 
+    time.
+    
+    Note this applies in single revolution cases only and does not include
+    perturbing forces. The method can be used in the final step of Gauss 
+    angles-only IOD provided the angular separation between the position 
+    vectors is small, and thus serves as a complement to Gibbs method. 
+    In particular, if the separation is less than 1 degree the method 
+    outperforms Gibbs.
+    
+    Parameters
+    ------
+    r1_vect : 3x1 numpy array
+        inertial position vector at time t1 [km]
+    r2_vect : 3x1 numpy array
+        inertial position vector at time t2 [km]
+    r3_vect : 3x1 numpy array
+        inertial position vector at time t3 [km]
+    UTC_list : list
+        datetime objects corresponding to t1, t2, t3 [UTC]
+    GM : float, optional
+        gravitational parameter (default=GME) [km^3/s^2]
+        
+    Returns
+    ------
+    v2_vect : 3x1 numpy array
+        inertial velocity vector at time t2 [km/s]
+    
+    References
+    ------
+    [1] Vallado, D., "Fundamentals of Astrodynamics and Applications," 4th ed,
+        2013. (Algorithm 55)
+    
+    '''
+    
+    # Initialize output
+    v2_vect = np.zeros((3,1))
+    
+    # Compute time differences
+    dt31 = (UTC_list[2] - UTC_list[0]).total_seconds()
+    dt32 = (UTC_list[2] - UTC_list[1]).total_seconds()
+    dt21 = (UTC_list[1] - UTC_list[0]).total_seconds()
+    
+    # Compute cross products
+    z23_vect = np.cross(r2_vect, r3_vect, axis=0)
+    
+    # Compute vector magnitudes
+    r1 = np.linalg.norm(r1_vect)
+    r2 = np.linalg.norm(r2_vect)
+    r3 = np.linalg.norm(r3_vect)
+    z23 = np.linalg.norm(z23_vect)
+    
+    # Test for coplanar
+    alpha_cop = math.pi/2. - math.acos(float(np.dot(z23_vect.T, r1_vect))/(z23*r1))
+    alpha_12 = math.acos(float(np.dot(r1_vect.T, r2_vect))/(r1*r2))
+    alpha_23 = math.acos(float(np.dot(r2_vect.T, r3_vect))/(r2*r3))
+
+    if abs(alpha_cop) > 5.*math.pi/180.:
+        exit_flag = -1
+        return v2_vect, exit_flag
+    
+    if (alpha_12 > 5.*math.pi/180.) or (alpha_23 > 5.*math.pi/180.):
+        exit_flag = -2
+        return v2_vect, exit_flag
+    
+    print(z23_vect)
+    print(alpha_cop*180/math.pi)
+    print(alpha_12*180/math.pi)
+    print(alpha_23*180/math.pi)
+       
+    # Compute velocity vector
+    v2_vect = -dt32*((1./(dt21*dt31)) + GM/(12.*r1**3.))*r1_vect \
+        + (dt32 - dt21)*((1./(dt21*dt32)) + GM/(12.*r2**3.))*r2_vect \
+        + dt21*((1./(dt32*dt31)) + GM/(12.*r3**3.))*r3_vect
+        
+    exit_flag = 1
+    
     
     
     return v2_vect, exit_flag
