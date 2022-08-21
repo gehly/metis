@@ -663,13 +663,45 @@ def compute_hypergeom_2F1(a, b, c, d):
 def gauss_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
                      time_format='datetime', eop_alldata=[], XYs_df=[]):
     '''
+    This function implements the Gauss angles-only IOD method, which uses
+    three line of sight vectors (defined by RA/DEC or Az/El measurements) to
+    compute an orbit. The method is not particularly accurate, does not 
+    include perturbations, is not appropriate for multiple revolutions between
+    observations, etc. It works best for angular separations less than 60 deg,
+    ideally less than 10 deg. In general, other methods such as Gooding or 
+    double-r iteration should be used instead.
     
-    works best for angle separation less than 60 deg, very well for less than
-    10 deg
-    
-    single revolution only?
-    no perturbations
-    
+    Parameters
+    ------
+    tk_list : list
+        observation times in JD or datetime object format [UTC]
+    Yk_list : list
+        measurements (RA/DEC or Az/El pairs) [rad]
+    sensor_id_list : list
+        sensor id corresponding to each measurement in Yk_list
+    sensor_params : dict
+        includes site_ecef and meas_types for each sensor used
+    time_format : string, optional
+        defines format of input tk_list ('JD' or 'datetime') 
+        (default='datetime')
+    eop_alldata : string, optional
+        text containing EOP data, if blank, function will retrieve from
+        celestrak.com
+    XYs_df : dataframe, optional
+        pandas dataframe containing polar motion data, if blank, function will
+        read from file in input_data directory
+                
+    Returns
+    ------
+    UTC2 : datetime object
+        time of second observation [UTC]
+    r2_vect : 3x1 numpy array
+        inertial position vector at t2 [km]
+    v2_vect : 3x1 numpy array
+        inertial velocity vector at t2 [km/s]
+    exit_flag : int
+        pass/fail criteria for Halley iterations (1 = pass, -1 = fail)  
+        
     
     References
     ------
@@ -743,9 +775,6 @@ def gauss_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
         # Store values in columns of L and R
         Lmat[:,kk] = rho_hat_eci.flatten()
         Rmat[:,kk] = site_eci.flatten()
-        
-    print('Lmat', Lmat)
-    print('Rmat', Rmat)
          
     # Calculations to set up root-finding problem
     tau1 = (UTC_list[0] - UTC_list[1]).total_seconds()
@@ -759,7 +788,6 @@ def gauss_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
     M = np.dot(np.linalg.inv(Lmat), Rmat)
     d1 = M[1,0]*a1 - M[1,1] + M[1,2]*a3
     d2 = M[1,0]*a1u + M[1,2]*a3u
-    
     
     # LOS and site ECI vectors
     L1_vect = Lmat[:,0].reshape(3,1)
@@ -781,67 +809,28 @@ def gauss_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
     r2_list = [roots2[ind] for ind in real_inds if roots2[ind] > 0.]
         
     if len(r2_list) != 1:
-        print(r2_list)
-        print(poly2)
-        print(roots2)
-        print(real_inds)
         exit_flag = -1
     
     r2 = float(np.real(r2_list[0]))
-    
-    print(poly2)
-    print(roots2)
-    print(real_inds)
-    print(r2_list)
-    print(r2)
     
     # Solve for position vectors
     u = GM/(r2**3.)
     c1 = a1 + a1u*u
     c2 = -1.
     c3 = a3 + a3u*u
-    
-    print('c1', c1)
-    print('c3', c3)
-    
+
     c_vect = -np.array([[c1], [c2], [c3]])
     crho_vect = np.dot(M, c_vect)
     rho1 = float(crho_vect[0])/c1
     rho2 = float(crho_vect[1])/c2
     rho3 = float(crho_vect[2])/c3
     
-    # Method can be iterated to improve performance
-    exit_flag = 1
+    # Note that method can be iterated to improve performance
     
-#    # Initialize for loop execution
-#    rho_diff = 1e6
-#    tol = 1e-5
-#    maxiters = 50
-#    iters = 0
-#    exit_flag = 1
-#    while rho_diff > tol:
-#        
-#        # Exit loop
-#        if iters > maxiters:
-#            print('Loop failed to converge in ' + iters + 'iterations!')
-#            print('rho_diff', rho_diff)
-#            exit_flag = -1
-#            break
-        
-#        # Store values for comparison
-#        rho_vect_prev = np.reshape([rho1, rho2, rho3], (3,1))        
-    
-    # Compute position vectors and magnitudes for each time
+    # Compute position vectors for each time
     r1_vect = rho1*L1_vect + R1_vect
     r2_vect = rho2*L2_vect + R2_vect
     r3_vect = rho3*L3_vect + R3_vect
-    r1 = np.linalg.norm(r1_vect)
-    r2 = np.linalg.norm(r2_vect)
-    r3 = np.linalg.norm(r3_vect)
-    
-#    # Compute angles between each observation
-#    alpha_12 = math.acos(float(np.dot(r1_vect.T, r2_vect))/(r1*r2))
-#    alpha_23 = math.acos(float(np.dot(r2_vect.T, r3_vect))/(r2*r3))
     
     # Try Gibbs to compute v2_vect
     v2_vect, gibbs_exit = gibbs_iod(r1_vect, r2_vect, r3_vect, GM)
@@ -850,49 +839,13 @@ def gauss_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
     if not (gibbs_exit == 1):
         v2_vect, hg_exit = herrick_gibbs_iod(r1_vect, r2_vect, r3_vect, 
                                              UTC_list, GM)
-    
-    
-#    print('r1_vect', r1_vect)
-#    print('r2_vect', r2_vect)
-#    print('r3_vect', r3_vect)
-#    print('v2_vect', v2_vect)
-    
-#    # Compute semi-latus rectum
-#    p = astro.compute_p(r2_vect, v2_vect, GM)
-#    
-#    # Compute f and g functions
-#    f1 = 1. - (r1/p)*(1. - math.cos(alpha_12))
-#    f3 = 1. - (r3/p)*(1. - math.cos(alpha_23))
-#    g1 = (r1*r2*math.sin(alpha_12))/np.sqrt(GM*p)
-#    g3 = (r3*r2*math.sin(alpha_23))/np.sqrt(GM*p)
-#    
-#    # Compute updated slant range values
-#    c1 = g3/(f1*g3 - f3*g1)
-#    c3 = -g1/(f1*g3 - f3*g1)
-#    
-#    print('c1', c1)
-#    print('c3', c3)
-#    
-#    c_vect = -np.array([[c1], [c2], [c3]])
-#    crho_vect = np.dot(M, c_vect)
-#    rho1 = float(crho_vect[0])/c1
-#    rho2 = float(crho_vect[1])/c2
-#    rho3 = float(crho_vect[2])/c3
-#    
-#    # Check for convergence
-#    rho_vect = np.reshape([rho1, rho2, rho3], (3,1))
-#    rho_diff = np.linalg.norm(rho_vect - rho_vect_prev)
-#    
-#    print('rho_vect', rho_vect)
-#    print('rho_vect_prev', rho_vect_prev)
-#    mistake
-#    
-#    print('iters', iters)
-#    print('rho_diff', rho_diff)
-        
-#        # Increment loop count
-#        iters += 1
 
+    # Exit condition
+    if (gibbs_exit != 1) and (hg_exit != 1):
+        exit_flag = -1
+    else:
+        exit_flag = 1
+    
     return UTC2, r2_vect, v2_vect, exit_flag
 
 
@@ -924,6 +877,8 @@ def gibbs_iod(r1_vect, r2_vect, r3_vect, GM=GME):
     ------
     v2_vect : 3x1 numpy array
         inertial velocity vector at time t2 [km/s]
+    exit_flag : int
+        pass/fail criteria for Halley iterations (1 = pass, -1 = fail)  
     
     References
     ------
@@ -1009,6 +964,8 @@ def herrick_gibbs_iod(r1_vect, r2_vect, r3_vect,UTC_list, GM=GME):
     ------
     v2_vect : 3x1 numpy array
         inertial velocity vector at time t2 [km/s]
+    exit_flag : int
+        pass/fail criteria for Halley iterations (1 = pass, -1 = fail)  
     
     References
     ------
