@@ -1,7 +1,8 @@
 import numpy as np
-from math import pi
+import math
 import matplotlib.pyplot as plt
 import sys
+from datetime import datetime, timedelta
 
 sys.path.append('../')
 
@@ -36,9 +37,15 @@ def unit_test_orbit():
     
     # Integration function and additional settings
     int_params = {}
-    int_params['integrator'] = 'ode'
-    int_params['ode_integrator'] = 'dop853'
-    int_params['intfcn'] = dyn.ode_twobody_j2_drag 
+#    int_params['integrator'] = 'ode'
+#    int_params['ode_integrator'] = 'dop853'
+#    int_params['intfcn'] = dyn.ode_twobody_j2_drag 
+    
+    
+    int_params['integrator'] = 'solve_ivp'
+    int_params['ode_integrator'] = 'DOP853'
+    int_params['intfcn'] = dyn.ode_twobody_j2_drag
+    
     int_params['step'] = 10.
     int_params['rtol'] = 1e-12
     int_params['atol'] = 1e-12
@@ -58,7 +65,7 @@ def unit_test_orbit():
     i = elem[2]
     RAAN = elem[3]
     w = elem[4]
-    theta0 = elem[5]*pi/180.
+    theta0 = elem[5]*math.pi/180.
     E0 = astro.true2ecc(theta0, e)
     M0 = astro.ecc2mean(E0, e)
     n = np.sqrt(params['GM']/a**3.)
@@ -78,17 +85,17 @@ def unit_test_orbit():
         
         # Compute new mean anomaly [rad]
         M = M0 + n*(t-tout[0])
-        while M > 2*pi:
-            M -= 2*pi
+        while M > 2*math.pi:
+            M -= 2*math.pi
         
         # Convert to true anomaly [rad]
         E = astro.mean2ecc(M,e)
         theta = astro.ecc2true(E,e)  
         
         # Convert anomaly angles to deg
-        M *= 180./pi
-        E *= 180./pi
-        theta *= 180./pi
+        M *= 180./math.pi
+        E *= 180./math.pi
+        theta *= 180./math.pi
         
         X_true = astro.kep2cart([a,e,i,RAAN,w,theta], GM=params['GM'])
         elem_true = [a,e,i,RAAN,w,theta]
@@ -159,11 +166,81 @@ def unit_test_orbit():
     return
 
 
+def test_orbit_timestep():
+    
+    
+    # Define state parameters
+    state_params = {}
+    state_params['GM'] = GME
+    GM = state_params['GM']
+
+    
+    # Integration function and additional settings
+    int_params = {}
+#    int_params['integrator'] = 'ode'
+#    int_params['ode_integrator'] = 'dop853'
+#    int_params['intfcn'] = dyn.ode_twobody
+    
+    int_params['integrator'] = 'solve_ivp'
+    int_params['ode_integrator'] = 'DOP853'
+    int_params['intfcn'] = dyn.ode_twobody
+    
+    int_params['tfirst'] = True
+    int_params['rtol'] = 1e-12
+    int_params['atol'] = 1e-12
+    int_params['step'] = 10.
+    int_params['max_step'] = 1000.
+    int_params['time_format'] = 'datetime'
+    
+    # Initial object state vector
+    # Sun-Synch Orbit
+    Xo = np.reshape([757.700301, 5222.606566, 4851.49977,
+                     2.213250611, 4.678372741, -5.371314404], (6,1))
+    
+
+    # Propagate several orbit fractions
+    elem0 = astro.cart2kep(Xo)
+    a = float(elem0[0])
+    P = 2.*math.pi*np.sqrt(a**3./GM)
+#    fraction_list = [0., 0.2, 0.8, 1.2, 1.8, 10.2, 10.8]
+    
+    fraction_list = [0., 10.2]
+    
+    
+    tvec = np.asarray([frac*P for frac in fraction_list])
+    UTC0 = datetime(1999, 10, 4, 1, 45, 0)
+    tin = [UTC0 + timedelta(seconds=ti) for ti in tvec]
+    
+    
+    # Run integrator
+    tout, Xout = dyn.general_dynamics(Xo, tin, state_params, int_params)
+
+    print(tout)
+    print(Xout)
+    
+    Xnum = Xout[-1,:].reshape(6,1)
+    
+    # Analytic solution
+    dt_sec = (tin[-1] - tin[0]).total_seconds()
+    Xtrue = astro.element_conversion(Xo, 1, 1, GME, dt_sec)
+    
+    print(Xnum)
+    print(Xtrue)
+    
+    err = np.linalg.norm(Xnum - Xtrue)
+    print('err', err)
+    
+    
+    return
+
+
 if __name__ == '__main__':
     
     plt.close('all')
     
     unit_test_orbit()
+    
+#    test_orbit_timestep()
     
     
     

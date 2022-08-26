@@ -393,6 +393,77 @@ def compute_visviva(r, a, GM=GME):
     return v
 
 
+def compute_rp(r_vect, v_vect, GM):
+    '''
+    This function computes the radius of periapsis for a given position and
+    velocity vector.
+    
+    Parameters
+    ------
+    r_vect : 3x1 numpy array
+        inertial position vector [km]
+    v_vect  : 3x1 numpy array
+        inertial velocity vector [km/s]
+    GM : float
+        gravitational parameter of central body [km^3/s^2]
+        
+    Returns
+    ------
+    rp : float
+        radius of periapsis [km]
+    
+    '''
+    r_vect = np.reshape(r_vect, (3,1))
+    v_vect = np.reshape(v_vect, (3,1))
+    r = np.linalg.norm(r_vect)
+    v = np.linalg.norm(v_vect)
+    
+    # Semi-major axis
+    a = 1./(2./r - v**2./GM)
+    
+    # Eccentricity vector 
+    h_vect = np.cross(r_vect, v_vect, axis=0)
+    cross1 = np.cross(v_vect, h_vect, axis=0)
+
+    e_vect = cross1/GM - r_vect/r
+    e = np.linalg.norm(e_vect)
+    
+    rp = a*(1. - e)
+    
+    return rp
+
+
+def compute_p(r_vect, v_vect, GM):
+    '''
+    This function computes the semi-latus rectum for a given position and
+    velocity vector.
+    
+    Parameters
+    ------
+    r_vect : 3x1 numpy array
+        inertial position vector [km]
+    v_vect  : 3x1 numpy array
+        inertial velocity vector [km/s]
+    GM : float
+        gravitational parameter of central body [km^3/s^2]
+        
+    Returns
+    ------
+    p : float
+        semi-latus rectum [km]
+    
+    '''
+    r_vect = np.reshape(r_vect, (3,1))
+    v_vect = np.reshape(v_vect, (3,1))
+
+    h_vect = np.cross(r_vect, v_vect, axis=0)
+    h = np.linalg.norm(h_vect)
+    
+    p = h**2./GM
+    
+    return p
+
+
 
 ###############################################################################
 # Physical Models

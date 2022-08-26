@@ -1,6 +1,6 @@
 import numpy as np
 from math import exp
-from scipy.integrate import odeint, ode
+from scipy.integrate import odeint, ode, solve_ivp
 import sys
 import os
 import inspect
@@ -32,6 +32,9 @@ def general_dynamics(Xo, tvec, state_params, int_params):
 #    print(tvec)
     
     integrator = int_params['integrator']
+    
+    # Flatten input state
+    Xo = Xo.flatten()
     
     # Convert time to seconds
     time_format = int_params['time_format']
@@ -127,11 +130,30 @@ def general_dynamics(Xo, tvec, state_params, int_params):
         intfcn = int_params['intfcn']
         rtol = int_params['rtol']
         atol = int_params['atol']
+        tfirst = int_params['tfirst']
+        hmax = int_params['max_step']
         
         # Run integrator
         tout = tvec
-        Xout = odeint(intfcn,Xo,tvec,(params,),rtol=rtol,atol=atol)
+        Xout = odeint(intfcn,Xo,tvec,args=(params,),rtol=rtol,atol=atol,hmax=hmax,tfirst=tfirst)
         
+        
+    if integrator == 'solve_ivp':
+        
+        # Setup integrator parameters
+        params = state_params
+        intfcn = int_params['intfcn']
+        method = int_params['ode_integrator']
+        rtol = int_params['rtol']
+        atol = int_params['atol']
+                
+        # Run integrator
+        tin = (tvec[0], tvec[-1])
+        tout = tvec
+        output = solve_ivp(intfcn,tin,Xo,method=method,args=(params,),rtol=rtol,atol=atol,t_eval=tvec)
+        
+        Xout = output['y'].T
+
         
     if integrator == 'ode':
         

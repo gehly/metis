@@ -90,7 +90,7 @@ def compute_measurement(X, state_params, sensor, UTC, EOP_data, XYs_df=[], meas_
 
 
 
-def ecef2azelrange(r_sat, r_site):
+def ecef2azelrange_deg(r_sat, r_site):
     '''
     This function computes the azimuth, elevation, and range of a satellite
     from a given ground station, all position in ECEF.
