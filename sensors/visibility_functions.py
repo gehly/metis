@@ -36,9 +36,9 @@ from utilities.coordinate_systems import ecef2enu
 from utilities.time_systems import utcdt2ttjd
 from utilities.time_systems import jd2cent
 from utilities.constants import Re, AU_km
-from sensors.measurements import compute_measurement
-from sensors.measurements import ecef2azelrange
-from sensors.measurements import ecef2azelrange_rad
+from sensors.measurement_functions import compute_measurement
+from sensors.measurement_functions import ecef2azelrange_deg
+from sensors.measurement_functions import ecef2azelrange_rad
 
 
 def define_RSOs(obj_id_list, UTC_list, tle_dict={}, prev_flag=False,
@@ -618,7 +618,7 @@ def compute_transit_dict(UTC_window, obj_id_list, site_dict, increment=10.,
                 r_ecef = ITRF_list[ii]
                 
                 # Compute az, el, range
-                az, el, rg = ecef2azelrange(r_ecef, site_ecef)
+                az, el, rg = ecef2azelrange_deg(r_ecef, site_ecef)
                 
                 if el > 0.:
                     az_list.append(az)

@@ -1,8 +1,10 @@
 import numpy as np
-from math import asin, atan2
+import scipy
+import math
 import sys
 import os
 import inspect
+import matplotlib.pyplot as plt
 
 filename = inspect.getframeinfo(inspect.currentframe()).filename
 current_dir = os.path.dirname(os.path.abspath(filename))
@@ -11,10 +13,9 @@ ind = current_dir.find('metis')
 metis_dir = current_dir[0:ind+5]
 sys.path.append(metis_dir)
 
-from dynamics.dynamics_functions import general_dynamics
-from utilities.coordinate_systems import itrf2gcrf, gcrf2itrf, ecef2enu
-from utilities.eop_functions import get_celestrak_eop_alldata, get_eop_data
-from utilities.eop_functions import get_XYs2006_alldata
+import dynamics.dynamics_functions as dyn
+
+from utilities.constants import arcsec2rad
 
 
 
@@ -62,6 +63,7 @@ def ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
     # Setup
     cholPo = np.linalg.inv(np.linalg.cholesky(Po_bar))
     invPo_bar = np.dot(cholPo.T, cholPo)
+    Xo_ref_print = Xo_ref.copy()
 
     n = len(Xo_ref)
 
@@ -72,9 +74,10 @@ def ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
     tk_list = meas_dict['tk_list']
     Yk_list = meas_dict['Yk_list']
     sensor_id_list = meas_dict['sensor_id_list']
+    nmeas = sum([len(Yk) for Yk in Yk_list])
 
     # Number of epochs
-    L = len(tk_list)
+    N = len(tk_list)
 
     # Initialize
     maxiters = 10
@@ -86,8 +89,11 @@ def ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
     # Begin Loop
     iters = 0
     xo_hat_mag = 1
-    conv_crit = 1e-5
-    while xo_hat_mag > conv_crit:
+    rms_prior = 1e6
+    xhat_crit = 1e-5
+    rms_crit = 1e-4
+    conv_flag = False    
+    while not conv_flag:
 
         # Increment loop counter and exit if necessary
         iters += 1
@@ -101,13 +107,14 @@ def ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         Xref_list = []
         phi_list = []
         resids_list = []
+        resids_sum = 0.
         phi_v = phi0_v.copy()
         Xref = Xo_ref.copy()
         Lambda = invPo_bar.copy()
-        N = np.dot(Lambda, xo_bar)
+        Nstate = np.dot(Lambda, xo_bar)
 
-        # Loop over times
-        for kk in range(L):
+        # Loop over times        
+        for kk in range(N):
             
 #            print('\nkk = ', kk)
             
@@ -136,7 +143,7 @@ def ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
                 int0 = int0.flatten()
                 tin = [tk_prior, tk]
                 
-                tout, intout = general_dynamics(int0, tin, state_params, int_params)
+                tout, intout = dyn.general_dynamics(int0, tin, state_params, int_params)
 
             # Extract values for later calculations
             xout = intout[-1,:]
@@ -155,12 +162,13 @@ def ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
             invRk = np.dot(cholRk.T, cholRk)
                         
             Lambda += np.dot(Hk.T, np.dot(invRk, Hk))
-            N += np.dot(Hk.T, np.dot(invRk, yk))
+            Nstate += np.dot(Hk.T, np.dot(invRk, yk))
             
             # Store output
             resids_list.append(yk)
             Xref_list.append(Xref)
             phi_list.append(phi)
+            resids_sum += float(np.dot(yk.T, np.dot(invRk, yk)))
             
             # print(kk)
             # print(tk)
@@ -181,28 +189,68 @@ def ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         # Solve the normal equations
         cholLam_inv = np.linalg.inv(np.linalg.cholesky(Lambda))
         Po = np.dot(cholLam_inv.T, cholLam_inv)     
-        xo_hat = np.dot(Po, N)
+        xo_hat = np.dot(Po, Nstate)
         xo_hat_mag = np.linalg.norm(xo_hat)
 
         # Update for next batch iteration
         Xo_ref = Xo_ref + xo_hat
         xo_bar = xo_bar - xo_hat
+        
+        # Evaluate xo_hat_mag and resids for convergence
+#        if xo_hat_mag < xhat_crit:
+#            conv_flag = True
+            
+        resids_rms = np.sqrt(resids_sum/nmeas)
+        resids_diff = abs(resids_rms - rms_prior)/rms_prior
+        if resids_diff < rms_crit:
+            conv_flag = True
+            
+        rms_prior = float(resids_rms)
+        
 
         print('Iteration Number: ', iters)
         print('xo_hat_mag = ', xo_hat_mag)
+        print('delta-X = ', xo_hat)
+        print('Xo', Xo_ref_print)
+        print('X', Xo_ref)
+        print('resids_rms = ', resids_rms)
+        print('resids_diff = ', resids_diff)
+        
+#        # DEBUG
+#        t_hrs = [(tt - tk_list[0]).total_seconds()/3600. for tt in tk_list]
+#        rg_resids = [res[0]*1000. for res in resids_list]
+#        ra_resids = [res[1]*(1./arcsec2rad) for res in resids_list]
+#        dec_resids = [res[2]*(1./arcsec2rad) for res in resids_list]
+#        
+#        plt.figure()
+#        plt.subplot(3,1,1)
+#        plt.plot(t_hrs, rg_resids, 'k.')
+#        plt.ylabel('Range [m]')
+#        plt.subplot(3,1,2)
+#        plt.plot(t_hrs, ra_resids, 'k.')
+#        plt.ylabel('RA [arcsec]')
+#        plt.subplot(3,1,3)
+#        plt.plot(t_hrs, dec_resids, 'k.')
+#        plt.ylabel('DEC [arcsec]')
+#        plt.xlabel('Time [hours]')
+#        
+#        plt.show()
+        
+#        if iters > 1:
+#            mistake
 
-    # Form output
-    for kk in range(L):
-        tk = tk_list[kk]
-        X = Xref_list[kk]
-        resids = resids_list[kk]
-        phi = phi_list[kk]
-        P = np.dot(phi, np.dot(Po, phi.T))
-
-        filter_output[tk] = {}
-        filter_output[tk]['X'] = X
-        filter_output[tk]['P'] = P
-        filter_output[tk]['resids'] = resids
+#    # Form output
+#    for kk in range(N):
+#        tk = tk_list[kk]
+#        X = Xref_list[kk]
+#        resids = resids_list[kk]
+#        phi = phi_list[kk]
+#        P = np.dot(phi, np.dot(Po, phi.T))
+#
+#        filter_output[tk] = {}
+#        filter_output[tk]['X'] = X
+#        filter_output[tk]['P'] = P
+#        filter_output[tk]['resids'] = resids
         
     
     # Integrate over full time
@@ -231,7 +279,7 @@ def ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
             int0 = int0.flatten()
             tin = [tk_prior, tk]
             
-            tout, intout = general_dynamics(int0, tin, state_params, int_params)
+            tout, intout = dyn.general_dynamics(int0, tin, state_params, int_params)
 
         # Extract values for later calculations
         xout = intout[-1,:]
@@ -244,7 +292,714 @@ def ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         full_state_output[tk]['X'] = Xref
         full_state_output[tk]['P'] = P
         
+        if tk in tk_list:
+            filter_output[tk] = {}
+            filter_output[tk]['X'] = Xref
+            filter_output[tk]['P'] = P
+            filter_output[tk]['resids'] = resids_list[tk_list.index(tk)]
     
+
+    return filter_output, full_state_output
+
+
+def lp_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
+             sensor_params, int_params):
+    '''
+    This function implements the linearized batch estimator for the minimum
+    Lp-norm cost function, not including L1-norm (Least Absolute Deviations).
+    Selection of pnorm = 2 will produce the least squares estimate with 
+    slightly more computational cost.
+    
+    The only allowable values of pnorm are pnorm > 1.
+    
+    For measurement data with outliers, it is recommended to set the input
+    parameter pnorm to a value 1 < pnorm < 2, for example pnorm = 1.2.
+
+    Parameters
+    ------
+    state_dict : dictionary
+        initial state and covariance for filter execution
+    truth_dict : dictionary
+        true state at all times
+    meas_dict : dictionary
+        measurement data over time for the filter and parameters (noise, etc)
+    meas_fcn : function handle
+        function for measurements
+    state_params : dictionary
+        physical parameters of spacecraft and central body
+    sensor_params : dictionary
+        location, constraint, noise parameters of sensors
+    int_params : dictionary
+        numerical integration parameters
+
+    Returns
+    ------
+    filter_output : dictionary
+        output state, covariance, and post-fit residuals at measurement times
+    full_state_output : dictionary
+        output state and covariance at all truth times
+        
+    '''
+
+    # State information
+    state_tk = sorted(state_dict.keys())[-1]
+    Xo_ref = state_dict[state_tk]['X']
+    Po_bar = state_dict[state_tk]['P']
+    
+    # Cost function parameter
+    pnorm = state_params['pnorm']
+    
+    # Rescale noise for pnorm distribution
+    scale = (math.gamma(3./pnorm)/math.gamma(1./pnorm)) * pnorm**(2./pnorm)
+    print(scale)
+
+    # Setup
+    cholPo = np.linalg.inv(np.linalg.cholesky(Po_bar))
+    invPo_bar = np.dot(cholPo.T, cholPo)
+    Xo_ref_print = Xo_ref.copy()
+
+    n = len(Xo_ref)
+
+    # Initialize output
+    filter_output = {}
+
+    # Measurement times
+    tk_list = meas_dict['tk_list']
+    Yk_list = meas_dict['Yk_list']
+    sensor_id_list = meas_dict['sensor_id_list']
+    nmeas = sum([len(Yk) for Yk in Yk_list])
+
+    # Number of epochs
+    N = len(tk_list)
+
+    # Initialize    
+    xo_bar = np.zeros((n, 1))
+    xo_hat = np.zeros((n, 1))
+    phi0 = np.identity(n)
+    phi0_v = np.reshape(phi0, (n**2, 1))
+
+    # Begin Loop
+    iters = 0
+    maxiters = 10
+    newt_maxiters = 100
+    xo_hat_mag = 1
+    rms_prior = 1e6
+    xhat_crit = 1e-5
+    rms_crit = 1e-4
+    newt_crit = 1e-10
+    conv_flag = False    
+    while not conv_flag:
+
+        # Increment loop counter and exit if necessary
+        iters += 1
+        if iters > maxiters:
+            iters -= 1
+            print('Solution did not converge in ', iters, ' iterations')
+            print('Last xo_hat magnitude: ', xo_hat_mag)
+            break
+
+        # Initialze values for this iteration
+        Xref_list = []
+        phi_list = []
+        resids_list = []
+        Hk_list = []
+        Rk_list = []
+        resids_sum = 0.
+        phi_v = phi0_v.copy()
+        Xref = Xo_ref.copy()
+        
+
+        # Loop over times        
+        for kk in range(N):
+            
+#            print('\nkk = ', kk)
+            
+            # Current and previous time
+            if kk == 0:
+                tk_prior = state_tk
+            else:
+                tk_prior = tk_list[kk-1]
+
+            tk = tk_list[kk]
+
+            # Read the next observation
+            Yk = Yk_list[kk]
+            sensor_id = sensor_id_list[kk]
+
+            # Initialize
+            Xref_prior = Xref.copy()
+
+            # Initial Conditions for Integration Routine
+            int0 = np.concatenate((Xref_prior, phi_v))
+
+            # Integrate Xref and STM
+            if tk_prior == tk:
+                intout = int0.T
+            else:
+                int0 = int0.flatten()
+                tin = [tk_prior, tk]
+                
+                tout, intout = dyn.general_dynamics(int0, tin, state_params, int_params)
+
+            # Extract values for later calculations
+            xout = intout[-1,:]
+            Xref = xout[0:n].reshape(n, 1)
+            phi_v = xout[n:].reshape(n**2, 1)
+            phi = np.reshape(phi_v, (n, n))
+            
+#            print('\n\n')
+#            print('Xref', Xref)
+
+            # Compute and store data
+            Hk_til, Gk, Rk = meas_fcn(tk, Xref, state_params, sensor_params, sensor_id)            
+            yk = Yk - Gk
+            Hk = np.dot(Hk_til, phi)
+            
+            cholRk = np.linalg.inv(np.linalg.cholesky(Rk))
+            invRk = np.dot(cholRk.T, cholRk)            
+            resids_sum += float(np.dot(yk.T, np.dot(invRk, yk)))
+            
+#            Rk = scale*Rk
+
+            # Store output
+            resids_list.append(yk)
+            Xref_list.append(Xref)
+            phi_list.append(phi)
+            Hk_list.append(Hk)
+            Rk_list.append(Rk)
+            
+            
+            
+            # print(kk)
+            # print(tk)
+            # print(int0)
+            # print(Xref)
+            # print(Yk)
+            # print(Gk)
+            # print(yk)
+            
+            # if kk > 2:
+            #     mistake
+
+
+        # print(Lambda)
+        # print(np.linalg.eig(Lambda))
+
+
+        # Solve the normal equations
+        # Newton Raphson iteration to get best xo_hat
+        newt_diff = 1.
+        xo_bar_newt = xo_bar.copy()
+
+        newt_iters = 0
+        while newt_diff > newt_crit:
+
+            newt_iters += 1
+            if newt_iters > newt_maxiters:
+                print('Newton iteration #', newt_iters)
+                print('Newton iteration difference magnitude:', newt_diff)
+                break
+            
+            # Initialize for this iteration
+            Lambda = invPo_bar.copy()
+            Nstate = np.dot(Lambda, xo_bar_newt)
+            
+            # Loop over times
+            for kk in range(N):
+                
+                # Retrieve values
+                yk = resids_list[kk]
+                Hk = Hk_list[kk]
+                Rk = Rk_list[kk]
+                
+                # Compute weighting matrix
+                W_vect = abs(yk - np.dot(Hk, xo_hat))**(pnorm-2.)
+                W = np.diag(W_vect.flatten())
+                
+                # Compute inverse of Rk
+                cholRk = np.linalg.inv(np.linalg.cholesky(Rk))
+                invRk = np.dot(cholRk.T, cholRk)
+                invRk_pover2 = np.diag(np.diag(Rk)**(-pnorm/2.))
+#                invRk_pover2 = invRk
+                
+#                print(invRk)
+#                print(invRk_pover2)
+                
+#                mistake
+            
+                # Accumulate quantities of interest
+                Lambda += (pnorm-1.)*\
+                    np.dot(Hk.T, np.dot(W, np.dot(invRk_pover2, Hk)))
+                abs_vect = np.multiply(abs(yk-np.dot(Hk, xo_hat))**(pnorm-1.),
+                                       np.sign(yk-np.dot(Hk, xo_hat)))
+                Nstate += np.dot(Hk.T, np.dot(invRk_pover2, abs_vect))
+                
+            # Solve the normal equations
+            cholLam_inv = np.linalg.inv(np.linalg.cholesky(Lambda))
+            Po = np.dot(cholLam_inv.T, cholLam_inv)   
+            
+            if pnorm > 2.:
+                alpha = 1.
+            else:
+                alpha = pnorm - 1.
+
+            xo_hat += alpha * np.dot(Po, Nstate)
+            xo_bar_newt = xo_bar - xo_hat
+            xo_hat_mag = np.linalg.norm(xo_hat)
+            newt_diff = alpha * np.linalg.norm(np.dot(Po, Nstate))
+        
+
+        # Update for next batch iteration
+        Xo_ref = Xo_ref + xo_hat
+        xo_bar = xo_bar - xo_hat
+        
+        # Evaluate xo_hat_mag and resids for convergence
+#        if xo_hat_mag < xhat_crit:
+#            conv_flag = True
+            
+        resids_rms = np.sqrt(resids_sum/nmeas)
+        resids_diff = abs(resids_rms - rms_prior)/rms_prior
+        if resids_diff < rms_crit:
+            conv_flag = True
+            
+        rms_prior = float(resids_rms)
+        
+
+        print('Iteration Number: ', iters)
+        print('xo_hat_mag = ', xo_hat_mag)
+        print('delta-X = ', xo_hat)
+        print('Xo', Xo_ref_print)
+        print('X', Xo_ref)
+        print('resids_rms = ', resids_rms)
+        print('resids_diff = ', resids_diff)
+        
+#        # DEBUG
+#        t_hrs = [(tt - tk_list[0]).total_seconds()/3600. for tt in tk_list]
+#        rg_resids = [res[0]*1000. for res in resids_list]
+#        ra_resids = [res[1]*(1./arcsec2rad) for res in resids_list]
+#        dec_resids = [res[2]*(1./arcsec2rad) for res in resids_list]
+#        
+#        plt.figure()
+#        plt.subplot(3,1,1)
+#        plt.plot(t_hrs, rg_resids, 'k.')
+#        plt.ylabel('Range [m]')
+#        plt.subplot(3,1,2)
+#        plt.plot(t_hrs, ra_resids, 'k.')
+#        plt.ylabel('RA [arcsec]')
+#        plt.subplot(3,1,3)
+#        plt.plot(t_hrs, dec_resids, 'k.')
+#        plt.ylabel('DEC [arcsec]')
+#        plt.xlabel('Time [hours]')
+#        
+#        plt.show()
+        
+#        if iters > 1:
+#            mistake
+
+#    # Form output
+#    for kk in range(N):
+#        tk = tk_list[kk]
+#        X = Xref_list[kk]
+#        resids = resids_list[kk]
+#        phi = phi_list[kk]
+#        P = np.dot(phi, np.dot(Po, phi.T))
+#
+#        filter_output[tk] = {}
+#        filter_output[tk]['X'] = X
+#        filter_output[tk]['P'] = P
+#        filter_output[tk]['resids'] = resids
+        
+    
+    # Integrate over full time
+    tk_truth = list(truth_dict.keys())
+    phi_v = phi0_v.copy()
+    Xref = Xo_ref.copy()
+    full_state_output = {}
+    for kk in range(len(tk_truth)):
+        
+        # Current and previous time
+        if kk == 0:
+            tk_prior = state_tk
+        else:
+            tk_prior = tk_truth[kk-1]
+            
+        tk = tk_truth[kk]
+        
+        # Initial Conditions for Integration Routine
+        Xref_prior = Xref.copy()
+        int0 = np.concatenate((Xref_prior, phi_v))
+
+        # Integrate Xref and STM
+        if tk_prior == tk:
+            intout = int0.T
+        else:
+            int0 = int0.flatten()
+            tin = [tk_prior, tk]
+            
+            tout, intout = dyn.general_dynamics(int0, tin, state_params, int_params)
+
+        # Extract values for later calculations
+        xout = intout[-1,:]
+        Xref = xout[0:n].reshape(n, 1)
+        phi_v = xout[n:].reshape(n**2, 1)
+        phi = np.reshape(phi_v, (n, n))
+        P = np.dot(phi, np.dot(Po, phi.T))
+        
+        full_state_output[tk] = {}
+        full_state_output[tk]['X'] = Xref
+        full_state_output[tk]['P'] = P
+        
+        if tk in tk_list:
+            filter_output[tk] = {}
+            filter_output[tk]['X'] = Xref
+            filter_output[tk]['P'] = P
+            filter_output[tk]['resids'] = resids_list[tk_list.index(tk)]
+    
+
+    return filter_output, full_state_output
+
+
+def unscented_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
+                    sensor_params, int_params):
+    '''
+    This function implements the unscented batch estimator for the least
+    squares cost function.
+
+    Parameters
+    ------
+    state_dict : dictionary
+        initial state and covariance for filter execution
+    truth_dict : dictionary
+        true state at all times
+    meas_dict : dictionary
+        measurement data over time for the filter and parameters (noise, etc)
+    meas_fcn : function handle
+        function for measurements
+    state_params : dictionary
+        physical parameters of spacecraft and central body
+    sensor_params : dictionary
+        location, constraint, noise parameters of sensors
+    int_params : dictionary
+        numerical integration parameters
+
+    Returns
+    ------
+    filter_output : dictionary
+        output state, covariance, and post-fit residuals at measurement times
+    full_state_output : dictionary
+        output state and covariance at all truth times
+        
+    '''
+
+    # State information
+    state_tk = sorted(state_dict.keys())[-1]
+    Xo = state_dict[state_tk]['X']
+    Po = state_dict[state_tk]['P']
+
+    # Setup
+    n = len(Xo)
+    
+    # Prior information about the distribution
+    pnorm = 2.
+    kurt = math.gamma(5./pnorm)*math.gamma(1./pnorm)/(math.gamma(3./pnorm)**2.)
+    beta = kurt - 1.
+    kappa = kurt - float(n)
+    
+    # Compute sigma point weights
+    alpha = state_params['alpha']
+    lam = alpha**2.*(n + kappa) - n
+    gam = np.sqrt(n + lam)
+    Wm = 1./(2.*(n + lam)) * np.ones(2*n,)
+    Wc = Wm.copy()
+    Wm = np.insert(Wm, 0, lam/(n + lam))
+    Wc = np.insert(Wc, 0, lam/(n + lam) + (1 - alpha**2 + beta))
+    diagWc = np.diag(Wc)
+    unscented_params = {}
+    unscented_params['gam'] = gam
+    unscented_params['Wm'] = Wm
+    unscented_params['diagWc'] = diagWc
+
+    # Initialize output
+    filter_output = {}
+
+    # Measurement times
+    tk_list = meas_dict['tk_list']
+    Yk_list = meas_dict['Yk_list']
+    sensor_id_list = meas_dict['sensor_id_list']
+    nmeas = sum([len(Yk) for Yk in Yk_list])
+    
+#    print('nmeas', nmeas)
+
+    # Number of epochs
+    N = len(tk_list)
+
+    # Initialize 
+    X = Xo.copy()
+    P = Po.copy()
+    maxiters = 10
+    xdiff = 1
+    rms_prior = 1e6
+    xdiff_crit = 1e-5
+    rms_crit = 1e-4
+    conv_flag = False 
+    
+    # Begin loop
+    iters = 0
+    while not conv_flag:
+
+        # Increment loop counter and exit if necessary
+        iters += 1
+        if iters > maxiters:
+            iters -= 1
+            print('Solution did not converge in ', iters, ' iterations')
+            print('Last xdiff magnitude: ', xdiff)
+            break
+
+        # Initialze values for this iteration
+        # Reset P every iteration???
+        P = Po.copy()
+        
+        # Compute Sigma Points
+        sqP = np.linalg.cholesky(P)
+        Xrep = np.tile(X, (1, n))
+        chi0 = np.concatenate((X, Xrep+(gam*sqP), Xrep-(gam*sqP)), axis=1)
+        chi_v = np.reshape(chi0, (n*(2*n+1), 1), order='F')  
+        chi_diff0 = chi0 - np.dot(X, np.ones((1, 2*n+1)))
+
+        # Loop over times
+        meas_ind = 0
+        Y_bar = np.zeros((nmeas, 1))
+        Y_til = np.zeros((nmeas, 1))
+        gamma_til_mat = np.zeros((nmeas, 2*n+1))
+        Rk_list = []
+        resids_list = []
+        resids_sum = 0.
+        for kk in range(N):
+            
+#            print('\nkk = ', kk)
+            
+            # Current and previous time
+            if kk == 0:
+                tk_prior = state_tk
+            else:
+                tk_prior = tk_list[kk-1]
+
+            tk = tk_list[kk]
+
+            # Read the next observation
+            Yk = Yk_list[kk]
+            sensor_id = sensor_id_list[kk]
+            p = len(Yk)
+
+            # Initial Conditions for Integration Routine
+            int0 = chi_v.copy()
+
+            # Integrate Xref and STM
+            if tk_prior == tk:
+                intout = int0.T
+            else:
+                int0 = int0.flatten()
+                tin = [tk_prior, tk]
+                
+                tout, intout = dyn.general_dynamics(int0, tin, state_params, int_params)
+
+            # Extract values for later calculations
+            chi_v = intout[-1,:]
+            chi = np.reshape(chi_v, (n, 2*n+1), order='F')
+            
+            # Compute measurement for each sigma point
+            gamma_til_k, Rk = meas_fcn(tk, chi, state_params, sensor_params, sensor_id)
+            ybar = np.dot(gamma_til_k, Wm.T)
+            ybar = np.reshape(ybar, (p, 1))
+            resids = Yk - ybar
+            cholRk = np.linalg.inv(np.linalg.cholesky(Rk))
+            invRk = np.dot(cholRk.T, cholRk)
+            
+            # Accumulate measurements and computed measurements
+            Y_til[meas_ind:meas_ind+p] = Yk
+            Y_bar[meas_ind:meas_ind+p] = ybar
+            gamma_til_mat[meas_ind:meas_ind+p, :] = gamma_til_k  
+            Rk_list.append(Rk)
+            
+            # Store output
+            resids_list.append(resids)
+            resids_sum += float(np.dot(resids.T, np.dot(invRk, resids)))
+            
+#            print('kk', kk)
+#            print('Yk', Yk)
+#            print('ybar', ybar)
+#            
+#            if kk == 27:
+#                print(gamma_til_k)
+#                print(Rk)
+#                mistake
+            
+            
+            
+#            Xk = np.dot(chi, Wm.T)
+#            Xk = np.reshape(Xk, (n, 1))
+#            chi_diff = chi - np.dot(Xk, np.ones((1, (2*n+1))))
+#            Pk = np.dot(chi_diff, np.dot(diagWc, chi_diff.T))
+#            
+#            if tk not in filter_output:
+#                filter_output[tk] = {}
+#            filter_output[tk]['X'] = Xk
+#            filter_output[tk]['P'] = Pk
+#            filter_output[tk]['resids'] = resids
+            
+            # Increment measurement index
+            meas_ind += p
+
+
+#        # DEBUG
+#        t_hrs = [(tt - tk_list[0]).total_seconds()/3600. for tt in tk_list]
+#        rg_resids = [res[0]*1000. for res in resids_list]
+#        ra_resids = [res[1]*(1./arcsec2rad) for res in resids_list]
+#        dec_resids = [res[2]*(1./arcsec2rad) for res in resids_list]
+#        
+#        plt.figure()
+#        plt.subplot(3,1,1)
+#        plt.plot(t_hrs, rg_resids, 'k.')
+#        plt.ylabel('Range [m]')
+#        plt.subplot(3,1,2)
+#        plt.plot(t_hrs, ra_resids, 'k.')
+#        plt.ylabel('RA [arcsec]')
+#        plt.subplot(3,1,3)
+#        plt.plot(t_hrs, dec_resids, 'k.')
+#        plt.ylabel('DEC [arcsec]')
+#        plt.xlabel('Time [hours]')
+#        
+#        plt.show()
+
+        # Compute covariances
+        Rk_full = scipy.linalg.block_diag(*Rk_list)
+        Y_diff = gamma_til_mat - np.dot(Y_bar, np.ones((1, 2*n+1)))
+        
+#        print(Rk_full.shape)
+#        print(gamma_til_mat.shape)
+#        print(Y_diff.shape)
+#        
+#        mistake
+        
+        Pyy = np.dot(Y_diff, np.dot(diagWc, Y_diff.T)) + Rk_full
+        Pxy = np.dot(chi_diff0, np.dot(diagWc, Y_diff.T)) 
+        
+#        print(Pyy)
+#        print(np.linalg.eig(Pyy))
+        
+#        print(Y_diff.shape)
+#        print(diagWc.shape)
+#        print(Rk_full.shape)
+#        
+#        np.linalg.cholesky(Rk_full)
+#        np.linalg.cholesky(np.dot(Y_diff, Y_diff.T))
+
+        # Compute Kalman Gain
+        cholPyy_inv = np.linalg.inv(np.linalg.cholesky(Pyy))
+        Pyy_inv = np.dot(cholPyy_inv.T, cholPyy_inv) 
+        
+#        Pyy_inv = np.linalg.inv(Pyy)
+        
+        K = np.dot(Pxy, Pyy_inv)
+        
+#        K = np.dot(Pxy, np.linalg.inv(Pyy))
+        
+
+        # Compute updated state and covariance    
+        X += np.dot(K, Y_til-Y_bar)
+#        P = P - np.dot(K, np.dot(Pyy, K.T))
+        
+        # Joseph Form        
+        cholPbar = np.linalg.inv(np.linalg.cholesky(P))
+        invPbar = np.dot(cholPbar.T, cholPbar)
+        P1 = (np.eye(n) - np.dot(np.dot(K, np.dot(Pyy, K.T)), invPbar))
+        P2 = np.dot(K, np.dot(Rk_full, K.T))
+        P = np.dot(P1, np.dot(P, P1.T)) + P2
+        
+        
+        xdiff = np.linalg.norm(np.dot(K, Y_til-Y_bar))
+        
+        # Evaluate xo_hat_mag and resids for convergence
+#        if xdiff < xdiff_crit:
+#            conv_flag = True
+            
+        resids_rms = np.sqrt(resids_sum/nmeas)
+        resids_diff = abs(resids_rms - rms_prior)/rms_prior
+        if resids_diff < rms_crit:
+            conv_flag = True
+            
+        rms_prior = float(resids_rms)
+        
+
+        print('Iteration Number: ', iters)
+        print('xdiff = ', xdiff)
+        print('delta-X = ', np.dot(K, Y_til-Y_bar))
+        print('Xo', Xo)
+        print('X', X)
+        print('resids_rms = ', resids_rms)
+        print('resids_diff = ', resids_diff)
+        
+        
+#        
+#        if iters > 3:
+#            mistake
+
+    
+    
+    # Setup for full_state_output
+    Xo = X.copy()
+    Po = P.copy()
+    
+    # Compute Sigma Points
+    sqP = np.linalg.cholesky(Po)
+    Xrep = np.tile(Xo, (1, n))
+    chi0 = np.concatenate((Xo, Xrep+(gam*sqP), Xrep-(gam*sqP)), axis=1)
+    chi_v = np.reshape(chi0, (n*(2*n+1), 1), order='F')
+    
+    # Integrate over full time
+    tk_truth = list(truth_dict.keys())
+    full_state_output = {}
+    for kk in range(len(tk_truth)):
+        
+        # Current and previous time
+        if kk == 0:
+            tk_prior = state_tk
+        else:
+            tk_prior = tk_truth[kk-1]
+            
+        tk = tk_truth[kk]
+
+        # Initial Conditions for Integration Routine
+        int0 = chi_v.copy()
+
+        # Integrate Xref and STM
+        if tk_prior == tk:
+            intout = int0.T
+        else:
+            int0 = int0.flatten()
+            tin = [tk_prior, tk]
+            
+            tout, intout = dyn.general_dynamics(int0, tin, state_params, int_params)
+
+        # Extract values for later calculations
+        chi_v = intout[-1,:]
+        chi = np.reshape(chi_v, (n, 2*n+1), order='F')
+    
+        # Store output
+        Xk = np.dot(chi, Wm.T)
+        Xk = np.reshape(Xk, (n, 1))
+        chi_diff = chi - np.dot(Xk, np.ones((1, (2*n+1))))
+        Pk = np.dot(chi_diff, np.dot(diagWc, chi_diff.T))
+        
+        full_state_output[tk] = {}
+        full_state_output[tk]['X'] = Xk
+        full_state_output[tk]['P'] = Pk
+        
+        if tk in tk_list:
+            filter_output[tk] = {}
+            filter_output[tk]['X'] = Xk
+            filter_output[tk]['P'] = Pk
+            filter_output[tk]['resids'] = resids_list[tk_list.index(tk)]
 
     return filter_output, full_state_output
 
@@ -256,8 +1011,8 @@ def ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
 def ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
            sensor_params, int_params):    
     '''
-    This function implements the linearized batch estimator for the least
-    squares cost function.
+    This function implements the linearized Extended Kalman Filter for the 
+    least squares cost function.
 
     Parameters
     ------
@@ -294,9 +1049,6 @@ def ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
     time_format = int_params['time_format']
 
     # Setup
-    cholPo = np.linalg.inv(np.linalg.cholesky(Po_bar))
-    invPo_bar = np.dot(cholPo.T, cholPo)
-
     n = len(Xo_ref)
     q = int(Q.shape[0])
 
@@ -309,7 +1061,7 @@ def ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
     sensor_id_list = meas_dict['sensor_id_list']
     
     # Number of epochs
-    L = len(tk_list)
+    N = len(tk_list)
 
     # Initialize
     xhat = np.zeros((n, 1))
@@ -321,7 +1073,7 @@ def ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
     count = 0
     
     # Loop over times
-    for kk in range(L):
+    for kk in range(N):
     
         # Current and previous time
         if kk == 0:
@@ -353,7 +1105,7 @@ def ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
             int0 = int0.flatten()
             tin = [tk_prior, tk]
             
-            tout, intout = general_dynamics(int0, tin, state_params, int_params)
+            tout, intout = dyn.general_dynamics(int0, tin, state_params, int_params)
 
         # Extract values for later calculations
         xout = intout[-1,:]
@@ -368,7 +1120,10 @@ def ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         if delta_t > gap_seconds:        
             Gamma = np.zeros((n,q))
         else:
-            Gamma = delta_t * np.concatenate((np.eye(q)*delta_t/2., np.eye(q)))
+            Gamma = np.zeros((n,q))
+            Gamma[0:q,:] = (delta_t**2./2) * np.eye(q)
+            Gamma[q:2*q,:] = delta_t * np.eye(q)
+#            Gamma = delta_t * np.concatenate((np.eye(q)*delta_t/2., np.eye(q)))
 
         xbar = np.dot(phi, xhat_prior)
         Pbar = np.dot(phi, np.dot(P_prior, phi.T)) + np.dot(Gamma, np.dot(Q, Gamma.T))
@@ -399,7 +1154,8 @@ def ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         # P1 = np.eye(n) - np.dot(Kk, Hk_til)
         # P = np.dot(P1, Pbar)
         
-        P = 0.5 * (P + P.T)
+        # Re-symmetric covariance
+#        P = 0.5 * (P + P.T)
         
         # Post-fit residuals and updated state
         resids = yk - np.dot(Hk_til, xhat)
@@ -432,10 +1188,10 @@ def ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         
         # Check convergence criteria and set flag to use EKF
 #        if kk > 10:
-        P_diff = np.trace(P)/np.trace(P_prior)
+#        P_diff = np.trace(P)/np.trace(P_prior)
 #        print('\n')
-        print(kk)
-        print(P_diff)
+#        print(kk)
+#        print(P_diff)
         
 #        if P_diff > 0.9 and P_diff < 1.0:
 #            conv_flag = True
@@ -519,272 +1275,213 @@ def ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
     return filter_output, full_state_output
 
 
+def ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
+           sensor_params, int_params):    
+    '''
+    This function implements the Unscented Kalman Filter for the least
+    squares cost function.
 
-###############################################################################
-# Measurement Functions
-###############################################################################
-    
-def H_rgradec(tk, Xref, state_params, sensor_params, sensor_id):
-    
-    
-    # Compute sensor position in GCRF
-    eop_alldata = sensor_params['eop_alldata']
-    XYs_df = sensor_params['XYs_df']
-    EOP_data = get_eop_data(eop_alldata, tk)
-    
-    sensor_kk = sensor_params[sensor_id]
-    sensor_itrf = sensor_kk['site_ecef']
-    sensor_gcrf, dum = itrf2gcrf(sensor_itrf, np.zeros((3,1)), tk, EOP_data, XYs_df)
-    
-    # Measurement noise
-    meas_types = sensor_kk['meas_types']
-    sigma_dict = sensor_kk['sigma_dict']
-    p = len(meas_types)
-    Rk = np.zeros((p, p))
-    for ii in range(p):
-        mtype = meas_types[ii]
-        sig = sigma_dict[mtype]
-        Rk[ii,ii] = sig**2.   
-    
-    
-    # Object location in GCRF
-    r_gcrf = Xref[0:3].reshape(3,1)
-    
-    # Compute range and line of sight vector
-    rho_gcrf = r_gcrf - sensor_gcrf
-    rg = np.linalg.norm(rho_gcrf)
-    rho_hat_gcrf = rho_gcrf/rg
-    
-    ra = atan2(rho_hat_gcrf[1], rho_hat_gcrf[0]) #rad
-    dec = asin(rho_hat_gcrf[2])  #rad
+    Parameters
+    ------
+    state_dict : dictionary
+        initial state and covariance for filter execution
+    truth_dict : dictionary
+        true state at all times
+    meas_dict : dictionary
+        measurement data over time for the filter and parameters (noise, etc)
+    meas_fcn : function handle
+        function for measurements
+    state_params : dictionary
+        physical parameters and constants
+    sensor_params : dictionary
+        location, constraint, noise parameters of sensors
+    int_params : dictionary
+        numerical integration parameters
 
-    # Calculate partials of rho
-    drho_dx = rho_hat_gcrf[0]
-    drho_dy = rho_hat_gcrf[1]
-    drho_dz = rho_hat_gcrf[2]
+    Returns
+    ------
+    filter_output : dictionary
+        output state, covariance, and post-fit residuals at measurement times
+    full_state_output : dictionary
+        output state and covariance at all truth times
+        
+    '''
     
-    # Calculate partials of right ascension
-    d_atan = 1./(1. + (rho_gcrf[1]/rho_gcrf[0])**2.)
-    dra_dx = d_atan*(-(rho_gcrf[1])/((rho_gcrf[0])**2.))
-    dra_dy = d_atan*(1./(rho_gcrf[0]))
-    
-    # Calculate partials of declination
-    d_asin = 1./np.sqrt(1. - ((rho_gcrf[2])/rg)**2.)
-    ddec_dx = d_asin*(-(rho_gcrf[2])/rg**2.)*drho_dx
-    ddec_dy = d_asin*(-(rho_gcrf[2])/rg**2.)*drho_dy
-    ddec_dz = d_asin*(1./rg - ((rho_gcrf[2])/rg**2.)*drho_dz)
+    # State information
+    state_tk = sorted(state_dict.keys())[-1]
+    Xk = state_dict[state_tk]['X']
+    P = state_dict[state_tk]['P']
+    Q = state_params['Q']
+    gap_seconds = state_params['gap_seconds']
+    time_format = int_params['time_format']
 
-    # Hk_til and Gi
-    Gk = np.reshape([rg, ra, dec], (3,1))
+    n = len(Xk)
+    q = int(Q.shape[0])
     
-    Hk_til = np.zeros((3,6))
-    Hk_til[0,0] = drho_dx
-    Hk_til[0,1] = drho_dy
-    Hk_til[0,2] = drho_dz
-    Hk_til[1,0] = dra_dx
-    Hk_til[1,1] = dra_dy
-    Hk_til[2,0] = ddec_dx
-    Hk_til[2,1] = ddec_dy
-    Hk_til[2,2] = ddec_dz    
+    # Prior information about the distribution
+    pnorm = 2.
+    kurt = math.gamma(5./pnorm)*math.gamma(1./pnorm)/(math.gamma(3./pnorm)**2.)
+    beta = kurt - 1.
+    kappa = kurt - float(n)
     
-    
-    return Hk_til, Gk, Rk
+    # Compute sigma point weights
+    alpha = state_params['alpha']
+    lam = alpha**2.*(n + kappa) - n
+    gam = np.sqrt(n + lam)
+    Wm = 1./(2.*(n + lam)) * np.ones(2*n,)
+    Wc = Wm.copy()
+    Wm = np.insert(Wm, 0, lam/(n + lam))
+    Wc = np.insert(Wc, 0, lam/(n + lam) + (1 - alpha**2 + beta))
+    diagWc = np.diag(Wc)
+    unscented_params = {}
+    unscented_params['gam'] = gam
+    unscented_params['Wm'] = Wm
+    unscented_params['diagWc'] = diagWc
 
+    # Initialize output
+    filter_output = {}
 
-def H_radec(tk, Xref, state_params, sensor_params, sensor_id):
+    # Measurement times
+    tk_list = meas_dict['tk_list']
+    Yk_list = meas_dict['Yk_list']
+    sensor_id_list = meas_dict['sensor_id_list']
     
+    # Number of epochs
+    N = len(tk_list)
+  
+    # Loop over times
+    for kk in range(N):
     
-    # Compute sensor position in GCRF
-    eop_alldata = sensor_params['eop_alldata']
-    XYs_df = sensor_params['XYs_df']
-    EOP_data = get_eop_data(eop_alldata, tk)
-    
-    sensor_kk = sensor_params[sensor_id]
-    sensor_itrf = sensor_kk['site_ecef']
-    sensor_gcrf, dum = itrf2gcrf(sensor_itrf, np.zeros((3,1)), tk, EOP_data, XYs_df)
-    
-    # Measurement noise
-    meas_types = sensor_kk['meas_types']
-    sigma_dict = sensor_kk['sigma_dict']
-    p = len(meas_types)
-    Rk = np.zeros((p, p))
-    for ii in range(p):
-        mtype = meas_types[ii]
-        sig = sigma_dict[mtype]
-        Rk[ii,ii] = sig**2.   
-    
-    
-    # Object location in GCRF
-    r_gcrf = Xref[0:3].reshape(3,1)
-    
-    # Compute range and line of sight vector
-    rho_gcrf = r_gcrf - sensor_gcrf
-    rg = np.linalg.norm(rho_gcrf)
-    rho_hat_gcrf = rho_gcrf/rg
-    
-    ra = atan2(rho_hat_gcrf[1], rho_hat_gcrf[0]) #rad
-    dec = asin(rho_hat_gcrf[2])  #rad
+        # Current and previous time
+        if kk == 0:
+            tk_prior = state_tk
+        else:
+            tk_prior = tk_list[kk-1]
 
-    # Calculate partials of rho
-    drho_dx = rho_hat_gcrf[0]
-    drho_dy = rho_hat_gcrf[1]
-    drho_dz = rho_hat_gcrf[2]
-    
-    # Calculate partials of right ascension
-    d_atan = 1./(1. + (rho_gcrf[1]/rho_gcrf[0])**2.)
-    dra_dx = d_atan*(-(rho_gcrf[1])/((rho_gcrf[0])**2.))
-    dra_dy = d_atan*(1./(rho_gcrf[0]))
-    
-    # Calculate partials of declination
-    d_asin = 1./np.sqrt(1. - ((rho_gcrf[2])/rg)**2.)
-    ddec_dx = d_asin*(-(rho_gcrf[2])/rg**2.)*drho_dx
-    ddec_dy = d_asin*(-(rho_gcrf[2])/rg**2.)*drho_dy
-    ddec_dz = d_asin*(1./rg - ((rho_gcrf[2])/rg**2.)*drho_dz)
+        tk = tk_list[kk]
+        
+        if time_format == 'seconds':
+            delta_t = tk - tk_prior
+        elif time_format == 'JD':
+            delta_t = (tk - tk_prior)*86400.
+        elif time_format == 'datetime':
+            delta_t = (tk - tk_prior).total_seconds()
 
-    # Hk_til and Gi
-    Gk = np.reshape([ra, dec], (2,1))
-    
-    Hk_til = np.zeros((2,6))
-    Hk_til[0,0] = dra_dx
-    Hk_til[0,1] = dra_dy
-    Hk_til[1,0] = ddec_dx
-    Hk_til[1,1] = ddec_dy
-    Hk_til[1,2] = ddec_dz    
-    
-    
-    return Hk_til, Gk, Rk
+        # Compute sigma points matrix
+        sqP = np.linalg.cholesky(P)
+        Xrep = np.tile(Xk, (1, n))
+        chi = np.concatenate((Xk, Xrep+(gam*sqP), Xrep-(gam*sqP)), axis=1)
+        chi_v = np.reshape(chi, (n*(2*n+1), 1), order='F')
+        
+        # Propagate to next time
+        if tk_prior == tk:
+            intout = chi_v.T
+        else:
+            int0 = chi_v.flatten()
+            tin = [tk_prior, tk]
+            
+            tout, intout = dyn.general_dynamics(int0, tin, state_params, int_params)
 
+        # Extract values for later calculations
+        chi_v = intout[-1,:]
+        chi = np.reshape(chi_v, (n, 2*n+1), order='F')
+       
+        # State Noise Compensation
+        # Zero out SNC for long time gaps
+        if delta_t > gap_seconds:        
+            Gamma = np.zeros((n,q))
+        else:
+            Gamma = np.zeros((n,q))
+            Gamma[0:q,:] = (delta_t**2./2) * np.eye(q)
+            Gamma[q:2*q,:] = delta_t * np.eye(q)
+#            Gamma = delta_t * np.concatenate((np.eye(q)*delta_t/2., np.eye(q)))
 
-def H_cwrho(tk, Xref, state_params, sensor_params, sensor_id):
+        Xbar = np.dot(chi, Wm.T)
+        Xbar = np.reshape(Xbar, (n, 1))
+        chi_diff = chi - np.dot(Xbar, np.ones((1, (2*n+1))))
+        Pbar = np.dot(chi_diff, np.dot(diagWc, chi_diff.T)) + np.dot(Gamma, np.dot(Q, Gamma.T))
 
-    
-    # Measurement noise
-    sensor_kk = sensor_params[sensor_id]
-    sigma_dict = sensor_kk['sigma_dict']
-    Rk = np.zeros((1, 1))
-    sig = sigma_dict['rho']
-    Rk[0,0] = sig**2.   
-    
-    # Object location in RIC
-    x = float(Xref[0])
-    y = float(Xref[1])
-    z = float(Xref[2])
-    
-    # Compute range and line of sight vector
-    rho = np.linalg.norm([x, y, z])
-    
-#    print('\n H fcn')
-#    print(Xref)
-#    print(x)
-#    print(y)
-#    print(z)
-#    print(rho)
+        # Recompute sigma points to incorporate process noise
+        sqP = np.linalg.cholesky(Pbar)
+        Xrep = np.tile(Xbar, (1, n))
+        chi_bar = np.concatenate((Xbar, Xrep+(gam*sqP), Xrep-(gam*sqP)), axis=1) 
+        chi_diff = chi_bar - np.dot(Xbar, np.ones((1, (2*n+1))))
+        
+        # Measurement Update: posterior state and covar at tk            
+        # Retrieve measurement data
+        Yk = Yk_list[kk]
+        sensor_id = sensor_id_list[kk]
+        
+        # Computed measurements and covariance
+        gamma_til_k, Rk = meas_fcn(tk, chi_bar, state_params, sensor_params, sensor_id)
+        ybar = np.dot(gamma_til_k, Wm.T)
+        ybar = np.reshape(ybar, (len(ybar), 1))
+        Y_diff = gamma_til_k - np.dot(ybar, np.ones((1, (2*n+1))))
+        Pyy = np.dot(Y_diff, np.dot(diagWc, Y_diff.T)) + Rk
+        Pxy = np.dot(chi_diff,  np.dot(diagWc, Y_diff.T))
+        
+        # Kalman gain and measurement update
+        Kk = np.dot(Pxy, np.linalg.inv(Pyy))
+        Xk = Xbar + np.dot(Kk, Yk-ybar)
+        
+        # Basic covariance update
+#        P = Pbar - np.dot(K, np.dot(Pyy, K.T))
+        
+        # Re-symmetric covariance     
+#        P = 0.5 * (P + P.T)
+        
+        # Joseph form
+        cholPbar = np.linalg.inv(np.linalg.cholesky(Pbar))
+        invPbar = np.dot(cholPbar.T, cholPbar)
+        P1 = (np.eye(n) - np.dot(np.dot(Kk, np.dot(Pyy, Kk.T)), invPbar))
+        P2 = np.dot(Kk, np.dot(Rk, Kk.T))
+        P = np.dot(P1, np.dot(Pbar, P1.T)) + P2
 
-    # Hk_til and Gi
-    Gk = np.zeros((1,1))
-    Gk[0] = rho
-    
-    Hk_til = np.zeros((1,6))
-    Hk_til[0,0] = x/rho
-    Hk_til[0,1] = y/rho
-    Hk_til[0,2] = z/rho  
-    
-#    print('Gk', Gk)
-#    print('Hk_til', Hk_til)
-    
-    
-    return Hk_til, Gk, Rk
+        # Recompute measurments using final state to get resids
+        sqP = np.linalg.cholesky(P)
+        Xrep = np.tile(Xk, (1, n))
+        chi_k = np.concatenate((Xk, Xrep+(gam*sqP), Xrep-(gam*sqP)), axis=1)
+        gamma_til_post, dum = meas_fcn(tk, chi_k, state_params, sensor_params, sensor_id)
+        ybar_post = np.dot(gamma_til_post, Wm.T)
+        ybar_post = np.reshape(ybar_post, (len(ybar), 1))
+        
+        # Post-fit residuals and updated state
+        resids = Yk - ybar_post
+        
+        # Store output
+        filter_output[tk] = {}
+        filter_output[tk]['X'] = Xk
+        filter_output[tk]['P'] = P
+        filter_output[tk]['resids'] = resids
+        
+#        print('\n')
+#        print('tk', tk)
+#        print('Xbar', Xbar)
+#        print('Xk', Xk)
+#        print('Yk', Yk)
+#        print('ybar', ybar)
+#        print('ybar_post', ybar_post)
+#        print('Kk', Kk)
+#        print('resids', resids)
+#        print('Pbar', Pbar)
+#        print('P', P)
+#        
+#        if kk > 2:
+#             mistake
 
-
-def H_cwxyz(tk, Xref, state_params, sensor_params, sensor_id):
-
+            
+    # TODO Generation of full_state_output not working correctly
+    # Use filter_output for error analysis
     
-    # Measurement noise
-    sensor_kk = sensor_params[sensor_id]
-    sigma_dict = sensor_kk['sigma_dict']
-    Rk = np.zeros((6,6))
-    Rk[0,0] = sigma_dict['x']**2.   
-    Rk[1,1] = sigma_dict['y']**2.
-    Rk[2,2] = sigma_dict['z']**2.
-    Rk[3,3] = sigma_dict['dx']**2.
-    Rk[4,4] = sigma_dict['dy']**2.
-    Rk[5,5] = sigma_dict['dz']**2.
-    
-    # Object location in RIC
-    x = float(Xref[0])
-    y = float(Xref[1])
-    z = float(Xref[2])
-    dx = float(Xref[3])
-    dy = float(Xref[4])
-    dz = float(Xref[5])
-
-    # Hk_til and Gi
-#    Gk = np.zeros((6,1))
-#    Gk[0] = x
-#    Gk[1] = y
-#    Gk[2] = z
-#    Gk[3]
-    
-    Gk = Xref.reshape(6,1)
-    
-#    Hk_til = np.zeros((6,6))
-#    Hk_til[0,0] = 1.
-#    Hk_til[1,1] = 1.
-#    Hk_til[2,2] = 1.
-    Hk_til = np.eye(6)
-    
-#    print('Gk', Gk)
-#    print('Hk_til', Hk_til)
-    
-    
-    return Hk_til, Gk, Rk
-
-
-def H_nonlincw_full(tk, Xref, state_params, sensor_params, sensor_id):
+    full_state_output = {}
+            
 
     
-    # Measurement noise
-    sensor_kk = sensor_params[sensor_id]
-    sigma_dict = sensor_kk['sigma_dict']
-    Rk = np.zeros((6,6))
-    Rk[0,0] = sigma_dict['x']**2.   
-    Rk[1,1] = sigma_dict['y']**2.
-    Rk[2,2] = sigma_dict['z']**2.
-    Rk[3,3] = sigma_dict['dx']**2.
-    Rk[4,4] = sigma_dict['dy']**2.
-    Rk[5,5] = sigma_dict['dz']**2.
-    
-    # Object location in RIC
-    x = float(Xref[0])
-    y = float(Xref[1])
-    z = float(Xref[2])
-    dx = float(Xref[3])
-    dy = float(Xref[4])
-    dz = float(Xref[5])
+    return filter_output, full_state_output
 
-    # Hk_til and Gi
-#    Gk = np.zeros((6,1))
-#    Gk[0] = x
-#    Gk[1] = y
-#    Gk[2] = z
-#    Gk[3]
-    
-    Gk = Xref[0:6].reshape(6,1)
-    
-    Hk_til = np.zeros((6,9))
-    Hk_til[0,0] = 1.
-    Hk_til[1,1] = 1.
-    Hk_til[2,2] = 1.
-    Hk_til[3,3] = 1.
-    Hk_til[4,4] = 1.
-    Hk_til[5,5] = 1.
-    
-    
-#    print('Gk', Gk)
-#    print('Hk_til', Hk_til)
-    
-    
-    return Hk_til, Gk, Rk
+
+
+
 
 
 #def lp_batch(state_dict, meas_dict, inputs, intfcn, meas_fcn, pnorm=2.):
@@ -1002,7 +1699,7 @@ def H_nonlincw_full(tk, Xref, state_params, sensor_params, sensor_id):
 #        filter_output[ti]['resids'] = copy.copy(resids)
 #
 #    return filter_output
-#
+
 #
 #
 #

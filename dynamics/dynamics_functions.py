@@ -1,8 +1,10 @@
 import numpy as np
-from scipy.integrate import odeint, ode
+from math import exp
+from scipy.integrate import odeint, ode, solve_ivp
 import sys
 import os
 import inspect
+from datetime import datetime, timedelta
 
 filename = inspect.getframeinfo(inspect.currentframe()).filename
 current_dir = os.path.dirname(os.path.abspath(filename))
@@ -11,7 +13,8 @@ ind = current_dir.find('metis')
 metis_dir = current_dir[0:ind+5]
 sys.path.append(metis_dir)
 
-from dynamics.numerical_integration import rk4, rkf78, dopri87
+import dynamics.numerical_integration as numint
+import utilities.astrodynamics as astro
 
 
 
@@ -29,6 +32,9 @@ def general_dynamics(Xo, tvec, state_params, int_params):
 #    print(tvec)
     
     integrator = int_params['integrator']
+    
+    # Flatten input state
+    Xo = Xo.flatten()
     
     # Convert time to seconds
     time_format = int_params['time_format']
@@ -51,7 +57,7 @@ def general_dynamics(Xo, tvec, state_params, int_params):
         params['step'] = int_params['step']
         
         # Run integrator
-        tout, Xout, fcalls = rk4(intfcn, tvec, Xo, params)
+        tout, Xout, fcalls = numint.rk4(intfcn, tvec, Xo, params)
         
         
     if integrator == 'rkf78':
@@ -66,7 +72,7 @@ def general_dynamics(Xo, tvec, state_params, int_params):
         
         # Run integrator
         if len(tvec) == 2:
-            tout, Xout, fcalls = rkf78(intfcn, tvec, Xo, params)
+            tout, Xout, fcalls = numint.rkf78(intfcn, tvec, Xo, params)
             
         else:
             
@@ -77,7 +83,7 @@ def general_dynamics(Xo, tvec, state_params, int_params):
             # Run integrator
             k = 1
             while tin[0] < tvec[-1]:           
-                dum, Xout_step, fcalls = rkf78(intfcn, tin, Xo, params)
+                dum, Xout_step, fcalls = numint.rkf78(intfcn, tin, Xo, params)
                 Xo = Xout_step[-1,:]
                 tin = tvec[k:k+2]
                 Xout[k] = Xo               
@@ -97,7 +103,7 @@ def general_dynamics(Xo, tvec, state_params, int_params):
         
         # Run integrator
         if len(tvec) == 2:
-            tout, Xout, fcalls = dopri87(intfcn, tvec, Xo, params)
+            tout, Xout, fcalls = numint.dopri87(intfcn, tvec, Xo, params)
             
         else:
             
@@ -108,7 +114,7 @@ def general_dynamics(Xo, tvec, state_params, int_params):
             # Run integrator
             k = 1
             while tin[0] < tvec[-1]:           
-                dum, Xout_step, fcalls = dopri87(intfcn, tin, Xo, params)
+                dum, Xout_step, fcalls = numint.dopri87(intfcn, tin, Xo, params)
                 Xo = Xout_step[-1,:]
                 tin = tvec[k:k+2]
                 Xout[k] = Xo               
@@ -124,11 +130,30 @@ def general_dynamics(Xo, tvec, state_params, int_params):
         intfcn = int_params['intfcn']
         rtol = int_params['rtol']
         atol = int_params['atol']
+        tfirst = int_params['tfirst']
+        hmax = int_params['max_step']
         
         # Run integrator
         tout = tvec
-        Xout = odeint(intfcn,Xo,tvec,(params,),rtol=rtol,atol=atol)
+        Xout = odeint(intfcn,Xo,tvec,args=(params,),rtol=rtol,atol=atol,hmax=hmax,tfirst=tfirst)
         
+        
+    if integrator == 'solve_ivp':
+        
+        # Setup integrator parameters
+        params = state_params
+        intfcn = int_params['intfcn']
+        method = int_params['ode_integrator']
+        rtol = int_params['rtol']
+        atol = int_params['atol']
+                
+        # Run integrator
+        tin = (tvec[0], tvec[-1])
+        tout = tvec
+        output = solve_ivp(intfcn,tin,Xo,method=method,args=(params,),rtol=rtol,atol=atol,t_eval=tvec)
+        
+        Xout = output['y'].T
+
         
     if integrator == 'ode':
         
@@ -229,6 +254,26 @@ def ode_linear1d_stm(t, X, params):
     return dX
 
 
+def ode_linear1d_ukf(t, X, params):
+    
+    
+    # Initialize
+    dX = np.zeros(len(X),)
+    n = int((-1 + np.sqrt(1. + 8.*len(X)))/4.)
+
+    for ind in range(0, 2*n+1):
+
+        # Pull out relevant values from X
+        x = float(X[ind*n])
+        dx = float(X[ind*n + 1])
+
+        # Set components of dX
+        dX[ind*n] = dx
+        dX[ind*n + 1] = 0.
+    
+    return dX
+
+
 def ode_balldrop(t, X, params):
     '''
     This function works with ode to propagate an object moving under constant
@@ -288,6 +333,28 @@ def ode_balldrop_stm(t, X, params):
     dX[1] = acc
     dX[n:] = dphi_v.flatten()
 
+    return dX
+
+
+def ode_balldrop_ukf(t, X, params):
+    
+    # Input data
+    acc = params['acc']
+    
+    # Initialize
+    dX = np.zeros(len(X),)
+    n = int((-1 + np.sqrt(1. + 8.*len(X)))/4.)
+
+    for ind in range(0, 2*n+1):
+
+        # Pull out relevant values from X
+        y = float(X[ind*n])
+        dy = float(X[ind*n + 1])
+
+        # Set components of dX
+        dX[ind*n] = dy
+        dX[ind*n + 1] = acc
+    
     return dX
 
 
@@ -567,7 +634,7 @@ def ode_twobody_ukf(t, X, params):
     GM = params['GM']
     
     # Initialize
-    dX = [0]*len(X)
+    dX = np.zeros(len(X),)
     n = int((-1 + np.sqrt(1. + 8.*len(X)))/4.)
 
     for ind in range(0, 2*n+1):
@@ -683,6 +750,359 @@ def ode_twobody_stm(t, X, params):
     dX[n:] = dphi_v.flatten()
 
     return dX
+
+
+
+###############################################################################
+# Orbit Dynamics with Perturbations
+###############################################################################
+   
+
+
+def ode_twobody_j2_drag(t, X, params):
+    '''
+    This function works with ode to propagate object assuming
+    two-body dynamics with J2 and drag perturbations included.
+    This function uses a low fidelity drag model using the 
+    standard atmospheric model, a co-rotating atmosphere to 
+    compute winds, and a spherical Earth to compute orbit height.
+    
+    It should NOT be used for high fidelity orbit prediction.
+
+    Parameters
+    ------
+    X : 6 element array
+      cartesian state vector (Inertial Frame)
+    t : float 
+      current time in seconds
+    params : dictionary
+        additional arguments
+
+    Returns
+    ------
+    dX : n element array array
+      state derivative vector
+    
+    '''
+    
+    # Additional arguments
+    GM = params['GM']
+    J2 = params['J2']
+    Cd = params['Cd']
+    R = params['R']
+    dtheta = params['dtheta']
+    A_m = params['A_m']
+#    UTC0 = params['UTC0']
+#    eop_alldata = params['eop_alldata']
+#    XYs_df = params['XYs_df']
+    
+    # Number of states
+    n = len(X)
+
+    # State Vector
+    x = float(X[0])
+    y = float(X[1])
+    z = float(X[2])
+    dx = float(X[3])
+    dy = float(X[4])
+    dz = float(X[5])
+    
+    if n > 6:
+        beta = float(X[6])
+    else:
+        beta = Cd*A_m
+
+    # Compute radius
+    r_vect = np.array([[x], [y], [z]])
+    r = np.linalg.norm(r_vect)
+
+    # Compute drag component
+    if beta == 0.:
+        x_drag = 0.
+        y_drag = 0.
+        z_drag = 0.
+    
+    else:    
+        # Find vector va of spacecraft relative to atmosphere
+        v_vect = np.array([[dx], [dy], [dz]])
+        w_vect = np.array([[0.], [0.], [dtheta]])
+        va_vect = v_vect - np.cross(w_vect, r_vect, axis=0)
+        va = np.linalg.norm(va_vect)
+        va_x = float(va_vect[0])
+        va_y = float(va_vect[1])
+        va_z = float(va_vect[2])
+        
+        # Atmosphere lookup
+#        UTC = UTC0 + timedelta(seconds=t)
+#        EOP_data = eop.get_eop_data(eop_alldata, UTC)
+#        r_ecef, dum = coord.gcrf2itrf(r_vect, v_vect, UTC, EOP_data, XYs_df)
+#        lat, lon, ht = coord.ecef2latlonht(r_ecef)
+        
+        ht = r - R
+        rho0, h0, H = astro.atmosphere_lookup(ht)
+        
+        # Calculate drag
+        drag = -0.5*beta*rho0*exp(-(ht - h0)/H)
+        x_drag = drag*va*va_x
+        y_drag = drag*va*va_y
+        z_drag = drag*va*va_z
+    
+
+    # Derivative vector
+    dX = np.zeros(n,)
+
+    dX[0] = dx
+    dX[1] = dy
+    dX[2] = dz
+
+    dX[3] = -GM*x/r**3. + x_drag - 1.5*J2*R**2.*GM*((x/r**5.) - (5.*x*z**2./r**7.))
+    dX[4] = -GM*y/r**3. + y_drag - 1.5*J2*R**2.*GM*((y/r**5.) - (5.*y*z**2./r**7.))
+    dX[5] = -GM*z/r**3. + z_drag - 1.5*J2*R**2.*GM*((3.*z/r**5.) - (5.*z**3./r**7.))
+    
+    # If additional states such as beta are included their first derivative
+    # is initialized to zero above
+    
+    return dX
+
+
+def ode_twobody_j2_drag_stm(t, X, params):
+    '''
+    This function works with ode to propagate object assuming
+    two-body dynamics with J2 and drag perturbations included.
+    Partials for the STM dynamics are included.
+    
+    This function uses a low fidelity drag model using the 
+    standard atmospheric model, a co-rotating atmosphere to 
+    compute winds, and a spherical Earth to compute orbit height.
+    
+    It should NOT be used for high fidelity orbit prediction.
+    
+
+    Parameters
+    ------
+    X : (n+n^2) element array
+      initial condition vector of cartesian state and STM (Inertial Frame)
+    t : float 
+      current time in seconds
+    params : dictionary
+        additional arguments
+
+    Returns
+    ------
+    dX : (n+n^2) element array
+      derivative vector
+      
+    '''
+
+    # Additional arguments
+    GM = params['GM']
+    J2 = params['J2']
+    Cd = params['Cd']
+    R = params['R']
+    dtheta = params['dtheta']
+    A_m = params['A_m']
+
+    # Compute number of states
+    n = int((-1 + np.sqrt(1 + 4*len(X)))/2)
+
+    # State Vector
+    x = float(X[0])
+    y = float(X[1])
+    z = float(X[2])
+    dx = float(X[3])
+    dy = float(X[4])
+    dz = float(X[5])
+    
+    # Compute ballistic coefficient from state vector or params
+    if n > 6:
+        beta = float(X[6])
+    else:
+        beta = Cd*A_m
+
+    # Compute radius
+    r_vect = np.array([[x], [y], [z]])
+    r = np.linalg.norm(r_vect)
+    
+    # Find vector va of spacecraft relative to atmosphere
+    v_vect = np.array([[dx], [dy], [dz]])
+    w_vect = np.array([[0.], [0.], [dtheta]])
+    va_vect = v_vect - np.cross(w_vect, r_vect, axis=0)
+    va = np.linalg.norm(va_vect)
+    va_x = float(va_vect[0])
+    va_y = float(va_vect[1])
+    va_z = float(va_vect[2])
+    
+    # Atmosphere lookup
+#        UTC = UTC0 + timedelta(seconds=t)
+#        EOP_data = eop.get_eop_data(eop_alldata, UTC)
+#        r_ecef, dum = coord.gcrf2itrf(r_vect, v_vect, UTC, EOP_data, XYs_df)
+#        lat, lon, ht = coord.ecef2latlonht(r_ecef)
+    
+    ht = r - R
+    rho0, h0, H = astro.atmosphere_lookup(ht)
+    
+    # Calculate drag
+    drag = -0.5*beta*rho0*exp(-(ht - h0)/H)
+    x_drag = drag*va*va_x
+    y_drag = drag*va*va_y
+    z_drag = drag*va*va_z
+    
+    
+    
+    # Find elements of A matrix
+    xx_cf = -GM/r**3. + 3.*GM*x**2./r**5.
+    xx_drag = drag*((-x*va*va_x/(H*r)) - dtheta*va_y*va_x/va)
+    xx_J2 = -1.5*J2*GM*R**2./r**5. - 7.5*J2*GM*R**2./r**7.*(-x**2. - z**2. + 7.*x**2.*z**2./r**2.)
+
+    xy_cf = 3.*GM*x*y/r**5.
+    xy_drag = drag*((-y*va*va_x/(H*r)) + dtheta*va_x**2./va + va*dtheta)
+    xy_J2 = -7.5*x*y/r**7. * J2*R**2.*GM*(-1. + 7.*z**2./r**2.)
+
+    xz_cf = 3.*GM*x*z/r**5.
+    xz_drag = drag*(-z*va*va_x/(H*r))
+    xz_J2 = -7.5*x*z/r**7. * J2*R**2.*GM*(-3. + 7.*z**2./r**2.)
+
+    yy_cf = -GM/r**3. + 3.*GM*y**2./r**5.
+    yy_drag = drag*((-y*va*va_y/(H*r)) + dtheta*va_x*va_y/va)
+    yy_J2 = -1.5*J2*GM*R**2./r**5. - 7.5*J2*GM*R**2./r**7.*(-y**2. - z**2. + 7.*y**2.*z**2./r**2.)
+
+    yx_cf = xy_cf
+    yx_drag = drag*((-x*va*va_y/(H*r)) - dtheta*va_y**2./va - va*dtheta)
+    yx_J2 = xy_J2
+
+    yz_cf = 3.*GM*y*z/r**5.
+    yz_drag = drag*(-z*va*va_y/(H*r))
+    yz_J2 = -7.5*y*z/r**7. * J2*R**2.*GM*(-3. + 7.*z**2./r**2.)
+
+    zz_cf = -GM/r**3. + 3.*GM*z**2./r**5.
+    zz_drag = drag*(-z*va*va_z/(H*r))
+    zz_J2 = -4.5*J2*R**2.*GM/r**5. - 7.5*J2*R**2.*GM/r**7.*(-6.*z**2. + 7.*z**4./r**2.)
+
+    zx_cf = xz_cf
+    zx_drag = drag*((-x*va*va_z/(H*r)) - dtheta*va_y*va_z/va)
+    zx_J2 = xz_J2
+
+    zy_cf = yz_cf
+    zy_drag = drag*((-y*va*va_z/(H*r)) + dtheta*va_x*va_z/va)
+    zy_J2 = yz_J2
+    
+    
+    
+    
+    # Generate A matrix using partials from above
+    A = np.zeros((n,n))
+
+    A[0,3] = 1. 
+    A[1,4] = 1. 
+    A[2,5] = 1.
+
+    A[3,0] = xx_cf + xx_drag + xx_J2
+    A[3,1] = xy_cf + xy_drag + xy_J2
+    A[3,2] = xz_cf + xz_drag + xz_J2
+    A[3,3] = drag*(va_x**2./va + va)
+    A[3,4] = drag*(va_y*va_x/va)
+    A[3,5] = drag*(va_z*va_x/va)      # Note, va_z = dz
+
+    A[4,0] = yx_cf + yx_drag + yx_J2
+    A[4,1] = yy_cf + yy_drag + yy_J2
+    A[4,2] = yz_cf + yz_drag + yz_J2
+    A[4,3] = drag*(va_y*va_x/va)
+    A[4,4] = drag*(va_y**2./va + va)
+    A[4,5] = drag*(va_y*va_z/va)       # Note, va_z = dz
+
+    A[5,0] = zx_cf + zx_drag + zx_J2
+    A[5,1] = zy_cf + zy_drag + zy_J2
+    A[5,2] = zz_cf + zz_drag + zz_J2
+    A[5,3] = drag*(va_x*va_z/va)
+    A[5,4] = drag*(va_y*va_z/va)
+    A[5,5] = drag*(va_z**2./va + va)
+    
+    if n > 6:
+        A[3,6] = x_drag/beta
+        A[4,6] = y_drag/beta
+        A[5,6] = z_drag/beta
+    
+
+    # Compute STM components dphi = A*phi
+    phi_mat = np.reshape(X[n:], (n, n))
+    dphi_mat = np.dot(A, phi_mat)
+    dphi_v = np.reshape(dphi_mat, (n**2, 1))
+
+    # Derivative vector
+    dX = np.zeros(n+n**2,)
+
+    dX[0] = dx
+    dX[1] = dy
+    dX[2] = dz
+
+    dX[3] = -GM*x/r**3. + x_drag - 1.5*J2*R**2.*GM*((x/r**5.) - (5.*x*z**2./r**7.))
+    dX[4] = -GM*y/r**3. + y_drag - 1.5*J2*R**2.*GM*((y/r**5.) - (5.*y*z**2./r**7.))
+    dX[5] = -GM*z/r**3. + z_drag - 1.5*J2*R**2.*GM*((3.*z/r**5.) - (5.*z**3./r**7.))
+    
+    # If additional states such as beta are included their first derivative
+    # is initialized to zero above
+
+    dX[n:] = dphi_v.flatten()
+
+    return dX
+
+
+
+
+#def ode_twobody_j2_drag_ukf(t, X, params):
+#    '''
+#    This function works with ode to propagate object assuming
+#    simple two-body dynamics.  No perturbations included.  States for UKF
+#    sigma points included.
+#
+#    Parameters
+#    ------
+#    X : (n*(2n+1)) element list
+#      initial condition vector of cartesian state and sigma points
+#    t : float 
+#      current time in seconds
+#    params : dictionary
+#        additional arguments
+#
+#    Returns
+#    ------
+#    dX : (n*(2n+1)) element list
+#      derivative vector
+#
+#    '''
+#    
+#    # Additional arguments
+#    GM = params['GM']
+#    
+#    # Initialize
+#    dX = [0]*len(X)
+#    n = int((-1 + np.sqrt(1. + 8.*len(X)))/4.)
+#
+#    for ind in range(0, 2*n+1):
+#
+#        # Pull out relevant values from X
+#        x = float(X[ind*n])
+#        y = float(X[ind*n + 1])
+#        z = float(X[ind*n + 2])
+#        dx = float(X[ind*n + 3])
+#        dy = float(X[ind*n + 4])
+#        dz = float(X[ind*n + 5])
+#
+#        # Compute radius
+#        r = np.linalg.norm([x, y, z])
+#
+#        # Solve for components of dX
+#        dX[ind*n] = dx
+#        dX[ind*n + 1] = dy
+#        dX[ind*n + 2] = dz
+#
+#        dX[ind*n + 3] = -GM*x/r**3
+#        dX[ind*n + 4] = -GM*y/r**3
+#        dX[ind*n + 5] = -GM*z/r**3
+#
+#    return dX
+#
+#
 
 
 ###############################################################################

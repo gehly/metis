@@ -21,7 +21,7 @@ metis_dir = current_dir[0:ind+5]
 sys.path.append(metis_dir)
 
 from sensors.sensors import define_sensors
-from sensors.measurements import ecef2azelrange
+from sensors.measurement_functions import ecef2azelrange_deg
 from utilities.eop_functions import get_celestrak_eop_alldata
 from utilities.eop_functions import get_nutation_data
 from utilities.eop_functions import get_eop_data
@@ -298,7 +298,7 @@ def generate_tle_list(num_obj, UTC_list, max_obj_id, filename, username, passwor
                     
                     output_state = propagate_TLE([obj_id], [UTC], tle_dict)
                     r_ecef = output_state[obj_id]['r_ITRF'][0]
-                    az, el, rg = ecef2azelrange(r_ecef, site_ecef)
+                    az, el, rg = ecef2azelrange_deg(r_ecef, site_ecef)
                     
                     if el < 30:
                         

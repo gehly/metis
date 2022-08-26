@@ -13,10 +13,11 @@ ind = current_dir.find('metis')
 metis_dir = current_dir[0:ind+5]
 sys.path.append(metis_dir)
 
+
+import utilities.time_systems as timesys
+import utilities.ephemeris as eph
+import utilities.coordinate_systems as coord
 from utilities.constants import GME, J2E, Re, wE
-from utilities.time_systems import utcdt2ttjd, jd2cent
-from utilities.ephemeris import compute_sun_coords
-from utilities.eop_functions import get_celestrak_eop_alldata, get_eop_data
 
 
 ###############################################################################
@@ -290,13 +291,13 @@ def RAAN_to_LTAN(RAAN, UTC, EOP_data):
     '''
     
     # Compute TT in JD format
-    TT_JD = utcdt2ttjd(UTC, EOP_data['TAI_UTC'])
+    TT_JD = timesys.utcdt2ttjd(UTC, EOP_data['TAI_UTC'])
     
     # Compute TT in centuries since J2000 epoch
-    TT_cent = jd2cent(TT_JD)
+    TT_cent = timesys.jd2cent(TT_JD)
     
     # Compute apparent right ascension of the sun
-    sun_eci_geom, sun_eci_app = compute_sun_coords(TT_cent)
+    sun_eci_geom, sun_eci_app = eph.compute_sun_coords(TT_cent)
     sun_ra = atan2(sun_eci_app[1], sun_eci_app[0]) * 180./pi     # deg
     
     # Compute LTAN in decimal hours
@@ -328,13 +329,13 @@ def LTAN_to_RAAN(LTAN, UTC, EOP_data):
     '''
     
     # Compute TT in JD format
-    TT_JD = utcdt2ttjd(UTC, EOP_data['TAI_UTC'])
+    TT_JD = timesys.utcdt2ttjd(UTC, EOP_data['TAI_UTC'])
     
     # Compute TT in centuries since J2000 epoch
-    TT_cent = jd2cent(TT_JD)
+    TT_cent = timesys.jd2cent(TT_JD)
     
     # Compute apparent right ascension of the sun
-    sun_eci_geom, sun_eci_app = compute_sun_coords(TT_cent)
+    sun_eci_geom, sun_eci_app = eph.compute_sun_coords(TT_cent)
     sun_ra = atan2(sun_eci_app[1], sun_eci_app[0]) * 180./pi     # deg
     
     # Compute RAAN in degrees
@@ -392,9 +393,189 @@ def compute_visviva(r, a, GM=GME):
     return v
 
 
+def compute_rp(r_vect, v_vect, GM):
+    '''
+    This function computes the radius of periapsis for a given position and
+    velocity vector.
+    
+    Parameters
+    ------
+    r_vect : 3x1 numpy array
+        inertial position vector [km]
+    v_vect  : 3x1 numpy array
+        inertial velocity vector [km/s]
+    GM : float
+        gravitational parameter of central body [km^3/s^2]
+        
+    Returns
+    ------
+    rp : float
+        radius of periapsis [km]
+    
+    '''
+    r_vect = np.reshape(r_vect, (3,1))
+    v_vect = np.reshape(v_vect, (3,1))
+    r = np.linalg.norm(r_vect)
+    v = np.linalg.norm(v_vect)
+    
+    # Semi-major axis
+    a = 1./(2./r - v**2./GM)
+    
+    # Eccentricity vector 
+    h_vect = np.cross(r_vect, v_vect, axis=0)
+    cross1 = np.cross(v_vect, h_vect, axis=0)
+
+    e_vect = cross1/GM - r_vect/r
+    e = np.linalg.norm(e_vect)
+    
+    rp = a*(1. - e)
+    
+    return rp
+
+
+def compute_p(r_vect, v_vect, GM):
+    '''
+    This function computes the semi-latus rectum for a given position and
+    velocity vector.
+    
+    Parameters
+    ------
+    r_vect : 3x1 numpy array
+        inertial position vector [km]
+    v_vect  : 3x1 numpy array
+        inertial velocity vector [km/s]
+    GM : float
+        gravitational parameter of central body [km^3/s^2]
+        
+    Returns
+    ------
+    p : float
+        semi-latus rectum [km]
+    
+    '''
+    r_vect = np.reshape(r_vect, (3,1))
+    v_vect = np.reshape(v_vect, (3,1))
+
+    h_vect = np.cross(r_vect, v_vect, axis=0)
+    h = np.linalg.norm(h_vect)
+    
+    p = h**2./GM
+    
+    return p
 
 
 
+###############################################################################
+# Physical Models
+###############################################################################
+
+
+def atmosphere_lookup(h):
+    '''
+    This function acts as a lookup table for atmospheric density reference
+    values, reference heights, and scale heights for a range of different 
+    altitudes from 100 - 1000+ km.  Values from Vallado 4th ed. Table 8-4.
+    
+    Parameters
+    ------
+    h : float
+        altitude [km]
+    
+    Returns
+    ------
+    rho0 : float
+        reference density [kg/km^3]
+    h0 : float
+        reference altitude [km]
+    H : float
+        scale height [km]
+
+    '''
+    
+    if h <= 100:
+        # Assume at this height we have re-entered atmosphere
+        rho0 = 0
+        h0 = 1
+        H = 1
+    elif h < 110:
+        rho0 = 5.297e-7 * 1e9  # kg/km^3
+        h0 = 100.    # km
+        H = 5.877    # km    
+    elif h < 120:
+        rho0 = 9.661e-8 * 1e9  # kg/km^3
+        h0 = 110.    # km
+        H = 7.263    # km   
+    elif h < 130:
+        rho0 = 2.438e-8 * 1e9  # kg/km^3
+        h0 = 120.    # km
+        H = 9.473    # km   
+    elif h < 140: 
+        rho0 = 8.484e-9 * 1e9  # kg/km^3
+        h0 = 130.    # km
+        H = 12.636   # km       
+    elif h < 150:
+        rho0 = 3.845e-9 * 1e9  # kg/km^3
+        h0 = 140.    # km
+        H = 16.149   # km       
+    elif h < 180:
+        rho0 = 2.070e-9 * 1e9  # kg/km^3
+        h0 = 150.    # km
+        H = 22.523   # km       
+    elif h < 200:
+        rho0 = 5.464e-10 * 1e9  # kg/km^3
+        h0 = 180.    # km
+        H = 29.740   # km     
+    elif h < 250:
+        rho0 = 2.789e-10 * 1e9  # kg/km^3
+        h0 = 200.    # km
+        H = 37.105   # km   
+    elif h < 300:
+        rho0 = 7.248e-11 * 1e9  # kg/km^3
+        h0 = 250.    # km
+        H = 45.546   # km       
+    elif h < 350:
+        rho0 = 2.418e-11 * 1e9  # kg/km^3
+        h0 = 300.    # km
+        H = 53.628   # km       
+    elif h < 400:
+        rho0 = 9.518e-12 * 1e9  # kg/km^3
+        h0 = 350.    # km
+        H = 53.298   # km       
+    elif h < 450:
+        rho0 = 3.725e-12 * 1e9   # kg/km^3
+        h0 = 400.    # km
+        H = 58.515   # km     
+    elif h < 500:
+        rho0 = 1.585e-12 * 1e9   # kg/km^3
+        h0 = 450.    # km
+        H = 60.828   # km   
+    elif h < 600:
+        rho0 = 6.967e-13 * 1e9   # kg/km^3
+        h0 = 500.    # km
+        H = 63.822   # km
+    elif h < 700:
+        rho0 = 1.454e-13 * 1e9   # kg/km^3
+        h0 = 600.    # km
+        H = 71.835   # km
+    elif h < 800:
+        rho0 = 3.614e-14 * 1e9   # kg/km^3
+        h0 = 700.    # km
+        H = 88.667   # km       
+    elif h < 900:
+        rho0 = 1.17e-14 * 1e9    # kg/km^3
+        h0 = 800.    # km
+        H = 124.64   # km       
+    elif h < 1000:
+        rho0 = 5.245e-15 * 1e9   # kg/km^3
+        h0 = 900.    # km
+        H = 181.05   # km       
+    else:
+        rho0 = 3.019e-15 * 1e9   # kg/km^3
+        h0 = 1000.   # km
+        H = 268.00   # km
+    
+    
+    return rho0, h0, H
 
 
 
