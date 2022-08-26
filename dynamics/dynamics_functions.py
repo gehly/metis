@@ -163,10 +163,9 @@ def general_dynamics(Xo, tvec, state_params, int_params):
         ode_integrator = int_params['ode_integrator']
         rtol = int_params['rtol']
         atol = int_params['atol']
-        first_step = int_params['step']
         
         solver = ode(intfcn)
-        solver.set_integrator(ode_integrator, atol=atol, rtol=rtol, first_step=first_step)
+        solver.set_integrator(ode_integrator, atol=atol, rtol=rtol)
         solver.set_f_params(params)
         
         solver.set_initial_value(Xo, tvec[0])
