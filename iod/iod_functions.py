@@ -177,6 +177,13 @@ def izzo_lambert(r1_vect, r2_vect, tof, GM=GME, R=Re, results_flag='all',
         v1_list.append(v1_vect)
         v2_list.append(v2_vect)
         M_list.append(Mi)
+    
+    # Generate list to identify output orbit type
+    if results_flag == 'retrograde':
+        type_list = ['retrograde']*len(M_list)
+    else:
+        type_list = ['prograde']*len(M_list)
+        
         
     # If it is desired to produce all possible cases, repeat execution for
     # retrograde cases (previous results cover prograde cases)
@@ -210,9 +217,11 @@ def izzo_lambert(r1_vect, r2_vect, tof, GM=GME, R=Re, results_flag='all',
             v1_list.append(v1_vect)
             v2_list.append(v2_vect)
             M_list.append(Mi)
+            type_list.append('retrograde')
+            
+            
 
-
-    return v1_list, v2_list, M_list
+    return v1_list, v2_list, M_list, type_list
 
 
 def find_xy(lam, T, maxiters=35, rtol=1e-8):
@@ -659,6 +668,46 @@ def compute_hypergeom_2F1(a, b, c, d):
 # Angles-Only IOD Methods
 ###############################################################################
 
+def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
+                     time_format='datetime', eop_alldata=[], XYs_df=[]):
+    '''
+    
+    
+    '''
+    
+    
+    
+    # Choose the first and last measurements Y0 and Yf and compute LOS vectors
+    
+    
+    # Loop over possible guesses for ranges rho0 and rhof
+    
+    
+        # Solve Lambert's Problem (returns multiple solutions)
+        
+        
+        # Loop over Lambert solutions
+        
+        
+            # Compute penalty function f
+            # Example f = dot(los2_obs, los2_calc)
+            
+        
+            
+            # Adjust rho0 and rhof to convergence
+            # Use central finite difference to compute numerical derivatives
+            # of penalty function and Newton-Raphson to step toward minimum
+            
+            
+            
+            
+        # Store solution (r0_vect, v0_vect, M) 
+    
+    
+    
+    return
+
+
 
 def gauss_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
                      time_format='datetime', eop_alldata=[], XYs_df=[]):
@@ -1021,10 +1070,7 @@ def herrick_gibbs_iod(r1_vect, r2_vect, r3_vect,UTC_list, GM=GME):
     return v2_vect, exit_flag
 
 
-def gooding_angles_iod():
-    
-    
-    return
+
 
 
 

@@ -82,7 +82,7 @@ def lambert_test():
     print('a', a)
     theta0 = float(elem0[5])
     P = 2.*math.pi*np.sqrt(a**3./GM)
-    fraction_list = [0., 0.2, 0.8, 1.2, 1.8, 10.2, 10.8, 50.2]
+    fraction_list = [0., 0.2, 0.8, 1.2, 1.8, 5.8, 10.8, 50.2]
     
     
     tvec = np.asarray([frac*P for frac in fraction_list])
@@ -108,7 +108,7 @@ def lambert_test():
     # Setup and run Lambert Solvers
     t0 = tk_list[0]    
 #    for kk in range(1,len(fraction_list)):
-    for kk in range(3,4):
+    for kk in range(5,6):
         
         frac = fraction_list[kk]        
         tf = tk_list[kk]
@@ -162,7 +162,9 @@ def lambert_test():
         
         start_time = time.time()
         
-        v0_list, vf_list, M_list = iod.izzo_lambert(r0_true, rf_true, tof, GM, Re, results_flag, periapsis_check)
+        v0_list, vf_list, M_list, type_list = \
+            iod.izzo_lambert(r0_true, rf_true, tof, GM, Re, results_flag,
+                             periapsis_check)
         
         izzo_time = time.time() - start_time
         
@@ -176,6 +178,7 @@ def lambert_test():
         
         print('')
         print('M_list', M_list)
+        print('type_list', type_list)
         print('len M_list', len(M_list))
         
         # Propagate output to ensure it achieves the right final position
@@ -220,6 +223,7 @@ def lambert_test():
             print('')
             print('ii', ii)
             print('Mi', M_list[ii])
+            print('type', type_list[ii])
             print('rf_test', rf_test)
             print('rf_true', rf_true)
             print('vf_test', vf_test)
@@ -1084,10 +1088,10 @@ if __name__ == '__main__':
     
 #    unit_test_herrick_gibbs_iod()
     
-    unit_test_gauss_iod()
+#    unit_test_gauss_iod()
     
     
-#    lambert_test()
+    lambert_test()
     
 #    lambert_test_hyperbolic()
     
