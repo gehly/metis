@@ -816,7 +816,7 @@ def unscented_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
             # ybar = np.dot(gamma_til_k, Wm.T)
             
             # Instead, use only the first column of gamma_til_k, corresponding
-            # to the mean state calculated with the best updated value of X(to)
+            # to the mean state calculated with the best updated value of X(t0)
             ybar = gamma_til_k[:,0]
             
             # Reshape and continue
