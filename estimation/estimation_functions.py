@@ -809,7 +809,17 @@ def unscented_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
             
             # Compute measurement for each sigma point
             gamma_til_k, Rk = meas_fcn(tk, chi, state_params, sensor_params, sensor_id)
-            ybar = np.dot(gamma_til_k, Wm.T)
+            
+            # Standard implementation computes ybar as the mean of the sigma
+            # point, but using Po_bar each iteration can cause these to have
+            # large spread and produce poor ybar calculation
+            # ybar = np.dot(gamma_til_k, Wm.T)
+            
+            # Instead, use only the first column of gamma_til_k, corresponding
+            # to the mean state calculated with the best updated value of X(to)
+            ybar = gamma_til_k[:,0]
+            
+            # Reshape and continue
             ybar = np.reshape(ybar, (p, 1))
             resids = Yk - ybar
             cholRk = np.linalg.inv(np.linalg.cholesky(Rk))
@@ -1400,6 +1410,12 @@ def ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         Xbar = np.reshape(Xbar, (n, 1))
         chi_diff = chi - np.dot(Xbar, np.ones((1, (2*n+1))))
         Pbar = np.dot(chi_diff, np.dot(diagWc, chi_diff.T)) + np.dot(Gamma, np.dot(Q, Gamma.T))
+        
+        print('')
+        print('kk', kk)
+        print('Pbar', Pbar)
+        print('eig', np.linalg.eig(Pbar))
+        print('det', np.linalg.det(Pbar))
 
         # Recompute sigma points to incorporate process noise
         sqP = np.linalg.cholesky(Pbar)
@@ -1419,6 +1435,9 @@ def ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         Y_diff = gamma_til_k - np.dot(ybar, np.ones((1, (2*n+1))))
         Pyy = np.dot(Y_diff, np.dot(diagWc, Y_diff.T)) + Rk
         Pxy = np.dot(chi_diff,  np.dot(diagWc, Y_diff.T))
+        
+        print('Yk', Yk)
+        print('ybar', ybar)
         
         # Kalman gain and measurement update
         Kk = np.dot(Pxy, np.linalg.inv(Pyy))

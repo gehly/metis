@@ -42,8 +42,8 @@ def linear_motion_setup():
     
     # Integration function and additional settings
     int_params = {}
-    int_params['integrator'] = 'ode'
-    int_params['ode_integrator'] = 'dop853'
+    int_params['integrator'] = 'solve_ivp'
+    int_params['ode_integrator'] = 'DOP853'
     int_params['intfcn'] = dyn.ode_linear1d
     int_params['rtol'] = 1e-12
     int_params['atol'] = 1e-12
@@ -161,8 +161,8 @@ def balldrop_setup():
     
     # Integration function and additional settings
     int_params = {}
-    int_params['integrator'] = 'ode'
-    int_params['ode_integrator'] = 'dop853'
+    int_params['integrator'] = 'solve_ivp'
+    int_params['ode_integrator'] = 'DOP853'
     int_params['intfcn'] = dyn.ode_balldrop
     int_params['rtol'] = 1e-12
     int_params['atol'] = 1e-12
@@ -241,20 +241,20 @@ def execute_balldrop_test():
     filter_output, full_state_output = est.lp_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
     analysis.compute_balldrop_errors(filter_output, truth_dict)
     
-#    # EKF Test
-#    filter_output, full_state_output = est.ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
-#    analysis.compute_balldrop_errors(filter_output, truth_dict)
-#        
-#    # Unscented Batch Test
-#    int_params['intfcn'] = dyn.ode_balldrop_ukf
-#    meas_fcn = mfunc.unscented_balldrop
-#    
-#    ubatch_output, full_state_output = est.unscented_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
-#    analysis.compute_balldrop_errors(ubatch_output, truth_dict) 
-#    
-#    # UKF Test
-#    filter_output, full_state_output = est.ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
-#    analysis.compute_balldrop_errors(filter_output, truth_dict)
+    # EKF Test
+    filter_output, full_state_output = est.ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
+    analysis.compute_balldrop_errors(filter_output, truth_dict)
+        
+    # Unscented Batch Test
+    int_params['intfcn'] = dyn.ode_balldrop_ukf
+    meas_fcn = mfunc.unscented_balldrop
+    
+    ubatch_output, full_state_output = est.unscented_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
+    analysis.compute_balldrop_errors(ubatch_output, truth_dict) 
+    
+    # UKF Test
+    filter_output, full_state_output = est.ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
+    analysis.compute_balldrop_errors(filter_output, truth_dict)
         
     
     return
@@ -290,8 +290,8 @@ def twobody_geo_setup():
     
     # Integration function and additional settings
     int_params = {}
-    int_params['integrator'] = 'ode'
-    int_params['ode_integrator'] = 'dop853'
+    int_params['integrator'] = 'solve_ivp'
+    int_params['ode_integrator'] = 'DOP853'
     int_params['intfcn'] = dyn.ode_twobody
     int_params['rtol'] = 1e-12
     int_params['atol'] = 1e-12
@@ -605,8 +605,8 @@ def twobody_born_setup():
     
     # Integration function and additional settings
     int_params = {}
-    int_params['integrator'] = 'ode'
-    int_params['ode_integrator'] = 'dop853'
+    int_params['integrator'] = 'solve_ivp'
+    int_params['ode_integrator'] = 'DOP853'
     int_params['intfcn'] = dyn.ode_twobody
     int_params['rtol'] = 1e-12
     int_params['atol'] = 1e-12
@@ -739,7 +739,7 @@ def twobody_born_setup():
     
     print(meas_dict)
                 
-    setup_file = os.path.join('unit_test', 'twobody_born_setup2.pkl')
+    setup_file = os.path.join('unit_test', 'twobody_born_setup.pkl')
     pklFile = open( setup_file, 'wb' )
     pickle.dump( [state_dict, state_params, int_params, meas_fcn, meas_dict, sensor_params, truth_dict], pklFile, -1 )
     pklFile.close()
@@ -777,23 +777,23 @@ def execute_twobody_test():
     # Batch Test
     filter_output, full_state_output = est.ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)    
     analysis.compute_orbit_errors(filter_output, full_state_output, truth_dict)
-    
-    # Lp-Norm Batch Test
-    state_params['pnorm'] = 1.2
-    filter_output, full_state_output = est.lp_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)    
-    analysis.compute_orbit_errors(filter_output, full_state_output, truth_dict)
-    
-    
-    # EKF Test
-    filter_output, full_state_output = est.ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
-    analysis.compute_orbit_errors(filter_output, filter_output, truth_dict)
+#    
+#    # Lp-Norm Batch Test
+#    state_params['pnorm'] = 1.2
+#    filter_output, full_state_output = est.lp_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)    
+#    analysis.compute_orbit_errors(filter_output, full_state_output, truth_dict)
+#    
+#    
+#    # EKF Test
+#    filter_output, full_state_output = est.ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
+#    analysis.compute_orbit_errors(filter_output, filter_output, truth_dict)
     
     
     # Unscented Batch Test
-#    int_params['intfcn'] = dyn.ode_twobody_ukf
-#    meas_fcn = mfunc.unscented_radec
+    int_params['intfcn'] = dyn.ode_twobody_ukf
+    meas_fcn = mfunc.unscented_radec
 #    meas_fcn = mfunc.unscented_rgradec
-#    state_params['alpha'] = 1e-4
+    state_params['alpha'] = 1e-2
     
     
 #    meas_fcn = mfunc.unscented_radec
@@ -809,7 +809,7 @@ def execute_twobody_test():
 #    Yk_list = meas_dict['Yk_list']
 #    Yk_list2 = [Yk[1:3] for Yk in Yk_list]
 #    meas_dict['Yk_list'] = Yk_list2
-        
+#        
 #    meas_fcn = mfunc.unscented_rg
 #    sensor_id_list = ['Born s101', 'Born s337', 'Born s394']
 #    for sensor_id in sensor_id_list:
@@ -823,18 +823,18 @@ def execute_twobody_test():
 #    Yk_list = meas_dict['Yk_list']
 #    Yk_list2 = [Yk[0] for Yk in Yk_list]
 #    meas_dict['Yk_list'] = Yk_list2
+#    
     
     
+    filter_output, full_state_output = est.unscented_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
+    analysis.compute_orbit_errors(filter_output, full_state_output, truth_dict)
     
-#    filter_output, full_state_output = est.unscented_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
-#    analysis.compute_orbit_errors(filter_output, full_state_output, truth_dict)
-    
-    # UKF Tes
-    int_params['intfcn'] = dyn.ode_twobody_ukf
-    meas_fcn = mfunc.unscented_radec
-    state_params['alpha'] = 1e-4
-    filter_output, full_state_output = est.ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
-    analysis.compute_orbit_errors(filter_output, filter_output, truth_dict)
+    # UKF Test
+#    int_params['intfcn'] = dyn.ode_twobody_ukf
+#    meas_fcn = mfunc.unscented_rgradec
+#    state_params['alpha'] = 1e-2
+#    filter_output, full_state_output = est.ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
+#    analysis.compute_orbit_errors(filter_output, filter_output, truth_dict)
     
 
         
