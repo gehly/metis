@@ -796,10 +796,75 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
     
     '''
     
+    # Constants
+    GM = GME
+    
+    # Retrieve/load EOP and polar motion data if needed
+    if len(eop_alldata) == 0:        
+        eop_alldata = eop.get_celestrak_eop_alldata()
+        
+    if len(XYs_df) == 0:
+        XYs_df = eop.get_XYs2006_alldata()            
+    
+    # Compute time parameters from given input
+    if time_format == 'datetime':
+        UTC_list = tk_list
+
+    elif time_format == 'JD':
+        JD_list = tk_list
+        UTC_list = [timesys.jd2dt(JD) for JD in JD_list]
+    
+    # For each measurement, compute the associated sensor location and 
+    # line of sight vector in ECI
+    Lmat = np.zeros((3,3))
+    Rmat = np.zeros((3,3))
+    for kk in range(len(tk_list)):
+        
+        # Retrieve current values
+        UTC = UTC_list[kk]
+        Yk = Yk_list[kk]
+        sensor_id = sensor_id_list[kk]
+        site_ecef = sensor_params[sensor_id]['site_ecef']
+        meas_types = sensor_params[sensor_id]['meas_types']
+        
+        # Compute sensor location in ECI
+        EOP_data = eop.get_eop_data(eop_alldata, UTC)
+        site_eci, dum = coord.itrf2gcrf(site_ecef, np.zeros((3,1)), UTC,
+                                        EOP_data, XYs_df)
+        
+        # Compute measurement line of sight vector in ECI
+        if 'ra' in meas_types and 'dec' in meas_types:
+            ra = Yk[meas_types.index('ra')]
+            dec = Yk[meas_types.index('dec')]
+            
+            rho_hat_eci = np.array([[math.cos(dec)*math.cos(ra)],
+                                    [math.cos(dec)*math.sin(ra)],
+                                    [math.sin(dec)]])
+    
+        elif 'az' in meas_types and 'el' in meas_types:
+            az = Yk[meas_types.index('az')]
+            el = Yk[meas_types.index('el')]
+            
+            rho_hat_enu = np.array([[math.cos(el)*math.sin(az)],
+                                    [math.cos(el)*math.cos(az)],
+                                    [math.sin(el)]])
+    
+            rho_hat_ecef = coord.enu2ecef(rho_hat_enu, site_ecef)
+            
+            rho_hat_eci, dum = coord.itrf2gcrf(rho_hat_ecef, np.zeros((3,1)),
+                                               UTC, EOP_data, XYs_df)
+            
+        
+        # Store values in columns of L and R
+        Lmat[:,kk] = rho_hat_eci.flatten()
+        Rmat[:,kk] = site_eci.flatten()
+    
+    
     
     
     # Choose the first and last measurements Y0 and Yf and compute LOS vectors
-    
+
+
     
     # Loop over possible guesses for ranges rho0 and rhof
     
