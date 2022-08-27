@@ -790,7 +790,7 @@ def compute_hypergeom_2F1(a, b, c, d):
 ###############################################################################
 
 def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
-                     time_format='datetime', eop_alldata=[], XYs_df=[]):
+                       time_format='datetime', eop_alldata=[], XYs_df=[]):
     '''
     
     
@@ -853,18 +853,84 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
             
             rho_hat_eci, dum = coord.itrf2gcrf(rho_hat_ecef, np.zeros((3,1)),
                                                UTC, EOP_data, XYs_df)
-            
-        
+       
         # Store values in columns of L and R
         Lmat[:,kk] = rho_hat_eci.flatten()
         Rmat[:,kk] = site_eci.flatten()
     
+    # Determine the admissible values of range for Earth orbit
+    # Set lower and upper bounds on range
+    rho0_hat = Lmat[:,0].reshape(3,1)
+    q0_vect = Rmat[:,0].reshape(3,1)
+    rho0_min = compute_rho_min(rho0_hat, q0_vect)
+    rho0_max = np.sqrt(50000.**2. + Re**2.)
+    
+    rhof_hat = Lmat[:,-1].reshape(3,1)
+    qf_vect = Rmat[:,-1].reshape(3,1)
+    rhof_min = compute_rho_min(rhof_hat, qf_vect)
+    rhof_max = np.sqrt(50000.**2. + Re**2.)
+    
+    rho0_array = np.linspace(rho0_min, rho0_max, 50)
+    rhof_array = np.linspace(rhof_min, rhof_max, 50)
+    
+    print(rho0_min)
+    print(rho0_max)
+    print(rhof_min)
+    print(rhof_max)
+    
+    # Time of flight
+    tof = (UTC_list[-1] - UTC_list[0]).total_seconds()
+    
+    # Loop over initial values of ranges and iterate to find nearby solutions
+    # if available
+    for ii in range(len(rho0_array)):
+        rho0 = rho0_array[ii]
+        
+        for jj in range(len(rhof_array)):
+            rhof = rhof_array[jj]
+    
+            # Compute Lambert solution
+            r0_vect = q0_vect + rho0*rho0_hat
+            rf_vect = qf_vect + rhof*rhof_hat
+            v0_list, vf_list, M_list, type_list = \
+                izzo_lambert(r0_vect, rf_vect, tof, results_flag='all')
+            
+            if len(M_list) == 0:
+                continue
+            
+            print('rho0', rho0)
+            print('rhof', rhof)
+            print(v0_list)
+            print(vf_list)
+            print(M_list)
+            print(type_list)
+            
+            # Loop over available solutions and iterate to convergence
+            rho0_prior = float(rho0)
+            rhof_prior = float(rhof)
+            for nn in range(len(M_list)):
+                M_n = M_list[nn]
+                type_n = type_list[nn]
+                
+                
+                # Compute penalty function f and derivatives
+            
+            
+            
+            
+            
+            mistake
     
     
     
-    # Choose the first and last measurements Y0 and Yf and compute LOS vectors
-
-
+    
+    
+    
+    
+    
+    
+    
+    
     
     # Loop over possible guesses for ranges rho0 and rhof
     
@@ -892,6 +958,37 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
     
     
     return
+
+
+def compute_rho_min(rho_hat_eci, site_eci, rmin=Re+100.):
+    '''
+    This function computes minimum range value to yield an orbit radius
+    greater than some given minimum.
+    
+    Parameters
+    ------
+    rho_hat_eci : 3x1 numpy array
+        LOS unit vector in ECI
+    site_eci : 3x1 numpy array
+        sensor position vector in ECI [km]
+    rmin : float, optional
+        minimum orbit radius at this location in the orbit 
+        (default = Re + 100.)
+        
+    Returns
+    ------
+    rho_min : float
+        minimum range value corresponding to specified minimum orbit radius        
+    
+    '''
+    
+    a = 1.
+    b = 2.*np.dot(rho_hat_eci.T, site_eci)
+    c = np.dot(site_eci.T, site_eci) - rmin**2.
+    
+    rho_min = float((-b + np.sqrt(b**2. - 4.*a*c))/(2.*a))
+    
+    return rho_min
 
 
 
