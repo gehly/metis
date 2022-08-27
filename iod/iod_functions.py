@@ -39,8 +39,9 @@ def lambert_iod(tk_list, Yk_list, sensor_params):
 
 
 
-def izzo_lambert(r1_vect, r2_vect, tof, GM=GME, R=Re, results_flag='all',
-                 periapsis_check=True, maxiters=35, rtol=1e-8):
+def izzo_lambert(r1_vect, r2_vect, tof, M_star=np.nan, GM=GME, R=Re,
+                 results_flag='all', periapsis_check=True, maxiters=35,
+                 rtol=1e-8):
     '''
     This function implements a solution to the twobody orbit boundary value
     problem (Lambert's Problem). Given initial and final position vectors and
@@ -65,6 +66,9 @@ def izzo_lambert(r1_vect, r2_vect, tof, GM=GME, R=Re, results_flag='all',
         final position vector in inertial coordinates [km]
     tof : float
         time of flight between r1_vect and r2_vect [sec]
+    M_star : int, optional
+        exact integer number of complete orbit revolutions traversed
+        (default=NAN)
     GM : float, optional
         gravitational parameter of central body (default=GME) [km^3/s^2]        
     R : float, optional
@@ -150,7 +154,11 @@ def izzo_lambert(r1_vect, r2_vect, tof, GM=GME, R=Re, results_flag='all',
     T = np.sqrt(2*GM/s**3.) * tof
     
     # Compute all possible x,y values that fit T
-    x_list1, y_list1, M_list1 = find_xy(lam, T, maxiters, rtol)
+    if np.isnan(M_star):
+        x_list1, y_list1, M_list1 = find_xy(lam, T, maxiters, rtol)
+    else:
+        x_list1, y_list1, M_list1 = find_xy_given_M(lam, T, M_star, maxiters,
+                                                    rtol)
     
     # Loop over x,y values and compute output velocities
     v1_list = []
@@ -193,7 +201,11 @@ def izzo_lambert(r1_vect, r2_vect, tof, GM=GME, R=Re, results_flag='all',
         ihat_t2 = -ihat_t2
         
         # Compute all possible x,y values that fit T
-        x_list2, y_list2, M_list2 = find_xy(lam, T, maxiters, rtol)
+        if np.isnan(M_star):
+            x_list2, y_list2, M_list2 = find_xy(lam, T, maxiters, rtol)
+        else:
+            x_list2, y_list2, M_list2 = find_xy_given_M(lam, T, M_star,
+                                                        maxiters, rtol)
         
         # Loop over x,y values and compute output velocities
         for ii in range(len(x_list2)):
@@ -336,6 +348,115 @@ def find_xy(lam, T, maxiters=35, rtol=1e-8):
 
     return x_list, y_list, M_list
 
+
+def find_xy_given_M(lam, T, M_star, maxiters=35, rtol=1e-8):
+    '''
+    This function computes all possible x,y values that fit the input orbit
+    non-dimensional time of flight T and specific orbit revolution number 
+    M_star.
+    
+    Parameters
+    ------
+    lam : float
+        non-dimensional orbit parameter in range [-1, 1]
+        lam > 0 for theta [0,pi] and lam < 0 for theta [pi, 2pi]
+    T : float
+        non-dimensional time of flight
+    M_star : int
+        exact integer number of complete orbit revolutions traversed
+    maxiters : int, optional
+        maximum number of iterations for the Halley and Householder 
+        root-finding steps (default=35)
+    rtol : float, optional
+        convergence tolerance for the Halley and Householder root-finding 
+        steps (default=1e-8)
+    
+    Returns
+    ------
+    x_list : list
+        all x values that fit boundary conditions
+    y_list : list
+        all y values that fit boundary conditions
+    M_list : list
+        all integer orbit revolutions that fit boundary conditions
+    
+    '''
+    
+    # Check inputs
+    assert abs(lam) <= 1.
+    assert T > 0.  # note error in Izzo paper
+    
+    # Initialize output
+    x_list = []
+    y_list = []
+    M_list = []
+    
+    # Compute maximum number of complete revolutions that would fit in 
+    # the simplest sense T_0M = T_00 + M*pi
+    M_max = int(np.floor(T / math.pi))
+    if M_star > M_max:
+        return x_list, y_list, M_list
+    
+    # Evaluate non-dimensional time of flight T
+    # T(x=0) denoted T_0M
+    # T_00 is T_0 for single revolution (M=0) case  
+    # T_0M = T_00 + M*pi
+    T_00 = math.acos(lam) + lam*np.sqrt(1. - lam**2.)
+            
+    # Compute T(x=1) parabolic case (Izzo Eq 21)
+    T_1 = (2./3.) * (1. - lam**3.)
+    
+    # Single revolution case
+    if M_star == 0:
+        
+        # Form initial guess for single revolution case (Izzo Eq 30)
+        if T >= T_00:
+            x_0 = (T_00/T)**(2./3.) - 1.
+    
+        elif T < T_1:
+            x_0 = (5./2.) * (T_1*(T_1 - T))/(T*(1.-lam**5.)) + 1.
+    
+        else:        
+            # Modified initial condition from poliastro
+            # https://github.com/poliastro/poliastro/issues/1362
+            x_0 = np.exp(np.log(2.) * np.log(T / T_00) / np.log(T_1 / T_00)) - 1.        
+            
+        # Run Householder iterations for x_0 to get x,y for single rev case
+        x, exit_flag = householder(x_0, T, lam, M_star, maxiters, rtol)
+        if exit_flag == 1:
+            y = np.sqrt(1. - lam**2.*(1. - x**2.))
+            x_list.append(x)
+            y_list.append(y)
+            M_list.append(M_star)
+            
+    # Multiple revolution case
+    else:
+
+        # Form initial x0_l and x0_r from Izzo Eq 31
+        x0_l = (((M_star*math.pi + math.pi)/(8.*T))**(2./3.) - 1.) * \
+            1./(((M_star*math.pi + math.pi)/(8.*T))**(2./3.) + 1.)
+            
+        x0_r = (((8.*T)/(M_star*math.pi))**(2./3.) - 1.) * \
+            1./(((8.*T)/(M_star*math.pi))**(2./3.) + 1.)
+    
+        # Run Householder iterations for x0_l and x0_r for multirev cases
+        xl, exit_flag = householder(x0_l, T, lam, M_star, maxiters, rtol)
+        
+        if exit_flag == 1:
+            yl = np.sqrt(1. - lam**2.*(1. - xl**2.))
+            x_list.append(xl)
+            y_list.append(yl)
+            M_list.append(M_star)
+        
+        xr, exit_flag = householder(x0_r, T, lam, M_star, maxiters, rtol)
+        
+        if exit_flag == 1:
+            yr = np.sqrt(1. - lam**2.*(1. - xr**2.))
+            x_list.append(xr)
+            y_list.append(yr)
+            M_list.append(M_star)
+
+    return x_list, y_list, M_list
 
 
 def compute_T_min(lam, M, maxiters=35, rtol=1e-8):

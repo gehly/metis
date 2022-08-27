@@ -73,8 +73,6 @@ def lambert_test():
     
     
     
-    results_flag = 'all'
-    periapsis_check = True
     
     # Propagate several orbit fractions
     elem0 = astro.cart2kep(Xo)
@@ -109,6 +107,10 @@ def lambert_test():
     t0 = tk_list[0]    
 #    for kk in range(1,len(fraction_list)):
     for kk in range(5,6):
+        
+        M_star = np.nan
+        results_flag = 'all'
+        periapsis_check = True
         
         frac = fraction_list[kk]        
         tf = tk_list[kk]
@@ -163,8 +165,9 @@ def lambert_test():
         start_time = time.time()
         
         v0_list, vf_list, M_list, type_list = \
-            iod.izzo_lambert(r0_true, rf_true, tof, GM, Re, results_flag,
-                             periapsis_check)
+            iod.izzo_lambert(r0_true, rf_true, tof, M_star=M_star, GM=GM, R=Re, 
+                             results_flag=results_flag,
+                             periapsis_check=periapsis_check)
         
         izzo_time = time.time() - start_time
         
@@ -209,8 +212,8 @@ def lambert_test():
             X = Xout[-1,:].reshape(6, 1)
             
 #            print('tof diff', tout[-1] - tof)
-            print('tout', tout)
-            print('X', X)
+#            print('tout', tout)
+#            print('X', X)
             
             rf_test = X[0:3].reshape(3,1)
             vf_test = X[3:6].reshape(3,1)
@@ -229,11 +232,11 @@ def lambert_test():
             print('vf_test', vf_test)
             print('vf_true', vf_true)
             
-            print('')
-            print('X_test', X_test)
-            print('elem_test', elem_test)
-            print('v0_ii', v0_ii)
-            print('vf_ii', vf_ii)
+#            print('')
+#            print('X_test', X_test)
+#            print('elem_test', elem_test)
+#            print('v0_ii', v0_ii)
+#            print('vf_ii', vf_ii)
             
             if np.linalg.norm(vf_test - vf_ii) > 1e-6:
                 print(vf_test)
