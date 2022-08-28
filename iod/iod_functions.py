@@ -911,11 +911,15 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
             for nn in range(len(M_list)):
                 M_n = M_list[nn]
                 type_n = type_list[nn]
+                v0_vect = v0_list[nn]
                 
                 
-                # Compute penalty function f and derivatives
-            
-            
+                
+                    
+                    
+                    
+                    
+                    
             
             
             
@@ -958,6 +962,113 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
     
     
     return
+
+
+def compute_delta_rho(rho0, rhof, tof, M_star, orbit_type, Lmat, Rmat,
+                      UTC_list):
+    
+    '''
+    
+    
+    '''
+    
+    # Basic Gooding assume 3 angles and use middle value to compute penalty
+    kk_list = [1]
+    
+    
+    # Compute range vectors at all intermediate times in kk_list
+    rho_list = compute_intermediate_rho(rho0, rhof, tof,
+                                        M_star, orbit_type, Lmat, Rmat,
+                                        UTC_list, kk_list)
+    
+    # Compute penalty for these values    
+    f = compute_penalty(rho_list, Lmat, Rmat, kk_list)
+    
+    # Use central finite difference to compute numerical derivatives of f
+    # with respect to small changes in rho0 and rhof
+    rho0_minus = rho0 - drho0
+    rho_list = compute_intermediate_rho(rho0_minus, rhof, tof,
+                                        M_star, orbit_type, Lmat, Rmat,
+                                        UTC_list, kk_list)
+    
+    # Compute penalty for these values    
+    fm0 = compute_penalty(rho_list, Lmat, Rmat, kk_list) - f
+    
+    
+    return
+
+
+def compute_intermediate_rho(rho0, rhof, tof, M_star, orbit_type, Lmat, Rmat, 
+                             UTC_list, kk_list):
+    
+    '''
+    
+    '''
+    
+    # Compute initial and final position vectors
+    rho0_hat = Lmat[:,0].reshape(3,1)
+    q0_vect = Rmat[:,0].reshape(3,1)    
+    rhof_hat = Lmat[:,-1].reshape(3,1)
+    qf_vect = Rmat[:,-1].reshape(3,1)
+    
+    r0_vect = q0_vect + rho0*rho0_hat
+    rf_vect = qf_vect + rhof*rhof_hat
+    
+    # Compute Lambert solution for these inputs
+    v0_list, vf_list, M_list, type_list = \
+        izzo_lambert(r0_vect, rf_vect, tof, M_star=M_star,
+                     results_flag=orbit_type)
+    
+    # There should only be one solution with everything specified
+    if len(M_list) > 1:
+        print(v0_list)
+        print(vf_list)
+        print(M_list)
+        print(type_list)
+        mistake
+        
+    v0_vect = v0_list[0]
+    
+    # Full cartesian state vector at t0
+    Xo = np.concatenate((r0_vect, v0_vect), axis=0)
+    
+    # Loop over intermediate times and compute rho_vect
+    rho_list = []
+    for kk in kk_list:
+        dt_sec = (UTC_list[kk] - UTC_list[0]).total_seconds()
+        qk_vect = Rmat[:,kk].reshape(3,1)
+        Xk = astro.element_conversion(Xo, 1, 1, dt=dt_sec)
+        rk_vect = Xk[0:3].reshape(3,1)
+        rhok_vect = rk_vect - qk_vect
+    
+        rho_list.append(rhok_vect)
+    
+    return rho_list
+
+
+def compute_penalty(rho_list, Lmat, Rmat, kk_list):
+    '''
+    
+    
+    '''
+    
+    f = 0.
+    for kk in kk_list:
+    
+        # Observed LOS unit vector at time tk
+        rhok_hat_obs = Lmat[:,kk].reshape(3,1)
+        
+        # Calcuated LOS range vector at time tk
+        rhok_vect_calc = rho_list[kk]
+        rhok_calc = np.linalg.norm(rhok_vect_calc)
+        
+        # Compute penalty function
+        en_vect = np.cross(rhok_hat_obs, rhok_vect_calc, axis=0)
+        p_vect = np.cross(en_vect, rhok_hat_obs, axis=0)
+        f += np.dot(p_vect.T, rhok_vect_calc)/rhok_calc
+    
+    
+    return f
 
 
 def compute_rho_min(rho_hat_eci, site_eci, rmin=Re+100.):
