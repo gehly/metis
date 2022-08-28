@@ -883,6 +883,8 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
     
     # Loop over initial values of ranges and iterate to find nearby solutions
     # if available
+    Xo_output = []
+    M_output = []
     for ii in range(len(rho0_array)):
         rho0 = rho0_array[ii]
         
@@ -906,62 +908,57 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
             print(type_list)
             
             # Loop over available solutions and iterate to convergence
-            rho0_prior = float(rho0)
-            rhof_prior = float(rhof)
+            rho0_lambert = float(rho0)
+            rhof_lambert = float(rhof)
             for nn in range(len(M_list)):
                 M_n = M_list[nn]
-                type_n = type_list[nn]
-                v0_vect = v0_list[nn]
+                type_n = type_list[nn]                
                 
+                # Iterate to convergence
+                rho0_iter = float(rho0_lambert)
+                rhof_iter = float(rhof_lambert)
+                diff = 1.
+                tol = 1e-12
+                iters = 0
+                maxiters = 50
+                while diff > tol:
+                    delta_rho0, delta_rhof = \
+                        compute_delta_rho(rho0_iter, rhof_iter, tof, M_n,
+                                          type_n, Lmat, Rmat, UTC_list)                    
+                    
+                    rho0_iter += delta_rho0
+                    rhof_iter += delta_rhof
+                    
+                    # Loop exit condition
+                    diff = abs(delta_rho0/rho0_iter) + abs(delta_rhof/rhof_iter)
+                    iters += 1
+                    if iters > maxiters:
+                        fail_flag = True
+                        break
+                    
+                # Store valid solutions    
+                if not fail_flag:
+                    r0_vect = q0_vect + rho0_iter*rho0_hat
+                    rf_vect = qf_vect + rhof_iter*rhof_hat
+                    v0_list, vf_list, M_list, type_list = \
+                        izzo_lambert(r0_vect, rf_vect, tof, M_star=M_n, 
+                                     results_flag=type_n)
                 
-                
-                    
-                    
-                    
-                    
-                    
-            
-            
-            
-            mistake
+                    # There should only be one solution with everything specified
+                    if len(M_list) > 1:
+                        print(v0_list)
+                        print(vf_list)
+                        print(M_list)
+                        print(type_list)
+                        mistake
+                        
+                    v0_vect = v0_list[0]
+                    Xo = np.concatenate((r0_vect, v0_vect), axis=0)
+                    Xo_output.append(Xo)
+                    M_output.append(M_n)
+
     
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    # Loop over possible guesses for ranges rho0 and rhof
-    
-    
-        # Solve Lambert's Problem (returns multiple solutions)
-        
-        
-        # Loop over Lambert solutions
-        
-        
-            # Compute penalty function f
-            # Example f = dot(los2_obs, los2_calc)
-            
-        
-            
-            # Adjust rho0 and rhof to convergence
-            # Use central finite difference to compute numerical derivatives
-            # of penalty function and Newton-Raphson to step toward minimum
-            
-            
-            
-            
-        # Store solution (r0_vect, v0_vect, M) 
-    
-    
-    
-    return
+    return Xo_output, M_output
 
 
 def compute_delta_rho(rho0, rhof, tof, M_star, orbit_type, Lmat, Rmat,
@@ -982,20 +979,66 @@ def compute_delta_rho(rho0, rhof, tof, M_star, orbit_type, Lmat, Rmat,
                                         UTC_list, kk_list)
     
     # Compute penalty for these values    
-    f = compute_penalty(rho_list, Lmat, Rmat, kk_list)
+    f, g = compute_penalty(rho_list, Lmat, Rmat, kk_list)
     
     # Use central finite difference to compute numerical derivatives of f
     # with respect to small changes in rho0 and rhof
+    drho0 = 0.001
+    drhof = 0.001
+    
+    # First range rho0 minus delta_rho
     rho0_minus = rho0 - drho0
     rho_list = compute_intermediate_rho(rho0_minus, rhof, tof,
                                         M_star, orbit_type, Lmat, Rmat,
                                         UTC_list, kk_list)
     
-    # Compute penalty for these values    
-    fm0 = compute_penalty(rho_list, Lmat, Rmat, kk_list) - f
+    fm0, gm0 = compute_penalty(rho_list, Lmat, Rmat, kk_list) - f
+    
+    # First range rho0 plus delta_rho
+    rho0_plus = rho0 + drho0
+    rho_list = compute_intermediate_rho(rho0_plus, rhof, tof,
+                                        M_star, orbit_type, Lmat, Rmat,
+                                        UTC_list, kk_list)
+       
+    fp0, gp0 = compute_penalty(rho_list, Lmat, Rmat, kk_list) - f
+    
+    # Last range rhof minus delta_rho
+    rhof_minus = rhof - drhof
+    rho_list = compute_intermediate_rho(rho0, rhof_minus, tof,
+                                        M_star, orbit_type, Lmat, Rmat,
+                                        UTC_list, kk_list)
+    
+    fmf, gmf = compute_penalty(rho_list, Lmat, Rmat, kk_list) - f
+    
+    # Last range rhof plus delta_rho
+    rhof_plus = rhof + drhof
+    rho_list = compute_intermediate_rho(rho0, rhof_plus, tof,
+                                        M_star, orbit_type, Lmat, Rmat,
+                                        UTC_list, kk_list)
+       
+    fpf, gpf = compute_penalty(rho_list, Lmat, Rmat, kk_list) - f
     
     
-    return
+    # Compute numerical derivatives using central finite difference
+    df_0 = (fp0 - fm0)/(2.*drho0)
+    ddf_0 = (fp0 + fm0)/(drho0**2.)
+    dg_0 = (gp0 - gm0)/(2.*drho0)  
+    ddg_0 = (gp0 + gm0)/(drho0**2.)
+    
+    df_f = (fpf - fmf)/(2.*drhof)
+    ddf_f = (fpf + fmf)/(drhof**2.)
+    dg_f = (gpf - gmf)/(2.*drhof)  
+    ddg_f = (gpf + gmf)/(drhof**2.)
+    
+    D = np.array([[df_0, df_f], 
+                  [dg_0, dg_f]])
+    
+    Dinv = np.linalg.inv(D)
+    
+    delta_rho0 = -Dinv * f * dg_f
+    delta_rhof =  Dinv * f * dg_0
+    
+    return delta_rho0, delta_rhof
 
 
 def compute_intermediate_rho(rho0, rhof, tof, M_star, orbit_type, Lmat, Rmat, 
@@ -1052,7 +1095,6 @@ def compute_penalty(rho_list, Lmat, Rmat, kk_list):
     
     '''
     
-    f = 0.
     for kk in kk_list:
     
         # Observed LOS unit vector at time tk
@@ -1065,10 +1107,10 @@ def compute_penalty(rho_list, Lmat, Rmat, kk_list):
         # Compute penalty function
         en_vect = np.cross(rhok_hat_obs, rhok_vect_calc, axis=0)
         p_vect = np.cross(en_vect, rhok_hat_obs, axis=0)
-        f += np.dot(p_vect.T, rhok_vect_calc)/rhok_calc
+        f = np.dot(p_vect.T, rhok_vect_calc)/rhok_calc
+        g = np.dot(en_vect.T, rhok_vect_calc)/np.linalg.norm(en_vect)
     
-    
-    return f
+    return f, g
 
 
 def compute_rho_min(rho_hat_eci, site_eci, rmin=Re+100.):
