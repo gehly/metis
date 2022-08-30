@@ -878,8 +878,11 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
     print(rhof_min)
     print(rhof_max)
     
-    rho0_array = np.array([39809.])
-    rhof_array = np.array([39834.])
+#    rho0_array = np.array([39809.])
+#    rhof_array = np.array([39834.])
+    
+    rho0_array = np.array([30000.])
+    rhof_array = np.array([30000.])
     
     # Time of flight
     tof = (UTC_list[-1] - UTC_list[0]).total_seconds()
@@ -932,7 +935,7 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
                                      results_flag=type_n)
                      
                     v0_vect = v0_list[0]
-                    Xo = np.concatentate((r0_vect, v0_vect), axis=0)
+                    Xo = np.concatenate((r0_vect, v0_vect), axis=0)
                     elem0 = astro.cart2kep(Xo)
                     
                     print(r0_vect)
@@ -966,14 +969,16 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, orbit_type, Lmat, Rmat, UTC_l
     rho0 = float(rho0_init)
     rhof = float(rhof_init)
     finite_diff_step = 1e-6
-    tol = 1e-14
-    diff = 1.
+    tol = 1e-10
+    conv_crit = 1.
     iters = 0
     maxiters = 100
     exit_flag = 0
+    crit_min = 1.
+    f_old = np.inf
     
     # Loop
-    while diff > tol:
+    while True:
     
         # Solve Lambert problem to get LOS vector at intermediate time
         rhok_list, rhok_inds = \
@@ -1006,13 +1011,22 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, orbit_type, Lmat, Rmat, UTC_l
         rhok_dot = np.dot(rhok_obs_hat.T, rhok_calc_vect)
         
         # Compute penalty
-        f = np.dot(p_hat.T, rhok_calc_vect)
-        g = np.dot(en_hat.T, rhok_calc_vect)
+        f = float(np.dot(p_hat.T, rhok_calc_vect))
+        g = float(np.dot(en_hat.T, rhok_calc_vect))
+        
+        
+        
+        print('\niters', iters)
+        print('f', f)
+        print('g', g)
         
         # Use central finite difference to compute numerical derivatives of f
         # and g with respect to small changes in rho0 and rhof
         drho0 = rho0 * finite_diff_step
         drhof = rhof * finite_diff_step
+        
+        print('drho0', drho0)
+        print('drhof', drhof)
         
         # Range rho0 minus delta_rho
         rho0_minus = rho0 - drho0
@@ -1021,8 +1035,8 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, orbit_type, Lmat, Rmat, UTC_l
                                      Lmat, Rmat, UTC_list)
             
         cm0 = rhok_list[0]
-        fm_rho0 = np.dot(p_hat.T, cm0)
-        gm_rho0 = np.dot(en_hat.T, cm0)
+        fm_rho0 = float(np.dot(p_hat.T, cm0))
+        gm_rho0 = float(np.dot(en_hat.T, cm0))
         
         # Range rho0 plus delta_rho
         rho0_plus = rho0 + drho0
@@ -1031,8 +1045,8 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, orbit_type, Lmat, Rmat, UTC_l
                                      Lmat, Rmat, UTC_list)
             
         cp0 = rhok_list[0]
-        fp_rho0 = np.dot(p_hat.T, cp0)
-        gp_rho0 = np.dot(en_hat.T, cp0)
+        fp_rho0 = float(np.dot(p_hat.T, cp0))
+        gp_rho0 = float(np.dot(en_hat.T, cp0))
         
         # Range rhof minus delta_rho
         rhof_minus = rhof - drhof
@@ -1041,8 +1055,8 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, orbit_type, Lmat, Rmat, UTC_l
                                      Lmat, Rmat, UTC_list)
             
         cmf = rhok_list[0]
-        fm_rhof = np.dot(p_hat.T, cmf)
-        gm_rhof = np.dot(en_hat.T, cmf)
+        fm_rhof = float(np.dot(p_hat.T, cmf))
+        gm_rhof = float(np.dot(en_hat.T, cmf))
         
         # Range rhof plus delta_rho
         rhof_plus = rhof + drhof
@@ -1051,14 +1065,23 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, orbit_type, Lmat, Rmat, UTC_l
                                      Lmat, Rmat, UTC_list)
             
         cpf = rhok_list[0]
-        fp_rhof = np.dot(p_hat.T, cpf)
-        gp_rhof = np.dot(en_hat.T, cpf)
+        fp_rhof = float(np.dot(p_hat.T, cpf))
+        gp_rhof = float(np.dot(en_hat.T, cpf))
         
         # Compute derivatives
         df_drho0 = (fp_rho0 - fm_rho0)/(2.*drho0)
         df_drhof = (fp_rhof - fm_rhof)/(2.*drhof)
         dg_drho0 = (gp_rho0 - gm_rho0)/(2.*drho0)
         dg_drhof = (gp_rhof - gm_rhof)/(2.*drhof)
+        
+        mat = np.array([[df_drho0, df_drhof],
+                        [dg_drho0, dg_drhof]])
+        
+        print('derivatives')
+        print('df_drho0', df_drho0)
+        print('df_drhof', df_drhof)
+        print('dg_drho0', dg_drho0)
+        print('dg_drhof', dg_drhof)
         
         
         # Newton's Method
@@ -1068,17 +1091,57 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, orbit_type, Lmat, Rmat, UTC_l
         delta_rho0 = -(1./D) * f * dg_drhof
         delta_rhof =  (1./D) * f * dg_drho0
         
+        print('D', D)
+        print('delta_rho0', delta_rho0)
+        print('delta_rhof', delta_rhof)
+        
+        print('mat', mat)
+        print('check D', np.linalg.det(mat))
+
+        
+        delta2 = -np.dot(np.linalg.inv(mat), np.reshape([f, 0.], (2,1)))
+        print('delta2', delta2)
+
         rho0 += delta_rho0
         rhof += delta_rhof
         
-        diff = abs(f)/max(rk, rhok_dot)
+#        rho0 += float(delta2[0])
+#        rhof += float(delta2[1])
         
+#        # Check for overshoot and adjust
+#        if iters > 1 and f > 2.*f_old:
+#            rho0 = (f*rho0_old + f_old*rho0)/(f + f_old)
+#            rhof = (f*rhof_old + f_old*rhof)/(f + f_old)
+#            print('overshoot')
+        
+        print('rho0', rho0)
+        print('rhof', rhof)
+        
+        conv_crit = abs(f)/max(rk, rhok_dot)
+        print('conv_crit', conv_crit)
+        
+        # Check exit condition
+        if conv_crit < tol:
+            exit_flag = 1
+            break
+        
+        
+        if conv_crit < crit_min:
+            crit_min = float(conv_crit)
+            
+        # Store values for future comparison
+        f_old = float(f)
+        rho0_old = float(rho0)
+        rhof_old = float(rhof)
+        
+        # Increment counter and exit condition
         iters += 1
         if iters > maxiters:
             exit_flag = 0
             break
-        
     
+    print('crit_min', crit_min)
+
     
     return rho0, rhof, exit_flag
 

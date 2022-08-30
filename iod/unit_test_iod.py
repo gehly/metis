@@ -1143,8 +1143,9 @@ def unit_test_gauss_iod():
 def unit_test_gooding_iod():
     
     # Generic GEO Orbit
-    elem = [42164.1, 0.001, 0., 90., 0., 0.]
+    elem = [42164.1, 0.01, 0.1, 90., 1., 1.]
     Xo = np.reshape(astro.kep2cart(elem), (6,1))
+    print('Xo true', Xo)
     
     # Time vector
     UTC0 = datetime(2021, 6, 21, 0, 0, 0)
@@ -1190,6 +1191,7 @@ def unit_test_gooding_iod():
     print(sensor_id_list)
     print(rho_list)
     
+
     # Execute function
     iod.gooding_angles_iod(UTC_list, Yk_list, sensor_id_list, sensor_params)
     
