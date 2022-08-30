@@ -912,46 +912,21 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
 
             
             # Loop over available solutions and iterate to convergence
-            rho0_lambert = float(rho0)
-            rhof_lambert = float(rhof)
+            rho0_init = float(rho0)
+            rhof_init = float(rhof)
             for nn in range(len(M_list)):
                 M_n = M_list[nn]
                 type_n = type_list[nn]                
                 
                 # Iterate to convergence
-                rho0_iter = float(rho0_lambert)
-                rhof_iter = float(rhof_lambert)
-                diff = 1.
-                tol = 1e-12
-                iters = 0
-                maxiters = 50
-                
-                    
-                    
-                    
-#                    # Check current solution
-#                    r0_vect = q0_vect + rho0_iter*rho0_hat
-#                    rf_vect = qf_vect + rhof_iter*rhof_hat
-#                    v0_list, vf_list, M_list, type_list = \
-#                        izzo_lambert(r0_vect, rf_vect, tof, M_star=M_n, 
-#                                     results_flag=type_n)
-#                        
-#                    print(v0_list)
-#                    print(M_list)
-#                    mistake
-                    
-                    
-#                    # Loop exit condition
-#                    diff = abs(delta_rho0/rho0_iter) + abs(delta_rhof/rhof_iter)
-#                    iters += 1
-#                    if iters > maxiters:
-#                        fail_flag = True
-#                        break
-                    
+                rho0, rhof, exit_flag = \
+                    iterate_rho(rho0_init, rhof_init, tof, M_n, type_n, Lmat,
+                                Rmat, UTC_list)
+
                 # Store valid solutions    
-                if not fail_flag:
-                    r0_vect = q0_vect + rho0_iter*rho0_hat
-                    rf_vect = qf_vect + rhof_iter*rhof_hat
+                if exit_flag == 1:
+                    r0_vect = q0_vect + rho0*rho0_hat
+                    rf_vect = qf_vect + rhof*rhof_hat
                     v0_list, vf_list, M_list, type_list = \
                         izzo_lambert(r0_vect, rf_vect, tof, M_star=M_n, 
                                      results_flag=type_n)
@@ -1008,7 +983,7 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, orbit_type, Lmat, Rmat, UTC_l
             
         # Error check
         if len(rhok_list) == 0:
-            modify(rho0, rhof)
+            rho0, rhof = modify_start_rho(Lmat, Rmat)
             
         # Assume a single intermediate point for now
         rhok_calc_vect = rhok_list[0]
@@ -1108,7 +1083,29 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, orbit_type, Lmat, Rmat, UTC_l
     return rho0, rhof, exit_flag
 
 
-
+def modify_start_rho(Lmat, Rmat):
+    '''
+    
+    
+    '''
+    
+    # Compute LOS unit vectors and sensor positions
+    rho0_hat = Lmat[:,0].reshape(3,1)
+    q0_vect = Rmat[:,0].reshape(3,1)    
+    rhof_hat = Lmat[:,-1].reshape(3,1)
+    qf_vect = Rmat[:,-1].reshape(3,1)
+    
+    # Compute updated guess for rho0, rhof
+    q0f_vect = qf_vect - q0_vect
+    D1 = np.dot(q0f_vect.T, rho0_hat)
+    D3 = np.dot(q0f_vect.T, rhof_hat)
+    D2 = np.dot(rho0_hat.T, rhof_hat)
+    D4 = 1. - D2**2.
+    
+    rho0 = max((D1-(D3*D2))/D4, 0.)
+    rhof = max(((D1*D2)-D3)/D4, 0.)
+    
+    return rho0, rhof
 
 
 
