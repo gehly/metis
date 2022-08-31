@@ -367,8 +367,8 @@ def twobody_geo_setup():
                 
                 # Compute measurements
                 Yk = mfunc.compute_measurement(X, state_params, sensor, UTC,
-                                         EOP_data, XYs_df,
-                                         meas_types=sensor['meas_types'])
+                                               EOP_data, XYs_df,
+                                               meas_types=sensor['meas_types'])
                 
                 Yk[0] += np.random.randn()*sigma_dict['ra']
                 Yk[1] += np.random.randn()*sigma_dict['dec']

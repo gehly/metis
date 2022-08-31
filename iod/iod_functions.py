@@ -39,8 +39,9 @@ def lambert_iod(tk_list, Yk_list, sensor_params):
 
 
 
-def izzo_lambert(r1_vect, r2_vect, tof, GM=GME, R=Re, results_flag='all',
-                 periapsis_check=True, maxiters=35, rtol=1e-8):
+def izzo_lambert(r1_vect, r2_vect, tof, M_star=np.nan, GM=GME, R=Re,
+                 results_flag='all', periapsis_check=True, maxiters=35,
+                 rtol=1e-8):
     '''
     This function implements a solution to the twobody orbit boundary value
     problem (Lambert's Problem). Given initial and final position vectors and
@@ -65,6 +66,9 @@ def izzo_lambert(r1_vect, r2_vect, tof, GM=GME, R=Re, results_flag='all',
         final position vector in inertial coordinates [km]
     tof : float
         time of flight between r1_vect and r2_vect [sec]
+    M_star : int, optional
+        exact integer number of complete orbit revolutions traversed
+        (default=NAN)
     GM : float, optional
         gravitational parameter of central body (default=GME) [km^3/s^2]        
     R : float, optional
@@ -150,7 +154,11 @@ def izzo_lambert(r1_vect, r2_vect, tof, GM=GME, R=Re, results_flag='all',
     T = np.sqrt(2*GM/s**3.) * tof
     
     # Compute all possible x,y values that fit T
-    x_list1, y_list1, M_list1 = find_xy(lam, T, maxiters, rtol)
+    if np.isnan(M_star):
+        x_list1, y_list1, M_list1 = find_xy(lam, T, maxiters, rtol)
+    else:
+        x_list1, y_list1, M_list1 = find_xy_given_M(lam, T, M_star, maxiters,
+                                                    rtol)
     
     # Loop over x,y values and compute output velocities
     v1_list = []
@@ -177,6 +185,13 @@ def izzo_lambert(r1_vect, r2_vect, tof, GM=GME, R=Re, results_flag='all',
         v1_list.append(v1_vect)
         v2_list.append(v2_vect)
         M_list.append(Mi)
+    
+    # Generate list to identify output orbit type
+    if results_flag == 'retrograde':
+        type_list = ['retrograde']*len(M_list)
+    else:
+        type_list = ['prograde']*len(M_list)
+        
         
     # If it is desired to produce all possible cases, repeat execution for
     # retrograde cases (previous results cover prograde cases)
@@ -186,7 +201,11 @@ def izzo_lambert(r1_vect, r2_vect, tof, GM=GME, R=Re, results_flag='all',
         ihat_t2 = -ihat_t2
         
         # Compute all possible x,y values that fit T
-        x_list2, y_list2, M_list2 = find_xy(lam, T, maxiters, rtol)
+        if np.isnan(M_star):
+            x_list2, y_list2, M_list2 = find_xy(lam, T, maxiters, rtol)
+        else:
+            x_list2, y_list2, M_list2 = find_xy_given_M(lam, T, M_star,
+                                                        maxiters, rtol)
         
         # Loop over x,y values and compute output velocities
         for ii in range(len(x_list2)):
@@ -210,9 +229,11 @@ def izzo_lambert(r1_vect, r2_vect, tof, GM=GME, R=Re, results_flag='all',
             v1_list.append(v1_vect)
             v2_list.append(v2_vect)
             M_list.append(Mi)
+            type_list.append('retrograde')
+            
+            
 
-
-    return v1_list, v2_list, M_list
+    return v1_list, v2_list, M_list, type_list
 
 
 def find_xy(lam, T, maxiters=35, rtol=1e-8):
@@ -327,6 +348,115 @@ def find_xy(lam, T, maxiters=35, rtol=1e-8):
 
     return x_list, y_list, M_list
 
+
+def find_xy_given_M(lam, T, M_star, maxiters=35, rtol=1e-8):
+    '''
+    This function computes all possible x,y values that fit the input orbit
+    non-dimensional time of flight T and specific orbit revolution number 
+    M_star.
+    
+    Parameters
+    ------
+    lam : float
+        non-dimensional orbit parameter in range [-1, 1]
+        lam > 0 for theta [0,pi] and lam < 0 for theta [pi, 2pi]
+    T : float
+        non-dimensional time of flight
+    M_star : int
+        exact integer number of complete orbit revolutions traversed
+    maxiters : int, optional
+        maximum number of iterations for the Halley and Householder 
+        root-finding steps (default=35)
+    rtol : float, optional
+        convergence tolerance for the Halley and Householder root-finding 
+        steps (default=1e-8)
+    
+    Returns
+    ------
+    x_list : list
+        all x values that fit boundary conditions
+    y_list : list
+        all y values that fit boundary conditions
+    M_list : list
+        all integer orbit revolutions that fit boundary conditions
+    
+    '''
+    
+    # Check inputs
+    assert abs(lam) <= 1.
+    assert T > 0.  # note error in Izzo paper
+    
+    # Initialize output
+    x_list = []
+    y_list = []
+    M_list = []
+    
+    # Compute maximum number of complete revolutions that would fit in 
+    # the simplest sense T_0M = T_00 + M*pi
+    M_max = int(np.floor(T / math.pi))
+    if M_star > M_max:
+        return x_list, y_list, M_list
+    
+    # Evaluate non-dimensional time of flight T
+    # T(x=0) denoted T_0M
+    # T_00 is T_0 for single revolution (M=0) case  
+    # T_0M = T_00 + M*pi
+    T_00 = math.acos(lam) + lam*np.sqrt(1. - lam**2.)
+            
+    # Compute T(x=1) parabolic case (Izzo Eq 21)
+    T_1 = (2./3.) * (1. - lam**3.)
+    
+    # Single revolution case
+    if M_star == 0:
+        
+        # Form initial guess for single revolution case (Izzo Eq 30)
+        if T >= T_00:
+            x_0 = (T_00/T)**(2./3.) - 1.
+    
+        elif T < T_1:
+            x_0 = (5./2.) * (T_1*(T_1 - T))/(T*(1.-lam**5.)) + 1.
+    
+        else:        
+            # Modified initial condition from poliastro
+            # https://github.com/poliastro/poliastro/issues/1362
+            x_0 = np.exp(np.log(2.) * np.log(T / T_00) / np.log(T_1 / T_00)) - 1.        
+            
+        # Run Householder iterations for x_0 to get x,y for single rev case
+        x, exit_flag = householder(x_0, T, lam, M_star, maxiters, rtol)
+        if exit_flag == 1:
+            y = np.sqrt(1. - lam**2.*(1. - x**2.))
+            x_list.append(x)
+            y_list.append(y)
+            M_list.append(M_star)
+            
+    # Multiple revolution case
+    else:
+
+        # Form initial x0_l and x0_r from Izzo Eq 31
+        x0_l = (((M_star*math.pi + math.pi)/(8.*T))**(2./3.) - 1.) * \
+            1./(((M_star*math.pi + math.pi)/(8.*T))**(2./3.) + 1.)
+            
+        x0_r = (((8.*T)/(M_star*math.pi))**(2./3.) - 1.) * \
+            1./(((8.*T)/(M_star*math.pi))**(2./3.) + 1.)
+    
+        # Run Householder iterations for x0_l and x0_r for multirev cases
+        xl, exit_flag = householder(x0_l, T, lam, M_star, maxiters, rtol)
+        
+        if exit_flag == 1:
+            yl = np.sqrt(1. - lam**2.*(1. - xl**2.))
+            x_list.append(xl)
+            y_list.append(yl)
+            M_list.append(M_star)
+        
+        xr, exit_flag = householder(x0_r, T, lam, M_star, maxiters, rtol)
+        
+        if exit_flag == 1:
+            yr = np.sqrt(1. - lam**2.*(1. - xr**2.))
+            x_list.append(xr)
+            y_list.append(yr)
+            M_list.append(M_star)
+
+    return x_list, y_list, M_list
 
 
 def compute_T_min(lam, M, maxiters=35, rtol=1e-8):
@@ -658,6 +788,661 @@ def compute_hypergeom_2F1(a, b, c, d):
 ###############################################################################
 # Angles-Only IOD Methods
 ###############################################################################
+
+def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
+                       time_format='datetime', eop_alldata=[], XYs_df=[]):
+    '''
+    
+    
+    '''
+    
+    # Constants
+    GM = GME
+    
+    # Retrieve/load EOP and polar motion data if needed
+    if len(eop_alldata) == 0:        
+        eop_alldata = eop.get_celestrak_eop_alldata()
+        
+    if len(XYs_df) == 0:
+        XYs_df = eop.get_XYs2006_alldata()            
+    
+    # Compute time parameters from given input
+    if time_format == 'datetime':
+        UTC_list = tk_list
+
+    elif time_format == 'JD':
+        JD_list = tk_list
+        UTC_list = [timesys.jd2dt(JD) for JD in JD_list]
+    
+    # For each measurement, compute the associated sensor location and 
+    # line of sight vector in ECI
+    Lmat = np.zeros((3,3))
+    Rmat = np.zeros((3,3))
+    for kk in range(len(tk_list)):
+        
+        # Retrieve current values
+        UTC = UTC_list[kk]
+        Yk = Yk_list[kk]
+        sensor_id = sensor_id_list[kk]
+        site_ecef = sensor_params[sensor_id]['site_ecef']
+        meas_types = sensor_params[sensor_id]['meas_types']
+        
+        # Compute sensor location in ECI
+        EOP_data = eop.get_eop_data(eop_alldata, UTC)
+        site_eci, dum = coord.itrf2gcrf(site_ecef, np.zeros((3,1)), UTC,
+                                        EOP_data, XYs_df)
+        
+        # Compute measurement line of sight vector in ECI
+        if 'ra' in meas_types and 'dec' in meas_types:
+            ra = Yk[meas_types.index('ra')]
+            dec = Yk[meas_types.index('dec')]
+            
+            rho_hat_eci = np.array([[math.cos(dec)*math.cos(ra)],
+                                    [math.cos(dec)*math.sin(ra)],
+                                    [math.sin(dec)]])
+    
+        elif 'az' in meas_types and 'el' in meas_types:
+            az = Yk[meas_types.index('az')]
+            el = Yk[meas_types.index('el')]
+            
+            rho_hat_enu = np.array([[math.cos(el)*math.sin(az)],
+                                    [math.cos(el)*math.cos(az)],
+                                    [math.sin(el)]])
+    
+            rho_hat_ecef = coord.enu2ecef(rho_hat_enu, site_ecef)
+            
+            rho_hat_eci, dum = coord.itrf2gcrf(rho_hat_ecef, np.zeros((3,1)),
+                                               UTC, EOP_data, XYs_df)
+       
+        # Store values in columns of L and R
+        Lmat[:,kk] = rho_hat_eci.flatten()
+        Rmat[:,kk] = site_eci.flatten()
+    
+    # Determine the admissible values of range for Earth orbit
+    # Set lower and upper bounds on range
+    rho0_hat = Lmat[:,0].reshape(3,1)
+    q0_vect = Rmat[:,0].reshape(3,1)
+    rho0_min = compute_rho_min(rho0_hat, q0_vect)
+    rho0_max = np.sqrt(50000.**2. + Re**2.)
+    
+    rhof_hat = Lmat[:,-1].reshape(3,1)
+    qf_vect = Rmat[:,-1].reshape(3,1)
+    rhof_min = compute_rho_min(rhof_hat, qf_vect)
+    rhof_max = np.sqrt(50000.**2. + Re**2.)
+    
+    rho0_array = np.linspace(rho0_min, rho0_max, 50)
+    rhof_array = np.linspace(rhof_min, rhof_max, 50)
+    
+    print(rho0_min)
+    print(rho0_max)
+    print(rhof_min)
+    print(rhof_max)
+    
+#    rho0_array = np.array([39809.])
+#    rhof_array = np.array([39834.])
+    
+    rho0_array = np.array([30000.])
+    rhof_array = np.array([30000.])
+    
+    # Time of flight
+    tof = (UTC_list[-1] - UTC_list[0]).total_seconds()
+    
+    # Loop over initial values of ranges and iterate to find nearby solutions
+    # if available
+    Xo_output = []
+    M_output = []
+    for ii in range(len(rho0_array)):
+        rho0 = rho0_array[ii]
+        
+        for jj in range(len(rhof_array)):
+            rhof = rhof_array[jj]
+    
+            # Compute Lambert solution
+            r0_vect = q0_vect + rho0*rho0_hat
+            rf_vect = qf_vect + rhof*rhof_hat
+            v0_list, vf_list, M_list, type_list = \
+                izzo_lambert(r0_vect, rf_vect, tof, results_flag='all')
+            
+            if len(M_list) == 0:
+                continue
+            
+            print('rho0', rho0)
+            print('rhof', rhof)
+            print(v0_list)
+            print(vf_list)
+            print(M_list)
+            print(type_list)
+
+            
+            # Loop over available solutions and iterate to convergence
+            rho0_init = float(rho0)
+            rhof_init = float(rhof)
+            for nn in range(len(M_list)):
+                M_n = M_list[nn]
+                type_n = type_list[nn]  
+                v0_test = v0_list[nn]
+                
+                # Check validity of the initial Lambert solution
+                Xo_test = np.concatenate((r0_vect, v0_test), axis=0)
+                elem0_test = astro.cart2kep(Xo_test)
+                Xf_test = astro.element_conversion(Xo_test, 1, 1, dt=tof)
+                rf_test = Xf_test[0:3].reshape(3,1)
+                rhof_test_vect = rf_test - qf_vect
+                rhof_test = np.linalg.norm(rhof_test_vect)
+                rhof_test_hat = rhof_test_vect/rhof_test
+                
+                anglef_deg = (1. - float(np.dot(rhof_test_hat.T, rhof_hat))) * 180./math.pi
+                
+                print('')
+                print('Solution attempt nn', nn)
+                print('M_n', M_n)
+                print('orbit type', type_n)
+                print('rho0_init', rho0_init)
+                print('rhof_init', rhof_init)
+                print('rhof_test', rhof_test)
+                print('Xo_test', Xo_test)
+                print('Xf_test', Xf_test)
+                print('r0_vect', r0_vect)
+                print('v0_vect', v0_test)
+                print('rf_vect', rf_vect)
+                print('vf_vect', vf_list[nn])
+                print('elem0_test', elem0_test)
+                print('anglef_deg', anglef_deg)
+                
+                
+                # Iterate to convergence
+                rho0, rhof, exit_flag = \
+                    iterate_rho(rho0_init, rhof_init, tof, M_n, type_n, Lmat,
+                                Rmat, UTC_list)
+
+                # Store valid solutions    
+                if exit_flag == 1:
+                    r0_final = q0_vect + rho0*rho0_hat
+                    rf_final = qf_vect + rhof*rhof_hat
+                    v0_final_list, vf_final_list, M_final, type_final = \
+                        izzo_lambert(r0_final, rf_final, tof, M_star=M_n, 
+                                     results_flag=type_n)
+                     
+                    v0_final = v0_final_list[0]
+                    Xo = np.concatenate((r0_final, v0_final), axis=0)
+                    elem0 = astro.cart2kep(Xo)
+                    
+                    print(r0_final)
+                    print(v0_final)
+                    print(elem0)
+
+                    # There should only be one solution with everything specified
+                    if len(M_final) > 1:
+                        print(v0_final_list)
+                        print(vf_final_list)
+                        print(M_final)
+                        print(type_final)
+                        mistake
+                        
+                    Xo_output.append(Xo)
+                    M_output.append(M_n)
+
+    
+    return Xo_output, M_output
+
+
+def iterate_rho(rho0_init, rhof_init, tof, M_star, orbit_type, Lmat, Rmat, UTC_list):
+    '''
+    
+    
+    '''
+    
+    rho0 = float(rho0_init)
+    rhof = float(rhof_init)
+    
+    # Gooding (1996) suggests 1e-5, orekit uses 1e-6
+    finite_diff_step = 1e-6
+    
+    # Gooding (1996) suggests 1e-12, orekit uses 1e-14
+    tol = 1e-14
+    
+    
+    conv_crit = 1.
+    iters = 0
+    maxiters = 100
+    exit_flag = 0
+    crit_min = 1.
+    f_old = np.inf
+    nfail = 0
+    
+    # Loop
+    while True:
+    
+        # Solve Lambert problem to get LOS vector at intermediate time
+        rhok_list, rhok_inds = \
+            compute_intermediate_rho(rho0, rhof, tof, M_star, orbit_type, Lmat,
+                                     Rmat, UTC_list)
+            
+        print('len rhok_list', len(rhok_list))
+            
+        # Error check
+        if len(rhok_list) == 0:
+            
+            nfail += 1
+                        
+            if nfail > 2:
+                exit_flag = 0
+                break
+            
+            rho0, rhof = modify_start_rho(Lmat, Rmat, nfail)
+            
+            print('nfail', nfail)
+            print('rho0', rho0)
+            print('rhof', rhof)
+            
+            continue
+            
+        # Assume a single intermediate point for now
+        rhok_calc_vect = rhok_list[0]
+        rk_vect = Rmat[:,1].reshape(3,1) + rhok_calc_vect
+        rk = np.linalg.norm(rk_vect)
+        
+        # Construct basis vectors
+        rhok_obs_hat = Lmat[:,1].reshape(3,1)
+        u_vect = np.cross(rhok_obs_hat, rhok_calc_vect, axis=0)
+        
+        # Exit condition (rhok_obs_hat = rhok_calc_hat)
+        if np.linalg.norm(u_vect) == 0.:
+            exit_flag = 1
+            break
+        
+        p_vect = np.cross(u_vect, rhok_obs_hat, axis=0)
+        p_hat = p_vect/np.linalg.norm(p_vect)
+        en_vect = np.cross(rhok_obs_hat, p_hat, axis=0)
+        en_hat = en_vect/np.linalg.norm(en_vect)
+        rhok_dot = np.dot(rhok_obs_hat.T, rhok_calc_vect)
+        
+        # Compute penalty
+        f = float(np.dot(p_hat.T, rhok_calc_vect))
+        g = float(np.dot(en_hat.T, rhok_calc_vect))
+        
+        
+        
+        print('\niters', iters)
+        print('f', f)
+        print('g', g)
+        
+        # Use central finite difference to compute numerical derivatives of f
+        # and g with respect to small changes in rho0 and rhof
+        drho0 = rho0 * finite_diff_step
+        drhof = rhof * finite_diff_step
+        
+        print('drho0', drho0)
+        print('drhof', drhof)
+        
+        # Range rho0 minus delta_rho
+        rho0_minus = rho0 - drho0
+        rhok_list, rhok_inds = \
+            compute_intermediate_rho(rho0_minus, rhof, tof, M_star, orbit_type,
+                                     Lmat, Rmat, UTC_list)
+            
+        cm0 = rhok_list[0]
+        fm_rho0 = float(np.dot(p_hat.T, cm0))
+        gm_rho0 = float(np.dot(en_hat.T, cm0))
+        
+        # Range rho0 plus delta_rho
+        rho0_plus = rho0 + drho0
+        rhok_list, rhok_inds = \
+            compute_intermediate_rho(rho0_plus, rhof, tof, M_star, orbit_type,
+                                     Lmat, Rmat, UTC_list)
+            
+        cp0 = rhok_list[0]
+        fp_rho0 = float(np.dot(p_hat.T, cp0))
+        gp_rho0 = float(np.dot(en_hat.T, cp0))
+        
+        # Range rhof minus delta_rho
+        rhof_minus = rhof - drhof
+        rhok_list, rhok_inds = \
+            compute_intermediate_rho(rho0, rhof_minus, tof, M_star, orbit_type,
+                                     Lmat, Rmat, UTC_list)
+            
+        cmf = rhok_list[0]
+        fm_rhof = float(np.dot(p_hat.T, cmf))
+        gm_rhof = float(np.dot(en_hat.T, cmf))
+        
+        # Range rhof plus delta_rho
+        rhof_plus = rhof + drhof
+        rhok_list, rhok_inds = \
+            compute_intermediate_rho(rho0, rhof_plus, tof, M_star, orbit_type,
+                                     Lmat, Rmat, UTC_list)
+            
+        cpf = rhok_list[0]
+        fp_rhof = float(np.dot(p_hat.T, cpf))
+        gp_rhof = float(np.dot(en_hat.T, cpf))
+        
+        # Compute derivatives
+        df_drho0 = (fp_rho0 - fm_rho0)/(2.*drho0)
+        df_drhof = (fp_rhof - fm_rhof)/(2.*drhof)
+        dg_drho0 = (gp_rho0 - gm_rho0)/(2.*drho0)
+        dg_drhof = (gp_rhof - gm_rhof)/(2.*drhof)
+        
+        mat = np.array([[df_drho0, df_drhof],
+                        [dg_drho0, dg_drhof]])
+        
+        print('derivatives')
+        print('df_drho0', df_drho0)
+        print('df_drhof', df_drhof)
+        print('dg_drho0', dg_drho0)
+        print('dg_drhof', dg_drhof)
+        
+        
+        # Newton's Method
+        # Compute determinant D and changes for rho0 and rhof
+        D = df_drho0*dg_drhof - df_drhof*dg_drho0
+        
+        delta_rho0 = -(1./D) * f * dg_drhof
+        delta_rhof =  (1./D) * f * dg_drho0
+        
+        print('D', D)
+        print('delta_rho0', delta_rho0)
+        print('delta_rhof', delta_rhof)
+        
+        print('mat', mat)
+        print('check D', np.linalg.det(mat))
+
+        
+        delta2 = -np.dot(np.linalg.inv(mat), np.reshape([f, 0.], (2,1)))
+        print('delta2', delta2)
+
+        rho0 += delta_rho0
+        rhof += delta_rhof
+        
+#        rho0 += float(delta2[0])
+#        rhof += float(delta2[1])
+        
+#        # Check for overshoot and adjust
+#        if iters > 1 and f > 2.*f_old:
+#            rho0 = (f*rho0_old + f_old*rho0)/(f + f_old)
+#            rhof = (f*rhof_old + f_old*rhof)/(f + f_old)
+#            print('overshoot')
+        
+        print('rho0', rho0)
+        print('rhof', rhof)
+        
+        conv_crit = abs(f)/max(rk, rhok_dot)
+        print('conv_crit', conv_crit)
+        
+        # Check exit condition
+        if conv_crit < tol:
+            exit_flag = 1
+            break
+        
+        
+        if conv_crit < crit_min:
+            crit_min = float(conv_crit)
+            
+        # Store values for future comparison
+        f_old = float(f)
+        rho0_old = float(rho0)
+        rhof_old = float(rhof)
+        
+        # Increment counter and exit condition
+        iters += 1
+        if iters > maxiters:
+            exit_flag = 0
+            break
+    
+    print('crit_min', crit_min)
+
+    
+    return rho0, rhof, exit_flag
+
+
+def modify_start_rho(Lmat, Rmat, nfail):
+    '''
+    
+    
+    '''
+    
+    # Compute LOS unit vectors and sensor positions
+    rho0_hat = Lmat[:,0].reshape(3,1)
+    q0_vect = Rmat[:,0].reshape(3,1)    
+    rhof_hat = Lmat[:,-1].reshape(3,1)
+    qf_vect = Rmat[:,-1].reshape(3,1)
+    
+    # Compute updated guess for rho0, rhof
+    if nfail == 1:
+        rho0 = max(-float(np.dot(q0_vect.T, rho0_hat)), 0.)
+        rhof = max(-float(np.dot(qf_vect.T, rhof_hat)), 0.)
+        
+    if nfail == 2:
+        
+        q0f_vect = qf_vect - q0_vect
+        D1 = np.dot(q0f_vect.T, rho0_hat)
+        D3 = np.dot(q0f_vect.T, rhof_hat)
+        D2 = np.dot(rho0_hat.T, rhof_hat)
+        D4 = 1. - D2**2.
+        
+        rho0 = max((D1-(D3*D2))/D4, 0.)
+        rhof = max(((D1*D2)-D3)/D4, 0.)
+    
+    return rho0, rhof
+
+
+
+
+#def compute_delta_rho(rho0, rhof, tof, M_star, orbit_type, Lmat, Rmat,
+#                      UTC_list):
+#    
+#    '''
+#    
+#    
+#    '''
+#    
+#    # Basic Gooding assume 3 angles and use middle value to compute penalty
+#    kk_list = [1]
+#    
+#    
+#    # Compute range vectors at all intermediate times in kk_list
+#    rhok_list, rhok_inds = \
+#        compute_intermediate_rho(rho0, rhof, tof, M_star, orbit_type, Lmat,
+#                                 Rmat, UTC_list, kk_list)
+#        
+#    
+#    
+#    print('rhok_list', rhok_list)
+#    
+#    # Exit condition
+#    if len(rhok_list) == 0:
+#        fail_flag = True
+#        return 0., 0., fail_flag
+#    else: 
+#        fail_flag = False
+#    
+#    # Compute penalty for these values    
+#    f, g = compute_penalty(rhok_list, rhok_inds, Lmat, Rmat, kk_list)
+#    
+#    print('f', f)
+#    print('g', g)
+#    
+#
+#    
+#    # Use central finite difference to compute numerical derivatives of f
+#    # with respect to small changes in rho0 and rhof
+#    drho0 = 1e-8
+#    drhof = 1e-8
+#    
+#    # First range rho0 minus delta_rho
+#    rho0_minus = rho0 - drho0
+#    rhok_list, rhok_inds = \
+#        compute_intermediate_rho(rho0_minus, rhof, tof, M_star, orbit_type,
+#                                 Lmat, Rmat, UTC_list, kk_list)
+#    
+#    fm0, gm0 = compute_penalty(rhok_list, rhok_inds, Lmat, Rmat, kk_list)
+#    
+#    # First range rho0 plus delta_rho
+#    rho0_plus = rho0 + drho0
+#    rhok_list, rhok_inds = \
+#        compute_intermediate_rho(rho0_plus, rhof, tof, M_star, orbit_type,
+#                                 Lmat, Rmat, UTC_list, kk_list)
+#       
+#    fp0, gp0 = compute_penalty(rhok_list, rhok_inds, Lmat, Rmat, kk_list)
+#    
+#    # Last range rhof minus delta_rho
+#    rhof_minus = rhof - drhof
+#    rhok_list, rhok_inds = \
+#        compute_intermediate_rho(rho0, rhof_minus, tof, M_star, orbit_type,
+#                                 Lmat, Rmat, UTC_list, kk_list)
+#    
+#    fmf, gmf = compute_penalty(rhok_list, rhok_inds, Lmat, Rmat, kk_list)
+#    
+#    # Last range rhof plus delta_rho
+#    rhof_plus = rhof + drhof
+#    rhok_list, rhok_inds = \
+#        compute_intermediate_rho(rho0, rhof_plus, tof, M_star, orbit_type,
+#                                 Lmat, Rmat, UTC_list, kk_list)
+#       
+#    fpf, gpf = compute_penalty(rhok_list, rhok_inds, Lmat, Rmat, kk_list)
+#    
+#    
+#    # Compute numerical derivatives using central finite difference
+#    df_0 = (fp0 - fm0)/(2.*drho0)
+#    dg_0 = (gp0 - gm0)/(2.*drho0)      
+#    df_f = (fpf - fmf)/(2.*drhof)
+#    dg_f = (gpf - gmf)/(2.*drhof)  
+#    
+#    print('df_0', df_0)
+#    print('dg_0', dg_0)
+#    print('df_f', df_f)
+#    print('dg_f', dg_f)
+#    
+#    mat = np.array([[df_0, df_f],
+#                    [dg_0, dg_f]])
+#    
+#    check = -np.dot(np.linalg.inv(mat), np.reshape([f, 0.], (2,1)))
+#    print('check', check)
+#    
+#    # Compute determinant D and changes for rho0 and rhof
+#    D = df_0*dg_f - df_f*dg_0    
+#    
+#    delta_rho0 = -(1./D) * f * dg_f
+#    delta_rhof =  (1./D) * f * dg_0
+#    
+#    print('delta_rho0', delta_rho0)
+#    print('delta_rhof', delta_rhof)
+#    
+#    print('matrix det', np.linalg.det(mat))
+#    print('D', D)
+#    
+#    return delta_rho0, delta_rhof, fail_flag
+#
+#
+def compute_intermediate_rho(rho0, rhof, tof, M_star, orbit_type, Lmat, Rmat, 
+                             UTC_list):
+    
+    '''
+    
+    '''
+    
+    kk_list = [1]
+    
+    # Compute initial and final position vectors
+    rho0_hat = Lmat[:,0].reshape(3,1)
+    q0_vect = Rmat[:,0].reshape(3,1)    
+    rhof_hat = Lmat[:,-1].reshape(3,1)
+    qf_vect = Rmat[:,-1].reshape(3,1)
+    
+    r0_vect = q0_vect + rho0*rho0_hat
+    rf_vect = qf_vect + rhof*rhof_hat
+    
+    # Compute Lambert solution for these inputs
+    v0_list, vf_list, M_list, type_list = \
+        izzo_lambert(r0_vect, rf_vect, tof, M_star=M_star,
+                     results_flag=orbit_type)
+    
+    # There should only be one solution with everything specified
+    if len(M_list) > 1:
+        print(v0_list)
+        print(vf_list)
+        print(M_list)
+        print(type_list)
+        mistake
+        
+    # If no valid solutions are found, exit    
+    if len(v0_list) == 0:
+        return [], []
+        
+    v0_vect = v0_list[0]
+    
+    # Full cartesian state vector at t0
+    Xo = np.concatenate((r0_vect, v0_vect), axis=0)
+    
+    # Loop over intermediate times and compute rho_vect
+    rhok_list = []   
+    rhok_inds = []
+    for kk in kk_list:
+    
+        dt_sec = (UTC_list[kk] - UTC_list[0]).total_seconds()
+        qk_vect = Rmat[:,kk].reshape(3,1)
+        Xk = astro.element_conversion(Xo, 1, 1, dt=dt_sec)
+        rk_vect = Xk[0:3].reshape(3,1)
+        rhok_vect = rk_vect - qk_vect
+    
+        rhok_list.append(rhok_vect)
+        rhok_inds.append(kk)
+    
+    return rhok_list, rhok_inds
+#
+#
+#def compute_penalty(rhok_list, rhok_inds, Lmat, Rmat, kk_list):
+#    '''
+#    
+#    
+#    '''
+#    
+#    for kk in kk_list:
+#    
+#        # Observed LOS unit vector at time tk
+#        rhok_hat_obs = Lmat[:,kk].reshape(3,1)
+#        
+#        # Calcuated LOS range vector at time tk
+#        rhok_vect_calc = rhok_list[rhok_inds.index(kk)]
+#        rhok_calc = np.linalg.norm(rhok_vect_calc)
+#        
+#        # Compute penalty function
+#        en_vect = np.cross(rhok_hat_obs, rhok_vect_calc, axis=0)
+#        p_vect = np.cross(en_vect, rhok_hat_obs, axis=0)
+#        f = float(np.dot(p_vect.T, rhok_vect_calc)/rhok_calc)
+#        g = float(np.dot(en_vect.T, rhok_vect_calc)/np.linalg.norm(en_vect))
+#    
+#    return f, g
+
+
+def compute_rho_min(rho_hat_eci, site_eci, rmin=Re+100.):
+    '''
+    This function computes minimum range value to yield an orbit radius
+    greater than some given minimum.
+    
+    Parameters
+    ------
+    rho_hat_eci : 3x1 numpy array
+        LOS unit vector in ECI
+    site_eci : 3x1 numpy array
+        sensor position vector in ECI [km]
+    rmin : float, optional
+        minimum orbit radius at this location in the orbit 
+        (default = Re + 100.)
+        
+    Returns
+    ------
+    rho_min : float
+        minimum range value corresponding to specified minimum orbit radius        
+    
+    '''
+    
+    a = 1.
+    b = 2.*np.dot(rho_hat_eci.T, site_eci)
+    c = np.dot(site_eci.T, site_eci) - rmin**2.
+    
+    rho_min = float((-b + np.sqrt(b**2. - 4.*a*c))/(2.*a))
+    
+    return rho_min
+
 
 
 def gauss_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
@@ -1021,10 +1806,7 @@ def herrick_gibbs_iod(r1_vect, r2_vect, r3_vect,UTC_list, GM=GME):
     return v2_vect, exit_flag
 
 
-def gooding_angles_iod():
-    
-    
-    return
+
 
 
 
