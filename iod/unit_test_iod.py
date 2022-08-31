@@ -331,6 +331,49 @@ def lambert_test():
     return
 
 
+def lambert_test_special():
+    
+    
+    # Time vector
+    UTC0 = datetime(2021, 6, 21, 0, 0, 0)
+    UTC2 = datetime(2021, 6, 21, 6, 0, 0)
+    
+    tof = (UTC2 - UTC0).total_seconds()
+
+    r0_vect = np.array([[ -601.88657074], [34105.83994351], [ -747.25997322]])
+    
+#    v0_vect [[-3.01862531]
+#     [ 0.8452397 ]
+#     [-0.08520894]]
+    
+    rf_vect = np.array([[-34030.3235281 ], [ -1365.71766779], [  -726.16897159]])
+    
+#    vf_vect [[ 1.02292154]
+#     [-2.96932209]
+#     [ 0.08660587]]
+    
+    v0_list, vf_list, M_list, type_list = \
+        iod.izzo_lambert(r0_vect, rf_vect, tof)
+        
+    print(v0_list)
+    print(vf_list)
+    print(M_list)
+    print(type_list)
+    
+    for ii in range(len(M_list)):
+        
+        Xo_test = np.concatenate((r0_vect, v0_list[ii]), axis=0)
+        Xf_test = astro.element_conversion(Xo_test, 1, 1, dt=tof)
+        
+        print('')
+        print('ii', ii)
+        print('Xo_test', Xo_test)
+        print('Xf_test', Xf_test)
+        print('rf err', np.linalg.norm(Xf_test[0:3].reshape(3,1) - rf_vect))
+
+    return
+
+
 def lambert_test_hyperbolic():
     
      # Define state parameters
@@ -1212,12 +1255,14 @@ if __name__ == '__main__':
     
 #    unit_test_gauss_iod()
     
-    unit_test_gooding_iod()
+#    unit_test_gooding_iod()
     
     
 #    lambert_test()
     
 #    lambert_test_hyperbolic()
+    
+    lambert_test_special()
     
 #    porkchop_plot_demo()
     

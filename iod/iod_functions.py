@@ -919,7 +919,36 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
             rhof_init = float(rhof)
             for nn in range(len(M_list)):
                 M_n = M_list[nn]
-                type_n = type_list[nn]                
+                type_n = type_list[nn]  
+                v0_test = v0_list[nn]
+                
+                # Check validity of the initial Lambert solution
+                Xo_test = np.concatenate((r0_vect, v0_test), axis=0)
+                elem0_test = astro.cart2kep(Xo_test)
+                Xf_test = astro.element_conversion(Xo_test, 1, 1, dt=tof)
+                rf_test = Xf_test[0:3].reshape(3,1)
+                rhof_test_vect = rf_test - qf_vect
+                rhof_test = np.linalg.norm(rhof_test_vect)
+                rhof_test_hat = rhof_test_vect/rhof_test
+                
+                anglef_deg = (1. - float(np.dot(rhof_test_hat.T, rhof_hat))) * 180./math.pi
+                
+                print('')
+                print('Solution attempt nn', nn)
+                print('M_n', M_n)
+                print('orbit type', type_n)
+                print('rho0_init', rho0_init)
+                print('rhof_init', rhof_init)
+                print('rhof_test', rhof_test)
+                print('Xo_test', Xo_test)
+                print('Xf_test', Xf_test)
+                print('r0_vect', r0_vect)
+                print('v0_vect', v0_test)
+                print('rf_vect', rf_vect)
+                print('vf_vect', vf_list[nn])
+                print('elem0_test', elem0_test)
+                print('anglef_deg', anglef_deg)
+                
                 
                 # Iterate to convergence
                 rho0, rhof, exit_flag = \
@@ -928,31 +957,28 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
 
                 # Store valid solutions    
                 if exit_flag == 1:
-                    r0_vect = q0_vect + rho0*rho0_hat
-                    rf_vect = qf_vect + rhof*rhof_hat
-                    v0_list, vf_list, M_list, type_list = \
-                        izzo_lambert(r0_vect, rf_vect, tof, M_star=M_n, 
+                    r0_final = q0_vect + rho0*rho0_hat
+                    rf_final = qf_vect + rhof*rhof_hat
+                    v0_final_list, vf_final_list, M_final, type_final = \
+                        izzo_lambert(r0_final, rf_final, tof, M_star=M_n, 
                                      results_flag=type_n)
                      
-                    v0_vect = v0_list[0]
-                    Xo = np.concatenate((r0_vect, v0_vect), axis=0)
+                    v0_final = v0_final_list[0]
+                    Xo = np.concatenate((r0_final, v0_final), axis=0)
                     elem0 = astro.cart2kep(Xo)
                     
-                    print(r0_vect)
-                    print(v0_vect)
+                    print(r0_final)
+                    print(v0_final)
                     print(elem0)
-                    mistake
-                
+
                     # There should only be one solution with everything specified
-                    if len(M_list) > 1:
-                        print(v0_list)
-                        print(vf_list)
-                        print(M_list)
-                        print(type_list)
+                    if len(M_final) > 1:
+                        print(v0_final_list)
+                        print(vf_final_list)
+                        print(M_final)
+                        print(type_final)
                         mistake
                         
-                    v0_vect = v0_list[0]
-                    Xo = np.concatenate((r0_vect, v0_vect), axis=0)
                     Xo_output.append(Xo)
                     M_output.append(M_n)
 
@@ -968,14 +994,21 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, orbit_type, Lmat, Rmat, UTC_l
     
     rho0 = float(rho0_init)
     rhof = float(rhof_init)
+    
+    # Gooding (1996) suggests 1e-5, orekit uses 1e-6
     finite_diff_step = 1e-6
-    tol = 1e-10
+    
+    # Gooding (1996) suggests 1e-12, orekit uses 1e-14
+    tol = 1e-14
+    
+    
     conv_crit = 1.
     iters = 0
     maxiters = 100
     exit_flag = 0
     crit_min = 1.
     f_old = np.inf
+    nfail = 0
     
     # Loop
     while True:
@@ -985,10 +1018,24 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, orbit_type, Lmat, Rmat, UTC_l
             compute_intermediate_rho(rho0, rhof, tof, M_star, orbit_type, Lmat,
                                      Rmat, UTC_list)
             
+        print('len rhok_list', len(rhok_list))
             
         # Error check
         if len(rhok_list) == 0:
-            rho0, rhof = modify_start_rho(Lmat, Rmat)
+            
+            nfail += 1
+                        
+            if nfail > 2:
+                exit_flag = 0
+                break
+            
+            rho0, rhof = modify_start_rho(Lmat, Rmat, nfail)
+            
+            print('nfail', nfail)
+            print('rho0', rho0)
+            print('rhof', rhof)
+            
+            continue
             
         # Assume a single intermediate point for now
         rhok_calc_vect = rhok_list[0]
@@ -1146,7 +1193,7 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, orbit_type, Lmat, Rmat, UTC_l
     return rho0, rhof, exit_flag
 
 
-def modify_start_rho(Lmat, Rmat):
+def modify_start_rho(Lmat, Rmat, nfail):
     '''
     
     
@@ -1159,14 +1206,20 @@ def modify_start_rho(Lmat, Rmat):
     qf_vect = Rmat[:,-1].reshape(3,1)
     
     # Compute updated guess for rho0, rhof
-    q0f_vect = qf_vect - q0_vect
-    D1 = np.dot(q0f_vect.T, rho0_hat)
-    D3 = np.dot(q0f_vect.T, rhof_hat)
-    D2 = np.dot(rho0_hat.T, rhof_hat)
-    D4 = 1. - D2**2.
-    
-    rho0 = max((D1-(D3*D2))/D4, 0.)
-    rhof = max(((D1*D2)-D3)/D4, 0.)
+    if nfail == 1:
+        rho0 = max(-float(np.dot(q0_vect.T, rho0_hat)), 0.)
+        rhof = max(-float(np.dot(qf_vect.T, rhof_hat)), 0.)
+        
+    if nfail == 2:
+        
+        q0f_vect = qf_vect - q0_vect
+        D1 = np.dot(q0f_vect.T, rho0_hat)
+        D3 = np.dot(q0f_vect.T, rhof_hat)
+        D2 = np.dot(rho0_hat.T, rhof_hat)
+        D4 = 1. - D2**2.
+        
+        rho0 = max((D1-(D3*D2))/D4, 0.)
+        rhof = max(((D1*D2)-D3)/D4, 0.)
     
     return rho0, rhof
 
