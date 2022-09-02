@@ -102,7 +102,7 @@ def interp_lagrange(X, Y, xx, p):
 def single_shooting(Xo_init, Xf, tin, boundary_fcn, state_params, int_params,
                     finite_diff_step=1e-6, tol=1e-14, maxiters=100):
     '''
-    This method implements the single shooting technique to solve two point
+    This function implements the single shooting technique to solve two point
     boundary value problems. The method takes an input guess at the initial
     conditions, computes the difference to the final boundary condition and
     uses Newton iteration to update the initial state until the boundary

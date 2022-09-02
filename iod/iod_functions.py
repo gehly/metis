@@ -881,8 +881,8 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
 #    rho0_array = np.array([39809.])
 #    rhof_array = np.array([39834.])
     
-    rho0_array = np.array([30000.])
-    rhof_array = np.array([30000.])
+    rho0_array = np.array([50000., 30000.])
+    rhof_array = np.array([50000., 30000.])
     
     # Time of flight
     tof = (UTC_list[-1] - UTC_list[0]).total_seconds()
@@ -906,6 +906,9 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
             if len(M_list) == 0:
                 continue
             
+            print('')
+            print('ii', ii)
+            print('jj', jj)
             print('rho0', rho0)
             print('rhof', rhof)
             print(v0_list)
@@ -954,6 +957,11 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
                 rho0, rhof, exit_flag = \
                     iterate_rho(rho0_init, rhof_init, tof, M_n, type_n, Lmat,
                                 Rmat, UTC_list)
+                    
+                print('')
+                print('Output of iterate_rho')
+                print('rho0', rho0)
+                print('rhof', rhof)
 
                 # Store valid solutions    
                 if exit_flag == 1:
