@@ -99,3 +99,99 @@ def interp_lagrange(X, Y, xx, p):
     return yy
 
 
+def single_shooting(Xo_init, Xf, tin, boundary_fcn, state_params, int_params,
+                    finite_diff_step=1e-6, tol=1e-14, maxiters=100):
+    '''
+    This method implements the single shooting technique to solve two point
+    boundary value problems. The method takes an input guess at the initial
+    conditions, computes the difference to the final boundary condition and
+    uses Newton iteration to update the initial state until the boundary
+    condition is met.
+    
+    Parameters
+    ------
+    Xo_init : n0x1 numpy array
+        initial guess at parameters that will be varied
+    Xf : nfx1 numpy array
+        boundary condition values at final time
+    tin : 1D array or list
+        times to integrate over, must contain at least [t0, tf] but can 
+        include intermediate values 
+    boundary_fcn : function handle
+        function to compute boundary values for given initial parameters 
+        (e.g. using numerical integration)
+    state_params : dictionary
+        physical parameters related to dynamics or object
+    int_params : dictionary
+        numerical integration parameters
+    finite_diff_step : float, optional
+        unitless step size for central finite difference calculation
+        (default=1e-6)
+    tol : float, optional
+        loop error tolerance (default=1e-14)
+    maxiters : int, optional
+        maximum number of iterations (default=100)
+        
+    Returns
+    ------
+    Xo : n0x1 numpy array
+        solved initial parameters to achieve boundary condition
+    fail_flag : boolean
+        exit status (True = iteration did not converge)
+
+    '''
+    
+    # Initial and final states
+    Xo = Xo_init.copy()
+    n0 = len(Xo)
+    nf = len(Xf)
+    
+    # Setup loop
+    err = 10*tol
+    iters = 0
+    fail_flag = False
+    while err > tol:
+        
+        # Compute penalty for current guess
+        Xf_num = boundary_fcn(Xo, tin, state_params, int_params)
+        c_vect = Xf_num - Xf
+        
+        # Loop over states and compute central finite differences to populate
+        # Jacobian matrix
+        cmat = np.zeros((nf, n0))
+        for ii in range(n0):
+            
+            # Step size for this state parameter
+            dxi = Xo[ii]*finite_diff_step
+            
+            # Compute minus side            
+            Xo_minus = Xo.copy()
+            Xo_minus[ii] -= dxi
+            Xf_num = boundary_fcn(Xo_minus, tin, state_params, int_params)
+            cm_vect = Xf_num - Xf
+            
+            # Compute plus side
+            Xo_plus = Xo.copy()
+            Xo_plus[ii] += dxi
+            Xf_num = boundary_fcn(Xo_plus, tin, state_params, int_params)
+            cp_vect = Xf_num - Xf
+            
+            dc_dxi = (1./(2.*dxi)) * (cp_vect - cm_vect)
+            cmat[ii,:] = dc_dxi.flatten()
+
+        # Compute updated initial state
+        delta_vect = -np.dot(np.linalg.inv(cmat), c_vect)
+        Xo += delta_vect
+        
+        denom = max([np.linalg.norm(Xf), np.linalg.norm(Xo), 1.])
+        err = np.linalg.norm(c_vect)/denom
+
+        iters += 1
+        if iters > maxiters:
+            fail_flag = True
+            break
+    
+    
+    return Xo, fail_flag
+
+
