@@ -1499,7 +1499,98 @@ def ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
     return filter_output, full_state_output
 
 
+def aegis_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
+              sensor_params, int_params):
+    
+    '''
+    This function implements the Adaptive Entropy-based Gaussian Information
+    Syntheis (AEGIS) Unscented Kalman Filter for the least
+    squares cost function.
 
+    Parameters
+    ------
+    state_dict : dictionary
+        initial state and covariance for filter execution
+    truth_dict : dictionary
+        true state at all times
+    meas_dict : dictionary
+        measurement data over time for the filter and parameters (noise, etc)
+    meas_fcn : function handle
+        function for measurements
+    state_params : dictionary
+        physical parameters and constants
+    sensor_params : dictionary
+        location, constraint, noise parameters of sensors
+    int_params : dictionary
+        numerical integration parameters
+
+    Returns
+    ------
+    filter_output : dictionary
+        output state, covariance, and post-fit residuals at measurement times
+    full_state_output : dictionary
+        output state and covariance at all truth times
+        
+        
+    References
+    ------
+    [1] DeMars, K.J., "Entropy-based Approach for Uncertainty Propagation of
+    Nonlinear Dynamical Systems," JGCD 2013.
+        
+    '''
+    
+    # Retrieve initial state parameters
+    weights = state_dict['weights']
+    means = state_dict['means']
+    covars = state_dict['covars']
+    
+    
+    
+    
+    return filter_output, full_state_output
+
+
+def split_gaussian_library(N=3):
+    '''
+    This function outputs the splitting library for GM components. All outputs
+    are given to split a univariate standard normal distribution (m=0,sig=1).
+
+    Parameters
+    ------
+    N : int (optional)
+        number of components to split into (3, 4, or 5) (default = 3)
+
+    Returns
+    ------
+    w : list
+        component weights
+    m : list
+        component means (univariate)
+    sig : list 
+        component sigmas (univariate)
+
+    '''
+
+    if N == 3:
+        w = [0.2252246249136750, 0.5495507501726501, 0.2252246249136750]
+        m = [-1.057515461475881, 0., 1.057515461475881]
+        sig = [0.6715662886640760]*3
+
+    elif N == 4:
+        w = [0.1238046161618835, 0.3761953838381165, 0.3761953838381165,
+             0.1238046161618835]
+        m = [-1.437464136328835, -0.455886223973523, 0.455886223973523,
+             1.437464136328835]
+        sig = [0.5276007226175397]*4
+
+    elif N == 5:
+        w = [0.0763216490701042, 0.2474417859474436, 0.3524731299649044,
+             0.2474417859474436, 0.0763216490701042]
+        m = [-1.689972911128078, -0.800928383429953, 0., 0.800928383429953,
+             1.689972911128078]
+        sig = [0.4422555386310084]*5
+
+    return w, m, sig
 
 
 

@@ -911,8 +911,10 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
             print('jj', jj)
             print('rho0', rho0)
             print('rhof', rhof)
-            print(v0_list)
-            print(vf_list)
+            print('r0_vect', r0_vect)
+            print('rf_vect', rf_vect)
+            print('v0_list', v0_list)
+            print('vf_list', vf_list)
             print(M_list)
             print(type_list)
 
@@ -930,6 +932,7 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
                 elem0_test = astro.cart2kep(Xo_test)
                 Xf_test = astro.element_conversion(Xo_test, 1, 1, dt=tof)
                 rf_test = Xf_test[0:3].reshape(3,1)
+                vf_test = Xf_test[3:6].reshape(3,1)
                 rhof_test_vect = rf_test - qf_vect
                 rhof_test = np.linalg.norm(rhof_test_vect)
                 rhof_test_hat = rhof_test_vect/rhof_test
@@ -949,24 +952,26 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
                 print('v0_vect', v0_test)
                 print('rf_vect', rf_vect)
                 print('vf_vect', vf_list[nn])
+                print('rf_test', rf_test)
+                print('vf_test', vf_test)
                 print('elem0_test', elem0_test)
                 print('anglef_deg', anglef_deg)
                 
                 
                 # Iterate to convergence
-                rho0, rhof, exit_flag = \
+                rho0_out, rhof_out, exit_flag = \
                     iterate_rho(rho0_init, rhof_init, tof, M_n, type_n, Lmat,
                                 Rmat, UTC_list)
                     
                 print('')
                 print('Output of iterate_rho')
-                print('rho0', rho0)
-                print('rhof', rhof)
+                print('rho0_out', rho0_out)
+                print('rhof_out', rhof_out)
 
                 # Store valid solutions    
                 if exit_flag == 1:
-                    r0_final = q0_vect + rho0*rho0_hat
-                    rf_final = qf_vect + rhof*rhof_hat
+                    r0_final = q0_vect + rho0_out*rho0_hat
+                    rf_final = qf_vect + rhof_out*rhof_hat
                     v0_final_list, vf_final_list, M_final, type_final = \
                         izzo_lambert(r0_final, rf_final, tof, M_star=M_n, 
                                      results_flag=type_n)
