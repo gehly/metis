@@ -1094,8 +1094,6 @@ def element_conversion(x_in, iflag, oflag, GM=GME, dt=0.):
       Velocity in z               [km/s]
 
     '''
-    
-    print('Start Element Conversion')
 
     # Get initial orbit elements
     if iflag == 0:
@@ -1174,10 +1172,6 @@ def element_conversion(x_in, iflag, oflag, GM=GME, dt=0.):
         tan2 = np.dot(ie_vect.T, ir_vect)
         f = atan2(tan1, tan2)    # rad
 
-
-        print('Calculate M')
-        print('a', a)
-
         # Calculate M
         if a > 0:
             n = np.sqrt(GM/a**3)
@@ -1190,10 +1184,6 @@ def element_conversion(x_in, iflag, oflag, GM=GME, dt=0.):
             Hrad = 2*atanh(np.sqrt((e-1)/(e+1))*tan(f/2))  # rad
             Mo = e*sinh(Hrad) - Hrad  # rad
             
-            print('n', n)
-            print('Hrad', Hrad)
-            print('Mo', Mo)
-            
         else:
             print('Error, input orbit is parabolic, a = ', a)
         
@@ -1202,8 +1192,6 @@ def element_conversion(x_in, iflag, oflag, GM=GME, dt=0.):
 
     # Solve for M(t) = Mo + n*dt
     M = Mo + n*dt   # rad
-    
-    print('M', M)
     
     while M < 0:
         M += 2*pi

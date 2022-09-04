@@ -881,8 +881,8 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
 #    rho0_array = np.array([39809.])
 #    rhof_array = np.array([39834.])
     
-    rho0_array = np.array([50000., 30000.])
-    rhof_array = np.array([50000., 30000.])
+    rho0_array = np.array([100., 500., 1000., 5000., 10000., 30000., 50000.])
+    rhof_array = np.array([100., 500., 1000., 5000., 10000., 30000., 50000.])
     
     # Time of flight
     tof = (UTC_list[-1] - UTC_list[0]).total_seconds()
