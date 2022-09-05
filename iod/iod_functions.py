@@ -839,7 +839,7 @@ def compute_hypergeom_2F1(a, b, c, d):
 
 def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
                        time_format='datetime', eop_alldata=[], XYs_df=[],
-                       periapsis_check=False):
+                       periapsis_check=True):
     '''
     
     
@@ -927,11 +927,11 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
 #    rho0_array = np.array([39809.])
 #    rhof_array = np.array([39834.])
     
-    rho0_array = np.array([7854.])
-    rhof_array = np.array([26752.])
+#    rho0_array = np.array([7854.])
+#    rhof_array = np.array([26752.])
     
-#    rho0_array = np.array([100., 500., 1000., 5000., 10000., 30000., 50000.])
-#    rhof_array = np.array([100., 500., 1000., 5000., 10000., 30000., 50000.])
+    rho0_array = np.array([100., 500., 1000., 5000., 10000., 30000., 50000.])
+    rhof_array = np.array([100., 500., 1000., 5000., 10000., 30000., 50000.])
     
     # Time of flight
     tof = (UTC_list[-1] - UTC_list[0]).total_seconds()
@@ -1288,8 +1288,8 @@ def modify_start_rho(Lmat, Rmat, nfail):
         D2 = np.dot(rho0_hat.T, rhof_hat)
         D4 = 1. - D2**2.
         
-        rho0 = max((D1-(D3*D2))/D4, 1000.)
-        rhof = max(((D1*D2)-D3)/D4, 1000.)
+        rho0 = max((D1-(D3*D2))/D4, 100.)
+        rhof = max(((D1*D2)-D3)/D4, 100.)
     
     return rho0, rhof
 

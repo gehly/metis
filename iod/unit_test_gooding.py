@@ -89,7 +89,7 @@ def single_rev_geo():
 
     # Execute function
     X_list, M_list = iod.gooding_angles_iod(UTC_list, Yk_list, sensor_id_list,
-                                            sensor_params)
+                                            sensor_params, periapsis_check=True)
     
     
     print('Final Answers')
@@ -213,7 +213,7 @@ def single_rev_leo():
     
     # Execute function
     X_list, M_list = iod.gooding_angles_iod(tk_list, Yk_list, sensor_id_time_list,
-                                            sensor_params)
+                                            sensor_params, periapsis_check=True)
     
     
     print('Final Answers')
@@ -342,7 +342,7 @@ def single_rev_leo_retro():
     
     # Execute function
     X_list, M_list = iod.gooding_angles_iod(tk_list, Yk_list, sensor_id_time_list,
-                                            sensor_params)
+                                            sensor_params, periapsis_check=True)
     
     
     print('Final Answers')
@@ -468,7 +468,7 @@ def single_rev_meo():
     
     # Execute function
     X_list, M_list = iod.gooding_angles_iod(tk_list, Yk_list, sensor_id_time_list,
-                                            sensor_params)
+                                            sensor_params, periapsis_check=True)
     
     
     print('Final Answers')
@@ -629,7 +629,7 @@ def single_rev_heo():
     
     # Execute function
     X_list, M_list = iod.gooding_angles_iod(tk_list, Yk_list, sensor_id_time_list,
-                                            sensor_params, periapsis_check=False)
+                                            sensor_params, periapsis_check=True)
     
     
     print('Final Answers')
