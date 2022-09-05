@@ -39,9 +39,9 @@ def lambert_iod(tk_list, Yk_list, sensor_params):
 
 
 
-def izzo_lambert(r1_vect, r2_vect, tof, M_star=np.nan, GM=GME, R=Re,
-                 results_flag='all', periapsis_check=True, maxiters=35,
-                 rtol=1e-8):
+def izzo_lambert(r1_vect, r2_vect, tof, M_star=np.nan, lr_star='none', 
+                 GM=GME, R=Re, results_flag='all', periapsis_check=True,
+                 maxiters=35, rtol=1e-8):
     '''
     This function implements a solution to the twobody orbit boundary value
     problem (Lambert's Problem). Given initial and final position vectors and
@@ -157,10 +157,10 @@ def izzo_lambert(r1_vect, r2_vect, tof, M_star=np.nan, GM=GME, R=Re,
     
     # Compute all possible x,y values that fit T
     if np.isnan(M_star):
-        x_list1, y_list1, M_list1 = find_xy(lam, T, maxiters, rtol)
+        x_list1, y_list1, M_list1, lr_list1 = find_xy(lam, T, maxiters, rtol)
     else:
-        x_list1, y_list1, M_list1 = find_xy_given_M(lam, T, M_star, maxiters,
-                                                    rtol)
+        x_list1, y_list1, M_list1, lr_list1 = \
+            find_single_xy(lam, T, M_star, lr_star, maxiters, rtol)
         
 #    print('x_list1', x_list1)
 #    print('y_list1', y_list1)
@@ -170,10 +170,12 @@ def izzo_lambert(r1_vect, r2_vect, tof, M_star=np.nan, GM=GME, R=Re,
     v1_list = []
     v2_list = []
     M_list = []
+    lr_list = []
     for ii in range(len(x_list1)):
         xi = x_list1[ii]
         yi = y_list1[ii]
         Mi = M_list1[ii]
+        lri = lr_list1[ii]
         
         Vr1 =  gamma*((lam*yi - xi) - rho*(lam*yi + xi))/r1
         Vr2 = -gamma*((lam*yi - xi) + rho*(lam*yi + xi))/r2
@@ -195,6 +197,7 @@ def izzo_lambert(r1_vect, r2_vect, tof, M_star=np.nan, GM=GME, R=Re,
         v1_list.append(v1_vect)
         v2_list.append(v2_vect)
         M_list.append(Mi)
+        lr_list.append(lri)
     
     # Generate list to identify output orbit type
     if results_flag == 'retrograde':
@@ -212,16 +215,17 @@ def izzo_lambert(r1_vect, r2_vect, tof, M_star=np.nan, GM=GME, R=Re,
         
         # Compute all possible x,y values that fit T
         if np.isnan(M_star):
-            x_list2, y_list2, M_list2 = find_xy(lam, T, maxiters, rtol)
+            x_list2, y_list2, M_list2, lr_list2 = find_xy(lam, T, maxiters, rtol)
         else:
-            x_list2, y_list2, M_list2 = find_xy_given_M(lam, T, M_star,
-                                                        maxiters, rtol)
+            x_list2, y_list2, M_list2, lr_list2 = \
+                find_single_xy(lam, T, M_star, lr_star, maxiters, rtol)
         
         # Loop over x,y values and compute output velocities
         for ii in range(len(x_list2)):
             xi = x_list2[ii]
             yi = y_list2[ii]
             Mi = M_list2[ii]
+            lri = lr_list2[ii]
             
             Vr1 =  gamma*((lam*yi - xi) - rho*(lam*yi + xi))/r1
             Vr2 = -gamma*((lam*yi - xi) + rho*(lam*yi + xi))/r2
@@ -239,11 +243,12 @@ def izzo_lambert(r1_vect, r2_vect, tof, M_star=np.nan, GM=GME, R=Re,
             v1_list.append(v1_vect)
             v2_list.append(v2_vect)
             M_list.append(Mi)
+            lr_list.append(lri)
             type_list.append('retrograde')
             
             
 
-    return v1_list, v2_list, M_list, type_list
+    return v1_list, v2_list, M_list, type_list, lr_list
 
 
 def find_xy(lam, T, maxiters=35, rtol=1e-8):
@@ -284,6 +289,7 @@ def find_xy(lam, T, maxiters=35, rtol=1e-8):
     x_list = []
     y_list = []
     M_list = []
+    lr_list = []
     
     # Compute maximum number of complete revolutions that would fit in 
     # the simplest sense T_0M = T_00 + M*pi
@@ -342,6 +348,7 @@ def find_xy(lam, T, maxiters=35, rtol=1e-8):
         x_list.append(x)
         y_list.append(y)
         M_list.append(M)
+        lr_list.append('none')
 
     # Loop over M values and compute x,y using Householder iterations
     for M in range(1,M_max+1):        
@@ -361,6 +368,7 @@ def find_xy(lam, T, maxiters=35, rtol=1e-8):
             x_list.append(xl)
             y_list.append(yl)
             M_list.append(M)
+            lr_list.append('left')
         
         xr, exit_flag = householder(x0_r, T, lam, M, maxiters, rtol)
         
@@ -369,11 +377,12 @@ def find_xy(lam, T, maxiters=35, rtol=1e-8):
             x_list.append(xr)
             y_list.append(yr)
             M_list.append(M)
+            lr_list.append('right')
 
-    return x_list, y_list, M_list
+    return x_list, y_list, M_list, lr_list
 
 
-def find_xy_given_M(lam, T, M_star, maxiters=35, rtol=1e-8):
+def find_single_xy(lam, T, M_star, lr_star, maxiters=35, rtol=1e-8):
     '''
     This function computes all possible x,y values that fit the input orbit
     non-dimensional time of flight T and specific orbit revolution number 
@@ -414,12 +423,13 @@ def find_xy_given_M(lam, T, M_star, maxiters=35, rtol=1e-8):
     x_list = []
     y_list = []
     M_list = []
+    lr_list = []
     
     # Compute maximum number of complete revolutions that would fit in 
     # the simplest sense T_0M = T_00 + M*pi
     M_max = int(np.floor(T / math.pi))
     if M_star > M_max:
-        return x_list, y_list, M_list
+        return x_list, y_list, M_list, lr_list
     
     # Evaluate non-dimensional time of flight T
     # T(x=0) denoted T_0M
@@ -452,35 +462,43 @@ def find_xy_given_M(lam, T, M_star, maxiters=35, rtol=1e-8):
             x_list.append(x)
             y_list.append(y)
             M_list.append(M_star)
+            lr_list.append('none')
             
     # Multiple revolution case
     else:
+        
+        if lr_star == 'left':
 
-        # Form initial x0_l and x0_r from Izzo Eq 31
-        x0_l = (((M_star*math.pi + math.pi)/(8.*T))**(2./3.) - 1.) * \
-            1./(((M_star*math.pi + math.pi)/(8.*T))**(2./3.) + 1.)
+            # Form initial x0_l from Izzo Eq 31
+            x0_l = (((M_star*math.pi + math.pi)/(8.*T))**(2./3.) - 1.) * \
+                1./(((M_star*math.pi + math.pi)/(8.*T))**(2./3.) + 1.)
+        
+            # Run Householder iterations for x0_l and x0_r for multirev cases
+            xl, exit_flag = householder(x0_l, T, lam, M_star, maxiters, rtol)
             
-        x0_r = (((8.*T)/(M_star*math.pi))**(2./3.) - 1.) * \
-            1./(((8.*T)/(M_star*math.pi))**(2./3.) + 1.)
-    
-        # Run Householder iterations for x0_l and x0_r for multirev cases
-        xl, exit_flag = householder(x0_l, T, lam, M_star, maxiters, rtol)
-        
-        if exit_flag == 1:
-            yl = np.sqrt(1. - lam**2.*(1. - xl**2.))
-            x_list.append(xl)
-            y_list.append(yl)
-            M_list.append(M_star)
-        
-        xr, exit_flag = householder(x0_r, T, lam, M_star, maxiters, rtol)
-        
-        if exit_flag == 1:
-            yr = np.sqrt(1. - lam**2.*(1. - xr**2.))
-            x_list.append(xr)
-            y_list.append(yr)
-            M_list.append(M_star)
+            if exit_flag == 1:
+                yl = np.sqrt(1. - lam**2.*(1. - xl**2.))
+                x_list.append(xl)
+                y_list.append(yl)
+                M_list.append(M_star)
+                lr_list.append('left')
+            
+        elif lr_star == 'right':
+            
+            # Form initial x0_r from Izzo Eq 31
+            x0_r = (((8.*T)/(M_star*math.pi))**(2./3.) - 1.) * \
+                1./(((8.*T)/(M_star*math.pi))**(2./3.) + 1.)
+            
+            xr, exit_flag = householder(x0_r, T, lam, M_star, maxiters, rtol)
+            
+            if exit_flag == 1:
+                yr = np.sqrt(1. - lam**2.*(1. - xr**2.))
+                x_list.append(xr)
+                y_list.append(yr)
+                M_list.append(M_star)
+                lr_list.append('right')
 
-    return x_list, y_list, M_list
+    return x_list, y_list, M_list, lr_list
 
 
 def compute_T_min(lam, M, maxiters=35, rtol=1e-8):
@@ -930,6 +948,9 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
 #    rho0_array = np.array([7854.])
 #    rhof_array = np.array([26752.])
     
+#    rho0_array = np.array([10000.])
+#    rhof_array = np.array([10000.])
+    
     rho0_array = np.array([100., 500., 1000., 5000., 10000., 30000., 50000.])
     rhof_array = np.array([100., 500., 1000., 5000., 10000., 30000., 50000.])
     
@@ -949,7 +970,7 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
             # Compute Lambert solution
             r0_vect = q0_vect + rho0*rho0_hat
             rf_vect = qf_vect + rhof*rhof_hat
-            v0_list, vf_list, M_list, type_list = \
+            v0_list, vf_list, M_list, type_list, lr_list = \
                 izzo_lambert(r0_vect, rf_vect, tof, results_flag='all',
                              periapsis_check=periapsis_check)
             
@@ -967,6 +988,7 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
             print('vf_list', vf_list)
             print(M_list)
             print(type_list)
+            print(lr_list)
 
             
             # Loop over available solutions and iterate to convergence
@@ -975,6 +997,7 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
             for nn in range(len(M_list)):
                 M_n = M_list[nn]
                 type_n = type_list[nn]  
+                lr_n = lr_list[nn]
                 v0_test = v0_list[nn]
                 
                 # Check validity of the initial Lambert solution
@@ -993,6 +1016,7 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
                 print('Solution attempt nn', nn)
                 print('M_n', M_n)
                 print('orbit type', type_n)
+                print('lr_n', lr_n)
                 print('rho0_init', rho0_init)
                 print('rhof_init', rhof_init)
                 print('rhof_test', rhof_test)
@@ -1010,8 +1034,9 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
                 
                 # Iterate to convergence
                 rho0_out, rhof_out, exit_flag = \
-                    iterate_rho(rho0_init, rhof_init, tof, M_n, type_n, Lmat,
-                                Rmat, UTC_list, periapsis_check=periapsis_check)
+                    iterate_rho(rho0_init, rhof_init, tof, M_n, lr_n, type_n, 
+                                Lmat, Rmat, UTC_list, 
+                                periapsis_check=periapsis_check)
                     
                 print('')
                 print('Output of iterate_rho')
@@ -1022,9 +1047,9 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
                 if exit_flag == 1:
                     r0_final = q0_vect + rho0_out*rho0_hat
                     rf_final = qf_vect + rhof_out*rhof_hat
-                    v0_final_list, vf_final_list, M_final, type_final = \
+                    v0_final_list, vf_final_list, M_final, type_final, lr = \
                         izzo_lambert(r0_final, rf_final, tof, M_star=M_n, 
-                                     results_flag=type_n,
+                                     lr_star=lr_n, results_flag=type_n,
                                      periapsis_check=periapsis_check)
 
                     v0_final = v0_final_list[0]
@@ -1050,7 +1075,7 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
     return Xo_output, M_output
 
 
-def iterate_rho(rho0_init, rhof_init, tof, M_star, orbit_type, Lmat, Rmat,
+def iterate_rho(rho0_init, rhof_init, tof, M_star, lr_star, orbit_type, Lmat, Rmat,
                 UTC_list, periapsis_check=False):
     '''
     
@@ -1080,8 +1105,8 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, orbit_type, Lmat, Rmat,
     
         # Solve Lambert problem to get LOS vector at intermediate time
         rhok_list, rhok_inds = \
-            compute_intermediate_rho(rho0, rhof, tof, M_star, orbit_type, Lmat,
-                                     Rmat, UTC_list,
+            compute_intermediate_rho(rho0, rhof, tof, M_star, lr_star, 
+                                     orbit_type, Lmat, Rmat, UTC_list,
                                      periapsis_check=periapsis_check)
             
         print('len rhok_list', len(rhok_list))
@@ -1112,6 +1137,21 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, orbit_type, Lmat, Rmat,
         rhok_obs_hat = Lmat[:,1].reshape(3,1)
         u_vect = np.cross(rhok_obs_hat, rhok_calc_vect, axis=0)
         
+        # Solution can converge on rhok_calc_hat pointing 180 degrees away
+        # from rhok_obs_hat - check and reset as needed
+        rhok_dot = float(np.dot(rhok_obs_hat.T, rhok_calc_vect))
+        if rhok_dot/np.linalg.norm(rhok_calc_vect) < -0.99:
+            nfail += 1
+            rho0, rhof = modify_start_rho(Lmat, Rmat, nfail)
+            
+            print('nfail', nfail)
+            print('rho0', rho0)
+            print('rhof', rhof)
+            print(rhok_dot)
+            print(np.linalg.norm(rhok_calc_vect))
+            
+            continue
+        
         # Exit condition (rhok_obs_hat = rhok_calc_hat)
         if np.linalg.norm(u_vect) == 0.:
             exit_flag = 1
@@ -1121,7 +1161,9 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, orbit_type, Lmat, Rmat,
         p_hat = p_vect/np.linalg.norm(p_vect)
         en_vect = np.cross(rhok_obs_hat, p_hat, axis=0)
         en_hat = en_vect/np.linalg.norm(en_vect)
-        rhok_dot = np.dot(rhok_obs_hat.T, rhok_calc_vect)
+        
+        
+        
         
         # Compute penalty
         f = float(np.dot(p_hat.T, rhok_calc_vect))
@@ -1144,8 +1186,8 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, orbit_type, Lmat, Rmat,
         # Range rho0 minus delta_rho
         rho0_minus = rho0 - drho0
         rhok_list, rhok_inds = \
-            compute_intermediate_rho(rho0_minus, rhof, tof, M_star, orbit_type,
-                                     Lmat, Rmat, UTC_list, 
+            compute_intermediate_rho(rho0_minus, rhof, tof, M_star, lr_star,
+                                     orbit_type, Lmat, Rmat, UTC_list, 
                                      periapsis_check=periapsis_check)
             
         cm0 = rhok_list[0]
@@ -1155,8 +1197,8 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, orbit_type, Lmat, Rmat,
         # Range rho0 plus delta_rho
         rho0_plus = rho0 + drho0
         rhok_list, rhok_inds = \
-            compute_intermediate_rho(rho0_plus, rhof, tof, M_star, orbit_type,
-                                     Lmat, Rmat, UTC_list,
+            compute_intermediate_rho(rho0_plus, rhof, tof, M_star, lr_star, 
+                                     orbit_type, Lmat, Rmat, UTC_list,
                                      periapsis_check=periapsis_check)
             
         cp0 = rhok_list[0]
@@ -1166,8 +1208,8 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, orbit_type, Lmat, Rmat,
         # Range rhof minus delta_rho
         rhof_minus = rhof - drhof
         rhok_list, rhok_inds = \
-            compute_intermediate_rho(rho0, rhof_minus, tof, M_star, orbit_type,
-                                     Lmat, Rmat, UTC_list,
+            compute_intermediate_rho(rho0, rhof_minus, tof, M_star, lr_star,
+                                     orbit_type, Lmat, Rmat, UTC_list,
                                      periapsis_check=periapsis_check)
             
         cmf = rhok_list[0]
@@ -1177,8 +1219,8 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, orbit_type, Lmat, Rmat,
         # Range rhof plus delta_rho
         rhof_plus = rhof + drhof
         rhok_list, rhok_inds = \
-            compute_intermediate_rho(rho0, rhof_plus, tof, M_star, orbit_type,
-                                     Lmat, Rmat, UTC_list,
+            compute_intermediate_rho(rho0, rhof_plus, tof, M_star, lr_star,
+                                     orbit_type, Lmat, Rmat, UTC_list,
                                      periapsis_check=periapsis_check)
             
         cpf = rhok_list[0]
@@ -1402,8 +1444,8 @@ def modify_start_rho(Lmat, Rmat, nfail):
 #    return delta_rho0, delta_rhof, fail_flag
 #
 #
-def compute_intermediate_rho(rho0, rhof, tof, M_star, orbit_type, Lmat, Rmat, 
-                             UTC_list, periapsis_check=False):
+def compute_intermediate_rho(rho0, rhof, tof, M_star, lr_star, orbit_type,
+                             Lmat, Rmat, UTC_list, periapsis_check=False):
     
     '''
     
@@ -1421,8 +1463,8 @@ def compute_intermediate_rho(rho0, rhof, tof, M_star, orbit_type, Lmat, Rmat,
     rf_vect = qf_vect + rhof*rhof_hat
     
     # Compute Lambert solution for these inputs
-    v0_list, vf_list, M_list, type_list = \
-        izzo_lambert(r0_vect, rf_vect, tof, M_star=M_star,
+    v0_list, vf_list, M_list, type_list, lr_list = \
+        izzo_lambert(r0_vect, rf_vect, tof, M_star=M_star, lr_star=lr_star,
                      results_flag=orbit_type, periapsis_check=periapsis_check)
     
     # There should only be one solution with everything specified

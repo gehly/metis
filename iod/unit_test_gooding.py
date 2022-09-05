@@ -701,6 +701,15 @@ def single_rev_heo():
         resids2 = (meas2 - Yk_list[1])*(1./arcsec2rad)
         residsf = (measf - Yk_list[2])*(1./arcsec2rad)
         
+        # unit vectors
+        uhat_meas2 = np.array([[math.cos(meas2[1])*math.cos(meas2[0])],
+                               [math.cos(meas2[1])*math.sin(meas2[0])],
+                               [math.sin(meas2[1])]])
+    
+        uhat_yk2 = np.array([[math.cos(Yk_list[1][1])*math.cos(Yk_list[1][0])],
+                             [math.cos(Yk_list[1][1])*math.sin(Yk_list[1][0])],
+                             [math.sin(Yk_list[1][1])]])
+        
         
         print('')
         print('Xi', Xi)
@@ -708,6 +717,11 @@ def single_rev_heo():
         print('resids0', resids0)
         print('resids2', resids2)
         print('residsf', residsf)
+        
+        print(uhat_meas2)
+        print(uhat_yk2)
+        
+        print(np.dot(uhat_meas2.T, uhat_yk2))
 
         
     
