@@ -153,12 +153,18 @@ def izzo_lambert(r1_vect, r2_vect, tof, M_star=np.nan, GM=GME, R=Re,
     # Compute non-dimensional time of flight T
     T = np.sqrt(2*GM/s**3.) * tof
     
+#    print('T', T)
+    
     # Compute all possible x,y values that fit T
     if np.isnan(M_star):
         x_list1, y_list1, M_list1 = find_xy(lam, T, maxiters, rtol)
     else:
         x_list1, y_list1, M_list1 = find_xy_given_M(lam, T, M_star, maxiters,
                                                     rtol)
+        
+#    print('x_list1', x_list1)
+#    print('y_list1', y_list1)
+#    print('M_list1', M_list1)
     
     # Loop over x,y values and compute output velocities
     v1_list = []
@@ -179,7 +185,11 @@ def izzo_lambert(r1_vect, r2_vect, tof, M_star=np.nan, GM=GME, R=Re,
         
         # Check for valid radius of periapsis
         rp = astro.compute_rp(r1_vect, v1_vect, GM)
-        if periapsis_check and rp < R:
+        
+#        print('rp', rp)
+#        print('R', R)
+        
+        if (periapsis_check or Mi > 0) and rp < R:
             continue
         
         v1_list.append(v1_vect)
@@ -223,7 +233,7 @@ def izzo_lambert(r1_vect, r2_vect, tof, M_star=np.nan, GM=GME, R=Re,
             
             # Check for valid radius of periapsis
             rp = astro.compute_rp(r1_vect, v1_vect, GM)
-            if periapsis_check and rp < R:
+            if (periapsis_check or Mi > 0) and rp < R:
                 continue
             
             v1_list.append(v1_vect)
@@ -279,11 +289,16 @@ def find_xy(lam, T, maxiters=35, rtol=1e-8):
     # the simplest sense T_0M = T_00 + M*pi
     M_max = int(np.floor(T / math.pi))
     
+#    print('lam', lam)
+#    print('M_max', M_max)
+    
     # Evaluate non-dimensional time of flight T
     # T(x=0) denoted T_0M
     # T_00 is T_0 for single revolution (M=0) case  
     # T_0M = T_00 + M*pi
     T_00 = math.acos(lam) + lam*np.sqrt(1. - lam**2.)
+    
+#    print('T_00', T_00)
     
     # Check if input T is less than minimum T required for M_max revolutions
     # If so, reduce M_max by 1
@@ -294,6 +309,8 @@ def find_xy(lam, T, maxiters=35, rtol=1e-8):
         
         if T < T_min and exit_flag == 1:
             M_max -= 1
+            
+#    print('M_max', M_max)
             
     # Compute T(x=1) parabolic case (Izzo Eq 21)
     T_1 = (2./3.) * (1. - lam**3.)
@@ -308,11 +325,18 @@ def find_xy(lam, T, maxiters=35, rtol=1e-8):
     else:        
         # Modified initial condition from poliastro
         # https://github.com/poliastro/poliastro/issues/1362
-        x_0 = np.exp(np.log(2.) * np.log(T / T_00) / np.log(T_1 / T_00)) - 1.        
+        x_0 = np.exp(np.log(2.) * np.log(T / T_00) / np.log(T_1 / T_00)) - 1.  
+        
+        
+#    print('initial guess x_0', x_0)
         
     # Run Householder iterations for x_0 to get x,y for single rev case
     M = 0
     x, exit_flag = householder(x_0, T, lam, M, maxiters, rtol)
+    
+#    print('x', x)
+#    print('exit_flag', exit_flag)
+#    print('y', np.sqrt(1. - lam**2.*(1. - x**2.)))
     if exit_flag == 1:
         y = np.sqrt(1. - lam**2.*(1. - x**2.))
         x_list.append(x)
@@ -503,6 +527,9 @@ def compute_T_min(lam, M, maxiters=35, rtol=1e-8):
             x_T_min, exit_flag = halley(x_i, T_i, lam, M, maxiters, rtol)
             T_min = compute_T(x_T_min, lam, M)
             
+#    print('x_T_min', x_T_min)
+#    print('T_min', T_min)
+#    print('exit_flag', exit_flag)
     
     return x_T_min, T_min, exit_flag
 
@@ -549,16 +576,26 @@ def halley(x0, T0, lam, M, maxiters=35, tol=1e-8):
 
     '''
     
+#    print('Halley iters')
+    
     diff = 1.
     iters = 0
     exit_flag = 1
     while diff > tol:
+        
+#        print('iters', iters)
+#        print('x0', x0)
         
         T = compute_T(x0, lam, M)
         dT, ddT, dddT = compute_T_der(x0, T, lam)
         
         # Halley step, cubic
         x = x0 - 2.*dT*ddT/(2.*ddT**2. - dT*dddT)
+        
+#        print('x', x)
+#        print('dT', dT)
+#        print('ddT', ddT)
+#        print('dddT', dddT)
         
         diff = abs(x - x0)
         x0 = float(x)
@@ -602,10 +639,15 @@ def householder(x0, T_star, lam, M, maxiters=35, tol=1e-8):
         pass/fail criteria for Halley iterations (1 = pass, -1 = fail) 
     '''
     
+#    print('householder iterations')
+    
     diff = 1.
     iters = 0
     exit_flag = 1
     while diff > tol:
+        
+#        print('iters', iters)
+#        print('x0', x0)
         
         T_x = compute_T(x0, lam, M)
         f_x = T_x - T_star
@@ -613,6 +655,12 @@ def householder(x0, T_star, lam, M, maxiters=35, tol=1e-8):
         
         x = x0 - f_x*((dT**2. - f_x*ddT/2.)/
                       (dT*(dT**2. - f_x*ddT) + dddT*f_x**2./6.))
+        
+#        print('x', x)
+#        print('T_x', T_x)
+#        print('dT', dT)
+#        print('ddT', ddT)
+#        print('dddT', dddT)
     
         diff = abs(x - x0)
         x0 = float(x)
@@ -790,14 +838,12 @@ def compute_hypergeom_2F1(a, b, c, d):
 ###############################################################################
 
 def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
-                       time_format='datetime', eop_alldata=[], XYs_df=[]):
+                       time_format='datetime', eop_alldata=[], XYs_df=[],
+                       periapsis_check=False):
     '''
     
     
     '''
-    
-    # Constants
-    GM = GME
     
     # Retrieve/load EOP and polar motion data if needed
     if len(eop_alldata) == 0:        
@@ -881,8 +927,11 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
 #    rho0_array = np.array([39809.])
 #    rhof_array = np.array([39834.])
     
-    rho0_array = np.array([100., 500., 1000., 5000., 10000., 30000., 50000.])
-    rhof_array = np.array([100., 500., 1000., 5000., 10000., 30000., 50000.])
+    rho0_array = np.array([7854.])
+    rhof_array = np.array([26752.])
+    
+#    rho0_array = np.array([100., 500., 1000., 5000., 10000., 30000., 50000.])
+#    rhof_array = np.array([100., 500., 1000., 5000., 10000., 30000., 50000.])
     
     # Time of flight
     tof = (UTC_list[-1] - UTC_list[0]).total_seconds()
@@ -901,7 +950,8 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
             r0_vect = q0_vect + rho0*rho0_hat
             rf_vect = qf_vect + rhof*rhof_hat
             v0_list, vf_list, M_list, type_list = \
-                izzo_lambert(r0_vect, rf_vect, tof, results_flag='all')
+                izzo_lambert(r0_vect, rf_vect, tof, results_flag='all',
+                             periapsis_check=periapsis_check)
             
             if len(M_list) == 0:
                 continue
@@ -961,7 +1011,7 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
                 # Iterate to convergence
                 rho0_out, rhof_out, exit_flag = \
                     iterate_rho(rho0_init, rhof_init, tof, M_n, type_n, Lmat,
-                                Rmat, UTC_list)
+                                Rmat, UTC_list, periapsis_check=periapsis_check)
                     
                 print('')
                 print('Output of iterate_rho')
@@ -974,8 +1024,9 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
                     rf_final = qf_vect + rhof_out*rhof_hat
                     v0_final_list, vf_final_list, M_final, type_final = \
                         izzo_lambert(r0_final, rf_final, tof, M_star=M_n, 
-                                     results_flag=type_n)
-                     
+                                     results_flag=type_n,
+                                     periapsis_check=periapsis_check)
+
                     v0_final = v0_final_list[0]
                     Xo = np.concatenate((r0_final, v0_final), axis=0)
                     elem0 = astro.cart2kep(Xo)
@@ -999,7 +1050,8 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
     return Xo_output, M_output
 
 
-def iterate_rho(rho0_init, rhof_init, tof, M_star, orbit_type, Lmat, Rmat, UTC_list):
+def iterate_rho(rho0_init, rhof_init, tof, M_star, orbit_type, Lmat, Rmat,
+                UTC_list, periapsis_check=False):
     '''
     
     
@@ -1029,12 +1081,13 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, orbit_type, Lmat, Rmat, UTC_l
         # Solve Lambert problem to get LOS vector at intermediate time
         rhok_list, rhok_inds = \
             compute_intermediate_rho(rho0, rhof, tof, M_star, orbit_type, Lmat,
-                                     Rmat, UTC_list)
+                                     Rmat, UTC_list,
+                                     periapsis_check=periapsis_check)
             
         print('len rhok_list', len(rhok_list))
             
         # Error check
-        if len(rhok_list) == 0:
+        if len(rhok_list) == 0 or rho0 < 0 or rhof < 0:
             
             nfail += 1
                         
@@ -1092,7 +1145,8 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, orbit_type, Lmat, Rmat, UTC_l
         rho0_minus = rho0 - drho0
         rhok_list, rhok_inds = \
             compute_intermediate_rho(rho0_minus, rhof, tof, M_star, orbit_type,
-                                     Lmat, Rmat, UTC_list)
+                                     Lmat, Rmat, UTC_list, 
+                                     periapsis_check=periapsis_check)
             
         cm0 = rhok_list[0]
         fm_rho0 = float(np.dot(p_hat.T, cm0))
@@ -1102,7 +1156,8 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, orbit_type, Lmat, Rmat, UTC_l
         rho0_plus = rho0 + drho0
         rhok_list, rhok_inds = \
             compute_intermediate_rho(rho0_plus, rhof, tof, M_star, orbit_type,
-                                     Lmat, Rmat, UTC_list)
+                                     Lmat, Rmat, UTC_list,
+                                     periapsis_check=periapsis_check)
             
         cp0 = rhok_list[0]
         fp_rho0 = float(np.dot(p_hat.T, cp0))
@@ -1112,7 +1167,8 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, orbit_type, Lmat, Rmat, UTC_l
         rhof_minus = rhof - drhof
         rhok_list, rhok_inds = \
             compute_intermediate_rho(rho0, rhof_minus, tof, M_star, orbit_type,
-                                     Lmat, Rmat, UTC_list)
+                                     Lmat, Rmat, UTC_list,
+                                     periapsis_check=periapsis_check)
             
         cmf = rhok_list[0]
         fm_rhof = float(np.dot(p_hat.T, cmf))
@@ -1122,7 +1178,8 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, orbit_type, Lmat, Rmat, UTC_l
         rhof_plus = rhof + drhof
         rhok_list, rhok_inds = \
             compute_intermediate_rho(rho0, rhof_plus, tof, M_star, orbit_type,
-                                     Lmat, Rmat, UTC_list)
+                                     Lmat, Rmat, UTC_list,
+                                     periapsis_check=periapsis_check)
             
         cpf = rhok_list[0]
         fp_rhof = float(np.dot(p_hat.T, cpf))
@@ -1220,8 +1277,8 @@ def modify_start_rho(Lmat, Rmat, nfail):
     
     # Compute updated guess for rho0, rhof
     if nfail == 1:
-        rho0 = max(-float(np.dot(q0_vect.T, rho0_hat)), 0.)
-        rhof = max(-float(np.dot(qf_vect.T, rhof_hat)), 0.)
+        rho0 = max(-float(np.dot(q0_vect.T, rho0_hat)), 1000.)
+        rhof = max(-float(np.dot(qf_vect.T, rhof_hat)), 1000.)
         
     if nfail == 2:
         
@@ -1231,8 +1288,8 @@ def modify_start_rho(Lmat, Rmat, nfail):
         D2 = np.dot(rho0_hat.T, rhof_hat)
         D4 = 1. - D2**2.
         
-        rho0 = max((D1-(D3*D2))/D4, 0.)
-        rhof = max(((D1*D2)-D3)/D4, 0.)
+        rho0 = max((D1-(D3*D2))/D4, 1000.)
+        rhof = max(((D1*D2)-D3)/D4, 1000.)
     
     return rho0, rhof
 
@@ -1346,7 +1403,7 @@ def modify_start_rho(Lmat, Rmat, nfail):
 #
 #
 def compute_intermediate_rho(rho0, rhof, tof, M_star, orbit_type, Lmat, Rmat, 
-                             UTC_list):
+                             UTC_list, periapsis_check=False):
     
     '''
     
@@ -1366,7 +1423,7 @@ def compute_intermediate_rho(rho0, rhof, tof, M_star, orbit_type, Lmat, Rmat,
     # Compute Lambert solution for these inputs
     v0_list, vf_list, M_list, type_list = \
         izzo_lambert(r0_vect, rf_vect, tof, M_star=M_star,
-                     results_flag=orbit_type)
+                     results_flag=orbit_type, periapsis_check=periapsis_check)
     
     # There should only be one solution with everything specified
     if len(M_list) > 1:
