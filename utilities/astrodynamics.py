@@ -215,6 +215,13 @@ def mean2hyp(M, e):
     # Ensure M is between -pi and pi
     if M > pi or M < -pi:
         print('Error: Expected -pi < M < pi!')
+        print('M', M)
+        
+    if M > pi:
+        M -= 2.*pi
+        
+    if M < -pi:
+        M += 2.*pi
 
     # Form starting guess for H
     H = M
