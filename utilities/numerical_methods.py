@@ -276,7 +276,14 @@ def multiple_shooting(Xo_init, bc_vect, tin, cvect_fcn, state_params,
             cp_vect = cvect_fcn(Xo_plus, bc_vect, tin, state_params, int_params)
             
             dc_dxi = (1./(2.*dxi)) * (cp_vect - cm_vect)
-            cmat[ii,:] = dc_dxi.flatten()
+            cmat[:,ii] = dc_dxi.flatten()
+            
+            print('')
+            print('ii', ii)
+            print('X[ii]', Xo[ii])
+            print('dxi', dxi)
+            print('dc_dxi', dc_dxi)
+            
 
         # Compute updated initial state
         delta_vect = -np.dot(np.linalg.inv(cmat), c_vect)
@@ -291,6 +298,7 @@ def multiple_shooting(Xo_init, bc_vect, tin, cvect_fcn, state_params,
         print('delta_vect', delta_vect)
         print('Xo', Xo)
         print('err', err)
+
         
         iters += 1
         if iters > maxiters:
