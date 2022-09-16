@@ -205,16 +205,19 @@ def multiple_shooting(Xo_init, bc_vect, tin, cvect_fcn, state_params,
                       maxiters=100):
     '''
     This function implements the single shooting technique to solve two point
-    boundary value problems. The method takes an input guess at the initial
-    conditions, computes the difference to the final boundary condition and
-    uses Newton iteration to update the initial state until the boundary
-    condition is met.
+    boundary value problems. The method takes an input guess at the n variable
+    parameters Xo_init, computes the difference to the m constraints 
+    (e.g. boundary conditions from bc_vect) computed by cvect_function and uses 
+    Newton iteration to update the variable parameters until the boundary 
+    conditions and other constraints are met.
+    
+    Number of constraints m <= Number of variable parameters n
     
     Parameters
     ------
-    Xo_init : n0x1 numpy array
+    Xo_init : nx1 numpy array
         initial guess at parameters that will be varied
-    bc_vect : nfx1 numpy array
+    bc_vect : bx1 numpy array
         boundary condition values
     tin : 1D array or list
         times to integrate over, must contain at least [t0, tf] but can 
@@ -236,10 +239,17 @@ def multiple_shooting(Xo_init, bc_vect, tin, cvect_fcn, state_params,
         
     Returns
     ------
-    Xo : n0x1 numpy array
+    Xo : nx1 numpy array
         solved parameters to achieve boundary conditions and other penalties
     fail_flag : boolean
         exit status (True = iteration did not converge)
+        
+        
+    References
+    ------
+    [1] Betts, J.T., "Practical Method for Optimal Control and Estimation 
+        Using Nonlinear Programming," 2nd ed. 2010.
+    
 
     '''
     
@@ -259,7 +269,7 @@ def multiple_shooting(Xo_init, bc_vect, tin, cvect_fcn, state_params,
         
         # Loop over states and compute central finite differences to populate
         # Jacobian matrix
-        cmat = np.zeros((m, n))
+        G = np.zeros((m, n))
         for ii in range(n):
             
             # Step size for this state parameter
@@ -276,7 +286,7 @@ def multiple_shooting(Xo_init, bc_vect, tin, cvect_fcn, state_params,
             cp_vect = cvect_fcn(Xo_plus, bc_vect, tin, state_params, int_params)
             
             dc_dxi = (1./(2.*dxi)) * (cp_vect - cm_vect)
-            cmat[:,ii] = dc_dxi.flatten()
+            G[:,ii] = dc_dxi.flatten()
             
             print('')
             print('ii', ii)
@@ -286,7 +296,12 @@ def multiple_shooting(Xo_init, bc_vect, tin, cvect_fcn, state_params,
             
 
         # Compute updated initial state
-        delta_vect = -np.dot(np.linalg.inv(cmat), c_vect)
+        if m == n:
+            delta_vect = -np.dot(np.linalg.inv(G), c_vect)
+        elif m < n:
+            Ginv = np.dot(G.T, np.linalg.inv(np.dot(G, G.T)))
+            delta_vect = -np.dot(Ginv, c_vect)
+            
         Xo += delta_vect
         
         denom = max([np.linalg.norm(bc_vect), np.linalg.norm(Xo), 1.])
@@ -294,7 +309,7 @@ def multiple_shooting(Xo_init, bc_vect, tin, cvect_fcn, state_params,
         
         print('')
         print('iters', iters)
-        print('cmat', cmat)
+        print('G', G)
         print('delta_vect', delta_vect)
         print('Xo', Xo)
         print('err', err)
