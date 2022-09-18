@@ -1105,7 +1105,7 @@ def kep2eqn(kep):
     h = e*sin(w + RAAN)
     q = tan(i/2)*cos(RAAN)
     p = tan(i/2)*sin(RAAN)
-    lam = RAAN + w + M
+    lam = (RAAN + w + M)*180./pi
     
     # Reset range to 0-360
     lam = lam % 360.
@@ -1176,7 +1176,7 @@ def kep2modeqn(kep):
     g = e*sin(w + RAAN)
     h = tan(i/2)*cos(RAAN)
     k = tan(i/2)*sin(RAAN)
-    L = RAAN + w + theta
+    L = (RAAN + w + theta)*180./pi
     
     # Reset range to 0-360
     L = L % 360.
@@ -1630,9 +1630,26 @@ if __name__ == '__main__':
 #    print(LTAN)
     
     
-    cart = np.array([710.87, 5151.26, 5075.69, 0.9039, -5.222, 5.1735])
-    kep = cart2kep(cart)
-    print(kep)
+#    cart = np.array([710.87, 5151.26, 5075.69, 0.9039, -5.222, 5.1735])
+#    kep = cart2kep(cart)
+#    print(kep)
+    
+    kep = np.array([42164.1, 0., 0., 20., 30., 0.])
+    cart = kep2cart(kep)
+    eqn = kep2eqn(kep)
+    modeqn = kep2modeqn(kep)
+    
+    cart2 = modeqn2cart(modeqn)
+    err = np.linalg.norm(cart - cart2)
+    
+    print('kep', kep)
+    print('cart', cart)
+    print('eqn', eqn)
+    print('modeqn', modeqn)
+    print('cart2', cart2)
+    print('err', err)
+    
+    
     
     
     

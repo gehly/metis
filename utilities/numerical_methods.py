@@ -294,13 +294,24 @@ def multiple_shooting(Xo_init, bc_vect, tin, cvect_fcn, state_params,
             print('dxi', dxi)
             print('dc_dxi', dc_dxi)
             
+            
+        print('m', m)
+        print('n', n)
 
         # Compute updated initial state
         if m == n:
             delta_vect = -np.dot(np.linalg.inv(G), c_vect)
         elif m < n:
             Ginv = np.dot(G.T, np.linalg.inv(np.dot(G, G.T)))
+            
+            print(G.shape)
+            print(Ginv.shape)
+            print(c_vect.shape)
+            
             delta_vect = -np.dot(Ginv, c_vect)
+            
+            print(delta_vect)
+            print(delta_vect.shape)
             
         Xo += delta_vect
         
@@ -313,6 +324,8 @@ def multiple_shooting(Xo_init, bc_vect, tin, cvect_fcn, state_params,
         print('delta_vect', delta_vect)
         print('Xo', Xo)
         print('err', err)
+        
+#        mistake
 
         
         iters += 1
