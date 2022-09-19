@@ -542,7 +542,7 @@ def single_rev_meo():
         
         
         print('')
-        print('Xi', Xi)
+        print('Xi_0', Xi_0)
         print('elem_i', astro.cart2kep(X_list[ii]))
         print('resids0', resids0)
         print('resids2', resids2)

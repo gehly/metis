@@ -5,6 +5,7 @@ import sys
 import os
 import inspect
 from datetime import datetime, timedelta
+import time
 
 filename = inspect.getframeinfo(inspect.currentframe()).filename
 current_dir = os.path.dirname(os.path.abspath(filename))
@@ -950,11 +951,14 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
     M_list = []
     lr_list = []
     type_list = []
+    multirev_time_list = []
     for M_star in M_candidates:
         
         print('\nM_star', M_star)
         
         if M_star == 0:
+            
+            start = time.time()
         
             # Prograde single revolution case
             lr_star = 'none'
@@ -972,6 +976,9 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
             lr_list.extend([lr_star]*nout)
             type_list.extend([orbit_type]*nout)
             
+            single_rev_prograde_time = time.time() - start
+            
+            start = time.time()
             
             # Retrograde single revolution case
             lr_star = 'none'
@@ -989,7 +996,11 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
             lr_list.extend([lr_star]*nout)
             type_list.extend([orbit_type]*nout)
             
+            single_rev_retrograde_time = time.time() - start
+            
         else:
+            
+            start = time.time()
             
             # Prograde multi-rev case - left branch
             lr_star = 'left'
@@ -1007,6 +1018,10 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
             lr_list.extend([lr_star]*nout)
             type_list.extend([orbit_type]*nout)
             
+            multirev_time_list.append(time.time() - start)
+            
+            start = time.time()
+            
             # Prograde multi-rev case - right branch
             lr_star = 'right'
             orbit_type = 'prograde'
@@ -1022,6 +1037,10 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
             M_list.extend([M_star]*nout)
             lr_list.extend([lr_star]*nout)
             type_list.extend([orbit_type]*nout)
+            
+            multirev_time_list.append(time.time() - start)
+            
+            start = time.time()
             
             # Retrograde multi-rev case - left branch
             lr_star = 'left'
@@ -1039,6 +1058,10 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
             lr_list.extend([lr_star]*nout)
             type_list.extend([orbit_type]*nout)
             
+            multirev_time_list.append(time.time() - start)
+            
+            start = time.time()
+            
             # Retrograde multi-rev case - right branch
             lr_star = 'right'
             orbit_type = 'retrograde'
@@ -1054,6 +1077,8 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
             M_list.extend([M_star]*nout)
             lr_list.extend([lr_star]*nout)
             type_list.extend([orbit_type]*nout)
+            
+            multirev_time_list.append(time.time() - start)
                 
  
     # Compute solutions  
@@ -1090,6 +1115,13 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
             
         Xo_output.append(Xo)
         M_output.append(M_ii)
+        
+    print('')
+    print('Execution times')
+    print('single rev prograde', single_rev_prograde_time)
+    print('single rev retrograde', single_rev_retrograde_time)
+    print('M_candidates', M_candidates)
+    print('multirev times', multirev_time_list)
     
     return Xo_output, M_output
 
@@ -1168,8 +1200,8 @@ def M_star_to_3rho(Lmat, Rmat, UTC_list, tof, M_star, lr_star, orbit_type,
             print(rho0_output_list)
             print(rhof_output_list)    
             
-            # If successful, exit
-            if len(rho0_output_list) > 0:
+            # If successful or nfails exceeded, exit
+            if len(rho0_output_list) > 0 or exit_flag == -1:
                 break
                 
 #            # If successful, take the max values from solutions to continue
@@ -1248,6 +1280,7 @@ seen (in section 2) that the general number of solutions for short-arc coverage 
         
         # Check exit condition
         if nfail > 4:
+            exit_flag = -1
             break
         
         # Check for converge on previous solution
