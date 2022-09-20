@@ -943,8 +943,8 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
     M_max = compute_M_max(Lmat, Rmat, tof, GM, R)
     M_candidates = list(range(M_max+1))
     
-    print('M_max', M_max)
-    print('M_candidates', M_candidates)
+#    print('M_max', M_max)
+#    print('M_candidates', M_candidates)
 
     # Loop over possible values of orbit revolution number M
     Xo_output = []
@@ -957,7 +957,7 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
     multirev_time_list = []
     for M_star in M_candidates:
         
-        print('\nM_star', M_star)
+#        print('\nM_star', M_star)
         
         if M_star == 0:
             
@@ -1147,9 +1147,9 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
         Xo = np.concatenate((r0_final, v0_final), axis=0)
         elem0 = astro.cart2kep(Xo)
         
-        print(r0_final)
-        print(v0_final)
-        print(elem0)
+#        print(r0_final)
+#        print(v0_final)
+#        print(elem0)
 
         # There should only be one solution with everything specified
         if len(M_final) > 1:
@@ -1189,14 +1189,14 @@ def M_star_to_3rho(Lmat, Rmat, UTC_list, tof, M_star, lr_star, orbit_type,
     range_pairs = itertools.product(rho0_array, rhof_array)
     range_pairs_list = [list(rp) for rp in range_pairs]
     nrange = len(range_pairs_list)
-    range_ind = int(np.floor(nrange/2))
-    increment = int(np.floor(nrange/4))
+#    range_ind = int(np.floor(nrange/2))
+#    increment = int(np.floor(nrange/4))
+#    
+#    while math.gcd(nrange, increment) != 1:
+#        increment += 1
     
-    while math.gcd(nrange, increment) != 1:
-        increment += 1
-    
-#    range_ind = 0
-#    increment = 1
+    range_ind = 0
+    increment = 1
     
     rho0_bounds = [rho0_array[0], rho0_array[-1]]
     rhof_bounds = [rhof_array[0], rhof_array[-1]]
@@ -1231,8 +1231,8 @@ def M_star_to_3rho(Lmat, Rmat, UTC_list, tof, M_star, lr_star, orbit_type,
         rho0 = float(range_pair[0])
         rhof = float(range_pair[1])
         
-        print('rho0', rho0)
-        print('rhof', rhof)
+#        print('rho0', rho0)
+#        print('rhof', rhof)
         
         # Attempt to solve Lambert's problem for this rho0/rhof pair
         r0_vect = q0_vect + rho0*rho0_hat
@@ -1279,9 +1279,9 @@ def M_star_to_3rho(Lmat, Rmat, UTC_list, tof, M_star, lr_star, orbit_type,
                             rho0_bounds, rhof_bounds,
                             periapsis_check=periapsis_check)
             
-            print('M_star_to_3rho')
-            print(rho0_output_list)
-            print(rhof_output_list)    
+#            print('M_star_to_3rho')
+#            print(rho0_output_list)
+#            print(rhof_output_list)    
             
             # If successful or nfails exceeded, exit
             if len(rho0_output_list) > 0 or (nfail_exit and exit_flag == -1):
@@ -1356,10 +1356,10 @@ seen (in section 2) that the general number of solutions for short-arc coverage 
     # Loop
     while len(rho0_output_list) < 3:
         
-        print('\nstart loop')
-        print('iters', iters)
-        print('rho0', rho0)
-        print('rhof', rhof)
+#        print('\nstart loop')
+#        print('iters', iters)
+#        print('rho0', rho0)
+#        print('rhof', rhof)
 
         # Check exit condition
         if nfail > 4:
@@ -1376,9 +1376,9 @@ seen (in section 2) that the general number of solutions for short-arc coverage 
             rho0, rhof = modify_start_rho(Lmat, Rmat, nfail, rho0, rhof,
                                           rho0_bounds, rhof_bounds)
             
-            print('nfail', nfail)
-            print('rho0', rho0)
-            print('rhof', rhof)
+#            print('nfail', nfail)
+#            print('rho0', rho0)
+#            print('rhof', rhof)
             
             continue
         
@@ -1391,9 +1391,9 @@ seen (in section 2) that the general number of solutions for short-arc coverage 
                 rho0, rhof = modify_start_rho(Lmat, Rmat, nfail, rho0, rhof,
                                           rho0_bounds, rhof_bounds)
             
-                print('nfail', nfail)
-                print('rho0', rho0)
-                print('rhof', rhof)
+#                print('nfail', nfail)
+#                print('rho0', rho0)
+#                print('rhof', rhof)
                 
                 continue
         
@@ -1404,7 +1404,7 @@ seen (in section 2) that the general number of solutions for short-arc coverage 
                                      orbit_type, Lmat, Rmat, UTC_list,
                                      periapsis_check=periapsis_check)
             
-        print('len rhok_list', len(rhok_list))
+#        print('len rhok_list', len(rhok_list))
             
         # Error check
         if len(rhok_list) == 0:
@@ -1414,10 +1414,10 @@ seen (in section 2) that the general number of solutions for short-arc coverage 
             rho0, rhof = modify_start_rho(Lmat, Rmat, nfail, rho0, rhof,
                                           rho0_bounds, rhof_bounds)
             
-            print('nfail', nfail)
-            print('rho0', rho0)
-            print('rhof', rhof)
-            
+#            print('nfail', nfail)
+#            print('rho0', rho0)
+#            print('rhof', rhof)
+#            
             continue
             
         # Assume a single intermediate point for now
@@ -1436,11 +1436,11 @@ seen (in section 2) that the general number of solutions for short-arc coverage 
             nfail += 1
             rho0, rhof = modify_start_rho(Lmat, Rmat, nfail)
             
-            print('nfail', nfail)
-            print('rho0', rho0)
-            print('rhof', rhof)
-            print(rhok_dot)
-            print(np.linalg.norm(rhok_calc_vect))
+#            print('nfail', nfail)
+#            print('rho0', rho0)
+#            print('rhof', rhof)
+#            print(rhok_dot)
+#            print(np.linalg.norm(rhok_calc_vect))
             
             continue
         
@@ -1478,17 +1478,17 @@ seen (in section 2) that the general number of solutions for short-arc coverage 
                                rho0_output_list, rhof_output_list, Lmat, Rmat)
         
         
-        print('f', f)
-        print('g', g)
+#        print('f', f)
+#        print('g', g)
         
         # Use central finite difference to compute numerical derivatives of f
         # and g with respect to small changes in rho0 and rhof
         drho0 = rho0 * finite_diff_step
         drhof = rhof * finite_diff_step
         
-        print('drho0', drho0)
-        print('drhof', drhof)
-        
+#        print('drho0', drho0)
+#        print('drhof', drhof)
+#        
         # Range rho0 minus delta_rho
         rho0_minus = rho0 - drho0
         rhok_list, rhok_inds = \
@@ -1556,11 +1556,11 @@ seen (in section 2) that the general number of solutions for short-arc coverage 
         mat = np.array([[df_drho0, df_drhof],
                         [dg_drho0, dg_drhof]])
         
-        print('derivatives')
-        print('df_drho0', df_drho0)
-        print('df_drhof', df_drhof)
-        print('dg_drho0', dg_drho0)
-        print('dg_drhof', dg_drhof)
+#        print('derivatives')
+#        print('df_drho0', df_drho0)
+#        print('df_drhof', df_drhof)
+#        print('dg_drho0', dg_drho0)
+#        print('dg_drhof', dg_drhof)
         
         
         # Newton's Method
@@ -1570,16 +1570,16 @@ seen (in section 2) that the general number of solutions for short-arc coverage 
         delta_rho0 = -(1./D) * f * dg_drhof
         delta_rhof =  (1./D) * f * dg_drho0
         
-        print('D', D)
-        print('delta_rho0', delta_rho0)
-        print('delta_rhof', delta_rhof)
-        
-        print('mat', mat)
-        print('check D', np.linalg.det(mat))
+#        print('D', D)
+#        print('delta_rho0', delta_rho0)
+#        print('delta_rhof', delta_rhof)
+#        
+#        print('mat', mat)
+#        print('check D', np.linalg.det(mat))
 
         
-        delta2 = -np.dot(np.linalg.inv(mat), np.reshape([f, 0.], (2,1)))
-        print('delta2', delta2)
+#        delta2 = -np.dot(np.linalg.inv(mat), np.reshape([f, 0.], (2,1)))
+#        print('delta2', delta2)
 
         rho0 += delta_rho0
         rhof += delta_rhof
@@ -1593,8 +1593,8 @@ seen (in section 2) that the general number of solutions for short-arc coverage 
 #            rhof = (f*rhof_old + f_old*rhof)/(f + f_old)
 #            print('overshoot')
         
-        print('rho0', rho0)
-        print('rhof', rhof)
+#        print('rho0', rho0)
+#        print('rhof', rhof)
         
         # If multiple solutions already found, use original f to check 
         # convergence criteria to be consistent for all solutions
@@ -1606,8 +1606,8 @@ seen (in section 2) that the general number of solutions for short-arc coverage 
                                          rhof_output_list, Lmat, Rmat)
         
         conv_crit = abs(fconv)/max(rk, rhok_dot)
-        print('conv_crit', conv_crit)
-        print('denom', rk, rhok_dot)
+#        print('conv_crit', conv_crit)
+#        print('denom', rk, rhok_dot)
         
         # For converged solution, store answer and update initial guess
         if conv_crit < tol:
@@ -1625,8 +1625,8 @@ seen (in section 2) that the general number of solutions for short-arc coverage 
             nfail = 0
             crit_min = 1.
             exit_flag = 1
-            print('rho0_output_list', rho0_output_list)
-            print('rhof_output_list', rhof_output_list)
+#            print('rho0_output_list', rho0_output_list)
+#            print('rhof_output_list', rhof_output_list)
             
             continue        
         
@@ -1638,15 +1638,15 @@ seen (in section 2) that the general number of solutions for short-arc coverage 
         rho0_old = float(rho0)
         rhof_old = float(rhof)
         
-        print('rho0_output_list', rho0_output_list)
-        print('rhof_output_list', rhof_output_list)
+#        print('rho0_output_list', rho0_output_list)
+#        print('rhof_output_list', rhof_output_list)
         
         # Increment counter and exit condition
         iters += 1
         if iters > maxiters:
             break
     
-    print('crit_min', crit_min)
+#    print('crit_min', crit_min)
 
     
     return rho0_output_list, rhof_output_list, exit_flag
@@ -1663,20 +1663,20 @@ def compute_M_max(Lmat, Rmat, tof, GM=GME, R=Re):
     rho0_min = radius2rho(rmin, rho0_hat, q0_vect)
     r0_vect = q0_vect + rho0_min*rho0_hat
     
-    print(rho0_hat)
-    print(q0_vect)
-    print(rho0_min)
-    print(r0_vect)
+#    print(rho0_hat)
+#    print(q0_vect)
+#    print(rho0_min)
+#    print(r0_vect)
     
     rhof_hat = Lmat[:,-1].reshape(3,1)
     qf_vect = Rmat[:,-1].reshape(3,1)
     rhof_min = radius2rho(rmin, rhof_hat, qf_vect)
     rf_vect = qf_vect + rhof_min*rhof_hat
     
-    print(rhof_hat)
-    print(qf_vect)
-    print(rhof_min)
-    print(rf_vect)
+#    print(rhof_hat)
+#    print(qf_vect)
+#    print(rhof_min)
+#    print(rf_vect)
         
     # Compute chord and minimum energy ellipse
     c_vect = rf_vect - r0_vect    
@@ -1694,11 +1694,11 @@ def compute_M_max(Lmat, Rmat, tof, GM=GME, R=Re):
     # Compute non-dimensional time of flight T
     T = np.sqrt(2*GM/s**3.) * tof
     
-    print('r0', r0)
-    print('rf', rf)
-    print('c', c)
-    print('s', s)
-    print('T', T)
+#    print('r0', r0)
+#    print('rf', rf)
+#    print('c', c)
+#    print('s', s)
+#    print('T', T)
     
     # Compute maximum number of orbit revolutions
     M_max = int(np.floor(T/math.pi))
@@ -1745,19 +1745,19 @@ def compute_range_search_arrays(Lmat, Rmat, M_star, tof, step=1000.,
         rmin = rp
         rmax = a_max*(1. + e_max)
         
-        print('M_star', M_star)
-        print('a_max', a_max)
-        print('e_max', e_max)
-        print('rmax', rmax)
+#        print('M_star', M_star)
+#        print('a_max', a_max)
+#        print('e_max', e_max)
+#        print('rmax', rmax)
         
         rho0_max = radius2rho(rmax, rho0_hat, q0_vect)
         rhof_max = radius2rho(rmax, rhof_hat, qf_vect)
         
         
-    print('rho0_min', rho0_min)
-    print('rho0_max', rho0_max)
-    print('rhof_min', rhof_min)
-    print('rhof_max', rhof_max)
+#    print('rho0_min', rho0_min)
+#    print('rho0_max', rho0_max)
+#    print('rhof_min', rhof_min)
+#    print('rhof_max', rhof_max)
         
     
     rho0_array = np.arange(rho0_min, rho0_max, step)
@@ -1806,19 +1806,19 @@ def compute_range_bounds(Lmat, Rmat, M_star, tof, rp=Re+100., GM=GME):
         rmin = rp
         rmax = a_max*(1. + e_max)
         
-        print('M_star', M_star)
-        print('a_max', a_max)
-        print('e_max', e_max)
-        print('rmax', rmax)
+#        print('M_star', M_star)
+#        print('a_max', a_max)
+#        print('e_max', e_max)
+#        print('rmax', rmax)
         
         rho0_max = radius2rho(rmax, rho0_hat, q0_vect)
         rhof_max = radius2rho(rmax, rhof_hat, qf_vect)
         
         
-    print('rho0_min', rho0_min)
-    print('rho0_max', rho0_max)
-    print('rhof_min', rhof_min)
-    print('rhof_max', rhof_max)
+#    print('rho0_min', rho0_min)
+#    print('rho0_max', rho0_max)
+#    print('rhof_min', rhof_min)
+#    print('rhof_max', rhof_max)
         
     
     rho0_bounds = [rho0_min, rho0_max]
