@@ -961,6 +961,9 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
         
         if M_star == 0:
             
+            
+            # Try for a fast solution for single-rev cases
+            
             start = time.time()
         
             # Prograde single revolution case
@@ -970,6 +973,8 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
                 M_star_to_3rho(Lmat, Rmat, UTC_list, tof, M_star, lr_star,
                                orbit_type, periapsis_check=periapsis_check,
                                step=1000., nfail_exit=True)
+                
+            mistake
             
             # Build outputs
             nout = len(rho0_list)
@@ -1001,6 +1006,9 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
             
             single_rev_retrograde_time = time.time() - start
             
+            
+            # If no single rev solutions found, try full search through all
+            # range values
             if len(rho0_output_list) == 0:
                 
                 start = time.time()
@@ -1373,29 +1381,45 @@ seen (in section 2) that the general number of solutions for short-arc coverage 
         # Check bad rho values
         if rho0 < 0 or rhof < 0:
             nfail += 1
+            iters = 0
             rho0, rhof = modify_start_rho(Lmat, Rmat, nfail, rho0, rhof,
                                           rho0_bounds, rhof_bounds)
             
             print('nfail', nfail)
+            print('rho below zero')
             print('rho0', rho0)
             print('rhof', rhof)
             
             continue
         
         # Check for converge on previous solution
+        restart_flag = False
         for ii in range(len(rho0_output_list)):
             rho0_diff = rho0 - rho0_output_list[ii]
             rhof_diff = rhof - rhof_output_list[ii]
-            if np.sqrt(rho0_diff**2. + rhof_diff**2.) < 1.:
+            
+            if np.sqrt(rho0_diff**2. + rhof_diff**2.) > 1.:
+                continue
+            else:                
                 nfail += 1
+                iters = 0
+                restart_flag = True
                 rho0, rhof = modify_start_rho(Lmat, Rmat, nfail, rho0, rhof,
                                           rho0_bounds, rhof_bounds)
             
                 print('nfail', nfail)
+                print('converge on previous')
                 print('rho0', rho0)
                 print('rhof', rhof)
+                print('rho0_diff', rho0_diff)
+                print('rhof_diff', rhof_diff)                
                 
-                continue
+                break
+        
+        if restart_flag:
+            continue
+            
+        
         
     
         # Solve Lambert problem to get LOS vector at intermediate time
@@ -1410,11 +1434,13 @@ seen (in section 2) that the general number of solutions for short-arc coverage 
         if len(rhok_list) == 0:
             
             nfail += 1
+            iters = 0
             
             rho0, rhof = modify_start_rho(Lmat, Rmat, nfail, rho0, rhof,
                                           rho0_bounds, rhof_bounds)
             
             print('nfail', nfail)
+            print('no Lambert solution')
             print('rho0', rho0)
             print('rhof', rhof)
             
@@ -1434,6 +1460,7 @@ seen (in section 2) that the general number of solutions for short-arc coverage 
         rhok_dot = float(np.dot(rhok_obs_hat.T, rhok_calc_vect))
         if rhok_dot/np.linalg.norm(rhok_calc_vect) < -0.99:
             nfail += 1
+            iters = 0
             rho0, rhof = modify_start_rho(Lmat, Rmat, nfail)
             
             print('nfail', nfail)
@@ -1602,12 +1629,12 @@ seen (in section 2) that the general number of solutions for short-arc coverage 
             fconv = f
         else:
             fconv, dum = compute_penalty(rhok_calc_vect, rho0, rhof, p_hat,
-                                         en_hat, rho0_output_list,
-                                         rhof_output_list, Lmat, Rmat)
+                                         en_hat, [], [], Lmat, Rmat)
         
         conv_crit = abs(fconv)/max(rk, rhok_dot)
         print('conv_crit', conv_crit)
         print('denom', rk, rhok_dot)
+        
         
         # For converged solution, store answer and update initial guess
         if conv_crit < tol:
