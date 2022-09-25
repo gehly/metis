@@ -974,7 +974,7 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
                                orbit_type, periapsis_check=periapsis_check,
                                step=1000., nfail_exit=True)
                 
-            mistake
+#            mistake
             
             # Build outputs
             nout = len(rho0_list)
