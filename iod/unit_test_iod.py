@@ -335,23 +335,35 @@ def lambert_test_special():
     
     
     # Time vector
-    UTC0 = datetime(2021, 6, 21, 0, 0, 0)
-    UTC2 = datetime(2021, 6, 21, 6, 0, 0)
+#    UTC0 = datetime(2021, 6, 21, 0, 0, 0)
+#    UTC2 = datetime(2021, 6, 21, 6, 0, 0)
+#    
+#    
+#
+#    r0_vect = np.array([[-2823.6493363 ], [53886.30127711], [ 1201.3599599 ]])
+#    rf_vect = np.array([[-53747.58363224], [ -4088.97163985], [  1226.6602041 ]])
     
-    tof = (UTC2 - UTC0).total_seconds()
-
-    r0_vect = np.array([[ -601.88657074], [34105.83994351], [ -747.25997322]])
     
 #    v0_vect [[-3.01862531]
 #     [ 0.8452397 ]
 #     [-0.08520894]]
     
-    rf_vect = np.array([[-34030.3235281 ], [ -1365.71766779], [  -726.16897159]])
-    
 #    vf_vect [[ 1.02292154]
 #     [-2.96932209]
 #     [ 0.08660587]]
     
+    
+    
+    
+    # HEO Molniya case
+    UTC0 = datetime(1999, 10, 4, 2, 3)
+    UTC2 = datetime(1999, 10, 4, 11, 44)
+    
+    r0_vect = np.array([[ 1085.07121139], [ 9294.12313532], [-1611.11613065]])
+    rf_vect = np.array([[-10785.04618542], [-17036.11892906], [ 21668.73671188]])
+    
+    
+    tof = (UTC2 - UTC0).total_seconds()
     v0_list, vf_list, M_list, type_list = \
         iod.izzo_lambert(r0_vect, rf_vect, tof)
         
@@ -369,6 +381,8 @@ def lambert_test_special():
         print('ii', ii)
         print('Xo_test', Xo_test)
         print('Xf_test', Xf_test)
+        print('elem0', astro.cart2kep(Xo_test))
+        print('elemf', astro.cart2kep(Xf_test))
         print('rf err', np.linalg.norm(Xf_test[0:3].reshape(3,1) - rf_vect))
 
     return

@@ -215,6 +215,13 @@ def mean2hyp(M, e):
     # Ensure M is between -pi and pi
     if M > pi or M < -pi:
         print('Error: Expected -pi < M < pi!')
+        print('M', M)
+        
+    if M > pi:
+        M -= 2.*pi
+        
+    if M < -pi:
+        M += 2.*pi
 
     # Form starting guess for H
     H = M
@@ -1030,7 +1037,337 @@ def kep2cart(elem, GM=GME):
     
     v_vect = -GM/h * np.array([[vv1], [vv2], [vv3]])
 
-    cart = np.concatenate([r_vect, v_vect])
+    cart = np.concatenate((r_vect, v_vect), axis=0)
+    
+    return cart
+
+
+def kep2eqn(kep):
+    '''
+    This function converts a vector of Keplerian orbital elements to a vector
+    of equinoctial orbital elements
+    
+    Parameters
+    ------
+    kep : 6x1 numpy array
+    
+    Keplerian Orbital Elements
+    ------
+    kep[0] : a
+      Semi-Major Axis             [km]
+    kep[1] : e
+      Eccentricity                [unitless]
+    kep[2] : i
+      Inclination                 [deg]
+    kep[3] : RAAN
+      Right Asc Ascending Node    [deg]
+    kep[4] : w
+      Argument of Periapsis       [deg]
+    kep[5] : theta
+      True Anomaly                [deg]
+      
+      
+    Returns
+    ------
+    eqn : 6x1 numpy array
+    
+    Equinoctial Orbital Elements
+    ------
+    eqn[0] : a
+      Semi-Major Axis               [km]
+    eqn[1] : k
+      k = e*cos(w + RAAN)           [unitless]
+    cart[2] : h
+      h = e*sin(w + RAAN)           [unitless]
+    cart[3] : q
+      q = tan(i/2)*cos(RAAN)        [unitless]
+    cart[4] : p
+      p = tan(i/2)*sin(RAAN)        [unitless]
+    cart[5] : lambda
+      Mean Longitude                [deg]  
+      
+    '''
+    
+    # Retrieve input elements, convert to radians
+    a = float(kep[0])
+    e = float(kep[1])
+    i = float(kep[2]) * pi/180
+    RAAN = float(kep[3]) * pi/180
+    w = float(kep[4]) * pi/180
+    theta = float(kep[5]) * pi/180
+    
+    # Compute mean anomaly
+    E = true2ecc(theta, e)
+    M = ecc2mean(E, e)
+    
+    # Compute equinoctial elements
+    k = e*cos(w + RAAN)
+    h = e*sin(w + RAAN)
+    q = tan(i/2)*cos(RAAN)
+    p = tan(i/2)*sin(RAAN)
+    lam = (RAAN + w + M)*180./pi
+    
+    # Reset range to 0-360
+    lam = lam % 360.
+    
+    # Output
+    eqn = np.array([[a], [k], [h], [q], [p], [lam]])    
+    
+    return eqn
+
+
+def kep2modeqn(kep):
+    '''
+    This function converts a vector of Keplerian orbital elements to a vector
+    of modified equinoctial orbital elements
+    
+    Parameters
+    ------
+    kep : 6x1 numpy array
+    
+    Keplerian Orbital Elements
+    ------
+    kep[0] : a
+      Semi-Major Axis             [km]
+    kep[1] : e
+      Eccentricity                [unitless]
+    kep[2] : i
+      Inclination                 [deg]
+    kep[3] : RAAN
+      Right Asc Ascending Node    [deg]
+    kep[4] : w
+      Argument of Periapsis       [deg]
+    kep[5] : theta
+      True Anomaly                [deg]
+      
+      
+    Returns
+    ------
+    modeqn : 6x1 numpy array
+    
+    Modified Equinoctial Orbital Elements
+    ------
+    eqn[0] : p
+      Semi-Latus Rectum             [km]
+    eqn[1] : k
+      f = e*cos(w + RAAN)           [unitless]
+    cart[2] : h
+      g = e*sin(w + RAAN)           [unitless]
+    cart[3] : q
+      h = tan(i/2)*cos(RAAN)        [unitless]
+    cart[4] : p
+      k = tan(i/2)*sin(RAAN)        [unitless]
+    cart[5] : L
+      True Longitude                [deg]  
+      
+    '''
+    
+    # Retrieve input elements, convert to radians
+    a = float(kep[0])
+    e = float(kep[1])
+    i = float(kep[2]) * pi/180
+    RAAN = float(kep[3]) * pi/180
+    w = float(kep[4]) * pi/180
+    theta = float(kep[5]) * pi/180
+    
+    # Compute modified equinoctial elements
+    p = a*(1. - e**2.)
+    f = e*cos(w + RAAN)
+    g = e*sin(w + RAAN)
+    h = tan(i/2)*cos(RAAN)
+    k = tan(i/2)*sin(RAAN)
+    L = (RAAN + w + theta)*180./pi
+    
+    # Reset range to 0-360
+    L = L % 360.
+    
+    # Output
+    modeqn = np.array([[p], [f], [g], [h], [k], [L]])    
+    
+    return modeqn
+
+
+def cart2eqn(cart, GM=GME):
+    '''
+    This function converts a Cartesian state vector in inertial frame to
+    equinoctial orbital elements.
+    
+    Parameters
+    ------
+    cart : 6x1 numpy array
+    
+    Cartesian Coordinates (Inertial Frame)
+    ------
+    cart[0] : x
+      Position in x               [km]
+    cart[1] : y
+      Position in y               [km]
+    cart[2] : z
+      Position in z               [km]
+    cart[3] : dx
+      Velocity in x               [km/s]
+    cart[4] : dy
+      Velocity in y               [km/s]
+    cart[5] : dz
+      Velocity in z               [km/s]
+      
+    Returns
+    ------
+    eqn : 6x1 numpy array
+    
+    Equinoctial Orbital Elements
+    ------
+    eqn[0] : a
+      Semi-Major Axis               [km]
+    eqn[1] : k
+      k = e*cos(w + RAAN)           [unitless]
+    cart[2] : h
+      h = e*sin(w + RAAN)           [unitless]
+    cart[3] : q
+      q = tan(i/2)*cos(RAAN)        [unitless]
+    cart[4] : p
+      p = tan(i/2)*sin(RAAN)        [unitless]
+    cart[5] : lambda
+      Mean Longitude                [deg]  
+      
+    '''
+    
+    kep = cart2kep(cart, GM)
+    eqn = kep2eqn(kep)    
+    
+    return eqn
+
+
+def cart2modeqn(cart, GM=GME):
+    '''
+    This function converts a Cartesian state vector in inertial frame to
+    modified equinoctial orbital elements.
+    
+    Parameters
+    ------
+    cart : 6x1 numpy array
+    
+    Cartesian Coordinates (Inertial Frame)
+    ------
+    cart[0] : x
+      Position in x               [km]
+    cart[1] : y
+      Position in y               [km]
+    cart[2] : z
+      Position in z               [km]
+    cart[3] : dx
+      Velocity in x               [km/s]
+    cart[4] : dy
+      Velocity in y               [km/s]
+    cart[5] : dz
+      Velocity in z               [km/s]
+      
+    Returns
+    ------
+    modeqn : 6x1 numpy array
+    
+    Modified Equinoctial Orbital Elements
+    ------
+    eqn[0] : p
+      Semi-Latus Rectum             [km]
+    eqn[1] : k
+      f = e*cos(w + RAAN)           [unitless]
+    cart[2] : h
+      g = e*sin(w + RAAN)           [unitless]
+    cart[3] : q
+      h = tan(i/2)*cos(RAAN)        [unitless]
+    cart[4] : p
+      k = tan(i/2)*sin(RAAN)        [unitless]
+    cart[5] : L
+      True Longitude                [deg]   
+      
+    '''
+    
+    kep = cart2kep(cart, GM)
+    modeqn = kep2modeqn(kep)    
+    
+    return modeqn
+
+
+def modeqn2cart(modeqn, GM=GME):
+    '''
+    This function converts a vector of modified equinoctial orbital elements 
+    to a Cartesian state vector in inertial frame.
+    
+    Parameters
+    ------
+    modeqn : 6x1 numpy array
+    
+    Modified Equinoctial Orbital Elements
+    ------
+    eqn[0] : p
+      Semi-Latus Rectum             [km]
+    eqn[1] : k
+      f = e*cos(w + RAAN)           [unitless]
+    cart[2] : h
+      g = e*sin(w + RAAN)           [unitless]
+    cart[3] : q
+      h = tan(i/2)*cos(RAAN)        [unitless]
+    cart[4] : p
+      k = tan(i/2)*sin(RAAN)        [unitless]
+    cart[5] : L
+      True Longitude                [deg]
+      
+      
+    Returns
+    ------
+    cart : 6x1 numpy array
+    
+    Cartesian Coordinates (Inertial Frame)
+    ------
+    cart[0] : x
+      Position in x               [km]
+    cart[1] : y
+      Position in y               [km]
+    cart[2] : z
+      Position in z               [km]
+    cart[3] : dx
+      Velocity in x               [km/s]
+    cart[4] : dy
+      Velocity in y               [km/s]
+    cart[5] : dz
+      Velocity in z               [km/s]
+      
+      
+    Reference
+    ------
+    [1] Betts, J.T., "Practical Method for Optimal Control and Estimation 
+        Using Nonlinear Programming," 2nd ed. 2010.
+      
+    '''
+    
+    # Retrieve input elements, convert to radians
+    p = float(modeqn[0])
+    f = float(modeqn[1])
+    g = float(modeqn[2])
+    h = float(modeqn[3])
+    k = float(modeqn[4])
+    L = float(modeqn[5]) * pi/180
+    
+    # Compute intermediate quantities (Betts Eq 6.37-6.41)
+    q = 1. + f*cos(L) + g*sin(L)
+    r = p/q
+    alpha2 = h**2. - k**2.
+    chi = np.sqrt(h**2. + k**2.)
+    s2 = 1. + chi**2.
+    
+    # Compute inertial position and velocity vectors
+    r_vect = (r/s2)*np.array([[cos(L) + alpha2*cos(L) + 2.*h*k*sin(L)],
+                               [sin(L) - alpha2*sin(L) + 2.*h*k*cos(L)],
+                               [2.*(h*sin(L) - k*cos(L))]])
+    
+    v1 =  sin(L) + alpha2*sin(L) - 2.*h*k*cos(L) + g - 2.*f*h*k + alpha2*g
+    v2 = -cos(L) + alpha2*cos(L) + 2.*h*k*sin(L) - f + 2.*g*h*k + alpha2*f
+    v3 = -2.*(h*cos(L) + k*sin(L) + f*h + g*k)
+    
+    v_vect = (-1./s2)*np.sqrt(GM/p)*np.array([[v1], [v2], [v3]])
+    
+    cart = np.concatenate((r_vect, v_vect), axis=0)    
     
     return cart
 
@@ -1183,6 +1520,7 @@ def element_conversion(x_in, iflag, oflag, GM=GME, dt=0.):
             n = np.sqrt(GM/-a**3)
             Hrad = 2*atanh(np.sqrt((e-1)/(e+1))*tan(f/2))  # rad
             Mo = e*sinh(Hrad) - Hrad  # rad
+            
         else:
             print('Error, input orbit is parabolic, a = ', a)
         
@@ -1218,7 +1556,7 @@ def element_conversion(x_in, iflag, oflag, GM=GME, dt=0.):
         elif a < 0:
             Hrad = mean2hyp(M, e)    # rad
             f = 2*atan(np.sqrt((e+1)/(e-1))*tanh(Hrad/2))    # rad
-            r = a*(1 - e*cos(Hrad))     # km
+            r = a*(1 - e*cosh(Hrad))     # km
 
         # Calculate theta
         theta = f + w   # rad
@@ -1292,9 +1630,26 @@ if __name__ == '__main__':
 #    print(LTAN)
     
     
-    cart = np.array([710.87, 5151.26, 5075.69, 0.9039, -5.222, 5.1735])
-    kep = cart2kep(cart)
-    print(kep)
+#    cart = np.array([710.87, 5151.26, 5075.69, 0.9039, -5.222, 5.1735])
+#    kep = cart2kep(cart)
+#    print(kep)
+    
+    kep = np.array([42164.1, 0., 0., 20., 30., 0.])
+    cart = kep2cart(kep)
+    eqn = kep2eqn(kep)
+    modeqn = kep2modeqn(kep)
+    
+    cart2 = modeqn2cart(modeqn)
+    err = np.linalg.norm(cart - cart2)
+    
+    print('kep', kep)
+    print('cart', cart)
+    print('eqn', eqn)
+    print('modeqn', modeqn)
+    print('cart2', cart2)
+    print('err', err)
+    
+    
     
     
     
