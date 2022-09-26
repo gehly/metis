@@ -1468,7 +1468,8 @@ seen (in section 2) that the general number of solutions for short-arc coverage 
         if rhok_dot/np.linalg.norm(rhok_calc_vect) < -0.99:
             nfail += 1
             iters = 0
-            rho0, rhof = modify_start_rho(Lmat, Rmat, nfail)
+            rho0, rhof = modify_start_rho(Lmat, Rmat, nfail, rho0, rhof,
+                                          rho0_bounds, rhof_bounds)
             
             print('nfail', nfail)
             print('rho0', rho0)
@@ -1785,7 +1786,7 @@ seen (in section 2) that the general number of solutions for short-arc coverage 
             crit_min = float(conv_crit)
             
         # Store values for future comparison
-        f_old = float(f)
+        f_old = float(fc)
         rho0_old = float(rho0)
         rhof_old = float(rhof)
         

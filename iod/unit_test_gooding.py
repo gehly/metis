@@ -1277,7 +1277,7 @@ if __name__ == '__main__':
     
 #    single_rev_leo_retro()
     
-    single_rev_meo()
+#    single_rev_meo()
     
 #    single_rev_heo()
     
@@ -1285,7 +1285,7 @@ if __name__ == '__main__':
     
 #    single_rev_hyperbola()
     
-#    multi_rev_geo()
+    multi_rev_geo()
     
     
     
