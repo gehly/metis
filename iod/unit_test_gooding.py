@@ -1281,11 +1281,11 @@ if __name__ == '__main__':
     
 #    single_rev_heo()
     
-#    single_rev_gto()
+    single_rev_gto()
     
 #    single_rev_hyperbola()
     
-    multi_rev_geo()
+#    multi_rev_geo()
     
     
     

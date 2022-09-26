@@ -1334,7 +1334,7 @@ def M_star_to_3rho(Lmat, Rmat, UTC_list, tof, M_star, lr_star, orbit_type,
 
 def iterate_rho(rho0_init, rhof_init, tof, M_star, lr_star, orbit_type, Lmat,
                 Rmat, UTC_list, rho0_output_list, rhof_output_list,
-                rho0_bounds, rhof_bounds, periapsis_check=True):
+                rho0_bounds, rhof_bounds, periapsis_check=True, HN=1.):
     '''
     
     Gooding 1993:
@@ -1359,7 +1359,11 @@ seen (in section 2) that the general number of solutions for short-arc coverage 
     
     # Gooding (1996) suggests 1e-12, orekit uses 1e-14
     tol = 1e-14
-        
+    
+    # Criteria for near-singular matrix, use geometric mean of NR and 
+    # (Halley or mNR) solutions
+    crit_gm = 1e-3
+    
     conv_crit = 1.
     iters = 0
     maxiters = 100
@@ -1681,15 +1685,44 @@ seen (in section 2) that the general number of solutions for short-arc coverage 
             d2g_drho0f -= dg_drhof*w0 + dg_drho0*wf
             
             
-        # Compute increments for rho0, rhof
-        D = df_drho0*dg_drhof - df_drhof*dg_drho0
+        # Compute Newton-Raphson increments
+        D_NR = df_drho0*dg_drhof - df_drhof*dg_drho0
         
-        delta_rho0 = -(1./D) * f * dg_drhof
-        delta_rhof =  (1./D) * f * dg_drho0
+        delta_rho0_NR = -(1./D_NR) * f * dg_drhof
+        delta_rhof_NR =  (1./D_NR) * f * dg_drho0
         
-        print('D', D)
-        print('delta_rho0', delta_rho0)
-        print('delta_rhof', delta_rhof)  
+        print('D_NR', D_NR)
+        print('delta_rho0_NR', delta_rho0_NR)
+        print('delta_rhof_NR', delta_rhof_NR)
+        
+        # Compute Halley/mNR derivatives
+        # If HN = 0.5 use Halley formula
+        # If HN = 1.0 use modifed Newton-Raphson formula
+        # Use of modified Newton-Raphson should be more robust in case of 
+        # neighboring solutions
+        df_drho0_H = df_drho0 + HN*(d2f_drho02*delta_rho0_NR + d2f_drho0f*delta_rhof_NR)
+        df_drhof_H = df_drhof + HN*(d2f_drho0f*delta_rho0_NR + d2f_drhof2*delta_rhof_NR)
+        dg_drho0_H = dg_drho0 + HN*(d2g_drho02*delta_rho0_NR + d2g_drho0f*delta_rhof_NR)
+        dg_drhof_H = dg_drhof + HN*(d2g_drho0f*delta_rho0_NR + d2g_drhof2*delta_rhof_NR)
+        
+        D_H = df_drho0_H*dg_drhof_H - df_drhof_H*dg_drho0_H
+        
+        delta_rho0 = -(1./D_H) * f * dg_drhof_H
+        delta_rhof =  (1./D_H) * f * dg_drho0_H
+        
+        # Check for near singular derivative matrix
+        H = df_drho0**2. + df_drhof**2. + dg_drho0**2. + dg_drhof**2.
+        dd = 2.*abs(D_NR)/(H + np.sqrt(H**2. - 4.*D_NR**2.))
+        
+        # If below threshold, use geometric mean of NR and (Halley or mNR)
+        if dd < crit_gm:
+            delta_rho0 = np.sign(delta_rho0_NR) * np.sqrt(abs(delta_rho0_NR*delta_rho0))
+            delta_rhof = np.sign(delta_rhof_NR) * np.sqrt(abs(delta_rhof_NR*delta_rhof))
+            
+        
+        
+        
+        
         
         
         
