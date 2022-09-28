@@ -7,6 +7,7 @@ import inspect
 from datetime import datetime, timedelta
 import time
 import itertools
+import random
 
 filename = inspect.getframeinfo(inspect.currentframe()).filename
 current_dir = os.path.dirname(os.path.abspath(filename))
@@ -940,7 +941,7 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
 
     # Compute maximum number of revolutions that could occur during tof
     # assuming very low circular orbit
-    M_max = compute_M_max(Lmat, Rmat, tof, GM, R)
+    M_max = compute_M_max(Lmat, Rmat, tof, GM, R, orbit_regime)
     M_candidates = list(range(M_max+1))
     
     print('M_max', M_max)
@@ -957,7 +958,22 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
     multirev_time_list = []
     for M_star in M_candidates:
         
-        print('\nM_star', M_star)
+        print('\nM_star', M_star)        
+        
+        # Compute the range pairs to use as initial guesses
+        range_pairs_list, orbit_regime_fail = \
+            compute_range_search_list(Lmat, Rmat, M_star, tof, orbit_regime)
+            
+        # If no viable solutions for the given orbit regime and revolution
+        # number, try next value
+        if orbit_regime_fail:
+            continue
+        
+        # Get the indices to use to retrieve range pairs
+        range_ind_list = compute_range_ind_list(range_pairs_list, search_mode)
+        
+        
+        
         
         if M_star == 0:
             
@@ -1844,10 +1860,33 @@ seen (in section 2) that the general number of solutions for short-arc coverage 
     return rho0_output_list, rhof_output_list, exit_flag
 
 
-def compute_M_max(Lmat, Rmat, tof, GM=GME, R=Re):
+def compute_M_max(Lmat, Rmat, tof, GM=GME, R=Re, orbit_regime='none'):
 
-    # Minimum orbit radius
-    rmin = R + 100.
+
+    
+    # Retrieve parameters for each orbit regime (using Ref 1 rmin/rmax)
+    if orbit_regime == 'LEO':
+        rmin = R + 100.
+        a_min = rmin
+        
+    elif orbit_regime == 'MEO':
+        rmin = R + 2000.
+        a_min = rmin
+        
+    elif orbit_regime == 'GEO':
+        rmin = 40000.
+        a_min = rmin
+        
+    elif orbit_regime == 'HEO':
+        rp_min = R + 100.
+        ra_min = R + 2000.
+        a_min = (rp_min + ra_min)/2.
+        
+    else:
+        rmin = R + 100.     
+        a_min = rmin
+    
+    
     
     # Vectors
     rho0_hat = Lmat[:,0].reshape(3,1)
@@ -1880,8 +1919,8 @@ def compute_M_max(Lmat, Rmat, tof, GM=GME, R=Re):
     s = 0.5 * (r0 + rf + c)
     
     # Test for minimum energy ellipse (s = 2*a_min) must be valid orbit
-    if s < 2.*(R + 100.):
-        s = 2.*(R + 100.)
+    if s < 2.*a_min:
+        s = 2.*a_min
     
     # Compute non-dimensional time of flight T
     T = np.sqrt(2*GM/s**3.) * tof
@@ -1898,135 +1937,329 @@ def compute_M_max(Lmat, Rmat, tof, GM=GME, R=Re):
     return M_max
 
 
-def compute_range_search_arrays(Lmat, Rmat, M_star, tof, step=1000., 
-                                rp=Re+100., GM=GME):
+
+def compute_range_search_list(Lmat, Rmat, M_star, tof, orbit_regime='none'):
+    '''
+    This function generates a list of rho0 and rhof value pairs for use as an
+    initial guess in the Gooding angles-only IOD method. Minimum and maximum
+    values are computed based on the sensor locations and pointing directions
+    and orbit characteristics including (optionally) the orbit regime.
+    
+    Parameters
+    ------
+    Lmat : 3xN numpy array
+        columns correspond to line of sight unit vectors in ECI for each
+        observation time
+    Rmat : 3xN numpy array
+        columns correspond to sensor location vectors in ECI for each 
+        observation time [km]
+    M_star : int
+        exact integer number of complete orbit revolutions traversed
+    tof : float
+        time of flight from the first to last observation [sec]
+    orbit_regime : string, optional
+        choose from 'LEO', 'GEO', 'HEO', 'MEO', or 'none' (default='none')
+    
+    Returns
+    ------
+    range_pairs_list : list
+        list of rho0 and rhof values to use as initial guess for Gooding
+        angles-only IOD [km]    
+    orbit_regime_fail : boolean
+        exit status flag, indicate if the given M_star does not yield a viable
+        solution within the given orbit regime (fail = True)
+    
+    References
+    ------
+    [1] Holzinger, M. et al., "Uncorrelated-Track Classification,
+        Characterization, and Prioritization Using Admissible Regions and 
+        Bayesian Inference," JGCD 2016.
+    
+    
     '''
     
+    # Initialize output
+    orbit_regime_fail = False
     
-    '''
+    # Retrieve parameters for each orbit regime (using Ref 1 rmin/rmax)
+    GM = GME
+    if orbit_regime == 'LEO':
+        rmin = Re + 100.
+        rmax = Re + 2000.
+        step = 500.
+        
+    elif orbit_regime == 'MEO':
+        rmin = Re + 2000.
+        rmax = 40000.
+        step = 1000.
+        
+    elif orbit_regime == 'GEO':
+        rmin = 40000.
+        rmax = 45000.
+        step = 1000.
+        
+    elif orbit_regime == 'HEO':
+        rmin = Re + 100.
+        rmax = 50000.
+        step = 5000.
+        
+    else:
+        rmin = Re + 100.
+        rmax = 50000.
+        step = 1000.        
     
-    # Vectors
+    # Sensor location and pointing vectors 
     rho0_hat = Lmat[:,0].reshape(3,1)
-    q0_vect = Rmat[:,0].reshape(3,1)
-    
+    q0_vect = Rmat[:,0].reshape(3,1)    
     rhof_hat = Lmat[:,-1].reshape(3,1)
     qf_vect = Rmat[:,-1].reshape(3,1)
     
-    # Compute minimum ranges
-    rmin = rp
-    rho0_min = radius2rho(rmin, rho0_hat, q0_vect)
-    rhof_min = radius2rho(rmin, rhof_hat, qf_vect)
-    
-    # Single revolution
-    if M_star == 0:
-        
-        # Max range limited by optical detection limit
-        rho0_max = 50000.
-        rhof_max = 50000.
-        
-    
-    # Orbit parameters for multi-rev cases
+    # Further restrict maximum range values using orbit revolution number
     if M_star > 0:
         
         # Compute orbit parameters for extreme case to get upper bound on 
         # orbit radius and range
+        rp = rmin
         n_min = (M_star/tof)*2.*math.pi
         a_max = (GM/n_min**2.)**(1./3.)
         e_max = 1. - (rp/a_max)        
-        
-        rmin = rp
-        rmax = a_max*(1. + e_max)
+
+        rmax_M = a_max*(1. + e_max)
         
         print('M_star', M_star)
         print('a_max', a_max)
         print('e_max', e_max)
-        print('rmax', rmax)
+        print('rmax_M', rmax_M)
         
-        rho0_max = radius2rho(rmax, rho0_hat, q0_vect)
-        rhof_max = radius2rho(rmax, rhof_hat, qf_vect)
+        # Exit condition
+        # If the maximum orbit radius allowable to complete M_star revolutions
+        # is less than the minimum radius of the given orbit regime, there is
+        # no valid solution
+        if rmax_M < rmin:
+            orbit_regime_fail = True
+            return [], orbit_regime_fail
         
-        
+        # If newly computed rmax is less than generic value for orbit regime,
+        # update to use the new value corresponding to the revolution number
+        if rmax_M < rmax:
+            rmax = rmax_M
+            
+    # Compute minimum and maximum ranges
+    rho0_min = radius2rho(rmin, rho0_hat, q0_vect)
+    rhof_min = radius2rho(rmin, rhof_hat, qf_vect)  
+    rho0_max = radius2rho(rmax, rho0_hat, q0_vect)
+    rhof_max = radius2rho(rmax, rhof_hat, qf_vect)  
+    
     print('rho0_min', rho0_min)
     print('rho0_max', rho0_max)
     print('rhof_min', rhof_min)
     print('rhof_max', rhof_max)
-        
-    
+
+    # Compute range search arrays
     rho0_array = np.arange(rho0_min, rho0_max, step)
     rho0_array = np.append(rho0_array, rho0_max)
     rhof_array = np.arange(rhof_min, rhof_max, step)
     rhof_array = np.append(rhof_array, rhof_max)
     
-    return rho0_array, rhof_array
+    # Form list of range pairs    
+    range_pairs = itertools.product(rho0_array, rhof_array)
+    range_pairs_list = [list(pair) for pair in range_pairs]
+    
+
+    rho0_bounds = [rho0_array[0], rho0_array[-1]]
+    rhof_bounds = [rhof_array[0], rhof_array[-1]]
+    
+    return range_pairs_list, orbit_regime_fail
 
 
-def compute_range_bounds(Lmat, Rmat, M_star, tof, rp=Re+100., GM=GME):
+def compute_range_ind_list(range_pairs_list, search_mode='middle_out'):
+    '''
+    This function generates a list of indices to select from the range pairs
+    list in different orders, as set by the search mode input.
+    
+    Parameters
+    ------
+    range_pairs_list : list
+        list of rho0 and rhof values to use as initial guess for Gooding
+        angles-only IOD [km] 
+    search_mode : string, optional
+        determines how to index into the range_pairs_list
+        'bottom_up' = start from minimum rho0, rhof and proceed upwards
+        'random' = randomly indexed
+        'middle_out' = start from middle and proceed in regular increments
+        
+    Returns
+    ------
+    range_ind_list : list
+        indices to use to retrieve range pair values
+        
+    '''
+    
+    nrange = len(range_pairs_list)
+        
+    if search_mode == 'bottom_up':
+        range_ind_list = list(range(nrange))
+        
+    elif search_mode == 'random':
+        range_ind_list = list(range(nrange))
+        random.shuffle(range_ind_list)
+
+    elif search_mode == 'middle_out':
+        ind = int(np.floor(nrange/2))
+        increment = int(np.floor(nrange/4))
+        
+        while math.gcd(nrange, increment) != 1:
+            increment += 1
+            
+        range_ind_list = [(ind+increment*ii) % nrange for ii in range(nrange)]
+
+    return range_ind_list
+
+
+def retrieve_next_range(range_pairs_list, prev_ind, increment):
     '''
     
     
     '''
     
-    # Vectors
-    rho0_hat = Lmat[:,0].reshape(3,1)
-    q0_vect = Rmat[:,0].reshape(3,1)
+    nrange = len(range_pairs_list)
+    ind = (prev_ind + increment) % nrange
+    rho0 = float(range_pairs_list[ind][0])
+    rhof = float(range_pairs_list[ind][1])    
     
-    rhof_hat = Lmat[:,-1].reshape(3,1)
-    qf_vect = Rmat[:,-1].reshape(3,1)
-    
-    # Compute minimum ranges
-    rmin = rp
-    rho0_min = radius2rho(rmin, rho0_hat, q0_vect)
-    rhof_min = radius2rho(rmin, rhof_hat, qf_vect)
-    
-    # Single revolution
-    if M_star == 0:
-        
-        # Max range limited by optical detection limit
-        rho0_max = 50000.
-        rhof_max = 50000.
-        
-    
-    # Orbit parameters for multi-rev cases
-    if M_star > 0:
-        
-        # Compute orbit parameters for extreme case to get upper bound on 
-        # orbit radius and range
-        n_min = (M_star/tof)*2.*math.pi
-        a_max = (GM/n_min**2.)**(1./3.)
-        e_max = 1. - (rp/a_max)        
-        
-        rmin = rp
-        rmax = a_max*(1. + e_max)
-        
-        print('M_star', M_star)
-        print('a_max', a_max)
-        print('e_max', e_max)
-        print('rmax', rmax)
-        
-        rho0_max = radius2rho(rmax, rho0_hat, q0_vect)
-        rhof_max = radius2rho(rmax, rhof_hat, qf_vect)
-        
-        
-    print('rho0_min', rho0_min)
-    print('rho0_max', rho0_max)
-    print('rhof_min', rhof_min)
-    print('rhof_max', rhof_max)
-        
-    
-    rho0_bounds = [rho0_min, rho0_max]
-    rhof_bounds = [rhof_min, rhof_max]
-    
-    return rho0_bounds, rhof_bounds
+    return rho0, rhof, ind
+
+
+#def compute_range_search_arrays(Lmat, Rmat, M_star, tof, step=1000., 
+#                                rp=Re+100., GM=GME):
+#    '''
+#    
+#    
+#    '''
+#    
+#    # Vectors
+#    rho0_hat = Lmat[:,0].reshape(3,1)
+#    q0_vect = Rmat[:,0].reshape(3,1)
+#    
+#    rhof_hat = Lmat[:,-1].reshape(3,1)
+#    qf_vect = Rmat[:,-1].reshape(3,1)
+#    
+#    # Compute minimum ranges
+#    rmin = rp
+#    rho0_min = radius2rho(rmin, rho0_hat, q0_vect)
+#    rhof_min = radius2rho(rmin, rhof_hat, qf_vect)
+#    
+#    # Single revolution
+#    if M_star == 0:
+#        
+#        # Max range limited by optical detection limit
+#        rho0_max = 50000.
+#        rhof_max = 50000.
+#        
+#    
+#    # Orbit parameters for multi-rev cases
+#    if M_star > 0:
+#        
+#        # Compute orbit parameters for extreme case to get upper bound on 
+#        # orbit radius and range
+#        n_min = (M_star/tof)*2.*math.pi
+#        a_max = (GM/n_min**2.)**(1./3.)
+#        e_max = 1. - (rp/a_max)        
+#        
+#        rmin = rp
+#        rmax = a_max*(1. + e_max)
+#        
+#        print('M_star', M_star)
+#        print('a_max', a_max)
+#        print('e_max', e_max)
+#        print('rmax', rmax)
+#        
+#        rho0_max = radius2rho(rmax, rho0_hat, q0_vect)
+#        rhof_max = radius2rho(rmax, rhof_hat, qf_vect)
+#        
+#        
+#    print('rho0_min', rho0_min)
+#    print('rho0_max', rho0_max)
+#    print('rhof_min', rhof_min)
+#    print('rhof_max', rhof_max)
+#        
+#    
+#    rho0_array = np.arange(rho0_min, rho0_max, step)
+#    rho0_array = np.append(rho0_array, rho0_max)
+#    rhof_array = np.arange(rhof_min, rhof_max, step)
+#    rhof_array = np.append(rhof_array, rhof_max)
+#    
+#    return rho0_array, rhof_array
+#
+#
+#def compute_range_bounds(Lmat, Rmat, M_star, tof, rp=Re+100., GM=GME):
+#    '''
+#    
+#    
+#    '''
+#    
+#    # Vectors
+#    rho0_hat = Lmat[:,0].reshape(3,1)
+#    q0_vect = Rmat[:,0].reshape(3,1)
+#    
+#    rhof_hat = Lmat[:,-1].reshape(3,1)
+#    qf_vect = Rmat[:,-1].reshape(3,1)
+#    
+#    # Compute minimum ranges
+#    rmin = rp
+#    rho0_min = radius2rho(rmin, rho0_hat, q0_vect)
+#    rhof_min = radius2rho(rmin, rhof_hat, qf_vect)
+#    
+#    # Single revolution
+#    if M_star == 0:
+#        
+#        # Max range limited by optical detection limit
+#        rho0_max = 50000.
+#        rhof_max = 50000.
+#        
+#    
+#    # Orbit parameters for multi-rev cases
+#    if M_star > 0:
+#        
+#        # Compute orbit parameters for extreme case to get upper bound on 
+#        # orbit radius and range
+#        n_min = (M_star/tof)*2.*math.pi
+#        a_max = (GM/n_min**2.)**(1./3.)
+#        e_max = 1. - (rp/a_max)        
+#        
+#        rmin = rp
+#        rmax = a_max*(1. + e_max)
+#        
+#        print('M_star', M_star)
+#        print('a_max', a_max)
+#        print('e_max', e_max)
+#        print('rmax', rmax)
+#        
+#        rho0_max = radius2rho(rmax, rho0_hat, q0_vect)
+#        rhof_max = radius2rho(rmax, rhof_hat, qf_vect)
+#        
+#        
+#    print('rho0_min', rho0_min)
+#    print('rho0_max', rho0_max)
+#    print('rhof_min', rhof_min)
+#    print('rhof_max', rhof_max)
+#        
+#    
+#    rho0_bounds = [rho0_min, rho0_max]
+#    rhof_bounds = [rhof_min, rhof_max]
+#    
+#    return rho0_bounds, rhof_bounds
 
 
 def radius2rho(r, rho_hat_eci, site_eci):
     '''
-    This function computes range value to yield a given orbit radius
+    This function computes range value from a sensor to space object
+    corresponding to a given orbit radius.
     
     Parameters
     ------
     r : float
-        orbit radius
+        orbit radius [km]
     rho_hat_eci : 3x1 numpy array
         LOS unit vector in ECI
     site_eci : 3x1 numpy array
