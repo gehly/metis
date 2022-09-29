@@ -855,7 +855,7 @@ def compute_hypergeom_2F1(a, b, c, d):
 
 
 ###############################################################################
-# Angles-Only IOD Methods
+# Gooding Angles-Only IOD
 ###############################################################################
 
 def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
@@ -1281,7 +1281,7 @@ seen (in section 2) that the general number of solutions for short-arc coverage 
 #                                          rho0_bounds, rhof_bounds)
             
 #            print('nfail', nfail)
-            print('rho below zero')
+            print('rho out of range')
             print('rho0', rho0)
             print('rhof', rhof)
             
@@ -1748,6 +1748,7 @@ def compute_M_max(Lmat, Rmat, tof, GM=GME, R=Re, orbit_regime='none'):
     elif orbit_regime == 'HEO':
         rp_min = R + 100.
         ra_min = R + 2000.
+        rmin = rp_min
         a_min = (rp_min + ra_min)/2.
         
     else:
@@ -1933,10 +1934,6 @@ def compute_range_search_list(Lmat, Rmat, M_star, tof, orbit_regime='none'):
     range_pairs = itertools.product(rho0_array, rhof_array)
     range_pairs_list = [list(pair) for pair in range_pairs]
     
-
-    rho0_bounds = [rho0_array[0], rho0_array[-1]]
-    rhof_bounds = [rhof_array[0], rhof_array[-1]]
-    
     return range_pairs_list, orbit_regime_fail
 
 
@@ -2056,165 +2053,6 @@ def compute_penalty(rhok_vect, rho0, rhof, p_hat, en_hat, rho0_list, rhof_list,
     return f, g
 
 
-def modify_start_rho(Lmat, Rmat, nfail, rho0, rhof, rho0_bounds, rhof_bounds):
-    '''
-    
-    
-    '''
-    
-#    # Compute LOS unit vectors and sensor positions
-#    rho0_hat = Lmat[:,0].reshape(3,1)
-#    q0_vect = Rmat[:,0].reshape(3,1)    
-#    rhof_hat = Lmat[:,-1].reshape(3,1)
-#    qf_vect = Rmat[:,-1].reshape(3,1)
-#    
-#    # Compute updated guess for rho0, rhof
-#    if nfail == 1:
-#        rho0 = max(-float(np.dot(q0_vect.T, rho0_hat)), 1000.)
-#        rhof = max(-float(np.dot(qf_vect.T, rhof_hat)), 1000.)
-#        
-#    if nfail == 2:
-#        
-#        q0f_vect = qf_vect - q0_vect
-#        D1 = np.dot(q0f_vect.T, rho0_hat)
-#        D3 = np.dot(q0f_vect.T, rhof_hat)
-#        D2 = np.dot(rho0_hat.T, rhof_hat)
-#        D4 = 1. - D2**2.
-#        
-#        rho0 = max((D1-(D3*D2))/D4, 100.)
-#        rhof = max(((D1*D2)-D3)/D4, 100.)
-    
-    rho0_mid = np.mean(rho0_bounds)
-    rhof_mid = np.mean(rhof_bounds)
-    
-    
-    if nfail == 1:
-        rho0 = rho0_mid
-        rhof = rhof_mid
-        
-    if nfail == 2:
-        rho0 = rho0_mid
-        rhof = float(rhof_bounds[1])
-    
-    if nfail == 3:
-        rho0 = float(rho0_bounds[1])
-        rhof = rhof_mid
-        
-    if nfail == 4:
-        rho0 = float(rho0_bounds[1])
-        rhof = float(rhof_bounds[1])
-    
-    return rho0, rhof
-
-
-
-
-#def compute_delta_rho(rho0, rhof, tof, M_star, orbit_type, Lmat, Rmat,
-#                      UTC_list):
-#    
-#    '''
-#    
-#    
-#    '''
-#    
-#    # Basic Gooding assume 3 angles and use middle value to compute penalty
-#    kk_list = [1]
-#    
-#    
-#    # Compute range vectors at all intermediate times in kk_list
-#    rhok_list, rhok_inds = \
-#        compute_intermediate_rho(rho0, rhof, tof, M_star, orbit_type, Lmat,
-#                                 Rmat, UTC_list, kk_list)
-#        
-#    
-#    
-#    print('rhok_list', rhok_list)
-#    
-#    # Exit condition
-#    if len(rhok_list) == 0:
-#        fail_flag = True
-#        return 0., 0., fail_flag
-#    else: 
-#        fail_flag = False
-#    
-#    # Compute penalty for these values    
-#    f, g = compute_penalty(rhok_list, rhok_inds, Lmat, Rmat, kk_list)
-#    
-#    print('f', f)
-#    print('g', g)
-#    
-#
-#    
-#    # Use central finite difference to compute numerical derivatives of f
-#    # with respect to small changes in rho0 and rhof
-#    drho0 = 1e-8
-#    drhof = 1e-8
-#    
-#    # First range rho0 minus delta_rho
-#    rho0_minus = rho0 - drho0
-#    rhok_list, rhok_inds = \
-#        compute_intermediate_rho(rho0_minus, rhof, tof, M_star, orbit_type,
-#                                 Lmat, Rmat, UTC_list, kk_list)
-#    
-#    fm0, gm0 = compute_penalty(rhok_list, rhok_inds, Lmat, Rmat, kk_list)
-#    
-#    # First range rho0 plus delta_rho
-#    rho0_plus = rho0 + drho0
-#    rhok_list, rhok_inds = \
-#        compute_intermediate_rho(rho0_plus, rhof, tof, M_star, orbit_type,
-#                                 Lmat, Rmat, UTC_list, kk_list)
-#       
-#    fp0, gp0 = compute_penalty(rhok_list, rhok_inds, Lmat, Rmat, kk_list)
-#    
-#    # Last range rhof minus delta_rho
-#    rhof_minus = rhof - drhof
-#    rhok_list, rhok_inds = \
-#        compute_intermediate_rho(rho0, rhof_minus, tof, M_star, orbit_type,
-#                                 Lmat, Rmat, UTC_list, kk_list)
-#    
-#    fmf, gmf = compute_penalty(rhok_list, rhok_inds, Lmat, Rmat, kk_list)
-#    
-#    # Last range rhof plus delta_rho
-#    rhof_plus = rhof + drhof
-#    rhok_list, rhok_inds = \
-#        compute_intermediate_rho(rho0, rhof_plus, tof, M_star, orbit_type,
-#                                 Lmat, Rmat, UTC_list, kk_list)
-#       
-#    fpf, gpf = compute_penalty(rhok_list, rhok_inds, Lmat, Rmat, kk_list)
-#    
-#    
-#    # Compute numerical derivatives using central finite difference
-#    df_0 = (fp0 - fm0)/(2.*drho0)
-#    dg_0 = (gp0 - gm0)/(2.*drho0)      
-#    df_f = (fpf - fmf)/(2.*drhof)
-#    dg_f = (gpf - gmf)/(2.*drhof)  
-#    
-#    print('df_0', df_0)
-#    print('dg_0', dg_0)
-#    print('df_f', df_f)
-#    print('dg_f', dg_f)
-#    
-#    mat = np.array([[df_0, df_f],
-#                    [dg_0, dg_f]])
-#    
-#    check = -np.dot(np.linalg.inv(mat), np.reshape([f, 0.], (2,1)))
-#    print('check', check)
-#    
-#    # Compute determinant D and changes for rho0 and rhof
-#    D = df_0*dg_f - df_f*dg_0    
-#    
-#    delta_rho0 = -(1./D) * f * dg_f
-#    delta_rhof =  (1./D) * f * dg_0
-#    
-#    print('delta_rho0', delta_rho0)
-#    print('delta_rhof', delta_rhof)
-#    
-#    print('matrix det', np.linalg.det(mat))
-#    print('D', D)
-#    
-#    return delta_rho0, delta_rhof, fail_flag
-#
-#
 def compute_intermediate_rho(rho0, rhof, tof, M_star, lr_star, orbit_type,
                              Lmat, Rmat, UTC_list, periapsis_check=False):
     
@@ -2232,7 +2070,7 @@ def compute_intermediate_rho(rho0, rhof, tof, M_star, lr_star, orbit_type,
     
     r0_vect = q0_vect + rho0*rho0_hat
     rf_vect = qf_vect + rhof*rhof_hat
-    
+        
     # Compute Lambert solution for these inputs
     v0_list, vf_list, M_list, type_list, lr_list = \
         izzo_lambert(r0_vect, rf_vect, tof, M_star=M_star, lr_star=lr_star,
@@ -2252,6 +2090,15 @@ def compute_intermediate_rho(rho0, rhof, tof, M_star, lr_star, orbit_type,
         
     v0_vect = v0_list[0]
     
+    # Hyperbolic orbit can pass periapsis check but still have unreasonable
+    # semi-major axis. C3 of 160 is sufficient to reach Pluto and corresponds
+    # to |SMA| = 2491. Any |SMA| < 1000 km can safely be rejected.
+    r0 = np.linalg.norm(r0_vect)
+    v0 = np.linalg.norm(v0_vect)
+    a = 1/(2/r0 - v0**2./GME)
+    if abs(a) < 1000.:
+        return [], []
+    
     # Full cartesian state vector at t0
     Xo = np.concatenate((r0_vect, v0_vect), axis=0)
     
@@ -2270,34 +2117,11 @@ def compute_intermediate_rho(rho0, rhof, tof, M_star, lr_star, orbit_type,
         rhok_inds.append(kk)
     
     return rhok_list, rhok_inds
-#
-#
-#def compute_penalty(rhok_list, rhok_inds, Lmat, Rmat, kk_list):
-#    '''
-#    
-#    
-#    '''
-#    
-#    for kk in kk_list:
-#    
-#        # Observed LOS unit vector at time tk
-#        rhok_hat_obs = Lmat[:,kk].reshape(3,1)
-#        
-#        # Calcuated LOS range vector at time tk
-#        rhok_vect_calc = rhok_list[rhok_inds.index(kk)]
-#        rhok_calc = np.linalg.norm(rhok_vect_calc)
-#        
-#        # Compute penalty function
-#        en_vect = np.cross(rhok_hat_obs, rhok_vect_calc, axis=0)
-#        p_vect = np.cross(en_vect, rhok_hat_obs, axis=0)
-#        f = float(np.dot(p_vect.T, rhok_vect_calc)/rhok_calc)
-#        g = float(np.dot(en_vect.T, rhok_vect_calc)/np.linalg.norm(en_vect))
-#    
-#    return f, g
 
 
-
-
+###############################################################################
+# Gauss Angles-Only IOD
+###############################################################################
 
 
 def gauss_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,

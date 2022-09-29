@@ -1591,7 +1591,7 @@ def element_conversion(x_in, iflag, oflag, GM=GME, dt=0.):
 #            Hrad = 2*atanh(np.sqrt((e-1)/(e+1))*tan(f/2))  # rad
             Hrad = true2hyp(f, e)
             Mo = e*sinh(Hrad) - Hrad  # rad
-            
+
         else:
             print('Error, input orbit is parabolic, a = ', a)
         

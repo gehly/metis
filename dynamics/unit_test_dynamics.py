@@ -179,7 +179,7 @@ def test_hyperbolic_prop():
 
     # Integration times
 #    tin = np.array([0., 86400.*2.])   
-    tin = np.arange(0., 86400.*2+1., 10.)
+    tin = np.arange(0., 86400.*100+1., 10000.)
     
     # Initial orbit - hyperbolic escape
     rp = Re + 300.
