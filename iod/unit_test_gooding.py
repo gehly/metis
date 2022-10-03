@@ -1338,7 +1338,7 @@ def multi_rev_geo():
 if __name__ == '__main__':
     
     
-#    single_rev_geo()
+    single_rev_geo()
     
 #    single_rev_leo()
     
@@ -1352,7 +1352,7 @@ if __name__ == '__main__':
     
 #    single_rev_hyperbola()
     
-    multi_rev_geo()
+#    multi_rev_geo()
     
     
     
