@@ -855,10 +855,6 @@ def compute_hypergeom_2F1(a, b, c, d):
             ii += 1
 
 
-
-
-
-
 ###############################################################################
 # Gooding Angles-Only IOD
 ###############################################################################
@@ -866,7 +862,7 @@ def compute_hypergeom_2F1(a, b, c, d):
 def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
                        time_format='datetime', eop_alldata=[], XYs_df=[],
                        orbit_regime='none', search_mode='middle_out',
-                       periapsis_check=True):
+                       periapsis_check=True, HN=1., rootfind='zeros'):
     '''    
     This function implements the Gooding angles-only IOD method, which uses
     three or more line of sight vectors (defined by RA/DEC or Az/El 
@@ -907,6 +903,13 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
     periapsis_check : boolean, optional
         flag to determine whether to check the orbit does not intersect the
         central body (rp > R) (default=True)
+    HN : float, optional
+        control parameter to use either Halley (HN=0.5) or 
+        modified Newton-Raphson (HN=1.0) to compute update to range values
+        (default=1.0)
+    rootfind : string, optional
+        control parameter to either find zeros ('zeros') or minimum ('min') of 
+        penalty function (default='zeros')
                     
     Returns
     ------
@@ -1021,7 +1024,8 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
         
         # Compute the range pairs to use as initial guesses
         range_pairs_list, orbit_regime_fail = \
-            compute_range_search_list(Lmat, Rmat, M_star, tof, orbit_regime)
+            compute_range_search_list(Lmat, Rmat, M_star, tof,
+                                      orbit_regime=orbit_regime)
             
         # If no viable solutions for the given orbit regime and revolution
         # number, try next value
@@ -1044,7 +1048,8 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
             rho0_list, rhof_list = \
                 M_star_to_3rho(Lmat, Rmat, UTC_list, tof, M_star, lr_star,
                                orbit_type, range_pairs_list, range_ind_list,
-                               periapsis_check=periapsis_check)
+                               periapsis_check=periapsis_check, HN=HN,
+                               rootfind=rootfind)
                 
             
             # Build outputs
@@ -1065,7 +1070,8 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
             rho0_list, rhof_list = \
                 M_star_to_3rho(Lmat, Rmat, UTC_list, tof, M_star, lr_star,
                                orbit_type, range_pairs_list, range_ind_list,
-                               periapsis_check=periapsis_check)
+                               periapsis_check=periapsis_check, HN=HN,
+                               rootfind=rootfind)
             
             # Build outputs
             nout = len(rho0_list)
@@ -1088,7 +1094,8 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
             rho0_list, rhof_list = \
                 M_star_to_3rho(Lmat, Rmat, UTC_list, tof, M_star, lr_star,
                                orbit_type, range_pairs_list, range_ind_list,
-                               periapsis_check=periapsis_check)
+                               periapsis_check=periapsis_check, HN=HN,
+                               rootfind=rootfind)
             
             # Build outputs
             nout = len(rho0_list)
@@ -1108,7 +1115,8 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
             rho0_list, rhof_list = \
                 M_star_to_3rho(Lmat, Rmat, UTC_list, tof, M_star, lr_star,
                                orbit_type, range_pairs_list, range_ind_list,
-                               periapsis_check=periapsis_check)
+                               periapsis_check=periapsis_check, HN=HN,
+                               rootfind=rootfind)
             
             # Build outputs
             nout = len(rho0_list)
@@ -1128,7 +1136,8 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
             rho0_list, rhof_list = \
                 M_star_to_3rho(Lmat, Rmat, UTC_list, tof, M_star, lr_star,
                                orbit_type, range_pairs_list, range_ind_list,
-                               periapsis_check=periapsis_check)
+                               periapsis_check=periapsis_check, HN=HN,
+                               rootfind=rootfind)
             
             # Build outputs
             nout = len(rho0_list)
@@ -1148,7 +1157,8 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
             rho0_list, rhof_list = \
                 M_star_to_3rho(Lmat, Rmat, UTC_list, tof, M_star, lr_star,
                                orbit_type, range_pairs_list, range_ind_list,
-                               periapsis_check=periapsis_check)
+                               periapsis_check=periapsis_check, HN=HN,
+                               rootfind=rootfind)
             
             # Build outputs
             nout = len(rho0_list)
@@ -1210,7 +1220,8 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
 
 
 def M_star_to_3rho(Lmat, Rmat, UTC_list, tof, M_star, lr_star, orbit_type,
-                   range_pairs_list, range_ind_list, periapsis_check=True):
+                   range_pairs_list, range_ind_list, periapsis_check=True,
+                   HN=1., rootfind='zeros'):
     '''
     This function iteratively adjusts range values corresponding to the first
     and last angles-only observations until finding an orbit that matches the
@@ -1254,6 +1265,13 @@ def M_star_to_3rho(Lmat, Rmat, UTC_list, tof, M_star, lr_star, orbit_type,
     periapsis_check : boolean, optional
         flag to determine whether to check the orbit does not intersect the
         central body (rp > R) (default=True)
+    HN : float, optional
+        control parameter to use either Halley (HN=0.5) or 
+        modified Newton-Raphson (HN=1.0) to compute update to range values
+        (default=1.0)
+    rootfind : string, optional
+        control parameter to either find zeros ('zeros') or minimum ('min') of 
+        penalty function (default='zeros')
         
     Returns
     ------
@@ -1310,7 +1328,8 @@ def M_star_to_3rho(Lmat, Rmat, UTC_list, tof, M_star, lr_star, orbit_type,
             rho0_output_list, rhof_output_list = \
                 iterate_rho(rho0, rhof, tof, M_star, lr_star, orbit_type, Lmat,
                             Rmat, UTC_list, rho0_output_list, rhof_output_list,
-                            periapsis_check=periapsis_check)
+                            periapsis_check=periapsis_check, HN=HN,
+                            rootfind=rootfind)
             
             print('M_star_to_3rho')
             print(rho0_output_list)
@@ -1329,7 +1348,7 @@ def M_star_to_3rho(Lmat, Rmat, UTC_list, tof, M_star, lr_star, orbit_type,
 
 def iterate_rho(rho0_init, rhof_init, tof, M_star, lr_star, orbit_type, Lmat,
                 Rmat, UTC_list, rho0_output_list, rhof_output_list,
-                periapsis_check=True, HN=1.):
+                periapsis_check=True, HN=1., rootfind='zeros'):
     '''
     This function iteratively updates the initial and final range values until
     converging on an orbit that matches the intermediate angles-only 
@@ -1370,6 +1389,9 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, lr_star, orbit_type, Lmat,
         control parameter to use either Halley (HN=0.5) or 
         modified Newton-Raphson (HN=1.0) to compute update to range values
         (default=1.0)
+    rootfind : string, optional
+        control parameter to either find zeros ('zeros') or minimum ('min') of 
+        penalty function (default='zeros')
         
     Returns
     ------
@@ -1675,48 +1697,60 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, lr_star, orbit_type, Lmat,
             fxy -= fy*w0 + fx*wf + w*f*epsilon*eta*uw
             gxy -= gy*w0 + gx*wf
 
-        # Compute Newton-Raphson increments (Gooding 1997 Section 3.2)
-        D_NR = fx*gy - fy*gx
-        
-        delta_rho0_NR = -(1./D_NR) * f * gy
-        delta_rhof_NR =  (1./D_NR) * f * gx
-        
-        print('D_NR', D_NR)
-        print('delta_rho0_NR', delta_rho0_NR)
-        print('delta_rhof_NR', delta_rhof_NR)
-        
-        # Compute Halley/mNR derivatives (Gooding 1997 Section 3.2)
-        # If HN = 0.5 use Halley formula
-        # If HN = 1.0 use modifed Newton-Raphson formula
-        # Use of modified Newton-Raphson should be more robust in case of 
-        # neighboring solutions
-        fx_H = fx + HN*(fxx*delta_rho0_NR + fxy*delta_rhof_NR)
-        fy_H = fy + HN*(fxy*delta_rho0_NR + fyy*delta_rhof_NR)
-        gx_H = gx + HN*(gxx*delta_rho0_NR + gxy*delta_rhof_NR)
-        gy_H = gy + HN*(gxy*delta_rho0_NR + gyy*delta_rhof_NR)
-        
-        D_H = fx_H*gy_H - fy_H*gx_H
-        
-        delta_rho0 = -(1./D_H) * f * gy_H
-        delta_rhof =  (1./D_H) * f * gx_H
-        
-        # Exception Handling
-        # Check for near singular derivative matrix (Gooding 1997 Eq 15-16)
-        H = fx**2. + fy**2. + gx**2. + gy**2.
-        dd = 2.*abs(D_NR)/(H + np.sqrt(H**2. - 4.*D_NR**2.))
-        
-        # If below threshold, use geometric mean of NR and (Halley or mNR)
-        if dd < crit_gm:
-            print('use geometric mean')
-            print('dd', dd)
-            print('crit_gm', crit_gm)
-            print('D_NR', D_NR)
-            print('test', D_NR/(fx*fy + gx*gy))
-            delta_rho0 = np.sign(delta_rho0_NR) * np.sqrt(abs(delta_rho0_NR*delta_rho0))
-            delta_rhof = np.sign(delta_rhof_NR) * np.sqrt(abs(delta_rhof_NR*delta_rhof))
+        # Either seek zeros or minimum of the penalty function
+        if rootfind == 'zeros':
             
-        print('delta_rho0', delta_rho0)
-        print('delta_rhof', delta_rhof)
+            # Compute Newton-Raphson increments (Gooding 1997 Section 3.2)
+            D_NR = fx*gy - fy*gx
+            
+            delta_rho0_NR = -(1./D_NR) * f * gy
+            delta_rhof_NR =  (1./D_NR) * f * gx
+            
+            print('D_NR', D_NR)
+            print('delta_rho0_NR', delta_rho0_NR)
+            print('delta_rhof_NR', delta_rhof_NR)
+            
+            # Compute Halley/mNR derivatives (Gooding 1997 Section 3.2)
+            # If HN = 0.5 use Halley formula
+            # If HN = 1.0 use modifed Newton-Raphson formula
+            # Use of modified Newton-Raphson should be more robust in case of 
+            # neighboring solutions
+            fx_H = fx + HN*(fxx*delta_rho0_NR + fxy*delta_rhof_NR)
+            fy_H = fy + HN*(fxy*delta_rho0_NR + fyy*delta_rhof_NR)
+            gx_H = gx + HN*(gxx*delta_rho0_NR + gxy*delta_rhof_NR)
+            gy_H = gy + HN*(gxy*delta_rho0_NR + gyy*delta_rhof_NR)
+            
+            D_H = fx_H*gy_H - fy_H*gx_H
+            
+            delta_rho0 = -(1./D_H) * f * gy_H
+            delta_rhof =  (1./D_H) * f * gx_H
+            
+            # Exception Handling
+            # Check for near singular derivative matrix (Gooding 1997 Eq 15-16)
+            H = fx**2. + fy**2. + gx**2. + gy**2.
+            dd = 2.*abs(D_NR)/(H + np.sqrt(H**2. - 4.*D_NR**2.))
+            
+            # If below threshold, use geometric mean of NR and (Halley or mNR)
+            if dd < crit_gm:
+                print('use geometric mean')
+                print('dd', dd)
+                print('crit_gm', crit_gm)
+                print('D_NR', D_NR)
+                print('test', D_NR/(fx*fy + gx*gy))
+                delta_rho0 = np.sign(delta_rho0_NR) * np.sqrt(abs(delta_rho0_NR*delta_rho0))
+                delta_rhof = np.sign(delta_rhof_NR) * np.sqrt(abs(delta_rhof_NR*delta_rhof))
+
+        elif rootfind == 'min':
+            
+            # Compute derivatives of h = 0.5*(f^2 + g^2) and use Newton-Raphson
+            # to find stationary point where h_x = h_y = 0
+            hxx = f*fxx + fx**2. + gx**2.
+            hyy = f*fyy + fy**2. + gy**2.
+            hxy = f*fxy + fx*fy + gx*gy
+            Dmin = hxx*hyy - hxy**2.
+            
+            delta_rho0 = -(hyy*f*fx - hxy*f*fy)/Dmin
+            delta_rhof = -(hxx*f*fy - hxy*f*fx)/Dmin
         
         # Store values for future comparison
         fc_old = float(fc)
@@ -1726,6 +1760,9 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, lr_star, orbit_type, Lmat,
         # Update range values
         rho0 += delta_rho0
         rhof += delta_rhof
+        
+        print('delta_rho0', delta_rho0)
+        print('delta_rhof', delta_rhof)
         
         print('rho0', rho0)
         print('rhof', rhof)
@@ -2023,6 +2060,8 @@ def define_orbit_regime(orbit_regime):
         
     '''
     
+    print('Orbit Regime', orbit_regime)
+    
     # These values have been modified somewhat from Ref 1. The intent is to 
     # restrict the range search grid in meaningful ways to improve 
     # computational performance, this is not an exhaustive orbit 
@@ -2077,6 +2116,9 @@ def define_orbit_regime(orbit_regime):
         
     rp_bounds = [rp_min, rp_max]
     ra_bounds = [ra_min, ra_max]
+    
+    print('rmin', rmin)
+    print('rmax', rmax)
         
     return step, rmin, rmax, rp_bounds, ra_bounds
 
