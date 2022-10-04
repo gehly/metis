@@ -92,7 +92,8 @@ def single_rev_geo():
     X_list, M_list = iod.gooding_angles_iod(UTC_list, Yk_list, sensor_id_list,
                                             sensor_params, orbit_regime='GEO',
                                             search_mode='middle_out',
-                                            periapsis_check=True)
+                                            periapsis_check=True,
+                                            rootfind='min')
     
     
     print('Final Answers')
@@ -268,7 +269,8 @@ def single_rev_leo():
     X_list, M_list = iod.gooding_angles_iod(tk_list, Yk_list, sensor_id_time_list,
                                             sensor_params, orbit_regime='LEO',
                                             search_mode='middle_out',
-                                            periapsis_check=True)
+                                            periapsis_check=True,
+                                            rootfind='min')
     
     
     print('Final Answers')
@@ -399,7 +401,8 @@ def single_rev_leo_retro():
     X_list, M_list = iod.gooding_angles_iod(tk_list, Yk_list, sensor_id_time_list,
                                             sensor_params, orbit_regime='LEO',
                                             search_mode='middle_out',
-                                            periapsis_check=True)
+                                            periapsis_check=True,
+                                            rootfind='min')
     
     
     print('Final Answers')
@@ -527,7 +530,8 @@ def single_rev_meo():
     X_list, M_list = iod.gooding_angles_iod(tk_list, Yk_list, sensor_id_time_list,
                                             sensor_params, orbit_regime='MEO',
                                             search_mode='middle_out',
-                                            periapsis_check=True)
+                                            periapsis_check=True,
+                                            rootfind='min')
     
     
     print('Final Answers')
@@ -599,6 +603,15 @@ def single_rev_meo():
         resids2 = (meas2 - Yk_list[1])*(1./arcsec2rad)
         residsf = (measf - Yk_list[2])*(1./arcsec2rad)
         
+        # unit vectors
+        uhat_meas2 = np.array([[math.cos(meas2[1])*math.cos(meas2[0])],
+                               [math.cos(meas2[1])*math.sin(meas2[0])],
+                               [math.sin(meas2[1])]])
+    
+        uhat_yk2 = np.array([[math.cos(Yk_list[1][1])*math.cos(Yk_list[1][0])],
+                             [math.cos(Yk_list[1][1])*math.sin(Yk_list[1][0])],
+                             [math.sin(Yk_list[1][1])]])
+        
         
         print('')
         print('Xi_0', Xi_0)
@@ -607,6 +620,10 @@ def single_rev_meo():
         print('resids2', resids2)
         print('residsf', residsf)
 
+        print(uhat_meas2)
+        print(uhat_yk2)
+        
+        print(float(np.dot(uhat_meas2.T, uhat_yk2)))
         
     
     
@@ -690,7 +707,8 @@ def single_rev_heo():
     X_list, M_list = iod.gooding_angles_iod(tk_list, Yk_list, sensor_id_time_list,
                                             sensor_params, orbit_regime='HEO',
                                             search_mode='middle_out',
-                                            periapsis_check=True)
+                                            periapsis_check=True,
+                                            rootfind='min')
     
     
     print('Final Answers')
@@ -873,7 +891,8 @@ def single_rev_gto():
     X_list, M_list = iod.gooding_angles_iod(tk_list, Yk_list, sensor_id_time_list,
                                             sensor_params, orbit_regime='HEO',
                                             search_mode='middle_out',
-                                            periapsis_check=True)
+                                            periapsis_check=True,
+                                            rootfind='min')
     
     
     print('Final Answers')
@@ -1056,7 +1075,8 @@ def single_rev_hyperbola():
     X_list, M_list = iod.gooding_angles_iod(tk_list, Yk_list, sensor_id_time_list,
                                             sensor_params, orbit_regime='none',
                                             search_mode='middle_out',
-                                            periapsis_check=True)
+                                            periapsis_check=True,
+                                            rootfind='min')
     
     
     print('Final Answers')
@@ -1350,9 +1370,9 @@ if __name__ == '__main__':
     
 #    single_rev_gto()
     
-#    single_rev_hyperbola()
+    single_rev_hyperbola()
     
-    multi_rev_geo()
+#    multi_rev_geo()
     
     
     

@@ -1739,18 +1739,27 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, lr_star, orbit_type, Lmat,
                 print('test', D_NR/(fx*fy + gx*gy))
                 delta_rho0 = np.sign(delta_rho0_NR) * np.sqrt(abs(delta_rho0_NR*delta_rho0))
                 delta_rhof = np.sign(delta_rhof_NR) * np.sqrt(abs(delta_rhof_NR*delta_rhof))
+                
+            # If multiple solutions already found, use original f to check 
+            # convergence criteria to be consistent for all solutions
+            conv_crit = abs(f)/max(rk, rhok_dot)
 
         elif rootfind == 'min':
             
             # Compute derivatives of h = 0.5*(f^2 + g^2) and use Newton-Raphson
             # to find stationary point where h_x = h_y = 0
+            hx = f*fx
+            hy = f*fy
             hxx = f*fxx + fx**2. + gx**2.
             hyy = f*fyy + fy**2. + gy**2.
             hxy = f*fxy + fx*fy + gx*gy
             Dmin = hxx*hyy - hxy**2.
             
-            delta_rho0 = -(hyy*f*fx - hxy*f*fy)/Dmin
-            delta_rhof = -(hxx*f*fy - hxy*f*fx)/Dmin
+            delta_rho0 = -(hyy*hx - hxy*hy)/Dmin
+            delta_rhof = -(hxx*hy - hxy*hx)/Dmin
+            
+            # Use h function derivatives for convergence test
+            conv_crit = (abs(hx) + abs(hy))/max(rk, rhok_dot)
         
         # Store values for future comparison
         fc_old = float(fc)
@@ -1767,9 +1776,7 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, lr_star, orbit_type, Lmat,
         print('rho0', rho0)
         print('rhof', rhof)
         
-        # If multiple solutions already found, use original f to check 
-        # convergence criteria to be consistent for all solutions
-        conv_crit = abs(f)/max(rk, rhok_dot)
+        
         print('conv_crit', conv_crit)
         print('denom', rk, rhok_dot)        
         
