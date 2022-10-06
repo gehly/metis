@@ -21,7 +21,7 @@ sys.path.append(metis_dir)
 import dynamics.dynamics_functions as dyn
 import estimation.analysis_functions as analysis
 import estimation.estimation_functions as est
-import iod.iod_functions6 as iod
+import iod.iod_functions as iod
 import sensors.measurement_functions as mfunc
 import sensors.sensors as sens
 import sensors.visibility_functions as visfunc
@@ -93,7 +93,7 @@ def single_rev_geo():
                                             sensor_params, orbit_regime='GEO',
                                             search_mode='middle_out',
                                             periapsis_check=True,
-                                            rootfind='min')
+                                            rootfind='zeros')
     
     
     print('Final Answers')
@@ -531,7 +531,7 @@ def single_rev_meo():
                                             sensor_params, orbit_regime='MEO',
                                             search_mode='middle_out',
                                             periapsis_check=True,
-                                            rootfind='min')
+                                            rootfind='zeros')
     
     
     print('Final Answers')
@@ -1255,7 +1255,8 @@ def multi_rev_geo():
     X_list, M_list = iod.gooding_angles_iod(tk_list, Yk_list, sensor_id_time_list,
                                             sensor_params, orbit_regime='GEO',
                                             search_mode='middle_out',
-                                            periapsis_check=True)
+                                            periapsis_check=True,
+                                            rootfind='min')
     
     
     print('Final Answers')
@@ -1364,13 +1365,13 @@ if __name__ == '__main__':
     
 #    single_rev_leo_retro()
     
-#    single_rev_meo()
+    single_rev_meo()
     
 #    single_rev_heo()
     
 #    single_rev_gto()
     
-    single_rev_hyperbola()
+#    single_rev_hyperbola()
     
 #    multi_rev_geo()
     
