@@ -212,16 +212,16 @@ def mean2hyp(M, e):
       hyperbolic anomaly [rad]
     '''
 
-    # Ensure M is between -pi and pi
-    if M > pi or M < -pi:
-        print('Error: Expected -pi < M < pi!')
-        print('M', M)
-        
-    if M > pi:
-        M -= 2.*pi
-        
-    if M < -pi:
-        M += 2.*pi
+#    # Ensure M is between -pi and pi
+#    if M > pi or M < -pi:
+#        print('Error: Expected -pi < M < pi!')
+#        print('M', M)
+#        
+#    if M > pi:
+#        M -= 2.*pi
+#        
+#    if M < -pi:
+#        M += 2.*pi
 
     # Form starting guess for H
     H = M
@@ -237,6 +237,73 @@ def mean2hyp(M, e):
         H = H - f/df
 
     return H
+
+
+def hyp2mean(H, e):
+    '''
+    This function converts from Hyperbolic Anomaly to Mean Anomaly
+
+    Parameters
+    ------
+    H : float
+      hyperbolic anomaly [rad]
+    e : float
+      eccentricity
+
+    Returns
+    ------
+    M : float
+      mean anomaly [rad]
+    
+    '''
+    
+    M = e*sinh(H) - H
+    
+    return M
+
+
+def true2hyp(f, e):
+    '''
+    This function converts from True Anomaly to Hyperbolic Anomaly
+
+    Parameters
+    ------
+    f : float
+      true anomaly [rad]
+    e : float
+      eccentricity
+
+    Returns
+    ------
+    H : float
+      hyperbolic anomaly [rad]
+    '''
+    
+    H = 2*atanh(np.sqrt((e-1)/(e+1))*tan(f/2))
+    
+    return H
+
+
+def hyp2true(H, e):
+    '''
+    This function converts from Hyperbolic Anomaly to True Anomaly
+
+    Parameters
+    ------
+    H : float
+      hyperbolic anomaly [rad]
+    e : float
+      eccentricity
+
+    Returns
+    ------    
+    f : float
+      true anomaly [rad]
+    '''
+    
+    f = 2*atan(np.sqrt((e+1)/(e-1))*tanh(H/2)) 
+    
+    return f
 
 
 def sunsynch_inclination(a, e):
@@ -947,8 +1014,10 @@ def cart2kep(cart, GM=GME):
     tan1 = np.dot(cross1.T, ih_vect)
     tan2 = np.dot(ie_vect.T, ir_vect)
     theta = atan2(tan1, tan2)    # rad
-    if theta < 0.:
-        theta += 2.*pi
+    
+    # Update range of true anomaly for elliptical orbits
+    if a > 0. and theta < 0.:
+        theta += 2.*pi    
     
     # Convert angles to deg
     i *= 180./pi
@@ -1384,7 +1453,7 @@ def element_conversion(x_in, iflag, oflag, GM=GME, dt=0.):
     x_in : 6x1 numpy array
       vector of elements or cartesian coordinates at t0
     iflag : int
-      input flag (0 = orbital elements, 1 = cartesian coordiantes)
+      input flag (0 = orbital elements, 1 = cartesian coordinates)
     oflag : int
       output flag (0 = orbital elements, 1 = cartesian coordinates)
     GM : float, optional
@@ -1512,15 +1581,17 @@ def element_conversion(x_in, iflag, oflag, GM=GME, dt=0.):
         # Calculate M
         if a > 0:
             n = np.sqrt(GM/a**3)
-            Erad = 2*atan(np.sqrt((1-e)/(1+e))*tan(f/2))    # rad
+#            Erad = 2*atan(np.sqrt((1-e)/(1+e))*tan(f/2))    # rad
+            Erad = true2ecc(f, e)
             Mo = Erad - e*sin(Erad)   # rad
             while Mo < 0:
                 Mo = Mo + 2*pi
         elif a < 0:
             n = np.sqrt(GM/-a**3)
-            Hrad = 2*atanh(np.sqrt((e-1)/(e+1))*tan(f/2))  # rad
+#            Hrad = 2*atanh(np.sqrt((e-1)/(e+1))*tan(f/2))  # rad
+            Hrad = true2hyp(f, e)
             Mo = e*sinh(Hrad) - Hrad  # rad
-            
+
         else:
             print('Error, input orbit is parabolic, a = ', a)
         
@@ -1529,14 +1600,16 @@ def element_conversion(x_in, iflag, oflag, GM=GME, dt=0.):
 
     # Solve for M(t) = Mo + n*dt
     M = Mo + n*dt   # rad
-    
-    while M < 0:
-        M += 2*pi
-    while M > 2*pi:
-        M -= 2*pi
 
     # Generate output vector x_out
     if oflag == 0:
+        
+        # Ensure M is between 0 and 2*pi for elliptical orbits
+        if a > 0:
+            
+            M = fmod(M, 2*pi)
+            if M < 0:
+                M += 2*pi
 
         # Convert angles to degrees
         i = i * 180/pi
@@ -1551,13 +1624,15 @@ def element_conversion(x_in, iflag, oflag, GM=GME, dt=0.):
         # Find eccentric/hyperbolic anomaly and true anomaly
         if a > 0:
             Erad = mean2ecc(M, e)    # rad
-            f = 2*atan(np.sqrt((1+e)/(1-e))*tan(Erad/2))    # rad
+            f = ecc2true(Erad, e)
+#            f = 2*atan(np.sqrt((1+e)/(1-e))*tan(Erad/2))    # rad
             r = a*(1 - e*cos(Erad))     # km
         elif a < 0:
             Hrad = mean2hyp(M, e)    # rad
-            f = 2*atan(np.sqrt((e+1)/(e-1))*tanh(Hrad/2))    # rad
+            f = hyp2true(Hrad, e)
+#            f = 2*atan(np.sqrt((e+1)/(e-1))*tanh(Hrad/2))    # rad
             r = a*(1 - e*cosh(Hrad))     # km
-
+            
         # Calculate theta
         theta = f + w   # rad
 
