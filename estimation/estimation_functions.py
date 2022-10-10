@@ -1499,9 +1499,12 @@ def ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
     return filter_output, full_state_output
 
 
+###############################################################################
+# Non-Gaussian Estimation
+###############################################################################
+
 def aegis_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
-              sensor_params, int_params):
-    
+              sensor_params, int_params):    
     '''
     This function implements the Adaptive Entropy-based Gaussian Information
     Syntheis (AEGIS) Unscented Kalman Filter for the least
@@ -1543,11 +1546,101 @@ def aegis_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
     weights = state_dict['weights']
     means = state_dict['means']
     covars = state_dict['covars']
+    Q = state_params['Q']
+    gap_seconds = state_params['gap_seconds']
+    time_format = int_params['time_format']
+
+    n = len(means[0])
+    q = int(Q.shape[0])
     
+    # Prior information about the distribution
+    pnorm = 2.
+    kurt = math.gamma(5./pnorm)*math.gamma(1./pnorm)/(math.gamma(3./pnorm)**2.)
+    beta = kurt - 1.
+    kappa = kurt - float(n)
+    
+    
+    
+    
+    
+    # Compute sigma point weights
+    alpha = state_params['alpha']
+    lam = alpha**2.*(n + kappa) - n
+    gam = np.sqrt(n + lam)
+    Wm = 1./(2.*(n + lam)) * np.ones(2*n,)
+    Wc = Wm.copy()
+    Wm = np.insert(Wm, 0, lam/(n + lam))
+    Wc = np.insert(Wc, 0, lam/(n + lam) + (1 - alpha**2 + beta))
+    diagWc = np.diag(Wc)
+    unscented_params = {}
+    unscented_params['gam'] = gam
+    unscented_params['Wm'] = Wm
+    unscented_params['diagWc'] = diagWc
     
     
     
     return filter_output, full_state_output
+
+
+def split_GMM(GMM0, N=3):
+    '''
+    This function splits a single gaussian PDF into multiple components.
+    For a multivariate PDF, it will split along the axis corresponding to the
+    largest eigenvalue (greatest uncertainty). The function splits along only
+    one axis.
+
+    Parameters
+    ------
+    GMM0 : list
+        PDF weights, means, and covars [w,m,P]
+            w = weight, scalar
+            m = mean, numpy nx1 array
+            P = covar, numpy nxn array
+
+    N : int, optional
+        number of components to split into (3,4,or 5) (default=3)
+
+    Returns
+    ------
+    GMM : list
+        PDF weight, mean, covar [w,m,P]
+            w = weight, list of scalars
+            m = mean, list of numpy nx1 arrays
+            P = covar, list of numpy nxn arrays
+    '''
+
+    # Break out input GM component
+    w0 = GMM0[0]
+    m0 = GMM0[1]
+    P0 = GMM0[2]
+    n = len(m0)
+
+    # Get splitting library info
+    wbar, mbar, sigbar = split_gaussian_library(N)
+
+    # Decompose covariance matrix
+    lam, V = np.linalg.eig(P0)
+
+    # Find largest eigenvalue and corresponding eigenvector
+    kk = np.argmax(lam)
+    lam0_k = lam[kk]
+    vk = V[:,kk].reshape(n, 1)
+
+    # Compute updated weights
+    w = [w0 * wi for wi in wbar]
+
+    # All sigma values are equal, just use first entry
+    lam[kk] *= sigbar[0]**2
+    Lam = np.diag(lam)
+
+    # Compute updated means, covars
+    m = [m0 + np.sqrt(lam0_k)*mbar_ii*vk for mbar_ii in mbar]
+    P = [np.dot(V, np.dot(Lam, V.T))]*N
+
+    # Form output
+    GMM = [w, m, P]
+
+    return GMM
 
 
 def split_gaussian_library(N=3):
