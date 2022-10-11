@@ -4,6 +4,7 @@ import math
 import sys
 import os
 import inspect
+import copy
 import matplotlib.pyplot as plt
 
 filename = inspect.getframeinfo(inspect.currentframe()).filename
@@ -714,10 +715,6 @@ def unscented_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
     Wm = np.insert(Wm, 0, lam/(n + lam))
     Wc = np.insert(Wc, 0, lam/(n + lam) + (1 - alpha**2 + beta))
     diagWc = np.diag(Wc)
-    unscented_params = {}
-    unscented_params['gam'] = gam
-    unscented_params['Wm'] = Wm
-    unscented_params['diagWc'] = diagWc
 
     # Initialize output
     filter_output = {}
@@ -1343,10 +1340,6 @@ def ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
     Wm = np.insert(Wm, 0, lam/(n + lam))
     Wc = np.insert(Wc, 0, lam/(n + lam) + (1 - alpha**2 + beta))
     diagWc = np.diag(Wc)
-    unscented_params = {}
-    unscented_params['gam'] = gam
-    unscented_params['Wm'] = Wm
-    unscented_params['diagWc'] = diagWc
 
     # Initialize output
     filter_output = {}
@@ -1542,44 +1535,68 @@ def aegis_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         
     '''
     
-    # Retrieve initial state parameters
-    weights = state_dict['weights']
-    means = state_dict['means']
-    covars = state_dict['covars']
-    Q = state_params['Q']
-    gap_seconds = state_params['gap_seconds']
-    time_format = int_params['time_format']
+    # State information
+    state_tk = sorted(state_dict.keys())[-1]
+    weights = state_dict[state_tk]['weights']
+    means = state_dict[state_tk]['means']
+    covars = state_dict[state_tk]['covars']
+    GMM_dict = {}
+    GMM_dict['weights'] = weights
+    GMM_dict['means'] = means
+    GMM_dict['covars'] = covars
+    
 
-    n = len(means[0])
-    q = int(Q.shape[0])
+    nstates = len(means[0])
+    
     
     # Prior information about the distribution
     pnorm = 2.
     kurt = math.gamma(5./pnorm)*math.gamma(1./pnorm)/(math.gamma(3./pnorm)**2.)
     beta = kurt - 1.
-    kappa = kurt - float(n)
-    
-    
-    
-    
-    
+    kappa = kurt - float(nstates)
+
     # Compute sigma point weights
     alpha = state_params['alpha']
-    lam = alpha**2.*(n + kappa) - n
-    gam = np.sqrt(n + lam)
-    Wm = 1./(2.*(n + lam)) * np.ones(2*n,)
+    lam = alpha**2.*(nstates + kappa) - nstates
+    gam = np.sqrt(nstates + lam)
+    Wm = 1./(2.*(nstates + lam)) * np.ones(2*nstates,)
     Wc = Wm.copy()
-    Wm = np.insert(Wm, 0, lam/(n + lam))
-    Wc = np.insert(Wc, 0, lam/(n + lam) + (1 - alpha**2 + beta))
+    Wm = np.insert(Wm, 0, lam/(nstates + lam))
+    Wc = np.insert(Wc, 0, lam/(nstates + lam) + (1 - alpha**2 + beta))
     diagWc = np.diag(Wc)
-    unscented_params = {}
-    unscented_params['gam'] = gam
-    unscented_params['Wm'] = Wm
-    unscented_params['diagWc'] = diagWc
+    state_params['gam'] = gam
+    state_params['Wm'] = Wm
+    state_params['diagWc'] = diagWc
+
+    # Initialize output
+    filter_output = {}
+
+    # Measurement times
+    tk_list = meas_dict['tk_list']
+    Yk_list = meas_dict['Yk_list']
+    sensor_id_list = meas_dict['sensor_id_list']
     
+    # Number of epochs
+    N = len(tk_list)
+  
+    # Loop over times
+    for kk in range(N):
     
-    
-    
+        # Current and previous time
+        if kk == 0:
+            tk_prior = state_tk
+        else:
+            tk_prior = tk_list[kk-1]
+
+        tk = tk_list[kk]
+
+        # Predictor Step
+        tin = [tk_prior, tk]
+        GMM_bar = aegis_predictor(GMM_dict, tin, state_params, int_params)
+        
+        # Corrector Step
+        GMM_dict, resids_k = aegis_corrector(GMM_bar)
+        
     
     
     
@@ -1588,7 +1605,168 @@ def aegis_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
     return filter_output, full_state_output
 
 
-def split_GMM(GMM0, N=3):
+def aegis_predictor(GMM_dict, tin, state_params, int_params):
+    '''
+    
+    
+    '''
+    
+    # Copy input to ensure pass by value
+    GMM_dict = copy.deepcopy(GMM_dict)
+    
+    # State information
+    Q = state_params['Q']
+    q = int(Q.shape[0])
+    gap_seconds = state_params['gap_seconds']
+    time_format = int_params['time_format']
+    delta_s = int_params['delta_s']
+    split_T = int_params['split_T']
+    gam = state_params['gam']
+    Wm = state_params['Wm']
+    diagWc = state_params['diagWc']
+    
+    tk_prior = tin[0]
+    tk = tin[1]
+    
+    if time_format == 'seconds':
+        delta_t = tk - tk_prior
+    elif time_format == 'JD':
+        delta_t = (tk - tk_prior)*86400.
+    elif time_format == 'datetime':
+        delta_t = (tk - tk_prior).total_seconds()
+    
+    # Check if propagation is needed
+    if delta_t == 0.:
+        return GMM_dict
+    
+    # Initialize for integrator
+    # Retrieve current GMM
+    weights = GMM_dict['weights']
+    means = GMM_dict['means']
+    covars = GMM_dict['covars']
+    
+    # For each GMM component, there should be 1 entropy, n states, and 2n+1
+    # sigma points. 
+    ncomp = len(weights)
+    nstates = len(means[0])
+    npoints = nstates*2 + 1
+    nint = ncomp*(nstates*npoints + 1)
+    int0 = np.zeros(nint,)
+
+    # Step through time in small increments
+    ts_prior = tk_prior
+    ts = tk_prior
+    while ts < tk :
+
+        # Time increment for this step
+        ts = ts_prior + delta_s
+        if ts < tk :
+            tin_s = [ts_prior, ts]
+        else :
+            tin_s = [ts_prior, tk]
+    
+        # Loop over components to compute initial entropy and sigma points
+        ncomp = len(weights)
+        for jj in range(ncomp):
+            
+            mj = means[jj]
+            Pj = covars[jj]
+            
+            # Compute entropy
+            ej = compute_entropy(Pj)
+            
+            # Compute sigma points
+            sqP = np.linalg.cholesky(Pj)
+            Xrep = np.tile(mj, (1, nstates))
+            chi = np.concatenate((mj, Xrep+(gam*sqP), Xrep-(gam*sqP)), axis=1)
+            chi_v = np.reshape(chi, (nstates*npoints, 1), order='F')
+            
+            # Store initial state for integrator
+            ind = jj*(nstates*npoints + 1)
+            int0[ind] = ej
+            int0[ind+1:ind+1+(nstates*npoints)] = chi_v.flatten()
+            
+        # Integrate entropy and sigma point dynamics
+        tout, intout = dyn.general_dynamics(int0, tin_s, state_params, int_params)
+        
+        # Retrieve values and split if needed
+        for jj in range(ncomp):
+            
+            # Index to start of this component's quantities
+            ind = jj*(nstates*npoints + 1)
+            
+            # Linear entropy
+            ej_linear = intout[-1, ind]
+            
+            # Nonlinear entropy
+            chi_v = intout[-1, ind+1:ind+1+(nstates*npoints)]            
+            chi = np.reshape(chi_v, (nstates, npoints), order='F')
+
+            Xbar = np.dot(chi, Wm.T)
+            Xbar = np.reshape(Xbar, (nstates, 1))
+            chi_diff = chi - np.dot(Xbar, np.ones((1, npoints)))
+            Pbar = np.dot(chi_diff, np.dot(diagWc, chi_diff.T))
+            
+            ej_nonlin = compute_entropy(Pbar)
+            
+            # Check nonlinearity condition and split if needed
+            if abs(ej_linear - ej_nonlin) > split_T:
+                wj = weights[jj]
+                w_split, m_split, P_split = split_GMM(wj, Xbar, Pbar, N=3)
+                
+                #Replace current component and add others
+                for comp in range(len(w_split)) :
+
+                    #Compute weights, entropy and sigma points
+                    w = w_split[comp]   #Note: split_GMM function multiplies by wj, no need to repeat here
+                    m = m_split[comp]
+                    P = P_split[comp]
+                    
+                    if comp == 0 :
+                        weights[jj] = w
+                        means[jj] = m
+                        covars[jj] = P
+                    else :
+                        weights.append(w)
+                        means.append(m)
+                        covars.append(P)
+            
+            # If no split, update mean and covariance from propagator  
+            # Note: It would save computation to store chi_v, if no split 
+            # needed, could just use this as input int0 to next step, but 
+            # probably little benefit
+            else:                
+                means[jj] = Xbar
+                covars[jj] = Pbar
+                
+    # After tk is reached, incorporate process noise
+    # State Noise Compensation
+    # Zero out SNC for long time gaps
+    if delta_t < gap_seconds:        
+
+        Gamma = np.zeros((nstates,q))
+        Gamma[0:q,:] = (delta_t**2./2) * np.eye(q)
+        Gamma[q:2*q,:] = delta_t * np.eye(q)
+        
+        for jj in range(len(weights)):
+            covars[jj] += np.dot(Gamma, np.dot(Q, Gamma.T))
+            
+    # Form output
+    GMM_bar = {}
+    GMM_bar['weights'] = weights
+    GMM_bar['means'] = means
+    GMM_bar['covars'] = covars    
+    
+    return GMM_bar
+
+
+def aegis_corrector():
+    
+    
+    return
+
+
+def split_GMM(w0, m0, P0, N=3):
     '''
     This function splits a single gaussian PDF into multiple components.
     For a multivariate PDF, it will split along the axis corresponding to the
@@ -1597,28 +1775,26 @@ def split_GMM(GMM0, N=3):
 
     Parameters
     ------
-    GMM0 : list
-        PDF weights, means, and covars [w,m,P]
-            w = weight, scalar
-            m = mean, numpy nx1 array
-            P = covar, numpy nxn array
-
+    w0 : float
+        initial component weight
+    m0 : nx1 numpy array
+        initial component mean state
+    P0 : nxn numpy array
+        initial component covariance
     N : int, optional
         number of components to split into (3,4,or 5) (default=3)
 
     Returns
     ------
-    GMM : list
-        PDF weight, mean, covar [w,m,P]
-            w = weight, list of scalars
-            m = mean, list of numpy nx1 arrays
-            P = covar, list of numpy nxn arrays
+    w : list
+        final component weights
+    m : list of nx1 numpy arrays
+        final component mean states
+    P : list nxn numpy array
+        final component covariance
     '''
 
-    # Break out input GM component
-    w0 = GMM0[0]
-    m0 = GMM0[1]
-    P0 = GMM0[2]
+    # Number of states
     n = len(m0)
 
     # Get splitting library info
@@ -1643,10 +1819,7 @@ def split_GMM(GMM0, N=3):
     m = [m0 + np.sqrt(lam0_k)*mbar_ii*vk for mbar_ii in mbar]
     P = [np.dot(V, np.dot(Lam, V.T))]*N
 
-    # Form output
-    GMM = [w, m, P]
-
-    return GMM
+    return w, m, P
 
 
 def split_gaussian_library(N=3):
