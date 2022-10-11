@@ -1595,12 +1595,12 @@ def aegis_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         GMM_bar = aegis_predictor(GMM_dict, tin, state_params, int_params)
         
         # Corrector Step
-        GMM_dict, resids_k = aegis_corrector(GMM_bar)
-        
-    
-    
-    
-    
+        Yk = Yk_list[kk]
+        sensor_id = sensor_id_list[kk]
+        GMM_dict, resids_k = aegis_corrector(GMM_bar, tk, Yk, sensor_id,
+                                             meas_fcn, state_params,
+                                             sensor_params)
+
     
     return filter_output, full_state_output
 
@@ -1760,7 +1760,83 @@ def aegis_predictor(GMM_dict, tin, state_params, int_params):
     return GMM_bar
 
 
-def aegis_corrector():
+def aegis_corrector(GMM_bar, tk, Yk, sensor_id, meas_fcn, state_params,
+                    sensor_params):
+    '''
+    
+    
+    '''
+    
+    # Retrieve inputs
+    gam = state_params['gam']
+    Wm = state_params['Wm']
+    diagWc = state_params['diagWc']
+    
+    # Break out GMM
+    weights0 = GMM_bar['weights']
+    means0 = GMM_bar['means']
+    covars0 = GMM_bar['covars']
+    nstates = len(means0[0])
+    npoints = nstates*2 + 1
+    
+    # Loop over components and compute measurement update
+    means = []
+    covars = []
+    beta_list = []
+    for jj in range(len(weights0)):        
+        
+        mj = means0[jj]
+        Pj = covars0[jj]
+        
+        # Compute sigma points
+        sqP = np.linalg.cholesky(Pj)
+        Xrep = np.tile(mj, (1, nstates))
+        chi = np.concatenate((mj, Xrep+(gam*sqP), Xrep-(gam*sqP)), axis=1)
+        chi_diff = chi - np.dot(mj, np.ones((1, npoints)))
+
+        # Computed measurements and covariance
+        gamma_til_k, Rk = meas_fcn(tk, chi, state_params, sensor_params, sensor_id)
+        ybar = np.dot(gamma_til_k, Wm.T)
+        ybar = np.reshape(ybar, (len(ybar), 1))
+        Y_diff = gamma_til_k - np.dot(ybar, np.ones((1, (2*nstates+1))))
+        Pyy = np.dot(Y_diff, np.dot(diagWc, Y_diff.T)) + Rk
+        Pxy = np.dot(chi_diff,  np.dot(diagWc, Y_diff.T))
+        
+        print('Yk', Yk)
+        print('ybar', ybar)
+        
+        # Kalman gain and measurement update
+        Kk = np.dot(Pxy, np.linalg.inv(Pyy))
+        mf = mj + np.dot(Kk, Yk-ybar)
+        
+        # Basic covariance update
+#        P = Pbar - np.dot(K, np.dot(Pyy, K.T))
+        
+        # Re-symmetric covariance     
+#        P = 0.5 * (P + P.T)
+        
+        # Joseph form
+        cholPbar = np.linalg.inv(np.linalg.cholesky(Pj))
+        invPbar = np.dot(cholPbar.T, cholPbar)
+        P1 = (np.eye(nstates) - np.dot(np.dot(Kk, np.dot(Pyy, Kk.T)), invPbar))
+        P2 = np.dot(Kk, np.dot(Rk, Kk.T))
+        Pf = np.dot(P1, np.dot(Pj, P1.T)) + P2
+        
+        # Compute Gaussian likelihood
+        beta_j = gaussian_likelihood(Yk, ybar, Pyy)
+
+        # Store output
+        means.append(mf)
+        covars.append(Pf)
+        beta_list.append(beta_j)
+        
+    # Normalize updated weights
+    denom = np.dot(beta_list, weights0)
+    weights = [a1*a2/denom for a1,a2 in zip(weights0, beta_list)]
+    
+    # Merge and Prune components
+    weights, means, covars = merge_GMM(weights, means, covars, state_params)
+    
     
     
     return
@@ -1904,6 +1980,34 @@ def compute_entropy(P) :
     entropy = H
 
     return entropy
+
+
+def gaussian_likelihood(x, m, P):
+    '''
+    This function computes the likelihood of the multivariate gaussian pdf
+    for a random vector x, assuming mean m and covariance P.  
+
+    Parameters
+    ------
+    x : nx1 numpy array
+        instance of a random vector
+    m : nx1 numpy array
+        mean
+    P : nxn numpy array
+        covariance
+
+    Returns
+    ------
+    pg : float
+        multivariate gaussian likelihood   
+
+    '''
+
+    K1 = np.sqrt(np.linalg.det(2*math.pi*(P)))
+    K2 = np.exp(-0.5 * np.dot((x-m).T, np.dot(np.linalg.inv(P),(x-m))))
+    pg = float((1./K1) * K2)
+
+    return pg
 
 
 
