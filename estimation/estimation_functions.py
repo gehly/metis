@@ -1579,6 +1579,12 @@ def aegis_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
     
     
     
+    
+    
+    
+    
+    
+    
     return filter_output, full_state_output
 
 
@@ -1684,6 +1690,47 @@ def split_gaussian_library(N=3):
         sig = [0.4422555386310084]*5
 
     return w, m, sig
+
+
+def compute_entropy(P) :
+    '''
+    This function computes the entropy of a Gaussian PDF given the covariance.
+    
+    Parameters
+    ------
+    P : nxn numpy array
+        covariance matrix
+    
+    Returns
+    ------
+    H : float
+        differential entropy
+        
+    Reference
+    ------
+    DeMars, K.J., Bishop, R.H., Jah, M.K., "Entropy-Based Approach for 
+        Uncertainty Propagation of Nonlinear Dynamical Systems," JGCD 2013.
+    '''
+
+    if np.linalg.det(2*math.pi*math.e*P) < 0. :
+        print(np.linalg.det(2*math.pi*math.e*P))
+        print(np.linalg.eig(P))
+        P2 = scipy.linalg.sqrtm(P)
+        P3 = np.real(np.dot(P2,P2.T))
+        print(np.linalg.eig(P3))
+        print(P3 - P)
+        mistake
+
+    # Differential Entropy (Eq. 5)
+    H = 0.5 * math.log(np.linalg.det(2.*math.pi*math.e*P))
+
+    # Renyi Entropy (Eq. 8)
+    # kappa = 0.5
+    # R = 0.5 * log(np.linalg.det(2*pi*(kappa**(1/(1-kappa)))*P))
+
+    entropy = H
+
+    return entropy
 
 
 

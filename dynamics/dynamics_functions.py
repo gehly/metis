@@ -358,6 +358,9 @@ def ode_balldrop_ukf(t, X, params):
     return dX
 
 
+
+
+
 ###############################################################################
 # Orbit Propagation Routines
 ###############################################################################
@@ -670,10 +673,10 @@ def ode_twobody_stm(t, X, params):
 
     Parameters
     ------
-    X : (n+n^2) element array
-      initial condition vector of cartesian state and STM (Inertial Frame)
     t : float 
       current time in seconds
+    X : (n+n^2) element array
+      initial condition vector of cartesian state and STM (Inertial Frame)    
     params : dictionary
         additional arguments
 
@@ -750,6 +753,76 @@ def ode_twobody_stm(t, X, params):
     dX[n:] = dphi_v.flatten()
 
     return dX
+
+
+def A_twobody(t, X, params):
+    '''
+    This function computes the dynamics model Jacobian corresponding to the
+    first order Taylor Series expansion, for use with standard batch and
+    Kalman filter implementations.
+    
+    Two-Body dynamics, no perturbing forces included.
+    
+    Parameters
+    ------
+    t : float 
+      current time in seconds
+    X : nx1 numpy array
+      initial condition vector of cartesian state and STM (Inertial Frame)
+    params : dictionary
+        additional arguments
+        
+    Returns
+    ------
+    A : nxn numpy array
+        Jacobian matrix    
+    '''
+    
+    # Additional arguments
+    GM = params['GM']
+
+    # Compute number of states
+    n = len(X)
+
+    # State Vector
+    x = float(X[0])
+    y = float(X[1])
+    z = float(X[2])
+
+    # Compute radius
+    r = np.linalg.norm([x, y, z])
+
+    # Find elements of A matrix
+    xx_cf = -GM/r**3 + 3.*GM*x**2/r**5
+    xy_cf = 3.*GM*x*y/r**5
+    xz_cf = 3.*GM*x*z/r**5
+    yy_cf = -GM/r**3 + 3.*GM*y**2/r**5
+    yx_cf = xy_cf
+    yz_cf = 3.*GM*y*z/r**5
+    zz_cf = -GM/r**3 + 3.*GM*z**2/r**5
+    zx_cf = xz_cf
+    zy_cf = yz_cf
+
+    # Generate A matrix
+    A = np.zeros((n, n))
+
+    A[0,3] = 1.
+    A[1,4] = 1.
+    A[2,5] = 1.
+
+    A[3,0] = xx_cf
+    A[3,1] = xy_cf
+    A[3,2] = xz_cf
+
+    A[4,0] = yx_cf
+    A[4,1] = yy_cf
+    A[4,2] = yz_cf
+
+    A[5,0] = zx_cf
+    A[5,1] = zy_cf
+    A[5,2] = zz_cf    
+    
+    return A
 
 
 
@@ -1103,6 +1176,75 @@ def ode_twobody_j2_drag_stm(t, X, params):
 #    return dX
 #
 #
+
+
+
+###############################################################################
+# Non-Gaussian Uncertainty Functions
+###############################################################################
+
+def ode_aegis(t, X, params):
+    '''
+    This function propagates the sigma points and entropy of a Gaussian Mixture
+    Model per the dynamics model specificied in the input params.
+    
+    Parameters
+    ------
+    X : numpy array
+        initial condition vector of entropies and cartesian state vectors 
+        corresponding to sigma points
+    t : float 
+        current time in seconds
+    params : dictionary
+        additional arguments
+
+    Returns
+    ------
+    dX : numpy array
+        derivative vector
+      
+    Reference
+    ------
+    DeMars, K.J., Bishop, R.H., Jah, M.K., "Entropy-Based Approach for 
+        Uncertainty Propagation of Nonlinear Dynamical Systems," JGCD 2013.
+        
+    '''
+    
+    # Function handles
+    A_fcn = params['A_fcn']
+    dyn_fcn = params['dyn_fcn']
+    
+    # Retrieve number of states, sigma points, entropies
+    nstates = params['nstates']
+    npoints = params['npoints']
+    ncomp = params['ncomp']
+    
+    # For each GMM component, there should be 1 entropy, n states, and 2n+1
+    # sigma points. Loop over components to compute derivative values
+    dX = np.zeros(len(X),)
+    for jj in range(ncomp):
+        
+        # Indices
+        nn = npoints*nstates 
+        entropy_ind = jj*(nn + 1)
+        mean_ind = entropy_ind + 1
+        
+        # Mean state
+        mj = X[mean_ind:mean_ind+nstates]
+        
+        # Compute A matrix
+        A = A_fcn(t, mj, params)
+        
+        # Compute derivative of entropy (DeMars Eq. 13)
+        dX[entropy_ind] = np.trace(A)
+        
+        # Compute derivatives of states
+        Xj = X[mean_ind:mean_ind+nn]
+        dXj = dyn_fcn(t, Xj, params)
+        dX[mean_ind:mean_ind+nn] = dXj.flatten()
+    
+    
+    return dX
 
 
 ###############################################################################
