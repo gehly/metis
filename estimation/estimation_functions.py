@@ -15,6 +15,7 @@ metis_dir = current_dir[0:ind+5]
 sys.path.append(metis_dir)
 
 import dynamics.dynamics_functions as dyn
+import sensors.measurement_functions as mfunc
 
 from utilities.constants import arcsec2rad
 
@@ -1600,7 +1601,18 @@ def aegis_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         GMM_dict, resids_k = aegis_corrector(GMM_bar, tk, Yk, sensor_id,
                                              meas_fcn, state_params,
                                              sensor_params)
-
+        
+        # Store output
+        filter_output[tk] = {}
+        filter_output[tk]['weights'] = GMM_dict['weights']
+        filter_output[tk]['means'] = GMM_dict['means']
+        filter_output[tk]['covars'] = GMM_dict['covars']
+        filter_output[tk]['resids'] = resids_k
+        
+        
+    # TODO Generation of full_state_output not working correctly
+    # Use filter_output for error analysis
+    full_state_output = {}
     
     return filter_output, full_state_output
 
@@ -1809,12 +1821,6 @@ def aegis_corrector(GMM_bar, tk, Yk, sensor_id, meas_fcn, state_params,
         Kk = np.dot(Pxy, np.linalg.inv(Pyy))
         mf = mj + np.dot(Kk, Yk-ybar)
         
-        # Basic covariance update
-#        P = Pbar - np.dot(K, np.dot(Pyy, K.T))
-        
-        # Re-symmetric covariance     
-#        P = 0.5 * (P + P.T)
-        
         # Joseph form
         cholPbar = np.linalg.inv(np.linalg.cholesky(Pj))
         invPbar = np.dot(cholPbar.T, cholPbar)
@@ -1838,9 +1844,23 @@ def aegis_corrector(GMM_bar, tk, Yk, sensor_id, meas_fcn, state_params,
     # Merge and Prune components
     weights, means, covars = merge_GMM(weights, means, covars, state_params)
     
+    # Compute post-fit residuals by merging all components
+    params = {}
+    params['prune_T'] = 0.
+    params['merge_U'] = 1e10
+    dum, Xhat, dum = merge_GMM(weights, means, covars, params)
     
+    ybar = mfunc.compute_measurement(Xhat, state_params, sensor_params,
+                                     sensor_id, tk)
+    resids_k = Yk - ybar
     
-    return
+    # Output
+    GMM_dict = {}
+    GMM_dict['weights'] = weights
+    GMM_dict['means'] = means
+    GMM_dict['covars'] = covars
+    
+    return weights, means, covars, resids_k
 
 
 def split_GMM(w0, m0, P0, N=3):

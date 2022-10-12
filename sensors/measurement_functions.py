@@ -17,8 +17,18 @@ import utilities.eop_functions as eop
 
 
 
-def compute_measurement(X, state_params, sensor, UTC, EOP_data, XYs_df=[], meas_types=[],
-                        sun_gcrf=[]):
+def compute_measurement(X, state_params, sensor_params, sensor_id, UTC, 
+                        EOP_data=[], XYs_df=[], meas_types=[], sun_gcrf=[]):
+    
+    # Retrieve data from sensor params
+    sensor = sensor_params[sensor_id]
+    
+    if len(EOP_data) == 0:
+        eop_alldata = sensor_params['eop_alldata']
+        EOP_data = eop.get_eop_data(eop_alldata, UTC)
+    
+    if len(XYs_df) == 0:    
+        XYs_df = sensor_params['XYs_df']    
     
     # Retrieve measurement types
     if len(meas_types) == 0:

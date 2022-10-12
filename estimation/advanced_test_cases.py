@@ -125,9 +125,9 @@ def geo_j2_setup():
             if visfunc.check_visibility(X, state_params, sensor, UTC, EOP_data, XYs_df):
                 
                 # Compute measurements
-                Yk = mfunc.compute_measurement(X, state_params, sensor, UTC,
-                                                  EOP_data, XYs_df,
-                                                  meas_types=sensor['meas_types'])
+                Yk = mfunc.compute_measurement(X, state_params, sensor_params,
+                                               sensor_id, UTC, EOP_data, XYs_df,
+                                               meas_types=sensor['meas_types'])
                 
                 Yk[0] += np.random.randn()*sigma_dict['ra']
                 Yk[1] += np.random.randn()*sigma_dict['dec']
@@ -307,8 +307,9 @@ def sso_j2_drag_setup():
             if visfunc.check_visibility(X, state_params, sensor, UTC, EOP_data, XYs_df):
                 
                 # Compute measurements
-                Yk = mfunc.compute_measurement(X, state_params, sensor, UTC,
-                                         EOP_data, XYs_df, meas_types)
+                Yk = mfunc.compute_measurement(X, state_params, sensor_params,
+                                               sensor_id, UTC, EOP_data, XYs_df,
+                                               meas_types=sensor['meas_types'])
                 
                 for mtype in meas_types:
                     mind = meas_types.index(mtype)

@@ -366,8 +366,8 @@ def twobody_geo_setup():
             if visfunc.check_visibility(X, state_params, sensor, UTC, EOP_data, XYs_df):
                 
                 # Compute measurements
-                Yk = mfunc.compute_measurement(X, state_params, sensor, UTC,
-                                               EOP_data, XYs_df,
+                Yk = mfunc.compute_measurement(X, state_params, sensor_params,
+                                               sensor_id, UTC, EOP_data, XYs_df,
                                                meas_types=sensor['meas_types'])
                 
                 Yk[0] += np.random.randn()*sigma_dict['ra']
@@ -685,8 +685,9 @@ def twobody_born_setup():
             if visfunc.check_visibility(X, state_params, sensor, UTC, EOP_data, XYs_df):
                 
                 # Compute measurements
-                Yk = mfunc.compute_measurement(X, state_params, sensor, UTC,
-                                         EOP_data, XYs_df, meas_types)
+                Yk = mfunc.compute_measurement(X, state_params, sensor_params,
+                                               sensor_id, UTC, EOP_data, XYs_df,
+                                               meas_types=sensor['meas_types'])
                 
                 for mtype in meas_types:
                     mind = meas_types.index(mtype)
