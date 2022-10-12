@@ -1673,7 +1673,7 @@ def aegis_predictor(GMM_dict, tin, state_params, int_params):
             Pj = covars[jj]
             
             # Compute entropy
-            ej = compute_entropy(Pj)
+            ej = gaussian_entropy(Pj)
             
             # Compute sigma points
             sqP = np.linalg.cholesky(Pj)
@@ -1707,7 +1707,7 @@ def aegis_predictor(GMM_dict, tin, state_params, int_params):
             chi_diff = chi - np.dot(Xbar, np.ones((1, npoints)))
             Pbar = np.dot(chi_diff, np.dot(diagWc, chi_diff.T))
             
-            ej_nonlin = compute_entropy(Pbar)
+            ej_nonlin = gaussian_entropy(Pbar)
             
             # Check nonlinearity condition and split if needed
             if abs(ej_linear - ej_nonlin) > split_T:
@@ -1831,8 +1831,9 @@ def aegis_corrector(GMM_bar, tk, Yk, sensor_id, meas_fcn, state_params,
         beta_list.append(beta_j)
         
     # Normalize updated weights
-    denom = np.dot(beta_list, weights0)
-    weights = [a1*a2/denom for a1,a2 in zip(weights0, beta_list)]
+#    denom = np.dot(beta_list, weights0)    
+#    weights = [a1*a2/denom for a1,a2 in zip(weights0, beta_list)]
+    weights = list(np.multiply(beta_list, weights0)/np.dot(beta_list, weights0))
     
     # Merge and Prune components
     weights, means, covars = merge_GMM(weights, means, covars, state_params)
@@ -1898,6 +1899,102 @@ def split_GMM(w0, m0, P0, N=3):
     return w, m, P
 
 
+def merge_GMM(w0, m0, P0, params) :
+    '''    
+    This function examines a GMM containing multiple components. It removes
+    components with weights below a given threshold, and merges components that
+    are close together (small NL2 distance).
+    
+    Parameters
+    ------
+    w0 : list
+        initial component weights
+    m0 : list of nx1 numpy arrays
+        initial component mean states
+    P0 : list nxn numpy array
+        initial component covariance
+    params : dictionary
+        thresholds for merging and pruning
+
+    Returns
+    ------
+    wf : list
+        final component weights
+    mf : list of nx1 numpy arrays
+        final component mean states
+    Pf : list nxn numpy array
+        final component covariance
+
+    References
+    ------
+    [1] Vo and Ma, "The Gaussian Mixture Probability Hypothesis Density
+        Filter," 2006.
+    
+    '''
+
+    # Break out inputs
+    T = params['prune_T']
+    U = params['merge_U']
+    
+    # Number of states
+    nstates = len(m0[0])
+
+    # Only keep GM components whose weight is above the threshold   
+    # DeMars threshold instead of Vo (just use T)
+    wmax = max(w0)
+    w = [w0[ii] for ii in range(len(w0)) if w0[ii] > T*wmax]
+    m = [m0[ii] for ii in range(len(w0)) if w0[ii] > T*wmax]
+    P = [P0[ii] for ii in range(len(w0)) if w0[ii] > T*wmax]
+
+    # Loop to merge components that are close
+    wf = []
+    mf = []
+    Pf = []
+    I = np.arange(0, len(w))
+    while len(I) != 0:
+
+        # Loop over components to see if they are close to j
+        # Note, at least one will be when i == j        
+        L = []
+        wsum = 0.
+        msum = np.zeros((nstates, 1))
+        jj = np.argmax(w)
+        for ii in range(len(w)):
+            Pi = P[ii]
+            invP = np.linalg.inv(Pi)
+            prod = np.dot((m[ii] - m[jj]).T, np.dot(invP,(m[ii] - m[jj])))
+            if prod <= U:
+                L.append(ii)
+                wsum += w[ii]
+                msum += w[ii]*m[ii]                
+
+        # Compute final w,m,P
+        wf.append(wsum)
+        mf_bar = (1./wsum)*msum
+        mf.append(mf_bar)
+
+        Psum = np.zeros((nstates, nstates))
+        for ii in range(len(L)):
+            Psum += w[L[ii]]*(P[L[ii]] + np.dot((mf_bar - m[L[ii]]),
+                                                (mf_bar - m[L[ii]]).T))
+        Pf_bar = (1./wsum)*Psum
+        Pf.append(Pf_bar)
+
+        # Reduce w,m,P
+        I = list(set(I).difference(set(L)))
+        w = [w[ii] for ii in I]
+        m = [m[ii] for ii in I]
+        P = [P[ii] for ii in I]
+
+        # Reset I        
+        I = np.arange(0, len(w))
+
+    # Normalize weights
+    wf = list(np.asarray(wf)/sum(wf))
+
+    return wf, mf, Pf
+
+
 def split_gaussian_library(N=3):
     '''
     This function outputs the splitting library for GM components. All outputs
@@ -1941,7 +2038,7 @@ def split_gaussian_library(N=3):
     return w, m, sig
 
 
-def compute_entropy(P) :
+def gaussian_entropy(P) :
     '''
     This function computes the entropy of a Gaussian PDF given the covariance.
     
