@@ -1,4 +1,5 @@
 import numpy as np
+from scipy import stats
 import pickle
 import matplotlib.pyplot as plt
 import sys
@@ -195,6 +196,71 @@ def compute_LAM(GMM_dict, mc_points):
             LAM += (1./N)*wj*pg
 
     return LAM
+
+
+def plot_pdf_contours(GMM_dict):
+    '''
+    
+    
+    '''
+    
+    # Break out GMM
+    weights = GMM_dict['weights']
+    means = GMM_dict['means']
+    covars = GMM_dict['covars']
+    
+    m = means[0].flatten()
+    P = covars[0]
+    sig1 = np.sqrt(P[0,0])
+    sig2 = np.sqrt(P[1,1])
+    
+    xmin = m[0] - 10*sig1
+    xmax = m[0] + 10*sig1
+    ymin = m[1] - 10*sig2
+    ymax = m[1] + 10*sig2
+    
+    x = np.linspace(xmin, xmax, 100)
+    y = np.linspace(ymin, ymax, 100)
+    
+    xgrid, ygrid = np.meshgrid(x, y)
+    
+    z = stats.multivariate_normal(m, P).pdf(np.dstack((xgrid, ygrid)))
+    
+
+#    w_0, w_1 = np.meshgrid(t, h)
+#    z = stats.multivariate_normal(biv_mean,biv_cov).pdf(np.dstack((w_0, w_1)))
+#    plt.figure(figsize=(10,5))
+#    plt.plot(eruptions,waiting,'go')
+#    plt.title("Duration of the eruption in minutes vs  the duration in minutes until the next eruption.")
+#    plt.ylabel("waiting")
+#    plt.xlabel("eruption duration")
+#    plt.contour(t, h, z)
+    
+    
+    plt.contour(x, y, z)
+    
+    
+    plt.show()
+    
+    
+    
+    return
+
+
+def test_pdf_contours():
+    
+    
+    x1 = np.reshape([3,-1], (2,1))
+    P1 = np.array([[2., 1.],[1., 8.]])
+    
+    GMM_dict = {}
+    GMM_dict['weights'] = [1.]
+    GMM_dict['means'] = [x1]
+    GMM_dict['covars'] = [P1]
+    
+    plot_pdf_contours(GMM_dict)
+    
+    return
 
 
 ###############################################################################
@@ -819,3 +885,24 @@ def compute_real_orbit_errors(filter_output, full_state_output, truth_dict, nora
     
     
     return
+
+
+
+
+
+if __name__ == '__main__':
+    
+    plt.close('all')
+    
+    test_pdf_contours()
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
