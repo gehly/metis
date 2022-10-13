@@ -6,6 +6,7 @@ import os
 import inspect
 import copy
 import matplotlib.pyplot as plt
+from datetime import datetime, timedelta
 
 filename = inspect.getframeinfo(inspect.currentframe()).filename
 current_dir = os.path.dirname(os.path.abspath(filename))
@@ -1545,10 +1546,7 @@ def aegis_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
     GMM_dict['weights'] = weights
     GMM_dict['means'] = means
     GMM_dict['covars'] = covars
-    
-
-    nstates = len(means[0])
-    
+    nstates = len(means[0])    
     
     # Prior information about the distribution
     pnorm = 2.
@@ -1630,8 +1628,7 @@ def aegis_predictor(GMM_dict, tin, state_params, int_params):
     Q = state_params['Q']
     q = int(Q.shape[0])
     gap_seconds = state_params['gap_seconds']
-    time_format = int_params['time_format']
-    delta_s = int_params['delta_s']
+    time_format = int_params['time_format']    
     split_T = int_params['split_T']
     gam = state_params['gam']
     Wm = state_params['Wm']
@@ -1642,10 +1639,13 @@ def aegis_predictor(GMM_dict, tin, state_params, int_params):
     
     if time_format == 'seconds':
         delta_t = tk - tk_prior
+        delta_s = int_params['delta_s_sec']
     elif time_format == 'JD':
         delta_t = (tk - tk_prior)*86400.
+        delta_s = int_params['delta_s_sec']*(1./86400.)
     elif time_format == 'datetime':
         delta_t = (tk - tk_prior).total_seconds()
+        delta_s = timedelta(seconds=int_params['delta_s_sec'])
     
     # Check if propagation is needed
     if delta_t == 0.:
@@ -1662,13 +1662,23 @@ def aegis_predictor(GMM_dict, tin, state_params, int_params):
     ncomp = len(weights)
     nstates = len(means[0])
     npoints = nstates*2 + 1
-    nint = ncomp*(nstates*npoints + 1)
-    int0 = np.zeros(nint,)
+    state_params['nstates'] = nstates
+    state_params['npoints'] = npoints
+    
+    # Compute initial entropy for each component
+    ej_initial_list = []
+    for jj in range(ncomp):
+        Pj = covars[jj]
+        ej_initial_list.append(gaussian_entropy(Pj))        
+    ej_linear_list = copy.copy(ej_initial_list)
 
     # Step through time in small increments
     ts_prior = tk_prior
     ts = tk_prior
     while ts < tk :
+        
+        print('\nstart loop')
+        print('ts', ts)
 
         # Time increment for this step
         ts = ts_prior + delta_s
@@ -1676,16 +1686,24 @@ def aegis_predictor(GMM_dict, tin, state_params, int_params):
             tin_s = [ts_prior, ts]
         else :
             tin_s = [ts_prior, tk]
-    
-        # Loop over components to compute initial entropy and sigma points
+                
+        # Loop over components to set up initial state for integration
         ncomp = len(weights)
+        state_params['ncomp'] = ncomp
+        nint = ncomp*(nstates*npoints + 1)
+        int0 = np.zeros(nint,)
+        print('ncomp', ncomp)
         for jj in range(ncomp):
             
+            # Retrieve component values
             mj = means[jj]
             Pj = covars[jj]
+            ej = ej_linear_list[jj]
             
-            # Compute entropy
-            ej = gaussian_entropy(Pj)
+#            print('set up int0')
+#            print('nint', nint)
+#            print('jj', jj)
+#            print('ej linear', ej)
             
             # Compute sigma points
             sqP = np.linalg.cholesky(Pj)
@@ -1697,6 +1715,8 @@ def aegis_predictor(GMM_dict, tin, state_params, int_params):
             ind = jj*(nstates*npoints + 1)
             int0[ind] = ej
             int0[ind+1:ind+1+(nstates*npoints)] = chi_v.flatten()
+            state_params['ncomp'] = ncomp
+            
             
         # Integrate entropy and sigma point dynamics
         tout, intout = dyn.general_dynamics(int0, tin_s, state_params, int_params)
@@ -1721,27 +1741,46 @@ def aegis_predictor(GMM_dict, tin, state_params, int_params):
             
             ej_nonlin = gaussian_entropy(Pbar)
             
+#            print('post integration')
+#            print('jj', jj)
+#            print('ej_linear', ej_linear)
+#            print('ej_nonlin', ej_nonlin)
+            
             # Check nonlinearity condition and split if needed
-            if abs(ej_linear - ej_nonlin) > split_T:
+            if abs(ej_linear - ej_nonlin) > abs(split_T*ej_initial_list[jj]):
                 wj = weights[jj]
-                w_split, m_split, P_split = split_GMM(wj, Xbar, Pbar, N=3)
+                GMM_in = {}
+                GMM_in['weights'] = [wj]
+                GMM_in['means'] = [Xbar]
+                GMM_in['covars'] = [Pbar]
+                GMM_out = split_GMM(GMM_in, N=3)
+                w_split = GMM_out['weights']
+                m_split = GMM_out['means']
+                P_split = GMM_out['covars']
                 
-                #Replace current component and add others
-                for comp in range(len(w_split)) :
+                # Replace current component and add others
+                for comp in range(len(w_split)):
 
-                    #Compute weights, entropy and sigma points
-                    w = w_split[comp]   #Note: split_GMM function multiplies by wj, no need to repeat here
+                    # Compute weights, entropy and sigma points
+                    # Note: split_GMM function multiplies by wj, no need to 
+                    # repeat here
+                    w = w_split[comp]   
                     m = m_split[comp]
                     P = P_split[comp]
+                    ej_initial = gaussian_entropy(P)
                     
-                    if comp == 0 :
+                    if comp == 0:
                         weights[jj] = w
                         means[jj] = m
                         covars[jj] = P
-                    else :
+                        ej_initial_list[jj] = ej_initial
+                        ej_linear_list[jj] = ej_initial
+                    else:
                         weights.append(w)
                         means.append(m)
                         covars.append(P)
+                        ej_initial_list.append(ej_initial)
+                        ej_linear_list.append(ej_initial)
             
             # If no split, update mean and covariance from propagator  
             # Note: It would save computation to store chi_v, if no split 
@@ -1750,6 +1789,10 @@ def aegis_predictor(GMM_dict, tin, state_params, int_params):
             else:                
                 means[jj] = Xbar
                 covars[jj] = Pbar
+                ej_linear_list[jj] = ej_linear
+                
+        # Update time for next step
+        ts_prior = ts
                 
     # After tk is reached, incorporate process noise
     # State Noise Compensation
@@ -1842,28 +1885,27 @@ def aegis_corrector(GMM_bar, tk, Yk, sensor_id, meas_fcn, state_params,
     weights = list(np.multiply(beta_list, weights0)/np.dot(beta_list, weights0))
     
     # Merge and Prune components
-    weights, means, covars = merge_GMM(weights, means, covars, state_params)
+    GMM_in = {}
+    GMM_in['weights'] = weights
+    GMM_in['means'] = means
+    GMM_in['covars'] = covars
+    GMM_dict = merge_GMM(GMM_in, state_params)
     
     # Compute post-fit residuals by merging all components
     params = {}
     params['prune_T'] = 0.
     params['merge_U'] = 1e10
-    dum, Xhat, dum = merge_GMM(weights, means, covars, params)
+    GMM_resids = merge_GMM(GMM_dict, params)
+    Xhat = GMM_resids['means'][0]
     
     ybar = mfunc.compute_measurement(Xhat, state_params, sensor_params,
                                      sensor_id, tk)
     resids_k = Yk - ybar
     
-    # Output
-    GMM_dict = {}
-    GMM_dict['weights'] = weights
-    GMM_dict['means'] = means
-    GMM_dict['covars'] = covars
-    
-    return weights, means, covars, resids_k
+    return GMM_dict, resids_k
 
 
-def split_GMM(w0, m0, P0, N=3):
+def split_GMM(GMM0, N=3):
     '''
     This function splits a single gaussian PDF into multiple components.
     For a multivariate PDF, it will split along the axis corresponding to the
@@ -1872,26 +1914,13 @@ def split_GMM(w0, m0, P0, N=3):
 
     Parameters
     ------
-    w0 : float
-        initial component weight
-    m0 : nx1 numpy array
-        initial component mean state
-    P0 : nxn numpy array
-        initial component covariance
-    N : int, optional
-        number of components to split into (3,4,or 5) (default=3)
 
-    Returns
-    ------
-    w : list
-        final component weights
-    m : list of nx1 numpy arrays
-        final component mean states
-    P : list nxn numpy array
-        final component covariance
     '''
 
-    # Number of states
+    # Break out GMM
+    w0 = GMM0['weights'][0]
+    m0 = GMM0['means'][0]
+    P0 = GMM0['covars'][0]
     n = len(m0)
 
     # Get splitting library info
@@ -1915,35 +1944,24 @@ def split_GMM(w0, m0, P0, N=3):
     # Compute updated means, covars
     m = [m0 + np.sqrt(lam0_k)*mbar_ii*vk for mbar_ii in mbar]
     P = [np.dot(V, np.dot(Lam, V.T))]*N
+    
+    # Form output
+    GMM = {}
+    GMM['weights'] = w
+    GMM['means'] = m
+    GMM['covars'] = P
 
-    return w, m, P
+    return GMM
 
 
-def merge_GMM(w0, m0, P0, params) :
+def merge_GMM(GMM0, params) :
     '''    
     This function examines a GMM containing multiple components. It removes
     components with weights below a given threshold, and merges components that
     are close together (small NL2 distance).
     
     Parameters
-    ------
-    w0 : list
-        initial component weights
-    m0 : list of nx1 numpy arrays
-        initial component mean states
-    P0 : list nxn numpy array
-        initial component covariance
-    params : dictionary
-        thresholds for merging and pruning
 
-    Returns
-    ------
-    wf : list
-        final component weights
-    mf : list of nx1 numpy arrays
-        final component mean states
-    Pf : list nxn numpy array
-        final component covariance
 
     References
     ------
@@ -1951,6 +1969,11 @@ def merge_GMM(w0, m0, P0, params) :
         Filter," 2006.
     
     '''
+    
+    # Break out GMM
+    w0 = GMM0['weights']
+    m0 = GMM0['means']
+    P0 = GMM0['covars']
 
     # Break out inputs
     T = params['prune_T']
@@ -2011,8 +2034,14 @@ def merge_GMM(w0, m0, P0, params) :
 
     # Normalize weights
     wf = list(np.asarray(wf)/sum(wf))
+    
+    # Output
+    GMM = {}
+    GMM['weights'] = wf
+    GMM['means'] = mf
+    GMM['covars'] = Pf
 
-    return wf, mf, Pf
+    return GMM
 
 
 def split_gaussian_library(N=3):
@@ -2089,6 +2118,8 @@ def gaussian_entropy(P) :
 
     # Differential Entropy (Eq. 5)
     H = 0.5 * math.log(np.linalg.det(2.*math.pi*math.e*P))
+    
+#    print(np.linalg.det(2.*math.pi*math.e*P))
 
     # Renyi Entropy (Eq. 8)
     # kappa = 0.5
@@ -2125,6 +2156,32 @@ def gaussian_likelihood(x, m, P):
     pg = float((1./K1) * K2)
 
     return pg
+
+
+def gmm_samples(GMM_dict, N):
+
+    # Break out GMM
+    w = GMM_dict['weights']
+    m = GMM_dict['means']
+    P = GMM_dict['covars']
+
+    # Loop over components and generate samples
+    for jj in range(len(w)):
+        wj = w[jj]
+        mj = m[jj]
+        Pj = P[jj]
+
+        mcj = np.random.multivariate_normal(mj.flatten(),Pj,int(wj*N))
+
+        if jj == 0 :
+            mc_points = mcj
+        else :
+            mc_points = np.concatenate((mc_points,mcj))
+
+    return mc_points
+
+
+
 
 
 

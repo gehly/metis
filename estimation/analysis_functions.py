@@ -12,6 +12,7 @@ ind = current_dir.find('metis')
 metis_dir = current_dir[0:ind+5]
 sys.path.append(metis_dir)
 
+import estimation.estimation_functions as est
 import utilities.coordinate_systems as coord
 import utilities.tle_functions as tle
 
@@ -143,6 +144,57 @@ def compute_balldrop_errors(filter_output, truth_dict):
     
     
     return
+
+
+###############################################################################
+# PDF Analysis
+###############################################################################
+
+def compute_LAM(GMM_dict, mc_points):
+    '''
+    This function computes the likelihood agreement measure between a 
+    Gaussian Mixture Model and a set of Monte-Carlo samples
+    
+    Parameters
+    ------
+    GMM_dict : dictionary
+        contains lists of GMM component weights, means, and covars
+    mc_points : Nxn numpy array
+        each row corresponts to one MC sample
+        
+    Returns
+    ------
+    LAM : float
+        likelihood agreement measure
+        
+    Reference
+    ------
+    DeMars, K.J., Bishop, R.H., Jah, M.K., "Entropy-Based Approach for 
+        Uncertainty Propagation of Nonlinear Dynamical Systems," JGCD 2013.
+    
+    '''
+    
+    
+    # Break out GMM
+    w = GMM_dict['weights']
+    m = GMM_dict['means']
+    P = GMM_dict['covars']
+    nstates = len(m[0])
+    
+    # Loop to compute Likelihood Agreement Measure (Eq 25)
+    N = len(mc_points) 
+    LAM = 0.
+    for jj in range(len(w)):
+        wj = w[jj]
+        mj = m[jj]
+        Pj = P[jj]
+        
+        for ii in range(N):
+            xi = mc_points[ii].reshape(nstates, 1)
+            pg = est.gaussian_likelihood(xi, mj, Pj)
+            LAM += (1./N)*wj*pg
+
+    return LAM
 
 
 ###############################################################################
