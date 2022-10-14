@@ -1533,7 +1533,7 @@ def aegis_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
     References
     ------
     [1] DeMars, K.J., "Entropy-based Approach for Uncertainty Propagation of
-    Nonlinear Dynamical Systems," JGCD 2013.
+        Nonlinear Dynamical Systems," JGCD 2013.
         
     '''
     

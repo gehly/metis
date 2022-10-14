@@ -458,8 +458,12 @@ def test_dopri_computation():
     
     # Initial object state vector
     # Sun-Synch Orbit
-    Xo = np.reshape([757.700301, 5222.606566, 4851.49977,
-                     2.213250611, 4.678372741, -5.371314404], (6,1))
+#    Xo = np.reshape([757.700301, 5222.606566, 4851.49977,
+#                     2.213250611, 4.678372741, -5.371314404], (6,1))
+    
+    # Molniya
+    elem0 = [26600., 0.74, 63.4, 90., 270., 10.]
+    Xo = astro.kep2cart(elem0)
     
     UTC0 = datetime(1999, 10, 4, 1, 45, 0)
     UTC1 = UTC0 + timedelta(days=2.)
