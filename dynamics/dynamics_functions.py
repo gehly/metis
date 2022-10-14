@@ -59,6 +59,8 @@ def general_dynamics(Xo, tvec, state_params, int_params):
         # Run integrator
         tout, Xout, fcalls = numint.rk4(intfcn, tvec, Xo, params)
         
+        return tout, Xout
+        
         
     if integrator == 'rkf78':
         
@@ -90,6 +92,8 @@ def general_dynamics(Xo, tvec, state_params, int_params):
                 k += 1
             
             tout = tvec
+        
+        return tout, Xout
             
         
     if integrator == 'dopri87':
@@ -121,6 +125,28 @@ def general_dynamics(Xo, tvec, state_params, int_params):
                 k += 1
             
             tout = tvec
+        
+        return tout, Xout
+            
+            
+    if integrator == 'dopri87_aegis':
+        
+        # Setup integrator parameters
+        params = state_params
+        intfcn = int_params['intfcn']
+        params['step'] = int_params['step']
+        params['rtol'] = int_params['rtol']
+        params['atol'] = int_params['atol']
+        params['split_T'] = int_params['split_T']
+        
+        # Run integrator
+        if len(tvec) == 2:
+            tout, Xout, fcalls, split_flag = numint.dopri87_aegis(intfcn, tvec, Xo, params)
+            
+        else:
+            mistake
+            
+        return tout, Xout, split_flag
             
         
     if integrator == 'odeint':
@@ -136,6 +162,8 @@ def general_dynamics(Xo, tvec, state_params, int_params):
         # Run integrator
         tout = tvec
         Xout = odeint(intfcn,Xo,tvec,args=(params,),rtol=rtol,atol=atol,hmax=hmax,tfirst=tfirst)
+        
+        return tout, Xout
         
         
     if integrator == 'solve_ivp':
@@ -153,6 +181,8 @@ def general_dynamics(Xo, tvec, state_params, int_params):
         output = solve_ivp(intfcn,tin,Xo,method=method,args=(params,),rtol=rtol,atol=atol,t_eval=tvec)
         
         Xout = output['y'].T
+        
+        return tout, Xout
 
         
     if integrator == 'ode':
@@ -184,10 +214,12 @@ def general_dynamics(Xo, tvec, state_params, int_params):
             k += 1
         
         tout = tvec
+        
+        return tout, Xout
     
     
     
-    return tout, Xout
+    
 
 
 

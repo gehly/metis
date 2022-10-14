@@ -502,7 +502,6 @@ def dopri87_aegis(intfcn, tin, y0, params):
     nstates = params['nstates']
     npoints = params['npoints']
     split_T = params['split_T']
-    ej_initial = params['ej_initial']
     
     # Unscented Transform Parameters
     kurt = 3.  # Gaussian
@@ -530,6 +529,7 @@ def dopri87_aegis(intfcn, tin, y0, params):
     tn = t0
     yvec = y0.reshape(1, len(y0))
     tvec = np.array([t0])
+    ej_initial = float(y0[0])
     fcalls = 0
     
     # Set up weights
