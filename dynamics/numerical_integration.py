@@ -174,6 +174,10 @@ def rkf78(intfcn, tin, y0, params):
     # Loop to end
     k8 = np.zeros((len(yn),13))
     while tn < tf:
+        
+        # Ensure final time step is exactly to the end
+        if tn + h > tf:
+            h = tf - tn
 
         k8[:,0] = h * intfcn(tn,yn,params)
         k8[:,1] = h * intfcn(tn+c[1]*h,yn+(k8[:,0]*A[1,0]).flatten(),params)
@@ -364,6 +368,10 @@ def dopri87(intfcn, tin, y0, params):
     # Loop to end
     k8 = np.zeros((len(yn),13))
     while tn < tf:
+        
+        # Ensure final time step is exactly to the end
+        if tn + h > tf:
+            h = tf - tn
 
         k8[:,0] = h * intfcn(tn,yn,params)
         k8[:,1] = h * intfcn(tn+c[1]*h,yn+(k8[:,0]*A[1,0]).flatten(),params)

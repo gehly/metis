@@ -52,7 +52,7 @@ def twobody_geo_aegis_prop():
 
     # Time vector
     UTC0 = datetime(2021, 6, 21, 0, 0, 0)
-    UTC1 = datetime(2021, 6, 21, 18, 0, 0)
+    UTC1 = datetime(2021, 6, 23, 0, 0, 0)
     tk_list = [UTC0, UTC1]
 
     # Inital State
@@ -97,27 +97,32 @@ def twobody_geo_aegis_prop():
     state_params['diagWc'] = diagWc
     
     
-    start = time.time()
+    
     
     # Run AEGIS Propagation
+    start = time.time()
     tin = tk_list
-    GMM_final = est.aegis_predictor(GMM_dict, tin, state_params, int_params)
+    aegis_final = est.aegis_predictor2(GMM_dict, tin, state_params, int_params)
+
+    aegis_run_time = time.time() - start
     
-    weights = GMM_final['weights']
+    weights = aegis_final['weights']
     print(len(weights))
     
-    print('AEGIS run time', time.time() - start)
-    
     N = 1000
-    aegis_points = est.gmm_samples(GMM_final, N)
+    aegis_points = est.gmm_samples(aegis_final, N)
     
-    start = time.time()
+    
     
     
     # Run UKF Propagation
+    start = time.time()
     int_params['split_T'] = 1e6
     ukf_final = est.aegis_predictor(GMM_dict, tin, state_params, int_params)
     ukf_points = est.gmm_samples(ukf_final, N)
+    
+    ukf_run_time = time.time() - start
+    
     
     
     # Monte-Carlo Propagation
@@ -126,6 +131,7 @@ def twobody_geo_aegis_prop():
     mc_final = np.zeros(mc_init.shape)
     
     # Propagate samples
+    start = time.time()
     int_params['intfcn'] = dyn.ode_twobody
     for jj in range(mc_init.shape[0]):
         
@@ -133,25 +139,46 @@ def twobody_geo_aegis_prop():
         tout, Xout = dyn.general_dynamics(int0, tk_list, state_params, int_params)
         mc_final[jj,:] = Xout[-1,:].flatten()
         
-    print('Monte Carlo run time', time.time() - start)
+    mc_run_time = time.time() - start
     
     
     
     # Likelihood Agreement Measure
-    aegis_lam = est.compute_LAM(GMM_final, mc_final)
-    ukf_lam = est.compute_LAM(ukf_final, mc_final)
+    aegis_lam = analysis.compute_LAM(aegis_final, mc_final)
+    ukf_lam = analysis.compute_LAM(ukf_final, mc_final)
     
     print('AEGIS LAM: ', aegis_lam)
     print('UKF LAM: ', ukf_lam)
     
+    print('AEGIS time: ', aegis_run_time)
+    print('UKF time: ', ukf_run_time)
+    print('MC time: ', mc_run_time)
+    
     
     # Generate plots
     plt.figure()
-    plt.plot(mc_final[:,0], mc_final[:,1], 'k.')
-    plt.plot(aegis_points[:,0], aegis_points[:,1], 'r.')
-    plt.plot(ukf_points[:,0], ukf_points[:,1], 'b.')
+    plt.plot(mc_final[:,0], mc_final[:,1], 'k.', alpha=0.2)    
+    analysis.plot_pdf_contours(aegis_final, axis1=0, axis2=1)
     plt.xlabel('X [km]')
     plt.ylabel('Y [km]')
+    plt.title('AEGIS Contours vs MC Points')
+    
+    plt.figure()
+    plt.plot(mc_final[:,0], mc_final[:,1], 'k.', alpha=0.2)    
+    analysis.plot_pdf_contours(ukf_final, axis1=0, axis2=1)
+    plt.xlabel('X [km]')
+    plt.ylabel('Y [km]')
+    plt.title('UKF Contours vs MC Points')
+    
+    
+    plt.figure()
+    plt.plot(mc_final[:,0], mc_final[:,1], 'k.', alpha=0.2)
+    plt.plot(aegis_points[:,0], aegis_points[:,1], 'r.', alpha=0.2)
+    plt.plot(ukf_points[:,0], ukf_points[:,1], 'b.', alpha=0.2)
+    plt.legend(['MC', 'AEGIS', 'UKF'])
+    plt.xlabel('X [km]')
+    plt.ylabel('Y [km]')
+    plt.title('MC Points vs AEGIS and UKF Samples')
     
     plt.show()
     

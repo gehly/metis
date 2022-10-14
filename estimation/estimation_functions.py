@@ -1815,6 +1815,200 @@ def aegis_predictor(GMM_dict, tin, state_params, int_params):
     return GMM_bar
 
 
+def aegis_predictor2(GMM_dict, tin, state_params, int_params):
+    '''
+    
+    
+    '''
+    
+    # Copy input to ensure pass by value
+    GMM_dict = copy.deepcopy(GMM_dict)
+    
+    # State information
+    Q = state_params['Q']
+    q = int(Q.shape[0])
+    gap_seconds = state_params['gap_seconds']
+    time_format = int_params['time_format']    
+    split_T = int_params['split_T']
+    gam = state_params['gam']
+    Wm = state_params['Wm']
+    diagWc = state_params['diagWc']
+    
+    tk_prior = tin[0]
+    tk = tin[1]
+    
+    if time_format == 'seconds':
+        delta_t = tk - tk_prior
+        delta_s = int_params['delta_s_sec']
+    elif time_format == 'JD':
+        delta_t = (tk - tk_prior)*86400.
+        delta_s = int_params['delta_s_sec']*(1./86400.)
+    elif time_format == 'datetime':
+        delta_t = (tk - tk_prior).total_seconds()
+        delta_s = timedelta(seconds=int_params['delta_s_sec'])
+    
+    # Check if propagation is needed
+    if delta_t == 0.:
+        return GMM_dict
+    
+    # Initialize for integrator
+    # Retrieve current GMM
+    weights = GMM_dict['weights']
+    means = GMM_dict['means']
+    covars = GMM_dict['covars']
+    
+    # For each GMM component, there should be 1 entropy, n states, and 2n+1
+    # sigma points. 
+    ncomp = len(weights)
+    nstates = len(means[0])
+    npoints = nstates*2 + 1
+    state_params['nstates'] = nstates
+    state_params['npoints'] = npoints
+    
+    # Compute initial entropy for each component
+    ej_initial_list = []
+    for jj in range(ncomp):
+        Pj = covars[jj]
+        ej_initial_list.append(gaussian_entropy(Pj))        
+    ej_linear_list = copy.copy(ej_initial_list)
+
+    # Step through time in small increments
+    ts_prior = tk_prior
+    ts = tk_prior
+    while ts < tk :
+        
+        print('\nstart loop')
+        print('ts', ts)
+
+        # Time increment for this step
+        ts = ts_prior + delta_s
+        if ts < tk :
+            tin_s = [ts_prior, ts]
+        else :
+            tin_s = [ts_prior, tk]
+                
+        # Loop over components to set up initial state for integration
+        ncomp = len(weights)
+        state_params['ncomp'] = ncomp
+        nint = ncomp*(nstates*npoints + 1)
+        
+        print('ncomp', ncomp)
+        for jj in range(ncomp):
+            
+            # Retrieve component values
+            mj = means[jj]
+            Pj = covars[jj]
+            ej = ej_linear_list[jj]
+            
+#            print('set up int0')
+#            print('nint', nint)
+#            print('jj', jj)
+#            print('ej linear', ej)
+            
+            # Compute sigma points
+            sqP = np.linalg.cholesky(Pj)
+            Xrep = np.tile(mj, (1, nstates))
+            chi = np.concatenate((mj, Xrep+(gam*sqP), Xrep-(gam*sqP)), axis=1)
+            chi_v = np.reshape(chi, (nstates*npoints, 1), order='F')
+            
+            # Store initial state for integrator
+            int0 = np.zeros(nstates*npoints+1,)
+            int0[0] = ej
+            int0[1:1+(nstates*npoints)] = chi_v.flatten()
+            state_params['ncomp'] = 1
+            
+            # Integrate entropy and sigma point dynamics
+            tout, intout = dyn.general_dynamics(int0, tin_s, state_params, int_params)
+        
+            # Retrieve values and split if needed            
+            # Linear entropy
+            ej_linear = intout[-1, 0]
+            
+            # Nonlinear entropy
+            chi_v = intout[-1, 1:1+(nstates*npoints)]            
+            chi = np.reshape(chi_v, (nstates, npoints), order='F')
+
+            Xbar = np.dot(chi, Wm.T)
+            Xbar = np.reshape(Xbar, (nstates, 1))
+            chi_diff = chi - np.dot(Xbar, np.ones((1, npoints)))
+            Pbar = np.dot(chi_diff, np.dot(diagWc, chi_diff.T))
+            
+            ej_nonlin = gaussian_entropy(Pbar)
+            
+#            print('post integration')
+#            print('jj', jj)
+#            print('ej_linear', ej_linear)
+#            print('ej_nonlin', ej_nonlin)
+            
+            # Check nonlinearity condition and split if needed
+            if abs(ej_linear - ej_nonlin) > abs(split_T*ej_initial_list[jj]):
+                wj = weights[jj]
+                GMM_in = {}
+                GMM_in['weights'] = [wj]
+                GMM_in['means'] = [Xbar]
+                GMM_in['covars'] = [Pbar]
+                GMM_out = split_GMM(GMM_in, N=3)
+                w_split = GMM_out['weights']
+                m_split = GMM_out['means']
+                P_split = GMM_out['covars']
+                
+                # Replace current component and add others
+                for comp in range(len(w_split)):
+
+                    # Compute weights, entropy and sigma points
+                    # Note: split_GMM function multiplies by wj, no need to 
+                    # repeat here
+                    w = w_split[comp]   
+                    m = m_split[comp]
+                    P = P_split[comp]
+                    ej_initial = gaussian_entropy(P)
+                    
+                    if comp == 0:
+                        weights[jj] = w
+                        means[jj] = m
+                        covars[jj] = P
+                        ej_initial_list[jj] = ej_initial
+                        ej_linear_list[jj] = ej_initial
+                    else:
+                        weights.append(w)
+                        means.append(m)
+                        covars.append(P)
+                        ej_initial_list.append(ej_initial)
+                        ej_linear_list.append(ej_initial)
+            
+            # If no split, update mean and covariance from propagator  
+            # Note: It would save computation to store chi_v, if no split 
+            # needed, could just use this as input int0 to next step, but 
+            # probably little benefit
+            else:                
+                means[jj] = Xbar
+                covars[jj] = Pbar
+                ej_linear_list[jj] = ej_linear
+                
+        # Update time for next step
+        ts_prior = ts
+                
+    # After tk is reached, incorporate process noise
+    # State Noise Compensation
+    # Zero out SNC for long time gaps
+    if delta_t < gap_seconds:        
+
+        Gamma = np.zeros((nstates,q))
+        Gamma[0:q,:] = (delta_t**2./2) * np.eye(q)
+        Gamma[q:2*q,:] = delta_t * np.eye(q)
+        
+        for jj in range(len(weights)):
+            covars[jj] += np.dot(Gamma, np.dot(Q, Gamma.T))
+            
+    # Form output
+    GMM_bar = {}
+    GMM_bar['weights'] = weights
+    GMM_bar['means'] = means
+    GMM_bar['covars'] = covars    
+    
+    return GMM_bar
+
+
 def aegis_corrector(GMM_bar, tk, Yk, sensor_id, meas_fcn, state_params,
                     sensor_params):
     '''

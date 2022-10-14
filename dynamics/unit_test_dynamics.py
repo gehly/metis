@@ -3,6 +3,7 @@ import math
 import matplotlib.pyplot as plt
 import sys
 from datetime import datetime, timedelta
+import time
 
 sys.path.append('../')
 
@@ -438,6 +439,116 @@ def test_orbit_timestep():
     return
 
 
+def test_dopri_computation():
+    
+    # Define state parameters
+    state_params = {}
+    state_params['GM'] = GME
+    
+    # Integration function and additional settings
+    int_params = {}    
+    int_params['integrator'] = 'solve_ivp'
+    int_params['ode_integrator'] = 'DOP853'
+    int_params['intfcn'] = dyn.ode_twobody
+    
+    int_params['rtol'] = 1e-12
+    int_params['atol'] = 1e-12
+    int_params['step'] = 10.
+    int_params['time_format'] = 'datetime'
+    
+    # Initial object state vector
+    # Sun-Synch Orbit
+    Xo = np.reshape([757.700301, 5222.606566, 4851.49977,
+                     2.213250611, 4.678372741, -5.371314404], (6,1))
+    
+    UTC0 = datetime(1999, 10, 4, 1, 45, 0)
+    UTC1 = UTC0 + timedelta(days=2.)
+    tin = [UTC0, UTC1]
+    
+    # Run integrator
+    start = time.time()
+    tout, Xout = dyn.general_dynamics(Xo, tin, state_params, int_params)
+    solve_ivp_time = time.time() - start
+
+
+    print('\nSolve IVP Results')
+    print(tout)
+    print(Xout)
+    
+    Xnum = Xout[-1,:].reshape(6,1)
+    
+    # Analytic solution
+    dt_sec = (tin[-1] - tin[0]).total_seconds()
+    Xtrue = astro.element_conversion(Xo, 1, 1, GME, dt_sec)
+    
+    print(Xnum)
+    print(Xtrue)
+    
+    err = np.linalg.norm(Xnum - Xtrue)
+    print('err', err)
+    
+    
+    
+    # Setup and run DOPRI87
+    int_params['integrator'] = 'dopri87'
+    start = time.time()
+    tout, Xout = dyn.general_dynamics(Xo, tin, state_params, int_params)
+    dopri_time = time.time() - start
+    
+    
+    print('\nDOPRI87 Results')
+    print(tout)
+    print(Xout)
+    
+    Xnum = Xout[-1,:].reshape(6,1)
+    
+    # Analytic solution
+    dt_sec = (tin[-1] - tin[0]).total_seconds()
+    Xtrue = astro.element_conversion(Xo, 1, 1, GME, dt_sec)
+    
+    print(Xnum)
+    print(Xtrue)
+    
+    err = np.linalg.norm(Xnum - Xtrue)
+    print('err', err)
+    
+    
+    # Setup and run RKF78
+    int_params['integrator'] = 'rkf78'
+    int_params['local_extrap'] = True
+    start = time.time()
+    tout, Xout = dyn.general_dynamics(Xo, tin, state_params, int_params)
+    rkf_time = time.time() - start
+    
+    
+    print('\nRKF78 Results')
+    print(tout)
+    print(Xout)
+    
+    Xnum = Xout[-1,:].reshape(6,1)
+    
+    # Analytic solution
+    dt_sec = (tin[-1] - tin[0]).total_seconds()
+    Xtrue = astro.element_conversion(Xo, 1, 1, GME, dt_sec)
+    
+    print(Xnum)
+    print(Xtrue)
+    
+    err = np.linalg.norm(Xnum - Xtrue)
+    print('err', err)
+    
+    
+    
+    print('')
+    print('solve_ivp_time', solve_ivp_time)
+    print('dopri_time', dopri_time)
+    print('rkf78_time', rkf_time)
+    
+    
+    
+    return
+
+
 if __name__ == '__main__':
     
     plt.close('all')
@@ -446,7 +557,9 @@ if __name__ == '__main__':
     
 #    test_orbit_timestep()
     
-    test_hyperbolic_prop()
+#    test_hyperbolic_prop()
+    
+    test_dopri_computation()
     
     
     
