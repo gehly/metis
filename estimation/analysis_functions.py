@@ -198,9 +198,18 @@ def compute_LAM(GMM_dict, mc_points):
     return LAM
 
 
-def plot_pdf_contours(GMM_dict):
+def plot_pdf_contours(GMM_dict, axis1=0, axis2=1):
     '''
+    The function plots the PDF contours of a given Gaussian Mixture Model.
     
+    Parameters
+    ------
+    GMM_dict : dictionary
+        contains weights, means, and covars of GMM
+    axis1 : int, optional
+        index of coordinate to plot as x-axis (default=0)
+    axis2 : int, optional
+        index of coordinate to plot as y-axis (default=1)
     
     '''
     
@@ -209,41 +218,39 @@ def plot_pdf_contours(GMM_dict):
     means = GMM_dict['means']
     covars = GMM_dict['covars']
     
-    m = means[0].flatten()
-    P = covars[0]
-    sig1 = np.sqrt(P[0,0])
-    sig2 = np.sqrt(P[1,1])
+    # Merge GMM to compute overall mean and covar to establish plot parameters
+    params = {}
+    params['prune_T'] = 0.
+    params['merge_U'] = 1e10
+    GMM_merge = est.merge_GMM(GMM_dict, params)
     
-    xmin = m[0] - 10*sig1
-    xmax = m[0] + 10*sig1
-    ymin = m[1] - 10*sig2
-    ymax = m[1] + 10*sig2
+    m = GMM_merge['means'][0].flatten()
+    P = GMM_merge['covars'][0]
+    sig1 = np.sqrt(P[axis1,axis1])
+    sig2 = np.sqrt(P[axis2,axis2])
+    
+    xmin = m[axis1] - 10*sig1
+    xmax = m[axis1] + 10*sig1
+    ymin = m[axis2] - 10*sig2
+    ymax = m[axis2] + 10*sig2
     
     x = np.linspace(xmin, xmax, 100)
     y = np.linspace(ymin, ymax, 100)
     
     xgrid, ygrid = np.meshgrid(x, y)
+    z = np.zeros((len(y), len(x)))
     
-    z = stats.multivariate_normal(m, P).pdf(np.dstack((xgrid, ygrid)))
+    for jj in range(len(weights)):
+        
+        wj = weights[jj]
+        mj = np.array([means[jj][axis1], means[jj][axis2]]).flatten()
+        Pj = np.array([[covars[jj][axis1,axis1], covars[jj][axis1,axis2]],
+                       [covars[jj][axis2,axis1], covars[jj][axis2,axis2]]])
     
-
-#    w_0, w_1 = np.meshgrid(t, h)
-#    z = stats.multivariate_normal(biv_mean,biv_cov).pdf(np.dstack((w_0, w_1)))
-#    plt.figure(figsize=(10,5))
-#    plt.plot(eruptions,waiting,'go')
-#    plt.title("Duration of the eruption in minutes vs  the duration in minutes until the next eruption.")
-#    plt.ylabel("waiting")
-#    plt.xlabel("eruption duration")
-#    plt.contour(t, h, z)
-    
+        z += wj * stats.multivariate_normal(mj, Pj).pdf(np.dstack((xgrid, ygrid)))
     
     plt.contour(x, y, z)
-    
-    
-    plt.show()
-    
-    
-    
+
     return
 
 
@@ -259,6 +266,51 @@ def test_pdf_contours():
     GMM_dict['covars'] = [P1]
     
     plot_pdf_contours(GMM_dict)
+    
+    
+    m1 = np.reshape([0, 0, 0], (3,1))
+    m2 = np.reshape([10, 10, 0], (3,1))
+    m3 = np.reshape([-10, 0, 10], (3,1))
+    
+    P1 = np.array([[40., 0., 0.],
+                   [0., 10., 0.],
+                   [0., 0., 10.]])
+    
+    P2 = np.array([[10., 0., 0.],
+                   [0., 40., 0.],
+                   [0., 0., 10.]])
+    
+    P3 = np.array([[10., 0., 0.],
+                   [0., 10., 0.],
+                   [0., 0., 40.]])
+    
+    GMM_dict2 = {}
+    GMM_dict2['weights'] = [1./3., 1./3., 1./3.]
+    GMM_dict2['means'] = [m1, m2, m3]
+    GMM_dict2['covars'] = [P1, P2, P3]
+    
+    mc_points = est.gmm_samples(GMM_dict2, 10000)
+    
+    plt.figure()
+    plt.plot(mc_points[:,0], mc_points[:,1], 'k.', alpha=0.05)
+    plot_pdf_contours(GMM_dict2, axis1=0, axis2=1)
+    plt.xlabel('x')
+    plt.ylabel('y')
+    
+    plt.figure()
+    plt.plot(mc_points[:,1], mc_points[:,2], 'k.', alpha=0.05)
+    plot_pdf_contours(GMM_dict2, axis1=1, axis2=2)
+    plt.xlabel('y')
+    plt.ylabel('z')
+    
+    plt.figure()
+    plt.plot(mc_points[:,0], mc_points[:,2], 'k.', alpha=0.05)
+    plot_pdf_contours(GMM_dict2, axis1=0, axis2=2)
+    plt.xlabel('x')
+    plt.ylabel('z')
+    
+    plt.show()
+    
     
     return
 
