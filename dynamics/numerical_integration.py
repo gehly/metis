@@ -11,7 +11,7 @@ ind = current_dir.find('metis')
 metis_dir = current_dir[0:ind+5]
 sys.path.append(metis_dir)
 
-import estimation.estimation_functions as est
+from estimation import estimation_functions as est
 
 
 def rk4(intfcn, tin, y0, params):

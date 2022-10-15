@@ -2022,8 +2022,7 @@ def aegis_predictor3(GMM_dict, tin, state_params, int_params):
     Q = state_params['Q']
     q = int(Q.shape[0])
     gap_seconds = state_params['gap_seconds']
-    time_format = int_params['time_format']    
-    split_T = int_params['split_T']
+    time_format = int_params['time_format']
     gam = state_params['gam']
     Wm = state_params['Wm']
     diagWc = state_params['diagWc']
@@ -2051,23 +2050,27 @@ def aegis_predictor3(GMM_dict, tin, state_params, int_params):
     
     # For each GMM component, there should be 1 entropy, n states, and 2n+1
     # sigma points. 
-    ncomp = len(weights)
+#    ncomp = len(weights)
     nstates = len(means[0])
     npoints = nstates*2 + 1
     state_params['nstates'] = nstates
     state_params['npoints'] = npoints
     
-    # Compute initial entropy for each component
-    ej_initial_list = []
-    for jj in range(ncomp):
-        Pj = covars[jj]
-        ej_initial_list.append(gaussian_entropy(Pj))        
-    ej_linear_list = copy.copy(ej_initial_list)
+#    # Compute initial entropy for each component
+#    ej_initial_list = []
+#    for jj in range(ncomp):
+#        Pj = covars[jj]
+#        ej_initial_list.append(gaussian_entropy(Pj))        
+#    ej_linear_list = copy.copy(ej_initial_list)
 
     # Loop over components
+    jj = 0
     while jj < len(weights):
         
-        print('\nstart loop')
+#        print('\nstart loop')
+#        print('jj', jj)
+#        print('ncomp', len(weights))
+#        print('t0', t0_list[jj])
         
         # Retrieve component values
         wj = weights[jj]
@@ -2089,9 +2092,13 @@ def aegis_predictor3(GMM_dict, tin, state_params, int_params):
         state_params['ncomp'] = 1
         
         # Integrate entropy and sigma point dynamics
-        tout, intout, split_flag = \
-            dyn.general_dynamics(int0, tin, state_params, int_params)
-            
+        if tin[0] == tk:
+            intout = chi_v.T
+            split_flag = False
+        else:
+            tout, intout, split_flag = \
+                dyn.general_dynamics(int0, tin, state_params, int_params)
+
         # Retrieve output state
         chi_v = intout[-1, 1:1+(nstates*npoints)]
         chi = np.reshape(chi_v, (nstates, npoints), order='F')
@@ -2100,6 +2107,19 @@ def aegis_predictor3(GMM_dict, tin, state_params, int_params):
         Xbar = np.reshape(Xbar, (nstates, 1))
         chi_diff = chi - np.dot(Xbar, np.ones((1, npoints)))
         Pbar = np.dot(chi_diff, np.dot(diagWc, chi_diff.T))
+        
+        # Compute the current time
+        if time_format == 'seconds':
+            t = t0_list[jj] + tout[-1]
+        elif time_format == 'JD':
+            t = t0_list[jj] + tout[-1]/86400.
+        elif time_format == 'datetime':
+            t = t0_list[jj] + timedelta(seconds=tout[-1])
+            
+#        print('post integration')
+#        print('t', t)
+#        print('split_flag', split_flag)
+        
             
         # Split if needed
         if split_flag:
@@ -2113,14 +2133,6 @@ def aegis_predictor3(GMM_dict, tin, state_params, int_params):
             w_split = GMM_out['weights']
             m_split = GMM_out['means']
             P_split = GMM_out['covars']
-            
-            # Compute the current time
-            if time_format == 'seconds':
-                t = t0_list[jj] + tout[-1]
-            elif time_format == 'JD':
-                t = t0_list[jj] + tout[-1]/86400.
-            elif time_format == 'datetime':
-                t = t0_list[jj] + timedelta(seconds=tout[-1])
             
             # Replace current component and add others
             for comp in range(len(w_split)):
@@ -2147,6 +2159,10 @@ def aegis_predictor3(GMM_dict, tin, state_params, int_params):
         else:                
             means[jj] = Xbar
             covars[jj] = Pbar
+            
+        # If final time is reached, go to next component
+        if t >= tk:
+            jj += 1
             
 
     # After tk is reached, incorporate process noise

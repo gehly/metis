@@ -99,18 +99,19 @@ def twobody_geo_aegis_prop():
     
     
     
-    # Run AEGIS Propagation
-    start = time.time()
+#    # Run AEGIS Propagation
+#    start = time.time()
     tin = tk_list
-    aegis_final = est.aegis_predictor2(GMM_dict, tin, state_params, int_params)
-
-    aegis_run_time = time.time() - start
-    
-    weights = aegis_final['weights']
-    print(len(weights))
-    
+#    aegis_final = est.aegis_predictor2(GMM_dict, tin, state_params, int_params)
+#
+#    aegis_run_time = time.time() - start
+#    
+#    weights = aegis_final['weights']
+#    print(len(weights))
+#    
     N = 1000
-    aegis_points = est.gmm_samples(aegis_final, N)
+#    aegis_points = est.gmm_samples(aegis_final, N)
+    
     
     
     
@@ -124,6 +125,18 @@ def twobody_geo_aegis_prop():
     ukf_run_time = time.time() - start
     
     
+    # Run Variable Step AEGIS Propagation
+    start = time.time()
+    int_params['integrator'] = 'dopri87_aegis'
+    int_params['split_T'] = 0.03
+    int_params['step'] = 10.
+    aegis_final3 = est.aegis_predictor3(GMM_dict, tin, state_params, int_params)
+    
+    aegis3_run_time = time.time() - start
+    
+    aegis_points = est.gmm_samples(aegis_final3, N)
+    
+    
     
     # Monte-Carlo Propagation
     # Generate samples
@@ -132,6 +145,7 @@ def twobody_geo_aegis_prop():
     
     # Propagate samples
     start = time.time()
+    int_params['integrator'] = 'solve_ivp'
     int_params['intfcn'] = dyn.ode_twobody
     for jj in range(mc_init.shape[0]):
         
@@ -144,13 +158,14 @@ def twobody_geo_aegis_prop():
     
     
     # Likelihood Agreement Measure
-    aegis_lam = analysis.compute_LAM(aegis_final, mc_final)
+    aegis_lam = analysis.compute_LAM(aegis_final3, mc_final)
     ukf_lam = analysis.compute_LAM(ukf_final, mc_final)
     
     print('AEGIS LAM: ', aegis_lam)
+    print('AEGIS Comps: ', len(aegis_final3['weights']))
     print('UKF LAM: ', ukf_lam)
     
-    print('AEGIS time: ', aegis_run_time)
+    print('AEGIS time: ', aegis3_run_time)
     print('UKF time: ', ukf_run_time)
     print('MC time: ', mc_run_time)
     
@@ -158,7 +173,7 @@ def twobody_geo_aegis_prop():
     # Generate plots
     plt.figure()
     plt.plot(mc_final[:,0], mc_final[:,1], 'k.', alpha=0.2)    
-    analysis.plot_pdf_contours(aegis_final, axis1=0, axis2=1)
+    analysis.plot_pdf_contours(aegis_final3, axis1=0, axis2=1)
     plt.xlabel('X [km]')
     plt.ylabel('Y [km]')
     plt.title('AEGIS Contours vs MC Points')
