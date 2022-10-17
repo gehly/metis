@@ -2067,10 +2067,10 @@ def aegis_predictor3(GMM_dict, tin, state_params, int_params):
     jj = 0
     while jj < len(weights):
         
-#        print('\nstart loop')
-#        print('jj', jj)
-#        print('ncomp', len(weights))
-#        print('t0', t0_list[jj])
+        print('\nstart loop')
+        print('jj', jj)
+        print('ncomp', len(weights))
+        print('t0', t0_list[jj])
         
         # Retrieve component values
         wj = weights[jj]
@@ -2093,13 +2093,13 @@ def aegis_predictor3(GMM_dict, tin, state_params, int_params):
         
         # Integrate entropy and sigma point dynamics
         if tin[0] == tk:
-            intout = chi_v.T
+            intout = np.reshape(int0, (1, len(int0)))
             split_flag = False
         else:
             tout, intout, split_flag = \
                 dyn.general_dynamics(int0, tin, state_params, int_params)
 
-        # Retrieve output state
+        # Retrieve output state        
         chi_v = intout[-1, 1:1+(nstates*npoints)]
         chi = np.reshape(chi_v, (nstates, npoints), order='F')
 
