@@ -13,8 +13,8 @@ ind = current_dir.find('metis')
 metis_dir = current_dir[0:ind+5]
 sys.path.append(metis_dir)
 
-import dynamics.numerical_integration as numint
-import utilities.astrodynamics as astro
+from dynamics import numerical_integration as numint
+from utilities import astrodynamics as astro
 
 
 
@@ -857,6 +857,9 @@ def A_twobody(t, X, params):
     A[5,2] = zz_cf    
     
     return A
+
+
+
 
 
 

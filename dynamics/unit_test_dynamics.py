@@ -4,11 +4,20 @@ import matplotlib.pyplot as plt
 import sys
 from datetime import datetime, timedelta
 import time
+import inspect
+import os
 
-sys.path.append('../')
+filename = inspect.getframeinfo(inspect.currentframe()).filename
+current_dir = os.path.dirname(os.path.abspath(filename))
 
-import dynamics.dynamics_functions as dyn
-import utilities.astrodynamics as astro
+ind = current_dir.find('metis')
+metis_dir = current_dir[0:ind+5]
+sys.path.append(metis_dir)
+
+from dynamics import dynamics_functions as dyn
+from dynamics import numerical_integration as numint
+from dynamics import fast_integration as fastint
+from utilities import astrodynamics as astro
 from utilities.constants import GME, J2E, wE, Re
 
 
@@ -553,6 +562,79 @@ def test_dopri_computation():
     return
 
 
+def test_jit_twobody():
+    
+    # Define state parameters
+    state_params = {}
+    state_params['GM'] = GME
+    GM = state_params['GM']
+
+    
+    # Integration function and additional settings
+    int_params = {}
+    int_params['integrator'] = 'rk4'
+    int_params['ode_integrator'] = 'DOP853'
+    int_params['intfcn'] = dyn.ode_twobody
+
+    int_params['step'] = 10.
+    int_params['time_format'] = 'datetime'
+    
+    # Initial object state vector
+    # Sun-Synch Orbit
+    Xo = np.reshape([757.700301, 5222.606566, 4851.49977,
+                     2.213250611, 4.678372741, -5.371314404], (6,1))
+    
+    # Time vector
+    UTC1 = datetime(2022, 10, 20, 0, 0, 0)
+    UTC2 = datetime(2022, 10, 22, 0, 0, 0)
+    tvec = [UTC1, UTC2]
+    
+    
+    # Convert time to seconds
+    time_format = int_params['time_format']
+    if time_format == 'datetime':
+        t0 = tvec[0]
+        tvec = np.asarray([(ti - t0).total_seconds() for ti in tvec])
+    if time_format == 'JD':
+        t0 = tvec[0]
+        tvec = np.asarray([(ti - t0)*86400. for ti in tvec])
+        
+    # Setup integrator parameters
+    params = state_params
+    intfcn = int_params['intfcn']        
+    params['step'] = int_params['step']
+    
+    # Run integrator
+    start = time.time()
+    tout, Xout, fcalls = numint.rk4(intfcn, tvec, Xo, params)
+    rk4_time = time.time() - start
+    
+    print(tout[-1])
+    print(Xout[-1])
+        
+        
+    # Setup for JIT execution
+    intfcn = fastint.jit_twobody
+    step = int_params['step']
+    
+    start = time.time()
+    tout, Xout = fastint.rk4(intfcn, tvec, Xo.flatten(), step, GM)
+    rk4_jit_time = time.time() - start
+    
+    start = time.time()
+    tout, Xout = fastint.rk4(intfcn, tvec, Xo.flatten(), step, GM)
+    rk4_jit_time = time.time() - start
+    
+    print(tout[-1])
+    print(Xout[-1])
+    
+    print('rk4 time', rk4_time)
+    print('rk4 jit', rk4_jit_time)
+    
+    
+    return
+
+
 if __name__ == '__main__':
     
     plt.close('all')
@@ -563,7 +645,11 @@ if __name__ == '__main__':
     
 #    test_hyperbolic_prop()
     
-    test_dopri_computation()
+#    test_dopri_computation()
+    
+    test_jit_twobody()
+    
+    
     
     
     

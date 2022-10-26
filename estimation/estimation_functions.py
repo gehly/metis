@@ -15,9 +15,8 @@ ind = current_dir.find('metis')
 metis_dir = current_dir[0:ind+5]
 sys.path.append(metis_dir)
 
-import dynamics.dynamics_functions as dyn
-import sensors.measurement_functions as mfunc
-
+from dynamics import dynamics_functions as dyn
+from sensors import measurement_functions as mfunc
 from utilities.constants import arcsec2rad
 
 

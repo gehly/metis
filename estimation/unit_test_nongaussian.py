@@ -234,7 +234,7 @@ def twobody_heo_aegis_prop():
     int_params['atol'] = 1e-12
     int_params['time_format'] = 'datetime'
     int_params['delta_s_sec'] = 600.
-    int_params['split_T'] = 0.03
+    int_params['split_T'] = 0.1
 
     # Time vector
     UTC0 = datetime(2021, 6, 21, 0, 0, 0)
@@ -317,13 +317,13 @@ def twobody_heo_aegis_prop():
     # Run Variable Step AEGIS Propagation
     start = time.time()
     int_params['integrator'] = 'dopri87_aegis'
-    int_params['split_T'] = 0.03
+    int_params['split_T'] = 0.1
     int_params['step'] = 10.
     aegis_final3 = est.aegis_predictor3(GMM_dict, tin, state_params, int_params)
     
     aegis3_run_time = time.time() - start
     
-    aegis_points = est.gmm_samples(aegis_final3, N)
+    aegis_points3 = est.gmm_samples(aegis_final3, N)
     
     print('aegis3 run time', aegis3_run_time)
     
@@ -342,6 +342,7 @@ def twobody_heo_aegis_prop():
         
         if jj % 100 == 0:
             print(jj)
+            print('elapsed time', time.time() - start)
         
         int0 = mc_init[jj].flatten()
         tout, Xout = dyn.general_dynamics(int0, tk_list, state_params, int_params)
@@ -387,11 +388,29 @@ def twobody_heo_aegis_prop():
     
     plt.figure()
     plt.plot(mc_final[:,0], mc_final[:,1], 'k.', alpha=0.2)
-    plt.plot(aegis_points[:,0], aegis_points[:,1], 'r.', alpha=0.2)
+    plt.plot(aegis_points3[:,0], aegis_points3[:,1], 'r.', alpha=0.2)
     plt.plot(ukf_points[:,0], ukf_points[:,1], 'b.', alpha=0.2)
     plt.legend(['MC', 'AEGIS', 'UKF'])
     plt.xlabel('X [km]')
     plt.ylabel('Y [km]')
+    plt.title('MC Points vs AEGIS and UKF Samples')
+    
+    plt.figure()
+    plt.plot(mc_final[:,0], mc_final[:,2], 'k.', alpha=0.2)
+    plt.plot(aegis_points3[:,0], aegis_points3[:,2], 'r.', alpha=0.2)
+    plt.plot(ukf_points[:,0], ukf_points[:,2], 'b.', alpha=0.2)
+    plt.legend(['MC', 'AEGIS', 'UKF'])
+    plt.xlabel('X [km]')
+    plt.ylabel('Z [km]')
+    plt.title('MC Points vs AEGIS and UKF Samples')
+    
+    plt.figure()
+    plt.plot(mc_final[:,1], mc_final[:,2], 'k.', alpha=0.2)
+    plt.plot(aegis_points3[:,1], aegis_points3[:,2], 'r.', alpha=0.2)
+    plt.plot(ukf_points[:,1], ukf_points[:,2], 'b.', alpha=0.2)
+    plt.legend(['MC', 'AEGIS', 'UKF'])
+    plt.xlabel('Y [km]')
+    plt.ylabel('Z [km]')
     plt.title('MC Points vs AEGIS and UKF Samples')
     
     plt.show()
