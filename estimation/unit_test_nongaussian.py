@@ -7,6 +7,8 @@ import pickle
 import os
 import inspect
 import time
+from numba import types
+from numba.typed import Dict
 
 filename = inspect.getframeinfo(inspect.currentframe()).filename
 current_dir = os.path.dirname(os.path.abspath(filename))
@@ -15,6 +17,7 @@ ind = current_dir.find('metis')
 metis_dir = current_dir[0:ind+5]
 sys.path.append(metis_dir)
 
+from dynamics import fast_integration as fastint
 import estimation.analysis_functions as analysis
 import estimation.estimation_functions as est
 import dynamics.dynamics_functions as dyn
@@ -234,11 +237,11 @@ def twobody_heo_aegis_prop():
     int_params['atol'] = 1e-12
     int_params['time_format'] = 'datetime'
     int_params['delta_s_sec'] = 600.
-    int_params['split_T'] = 0.1
+    int_params['split_T'] = 0.01
 
     # Time vector
     UTC0 = datetime(2021, 6, 21, 0, 0, 0)
-    UTC1 = datetime(2021, 6, 21, 12, 0, 0)
+    UTC1 = datetime(2021, 6, 21, 7, 0, 0)
     tk_list = [UTC0, UTC1]
 
     # Inital State
@@ -301,23 +304,11 @@ def twobody_heo_aegis_prop():
     
     print('aegis2 run time', aegis2_run_time)
     
-    
-    
-    # Run UKF Propagation
-    start = time.time()
-    int_params['split_T'] = 1e6
-    ukf_final = est.aegis_predictor(GMM_dict, tin, state_params, int_params)
-    ukf_points = est.gmm_samples(ukf_final, N)
-    
-    ukf_run_time = time.time() - start
-    
-    print('ukf run time', ukf_run_time)
-    
+
     
     # Run Variable Step AEGIS Propagation
     start = time.time()
     int_params['integrator'] = 'dopri87_aegis'
-    int_params['split_T'] = 0.1
     int_params['step'] = 10.
     aegis_final3 = est.aegis_predictor3(GMM_dict, tin, state_params, int_params)
     
@@ -328,16 +319,47 @@ def twobody_heo_aegis_prop():
     print('aegis3 run time', aegis3_run_time)
     
     
+    # Run UKF Propagation
+    int_params = {}
+    int_params['integrator'] = 'solve_ivp'
+    int_params['ode_integrator'] = 'DOP853'
+    int_params['intfcn'] = dyn.ode_aegis
+    int_params['rtol'] = 1e-12
+    int_params['atol'] = 1e-12
+    int_params['time_format'] = 'datetime'
+    int_params['delta_s_sec'] = 600.
+    int_params['split_T'] = 1e6
+    
+    start = time.time()
+    ukf_final = est.aegis_predictor(GMM_dict, tin, state_params, int_params)
+    ukf_points = est.gmm_samples(ukf_final, N)
+    
+    ukf_run_time = time.time() - start
+    
+    print('ukf run time', ukf_run_time)
+    
+    
     
     # Monte-Carlo Propagation
     # Generate samples
     mc_init = np.random.multivariate_normal(X_true.flatten(),P,int(N))
     mc_final = np.zeros(mc_init.shape)
     
+    # Convert time to seconds
+    time_format = int_params['time_format']
+    if time_format == 'datetime':
+        t0 = tk_list[0]
+        tvec = np.asarray([(ti - t0).total_seconds() for ti in tk_list])
+        
+    params2 = Dict.empty(key_type=types.unicode_type, value_type=types.float64,)
+    params2['step'] = 10.
+    params2['GM'] = GME
+    params2['rtol'] = 1e-12
+    params2['atol'] = 1e-12
+    
     # Propagate samples
     start = time.time()
-    int_params['integrator'] = 'solve_ivp'
-    int_params['intfcn'] = dyn.ode_twobody
+    intfcn = fastint.jit_twobody
     for jj in range(mc_init.shape[0]):
         
         if jj % 100 == 0:
@@ -345,7 +367,7 @@ def twobody_heo_aegis_prop():
             print('elapsed time', time.time() - start)
         
         int0 = mc_init[jj].flatten()
-        tout, Xout = dyn.general_dynamics(int0, tk_list, state_params, int_params)
+        tout, Xout = fastint.dopri87(intfcn, tvec, int0.flatten(), params2)
         mc_final[jj,:] = Xout[-1,:].flatten()
         
     mc_run_time = time.time() - start

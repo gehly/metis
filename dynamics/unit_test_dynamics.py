@@ -6,6 +6,8 @@ from datetime import datetime, timedelta
 import time
 import inspect
 import os
+from numba import types
+from numba.typed import Dict
 
 filename = inspect.getframeinfo(inspect.currentframe()).filename
 current_dir = os.path.dirname(os.path.abspath(filename))
@@ -573,16 +575,18 @@ def test_jit_twobody():
     # Integration function and additional settings
     int_params = {}
     int_params['integrator'] = 'rk4'
-    int_params['ode_integrator'] = 'DOP853'
     int_params['intfcn'] = dyn.ode_twobody
-
     int_params['step'] = 10.
     int_params['time_format'] = 'datetime'
     
     # Initial object state vector
     # Sun-Synch Orbit
-    Xo = np.reshape([757.700301, 5222.606566, 4851.49977,
-                     2.213250611, 4.678372741, -5.371314404], (6,1))
+#    Xo = np.reshape([757.700301, 5222.606566, 4851.49977,
+#                     2.213250611, 4.678372741, -5.371314404], (6,1))
+    
+    # Molniya
+    elem0 = [26600., 0.74, 63.4, 90., 270., 10.]
+    Xo = astro.kep2cart(elem0)
     
     # Time vector
     UTC1 = datetime(2022, 10, 20, 0, 0, 0)
@@ -617,20 +621,101 @@ def test_jit_twobody():
     intfcn = fastint.jit_twobody
     step = int_params['step']
     
-    start = time.time()
-    tout, Xout = fastint.rk4(intfcn, tvec, Xo.flatten(), step, GM)
-    rk4_jit_time = time.time() - start
+    params2 = Dict.empty(key_type=types.unicode_type, value_type=types.float64,)
+    params2['step'] = 10.
+    params2['GM'] = GME
+    params2['rtol'] = 1e-12
+    params2['atol'] = 1e-12
     
     start = time.time()
-    tout, Xout = fastint.rk4(intfcn, tvec, Xo.flatten(), step, GM)
+    tout, Xout = fastint.rk4(intfcn, tvec, Xo.flatten(), params2)
+    rk4_jit_time = time.time() - start
+    
+    print('rk4 time1', rk4_jit_time)
+    
+    start = time.time()
+    tout, Xout = fastint.rk4(intfcn, tvec, Xo.flatten(), params2)
     rk4_jit_time = time.time() - start
     
     print(tout[-1])
     print(Xout[-1])
     
-    print('rk4 time', rk4_time)
-    print('rk4 jit', rk4_jit_time)
     
+    # Compute and plot errors
+    Xerr = np.zeros(Xout.shape)
+    for ii in range(len(tout)):
+        X_true = astro.element_conversion(Xo, 1, 1, dt=tout[ii])
+        Xerr[ii,:] = (Xout[ii,:].reshape(6,1) - X_true).flatten()
+        
+    plt.figure()
+    plt.subplot(3,1,1)
+    plt.plot(tout/3600., Xerr[:,0], 'k.')
+    plt.ylabel('X Err [km]')
+    plt.title('RK4 Errors')
+    plt.subplot(3,1,2)
+    plt.plot(tout/3600., Xerr[:,1], 'k.')
+    plt.ylabel('Y Err [km]')
+    plt.subplot(3,1,3)
+    plt.plot(tout/3600., Xerr[:,2], 'k.')
+    plt.ylabel('Z Err [km]')
+    plt.xlabel('Time [hours]')
+    
+    
+    # DOPRI87 Testing
+    intfcn = dyn.ode_twobody
+    params['step'] = int_params['step']
+    params['rtol'] = 1e-12
+    params['atol'] = 1e-12
+    
+    start = time.time()
+    tout, Xout, fcalls = numint.dopri87(intfcn, tvec, Xo, params)
+    dp87_time = time.time() - start
+    
+    print(tout[-1])
+    print(Xout[-1])
+    
+    # JIT execution
+    intfcn = fastint.jit_twobody
+
+    start = time.time()
+    tout, Xout = fastint.dopri87(intfcn, tvec, Xo.flatten(), params2)
+    dp87_jit_time = time.time() - start
+    
+    print('dp87 time1', dp87_jit_time)
+    
+    start = time.time()
+    tout, Xout = fastint.dopri87(intfcn, tvec, Xo.flatten(), params2)
+    dp87_jit_time = time.time() - start
+    
+    print(tout[-1])
+    print(Xout[-1])
+    
+    # Compute and plot errors
+    Xerr = np.zeros(Xout.shape)
+    for ii in range(len(tout)):
+        X_true = astro.element_conversion(Xo, 1, 1, dt=tout[ii])
+        Xerr[ii,:] = (Xout[ii,:].reshape(6,1) - X_true).flatten()
+        
+    plt.figure()
+    plt.subplot(3,1,1)
+    plt.plot(tout/3600., Xerr[:,0], 'k.')
+    plt.ylabel('X Err [km]')
+    plt.title('DOPRI87 Errors')
+    plt.subplot(3,1,2)
+    plt.plot(tout/3600., Xerr[:,1], 'k.')
+    plt.ylabel('Y Err [km]')
+    plt.subplot(3,1,3)
+    plt.plot(tout/3600., Xerr[:,2], 'k.')
+    plt.ylabel('Z Err [km]')
+    plt.xlabel('Time [hours]')
+    
+    
+    print('rk4 time', rk4_time)
+    print('rk4 jit time', rk4_jit_time)
+    print('dp87 time', dp87_time)
+    print('dp87 jit time', dp87_jit_time)
+    
+    plt.show()
     
     return
 
@@ -647,9 +732,16 @@ if __name__ == '__main__':
     
 #    test_dopri_computation()
     
-    test_jit_twobody()
+#    test_jit_twobody()
     
+
+    test, test2, test3, test4, test5 = fastint.test_jit()
     
+    print(test)
+    print(test2)
+    print(test3)
+    print(test4)
+    print(test5)
     
     
     
