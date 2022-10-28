@@ -1,6 +1,5 @@
 import numpy as np
 from numba import jit
-from numba.typed import Dict
 
 
 @jit(nopython=True)
@@ -327,10 +326,12 @@ def dopri87_aegis(intfcn, tin, y0, params):
     kappa = kurt - nstates
     alpha = params['alpha']
     lam = alpha**2.*(nstates + kappa) - nstates
-    Wm = 1./(2.*(nstates + lam)) * np.ones(2*nstates,)
-    Wc = Wm.copy()
-    Wm = np.insert(Wm, 0, lam/(nstates + lam))
-    Wc = np.insert(Wc, 0, lam/(nstates + lam) + (1 - alpha**2 + beta))
+    Wm = np.zeros(2*nstates+1,)
+    Wc = np.zeros(2*nstates+1,)
+    Wm[0] = lam/(nstates + lam)
+    Wc[0] = lam/(nstates + lam) + (1 - alpha**2 + beta)
+    Wm[1:] = 1./(2.*(nstates + lam)) * np.ones(2*nstates,)
+    Wc[1:] = 1./(2.*(nstates + lam)) * np.ones(2*nstates,)
     diagWc = np.diag(Wc)    
     
     # Start and end times
@@ -483,7 +484,7 @@ def dopri87_aegis(intfcn, tin, y0, params):
 
 
 @jit(nopython=True)
-def jit_aegis_twobody(t, X, params):
+def jit_twobody_aegis(t, X, params):
     '''
     This function propagates the sigma points and entropy of a Gaussian Mixture
     Model per the dynamics model specificied in the input params.

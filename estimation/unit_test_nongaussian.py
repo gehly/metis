@@ -36,22 +36,26 @@ def twobody_geo_aegis_prop():
     # Define state parameters
     state_params = {}
     state_params['GM'] = GME
-    state_params['Q'] = 1e-16 * np.diag([1, 1, 1])
-    state_params['gap_seconds'] = 900.
-    state_params['alpha'] = 1e-4
-    state_params['A_fcn'] = dyn.A_twobody
-    state_params['dyn_fcn'] = dyn.ode_twobody_ukf
+
+    # Define filter parameters
+    filter_params = {}
+    filter_params['Q'] = 1e-16 * np.diag([1, 1, 1])
+    filter_params['gap_seconds'] = 900.
+    filter_params['alpha'] = 1e-4
+    filter_params['delta_s_sec'] = 600.
+    filter_params['split_T'] = 0.03
     
     # Integration function and additional settings
     int_params = {}
     int_params['integrator'] = 'solve_ivp'
     int_params['ode_integrator'] = 'DOP853'
     int_params['intfcn'] = dyn.ode_aegis
+    int_params['A_fcn'] = dyn.A_twobody
+    int_params['dyn_fcn'] = dyn.ode_twobody_ukf
     int_params['rtol'] = 1e-12
     int_params['atol'] = 1e-12
     int_params['time_format'] = 'datetime'
-    int_params['delta_s_sec'] = 600.
-    int_params['split_T'] = 0.03
+
 
     # Time vector
     UTC0 = datetime(2021, 6, 21, 0, 0, 0)
@@ -222,26 +226,29 @@ def twobody_heo_aegis_prop():
     # Define state parameters
     state_params = {}
     state_params['GM'] = GME
-    state_params['Q'] = 1e-16 * np.diag([1, 1, 1])
-    state_params['gap_seconds'] = 900.
-    state_params['alpha'] = 1e-4
-    state_params['A_fcn'] = dyn.A_twobody
-    state_params['dyn_fcn'] = dyn.ode_twobody_ukf
+
+    # Define filter parameters
+    filter_params = {}
+    filter_params['Q'] = 1e-16 * np.diag([1, 1, 1])
+    filter_params['gap_seconds'] = 900.
+    filter_params['alpha'] = 1e-4
+    filter_params['delta_s_sec'] = 600.
+    filter_params['split_T'] = 0.1
     
     # Integration function and additional settings
     int_params = {}
     int_params['integrator'] = 'solve_ivp'
     int_params['ode_integrator'] = 'DOP853'
     int_params['intfcn'] = dyn.ode_aegis
+    int_params['A_fcn'] = dyn.A_twobody
+    int_params['dyn_fcn'] = dyn.ode_twobody_ukf
     int_params['rtol'] = 1e-12
     int_params['atol'] = 1e-12
     int_params['time_format'] = 'datetime'
-    int_params['delta_s_sec'] = 600.
-    int_params['split_T'] = 0.01
 
     # Time vector
     UTC0 = datetime(2021, 6, 21, 0, 0, 0)
-    UTC1 = datetime(2021, 6, 21, 7, 0, 0)
+    UTC1 = datetime(2021, 6, 21, 12, 0, 0)
     tk_list = [UTC0, UTC1]
 
     # Inital State
@@ -273,7 +280,7 @@ def twobody_heo_aegis_prop():
     kappa = kurt - float(nstates)
 
     # Compute sigma point weights
-    alpha = state_params['alpha']
+    alpha = filter_params['alpha']
     lam = alpha**2.*(nstates + kappa) - nstates
     gam = np.sqrt(nstates + lam)
     Wm = 1./(2.*(nstates + lam)) * np.ones(2*nstates,)
@@ -281,17 +288,20 @@ def twobody_heo_aegis_prop():
     Wm = np.insert(Wm, 0, lam/(nstates + lam))
     Wc = np.insert(Wc, 0, lam/(nstates + lam) + (1 - alpha**2 + beta))
     diagWc = np.diag(Wc)
-    state_params['gam'] = gam
-    state_params['Wm'] = Wm
-    state_params['diagWc'] = diagWc
+    filter_params['gam'] = gam
+    filter_params['Wm'] = Wm
+    filter_params['diagWc'] = diagWc
     
     
+    print('')
+    print('state_params', state_params)
     
     
     # Run AEGIS Propagation
     start = time.time()
     tin = tk_list
-    aegis_final2 = est.aegis_predictor2(GMM_dict, tin, state_params, int_params)
+    aegis_final2 = est.aegis_predictor2(GMM_dict, tin, filter_params, 
+                                        state_params, int_params)
 
     aegis2_run_time = time.time() - start
     
@@ -304,13 +314,15 @@ def twobody_heo_aegis_prop():
     
     print('aegis2 run time', aegis2_run_time)
     
-
+    print('')
+    print('state_params', state_params)
     
-    # Run Variable Step AEGIS Propagation
-    start = time.time()
+    # Run Variable Step AEGIS Propagation    
     int_params['integrator'] = 'dopri87_aegis'
     int_params['step'] = 10.
-    aegis_final3 = est.aegis_predictor3(GMM_dict, tin, state_params, int_params)
+    start = time.time()
+    aegis_final3 = est.aegis_predictor3(GMM_dict, tin, filter_params, 
+                                        state_params, int_params)
     
     aegis3_run_time = time.time() - start
     
@@ -318,20 +330,34 @@ def twobody_heo_aegis_prop():
     
     print('aegis3 run time', aegis3_run_time)
     
+    print('')
+    print('state_params', state_params)
+    
+    
+    # Variable Step AEGIS Propagation with JIT
+    int_params['integrator'] = 'dopri87_aegis_jit'
+    int_params['intfcn'] = fastint.jit_twobody_aegis
+    
+    start = time.time()
+    aegis_final4 = est.aegis_predictor3(GMM_dict, tin, filter_params, 
+                                        state_params, int_params)
+    
+    aegis4_run_time = time.time() - start
+    
+    aegis_points4 = est.gmm_samples(aegis_final2, N)
+    
+    print('aegis4 run time', aegis4_run_time)
+    
     
     # Run UKF Propagation
-    int_params = {}
     int_params['integrator'] = 'solve_ivp'
     int_params['ode_integrator'] = 'DOP853'
     int_params['intfcn'] = dyn.ode_aegis
-    int_params['rtol'] = 1e-12
-    int_params['atol'] = 1e-12
-    int_params['time_format'] = 'datetime'
-    int_params['delta_s_sec'] = 600.
-    int_params['split_T'] = 1e6
+    filter_params['split_T'] = 1e6
     
     start = time.time()
-    ukf_final = est.aegis_predictor(GMM_dict, tin, state_params, int_params)
+    ukf_final = est.aegis_predictor(GMM_dict, tin, filter_params,
+                                    state_params, int_params)
     ukf_points = est.gmm_samples(ukf_final, N)
     
     ukf_run_time = time.time() - start
@@ -374,20 +400,24 @@ def twobody_heo_aegis_prop():
     
     
     
-    # Likelihood Agreement Measure
-    aegis_lam2 = analysis.compute_LAM(aegis_final2, mc_final)
-    aegis_lam3 = analysis.compute_LAM(aegis_final3, mc_final)
-    ukf_lam = analysis.compute_LAM(ukf_final, mc_final)
-    
-    print('AEGIS For Loop LAM: ', aegis_lam2)
-    print('AEGIS Variable LAM: ', aegis_lam3)
-    print('UKF LAM: ', ukf_lam)
+#    # Likelihood Agreement Measure
+#    aegis_lam2 = analysis.compute_LAM(aegis_final2, mc_final)
+#    aegis_lam3 = analysis.compute_LAM(aegis_final3, mc_final)
+#    aegis_lam4 = analysis.compute_LAM(aegis_final4, mc_final)
+#    ukf_lam = analysis.compute_LAM(ukf_final, mc_final)
+#    
+#    print('AEGIS For Loop LAM: ', aegis_lam2)
+#    print('AEGIS Variable LAM: ', aegis_lam3)
+#    print('AEGIS JIT LAM: ', aegis_lam4)
+#    print('UKF LAM: ', ukf_lam)
     
     print('AEGIS For Loop Comps: ', len(aegis_final2['weights']))
     print('AEGIS Variable Comps: ', len(aegis_final3['weights']))
+    print('AEGIS JIT Comps: ', len(aegis_final4['weights']))
     
     print('AEGIS For Loop Time: ', aegis2_run_time)
     print('AEGIS Variable time: ', aegis3_run_time)
+    print('AEGIS JIT time: ', aegis4_run_time)
     print('UKF time: ', ukf_run_time)
     print('MC time: ', mc_run_time)
     
@@ -395,7 +425,7 @@ def twobody_heo_aegis_prop():
     # Generate plots
     plt.figure()
     plt.plot(mc_final[:,0], mc_final[:,1], 'k.', alpha=0.2)    
-    analysis.plot_pdf_contours(aegis_final3, axis1=0, axis2=1)
+    analysis.plot_pdf_contours(aegis_final4, axis1=0, axis2=1)
     plt.xlabel('X [km]')
     plt.ylabel('Y [km]')
     plt.title('AEGIS Contours vs MC Points')
@@ -410,7 +440,7 @@ def twobody_heo_aegis_prop():
     
     plt.figure()
     plt.plot(mc_final[:,0], mc_final[:,1], 'k.', alpha=0.2)
-    plt.plot(aegis_points3[:,0], aegis_points3[:,1], 'r.', alpha=0.2)
+    plt.plot(aegis_points4[:,0], aegis_points4[:,1], 'r.', alpha=0.2)
     plt.plot(ukf_points[:,0], ukf_points[:,1], 'b.', alpha=0.2)
     plt.legend(['MC', 'AEGIS', 'UKF'])
     plt.xlabel('X [km]')
@@ -419,7 +449,7 @@ def twobody_heo_aegis_prop():
     
     plt.figure()
     plt.plot(mc_final[:,0], mc_final[:,2], 'k.', alpha=0.2)
-    plt.plot(aegis_points3[:,0], aegis_points3[:,2], 'r.', alpha=0.2)
+    plt.plot(aegis_points4[:,0], aegis_points4[:,2], 'r.', alpha=0.2)
     plt.plot(ukf_points[:,0], ukf_points[:,2], 'b.', alpha=0.2)
     plt.legend(['MC', 'AEGIS', 'UKF'])
     plt.xlabel('X [km]')
@@ -428,7 +458,7 @@ def twobody_heo_aegis_prop():
     
     plt.figure()
     plt.plot(mc_final[:,1], mc_final[:,2], 'k.', alpha=0.2)
-    plt.plot(aegis_points3[:,1], aegis_points3[:,2], 'r.', alpha=0.2)
+    plt.plot(aegis_points4[:,1], aegis_points4[:,2], 'r.', alpha=0.2)
     plt.plot(ukf_points[:,1], ukf_points[:,2], 'b.', alpha=0.2)
     plt.legend(['MC', 'AEGIS', 'UKF'])
     plt.xlabel('Y [km]')

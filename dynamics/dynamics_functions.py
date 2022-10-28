@@ -4,7 +4,10 @@ from scipy.integrate import odeint, ode, solve_ivp
 import sys
 import os
 import inspect
+import copy
 from datetime import datetime, timedelta
+from numba import types
+from numba.typed import Dict
 
 filename = inspect.getframeinfo(inspect.currentframe()).filename
 current_dir = os.path.dirname(os.path.abspath(filename))
@@ -14,6 +17,7 @@ metis_dir = current_dir[0:ind+5]
 sys.path.append(metis_dir)
 
 from dynamics import numerical_integration as numint
+from dynamics import fast_integration as fastint
 from utilities import astrodynamics as astro
 
 
@@ -31,7 +35,8 @@ def general_dynamics(Xo, tvec, state_params, int_params):
     '''
     
 #    print(tvec)
-    
+    state_params = copy.deepcopy(state_params)
+    int_params = copy.deepcopy(int_params)
     integrator = int_params['integrator']
     
     # Flatten input state
@@ -59,6 +64,23 @@ def general_dynamics(Xo, tvec, state_params, int_params):
         
         # Run integrator
         tout, Xout, fcalls = numint.rk4(intfcn, tvec, Xo, params)
+        
+        return tout, Xout
+    
+    
+    if integrator == 'rk4_jit':
+        
+        # Setup integrator parameters
+        intfcn = int_params['intfcn']
+        params = Dict.empty(key_type=types.unicode_type, value_type=types.float64,)
+        params['step'] = int_params['step']
+        
+        for key in state_params:
+            params[key] = state_params[key]
+            
+        # Run integrator
+        tvec = np.asarray(tvec)
+        tout, Xout = fastint.rk4(intfcn, tvec, Xo, params)
         
         return tout, Xout
         
@@ -128,6 +150,43 @@ def general_dynamics(Xo, tvec, state_params, int_params):
             tout = tvec
         
         return tout, Xout
+    
+    
+    if integrator == 'dopri87_jit':
+        
+        # Setup integrator parameters
+        intfcn = int_params['intfcn']
+        params = Dict.empty(key_type=types.unicode_type, value_type=types.float64,)
+        params['step'] = int_params['step']
+        params['rtol'] = int_params['rtol']
+        params['atol'] = int_params['atol']
+        
+        for key in state_params:
+            params[key] = state_params[key]
+            
+        # Run integrator
+        tvec = np.asarray(tvec)
+        if len(tvec) == 2:
+            tout, Xout = fastint.dopri87(intfcn, tvec, Xo, params)
+            
+        else:
+            
+            Xout = np.zeros((len(tvec), len(Xo)))
+            Xout[0] = Xo
+            tin = tvec[0:2]
+            
+            # Run integrator
+            k = 1
+            while tin[0] < tvec[-1]:           
+                dum, Xout_step = fastint.dopri87(intfcn, tin, Xo, params)
+                Xo = Xout_step[-1,:]
+                tin = tvec[k:k+2]
+                Xout[k] = Xo               
+                k += 1
+            
+            tout = tvec
+
+        return tout, Xout
             
             
     if integrator == 'dopri87_aegis':
@@ -138,7 +197,8 @@ def general_dynamics(Xo, tvec, state_params, int_params):
         params['step'] = int_params['step']
         params['rtol'] = int_params['rtol']
         params['atol'] = int_params['atol']
-        params['split_T'] = int_params['split_T']
+        params['A_fcn'] = int_params['A_fcn']
+        params['dyn_fcn'] = int_params['dyn_fcn']
         
         # Run integrator
         if len(tvec) == 2:
@@ -148,6 +208,30 @@ def general_dynamics(Xo, tvec, state_params, int_params):
             mistake
             
         return tout, Xout, split_flag
+    
+    
+    if integrator == 'dopri87_aegis_jit':
+        
+        # Setup integrator parameters
+        intfcn = int_params['intfcn']
+        params = Dict.empty(key_type=types.unicode_type, value_type=types.float64,)
+        params['step'] = int_params['step']
+        params['rtol'] = int_params['rtol']
+        params['atol'] = int_params['atol']
+        
+        for key in state_params:
+            params[key] = state_params[key]
+            
+        # Run integrator
+        tvec = np.asarray(tvec)
+        if len(tvec) == 2:
+            tout, Xout, split_flag = fastint.dopri87_aegis(intfcn, tvec, Xo, params)
+            
+        else:
+             mistake
+        
+        return tout, Xout, split_flag
+        
             
         
     if integrator == 'odeint':
@@ -171,6 +255,7 @@ def general_dynamics(Xo, tvec, state_params, int_params):
         
         # Setup integrator parameters
         params = state_params
+        params.update(int_params)
         intfcn = int_params['intfcn']
         method = int_params['ode_integrator']
         rtol = int_params['rtol']

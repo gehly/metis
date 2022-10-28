@@ -569,7 +569,6 @@ def test_jit_twobody():
     # Define state parameters
     state_params = {}
     state_params['GM'] = GME
-    GM = state_params['GM']
 
     
     # Integration function and additional settings
@@ -593,53 +592,33 @@ def test_jit_twobody():
     UTC2 = datetime(2022, 10, 22, 0, 0, 0)
     tvec = [UTC1, UTC2]
     
-    
-    # Convert time to seconds
-    time_format = int_params['time_format']
-    if time_format == 'datetime':
-        t0 = tvec[0]
-        tvec = np.asarray([(ti - t0).total_seconds() for ti in tvec])
-    if time_format == 'JD':
-        t0 = tvec[0]
-        tvec = np.asarray([(ti - t0)*86400. for ti in tvec])
-        
-    # Setup integrator parameters
-    params = state_params
-    intfcn = int_params['intfcn']        
-    params['step'] = int_params['step']
-    
+
     # Run integrator
     start = time.time()
-    tout, Xout, fcalls = numint.rk4(intfcn, tvec, Xo, params)
+    tout, Xout = dyn.general_dynamics(Xo, tvec, state_params, int_params)
     rk4_time = time.time() - start
     
     print(tout[-1])
     print(Xout[-1])
-        
+
         
     # Setup for JIT execution
-    intfcn = fastint.jit_twobody
-    step = int_params['step']
-    
-    params2 = Dict.empty(key_type=types.unicode_type, value_type=types.float64,)
-    params2['step'] = 10.
-    params2['GM'] = GME
-    params2['rtol'] = 1e-12
-    params2['atol'] = 1e-12
+    int_params['integrator'] = 'rk4_jit'
+    int_params['intfcn'] = fastint.jit_twobody
     
     start = time.time()
-    tout, Xout = fastint.rk4(intfcn, tvec, Xo.flatten(), params2)
+    tout, Xout = dyn.general_dynamics(Xo, tvec, state_params, int_params)
     rk4_jit_time = time.time() - start
     
     print('rk4 time1', rk4_jit_time)
     
     start = time.time()
-    tout, Xout = fastint.rk4(intfcn, tvec, Xo.flatten(), params2)
+    tout, Xout = dyn.general_dynamics(Xo, tvec, state_params, int_params)
     rk4_jit_time = time.time() - start
     
     print(tout[-1])
     print(Xout[-1])
-    
+
     
     # Compute and plot errors
     Xerr = np.zeros(Xout.shape)
@@ -662,29 +641,30 @@ def test_jit_twobody():
     
     
     # DOPRI87 Testing
-    intfcn = dyn.ode_twobody
-    params['step'] = int_params['step']
-    params['rtol'] = 1e-12
-    params['atol'] = 1e-12
+    int_params['integrator'] = 'dopri87'
+    int_params['intfcn'] = dyn.ode_twobody
+    int_params['rtol'] = 1e-12
+    int_params['atol'] = 1e-12
     
     start = time.time()
-    tout, Xout, fcalls = numint.dopri87(intfcn, tvec, Xo, params)
+    tout, Xout = dyn.general_dynamics(Xo, tvec, state_params, int_params)
     dp87_time = time.time() - start
     
     print(tout[-1])
     print(Xout[-1])
     
     # JIT execution
-    intfcn = fastint.jit_twobody
+    int_params['integrator'] = 'dopri87_jit'
+    int_params['intfcn'] = fastint.jit_twobody
 
     start = time.time()
-    tout, Xout = fastint.dopri87(intfcn, tvec, Xo.flatten(), params2)
+    tout, Xout = dyn.general_dynamics(Xo, tvec, state_params, int_params)
     dp87_jit_time = time.time() - start
     
     print('dp87 time1', dp87_jit_time)
     
     start = time.time()
-    tout, Xout = fastint.dopri87(intfcn, tvec, Xo.flatten(), params2)
+    tout, Xout = dyn.general_dynamics(Xo, tvec, state_params, int_params)
     dp87_jit_time = time.time() - start
     
     print(tout[-1])
@@ -732,16 +712,16 @@ if __name__ == '__main__':
     
 #    test_dopri_computation()
     
-#    test_jit_twobody()
+    test_jit_twobody()
     
 
-    test, test2, test3, test4, test5 = fastint.test_jit()
-    
-    print(test)
-    print(test2)
-    print(test3)
-    print(test4)
-    print(test5)
+#    test, test2, test3, test4, test5 = fastint.test_jit()
+#    
+#    print(test)
+#    print(test2)
+#    print(test3)
+#    print(test4)
+#    print(test5)
     
     
     

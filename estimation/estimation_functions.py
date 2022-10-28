@@ -1614,7 +1614,7 @@ def aegis_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
     return filter_output, full_state_output
 
 
-def aegis_predictor(GMM_dict, tin, state_params, int_params):
+def aegis_predictor(GMM_dict, tin, filter_params, state_params, int_params):
     '''
     
     
@@ -1622,29 +1622,32 @@ def aegis_predictor(GMM_dict, tin, state_params, int_params):
     
     # Copy input to ensure pass by value
     GMM_dict = copy.deepcopy(GMM_dict)
+    filter_params = copy.deepcopy(filter_params)
+    state_params = copy.deepcopy(state_params)
+    int_params = copy.deepcopy(int_params)
     
-    # State information
-    Q = state_params['Q']
+    # Retrieve parameters
+    Q = filter_params['Q']
+    gam = filter_params['gam']
+    Wm = filter_params['Wm']
+    diagWc = filter_params['diagWc']    
+    gap_seconds = filter_params['gap_seconds']       
+    split_T = filter_params['split_T']    
+    time_format = int_params['time_format']     
     q = int(Q.shape[0])
-    gap_seconds = state_params['gap_seconds']
-    time_format = int_params['time_format']    
-    split_T = int_params['split_T']
-    gam = state_params['gam']
-    Wm = state_params['Wm']
-    diagWc = state_params['diagWc']
     
     tk_prior = tin[0]
     tk = tin[1]
     
     if time_format == 'seconds':
         delta_t = tk - tk_prior
-        delta_s = int_params['delta_s_sec']
+        delta_s = filter_params['delta_s_sec']
     elif time_format == 'JD':
         delta_t = (tk - tk_prior)*86400.
-        delta_s = int_params['delta_s_sec']*(1./86400.)
+        delta_s = filter_params['delta_s_sec']*(1./86400.)
     elif time_format == 'datetime':
         delta_t = (tk - tk_prior).total_seconds()
-        delta_s = timedelta(seconds=int_params['delta_s_sec'])
+        delta_s = timedelta(seconds=filter_params['delta_s_sec'])
     
     # Check if propagation is needed
     if delta_t == 0.:
@@ -1814,7 +1817,7 @@ def aegis_predictor(GMM_dict, tin, state_params, int_params):
     return GMM_bar
 
 
-def aegis_predictor2(GMM_dict, tin, state_params, int_params):
+def aegis_predictor2(GMM_dict, tin, filter_params, state_params, int_params):
     '''
     
     
@@ -1822,29 +1825,32 @@ def aegis_predictor2(GMM_dict, tin, state_params, int_params):
     
     # Copy input to ensure pass by value
     GMM_dict = copy.deepcopy(GMM_dict)
+    filter_params = copy.deepcopy(filter_params)
+    state_params = copy.deepcopy(state_params)
+    int_params = copy.deepcopy(int_params)
     
-    # State information
-    Q = state_params['Q']
+    # Retrieve parameters
+    Q = filter_params['Q']
+    gam = filter_params['gam']
+    Wm = filter_params['Wm']
+    diagWc = filter_params['diagWc']    
+    gap_seconds = filter_params['gap_seconds']       
+    split_T = filter_params['split_T']    
+    time_format = int_params['time_format']     
     q = int(Q.shape[0])
-    gap_seconds = state_params['gap_seconds']
-    time_format = int_params['time_format']    
-    split_T = int_params['split_T']
-    gam = state_params['gam']
-    Wm = state_params['Wm']
-    diagWc = state_params['diagWc']
     
     tk_prior = tin[0]
     tk = tin[1]
     
     if time_format == 'seconds':
         delta_t = tk - tk_prior
-        delta_s = int_params['delta_s_sec']
+        delta_s = filter_params['delta_s_sec']
     elif time_format == 'JD':
         delta_t = (tk - tk_prior)*86400.
-        delta_s = int_params['delta_s_sec']*(1./86400.)
+        delta_s = filter_params['delta_s_sec']*(1./86400.)
     elif time_format == 'datetime':
         delta_t = (tk - tk_prior).total_seconds()
-        delta_s = timedelta(seconds=int_params['delta_s_sec'])
+        delta_s = timedelta(seconds=filter_params['delta_s_sec'])
     
     # Check if propagation is needed
     if delta_t == 0.:
@@ -2008,7 +2014,7 @@ def aegis_predictor2(GMM_dict, tin, state_params, int_params):
     return GMM_bar
 
 
-def aegis_predictor3(GMM_dict, tin, state_params, int_params):
+def aegis_predictor3(GMM_dict, tin, filter_params, state_params, int_params):
     '''
     
     
@@ -2016,15 +2022,23 @@ def aegis_predictor3(GMM_dict, tin, state_params, int_params):
     
     # Copy input to ensure pass by value
     GMM_dict = copy.deepcopy(GMM_dict)
+    filter_params = copy.deepcopy(filter_params)
+    state_params = copy.deepcopy(state_params)
+    int_params = copy.deepcopy(int_params)
     
-    # State information
-    Q = state_params['Q']
+    # Retrieve parameters
+    Q = filter_params['Q']
+    gam = filter_params['gam']
+    Wm = filter_params['Wm']
+    diagWc = filter_params['diagWc']    
+    gap_seconds = filter_params['gap_seconds']        
+    time_format = int_params['time_format']     
+    
+    # Fudge to work with general_dynamics
+    state_params['split_T'] = filter_params['split_T']
+    state_params['alpha'] = filter_params['alpha']
+    
     q = int(Q.shape[0])
-    gap_seconds = state_params['gap_seconds']
-    time_format = int_params['time_format']
-    gam = state_params['gam']
-    Wm = state_params['Wm']
-    diagWc = state_params['diagWc']
     
     tk_prior = tin[0]
     tk = tin[1]
@@ -2183,6 +2197,9 @@ def aegis_predictor3(GMM_dict, tin, state_params, int_params):
     GMM_bar['covars'] = covars    
     
     return GMM_bar
+
+
+
 
 
 def aegis_corrector(GMM_bar, tk, Yk, sensor_id, meas_fcn, state_params,
