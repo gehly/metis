@@ -218,6 +218,10 @@ def plot_pdf_contours(GMM_dict, axis1=0, axis2=1):
     means = GMM_dict['means']
     covars = GMM_dict['covars']
     
+    print('Ncomps', len(weights))
+    print('wmax', max(weights))
+    print('wmin', min(weights))
+    
     # Merge GMM to compute overall mean and covar to establish plot parameters
     params = {}
     params['prune_T'] = 0.
@@ -237,6 +241,20 @@ def plot_pdf_contours(GMM_dict, axis1=0, axis2=1):
     x = np.linspace(xmin, xmax, 100)
     y = np.linspace(ymin, ymax, 100)
     
+#    # Merge GMM to get cleaner plot
+#    params = {}
+#    params['prune_T'] = 0
+#    params['merge_U'] = 0.1
+#    GMM_merge = est.merge_GMM(GMM_dict, params)
+#    
+#    # Break out GMM
+#    weights = GMM_merge['weights']
+#    means = GMM_merge['means']
+#    covars = GMM_merge['covars']
+#    
+#    print('Ncomps', len(weights))
+    
+    
     xgrid, ygrid = np.meshgrid(x, y)
     z = np.zeros((len(y), len(x)))
     
@@ -249,7 +267,14 @@ def plot_pdf_contours(GMM_dict, axis1=0, axis2=1):
     
         z += wj * stats.multivariate_normal(mj, Pj).pdf(np.dstack((xgrid, ygrid)))
     
-    plt.contour(x, y, z)
+    print(z.shape)
+    zmax = np.max(z)
+    print(zmax)
+    levels = np.logspace(-8,-1,8)*zmax
+    
+    print(levels)
+    
+    plt.contour(x, y, z, levels=5)
 
     return
 

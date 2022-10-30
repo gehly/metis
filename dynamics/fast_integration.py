@@ -397,9 +397,7 @@ def dopri87_aegis(intfcn, tin, y0, params):
                   11173962825./925320556., -13158990841./6184727034., 
                   3936647629./1978049680., -160528059./685178525., 
                   248638103./1413531060., 0.]
-    
-    
-    
+       
     # Loop to end
     k8 = np.zeros((len(yn),13))
     split_flag = False
@@ -634,6 +632,8 @@ def test_jit():
     for ii in range(10):
         x = 1.
         print(x)
+        
+    
         
     
     
