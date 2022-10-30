@@ -1497,8 +1497,7 @@ def ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
 # Non-Gaussian Estimation
 ###############################################################################
 
-def aegis_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
-              sensor_params, int_params):    
+def aegis_ukf(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):    
     '''
     This function implements the Adaptive Entropy-based Gaussian Information
     Syntheis (AEGIS) Unscented Kalman Filter for the least
@@ -1535,6 +1534,9 @@ def aegis_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         Nonlinear Dynamical Systems," JGCD 2013.
         
     '''
+    
+    # Break out inputs
+    state_params = params_dict['state_params']
     
     # State information
     state_tk = sorted(state_dict.keys())[-1]
@@ -1590,14 +1592,13 @@ def aegis_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
 
         # Predictor Step
         tin = [tk_prior, tk]
-        GMM_bar = aegis_predictor(GMM_dict, tin, state_params, int_params)
+        GMM_bar = aegis_predictor(GMM_dict, tin, params_dict)
         
         # Corrector Step
         Yk = Yk_list[kk]
         sensor_id = sensor_id_list[kk]
         GMM_dict, resids_k = aegis_corrector(GMM_bar, tk, Yk, sensor_id,
-                                             meas_fcn, state_params,
-                                             sensor_params)
+                                             meas_fcn, params_dict)
         
         # Store output
         filter_output[tk] = {}

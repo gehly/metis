@@ -132,10 +132,13 @@ def twobody_geo_aegis_prop():
     # Variable Step AEGIS Propagation with JIT
     int_params['integrator'] = 'dopri87_aegis_jit'
     int_params['intfcn'] = fastint.jit_twobody_aegis
+    params_dict = {}
+    params_dict['filter_params'] = filter_params
+    params_dict['state_params'] = state_params
+    params_dict['int_params'] = int_params
     
     start = time.time()
-    aegis_final4 = est.aegis_predictor(GMM_dict, tin, filter_params, 
-                                        state_params, int_params)
+    aegis_final4 = est.aegis_predictor(GMM_dict, tin, params_dict)
     
     aegis4_run_time = time.time() - start
     
@@ -150,10 +153,13 @@ def twobody_geo_aegis_prop():
     int_params['A_fcn'] = dyn.A_twobody
     int_params['dyn_fcn'] = dyn.ode_twobody_ukf
     filter_params['split_T'] = 1e6
+    params_dict = {}
+    params_dict['filter_params'] = filter_params
+    params_dict['state_params'] = state_params
+    params_dict['int_params'] = int_params
     
     start = time.time()
-    ukf_final = est.aegis_predictor(GMM_dict, tin, filter_params,
-                                    state_params, int_params)
+    ukf_final = est.aegis_predictor(GMM_dict, tin, params_dict)
     ukf_points = est.gmm_samples(ukf_final, N)
     
     ukf_run_time = time.time() - start
@@ -375,9 +381,12 @@ def twobody_heo_aegis_prop():
     int_params['A_fcn'] = dyn.A_twobody
     int_params['dyn_fcn'] = dyn.ode_twobody_ukf
     int_params['step'] = 10.
+    params_dict = {}
+    params_dict['filter_params'] = filter_params
+    params_dict['state_params'] = state_params
+    params_dict['int_params'] = int_params
     start = time.time()
-    aegis_final3 = est.aegis_predictor(GMM_dict, tin, filter_params, 
-                                       state_params, int_params)
+    aegis_final3 = est.aegis_predictor(GMM_dict, tin, params_dict)
     
     aegis3_run_time = time.time() - start
     
@@ -392,10 +401,13 @@ def twobody_heo_aegis_prop():
     # Variable Step AEGIS Propagation with JIT
     int_params['integrator'] = 'dopri87_aegis_jit'
     int_params['intfcn'] = fastint.jit_twobody_aegis
+    params_dict = {}
+    params_dict['filter_params'] = filter_params
+    params_dict['state_params'] = state_params
+    params_dict['int_params'] = int_params
     
     start = time.time()
-    aegis_final4 = est.aegis_predictor(GMM_dict, tin, filter_params, 
-                                        state_params, int_params)
+    aegis_final4 = est.aegis_predictor(GMM_dict, tin, params_dict)
     
     aegis4_run_time = time.time() - start
     
@@ -410,10 +422,13 @@ def twobody_heo_aegis_prop():
     int_params['A_fcn'] = dyn.A_twobody
     int_params['dyn_fcn'] = dyn.ode_twobody_ukf
     filter_params['split_T'] = 1e6
+    params_dict = {}
+    params_dict['filter_params'] = filter_params
+    params_dict['state_params'] = state_params
+    params_dict['int_params'] = int_params
     
     start = time.time()
-    ukf_final = est.aegis_predictor(GMM_dict, tin, filter_params,
-                                    state_params, int_params)
+    ukf_final = est.aegis_predictor(GMM_dict, tin, params_dict)
     ukf_points = est.gmm_samples(ukf_final, N)
     
     ukf_run_time = time.time() - start
@@ -610,19 +625,25 @@ def demars_high_orbit():
     
     
     # Run AEGIS Propagation
+    params_dict = {}
+    params_dict['filter_params'] = filter_params
+    params_dict['state_params'] = state_params
+    params_dict['int_params'] = int_params
     start = time.time()
-    aegis_final = est.aegis_predictor(GMM_dict, tin, filter_params, 
-                                        state_params, int_params)
+    aegis_final = est.aegis_predictor(GMM_dict, tin, params_dict)
     
     aegis_run_time = time.time() - start
     
     
     # Run UKF Propagation
     filter_params['split_T'] = 1e6
+    params_dict = {}
+    params_dict['filter_params'] = filter_params
+    params_dict['state_params'] = state_params
+    params_dict['int_params'] = int_params
     
     start = time.time()
-    ukf_final = est.aegis_predictor(GMM_dict, tin, filter_params, 
-                                     state_params, int_params)
+    ukf_final = est.aegis_predictor(GMM_dict, tin, params_dict)
 
     ukf_run_time = time.time() - start
     
