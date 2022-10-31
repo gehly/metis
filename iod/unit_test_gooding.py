@@ -70,7 +70,7 @@ def single_rev_geo():
         dt_sec = (UTC - UTC0).total_seconds()
         EOP_data = eop.get_eop_data(eop_alldata, UTC)
         Xk = astro.element_conversion(Xo, 1, 1, dt=dt_sec)
-        all_meas = mfunc.compute_measurement(Xk, {}, sensor, UTC, EOP_data,
+        all_meas = mfunc.compute_measurement(Xk, {}, sensor_params, sensor_id, UTC, EOP_data,
                                              XYs_df, meas_types=['ra', 'dec', 'rg', 'az', 'el'])
         
         
@@ -142,9 +142,9 @@ def single_rev_geo():
     sensor_id_time_list = sensor_id_list
     tof_2 = (tk_list[1] - tk_list[0]).total_seconds()
     tof_f = (tk_list[2] - tk_list[0]).total_seconds()
-    sensor0 = sensor_params[sensor_id_time_list[0]]
-    sensor2 = sensor_params[sensor_id_time_list[1]]
-    sensorf = sensor_params[sensor_id_time_list[2]]
+    sensor0 = sensor_id_time_list[0]
+    sensor2 = sensor_id_time_list[1]
+    sensorf = sensor_id_time_list[2]
     EOP_data0 = eop.get_eop_data(eop_alldata, tk_list[0])
     EOP_data2 = eop.get_eop_data(eop_alldata, tk_list[1])
     EOP_dataf = eop.get_eop_data(eop_alldata, tk_list[2])
@@ -154,12 +154,12 @@ def single_rev_geo():
         Xi_2 = astro.element_conversion(Xi_0, 1, 1, dt=tof_2)
         Xi_f = astro.element_conversion(Xi_0, 1, 1, dt=tof_f)
         
-        meas0 = mfunc.compute_measurement(Xi_0, {}, sensor0, tk_list[0], EOP_data0,
+        meas0 = mfunc.compute_measurement(Xi_0, {}, sensor_params, sensor0, tk_list[0], EOP_data0,
                                           XYs_df, meas_types=['ra', 'dec'])
         
-        meas2 = mfunc.compute_measurement(Xi_2, {}, sensor2, tk_list[1], EOP_data2,
+        meas2 = mfunc.compute_measurement(Xi_2, {}, sensor_params, sensor2, tk_list[1], EOP_data2,
                                           XYs_df, meas_types=['ra', 'dec'])
-        measf = mfunc.compute_measurement(Xi_f, {}, sensorf, tk_list[2], EOP_dataf,
+        measf = mfunc.compute_measurement(Xi_f, {}, sensor_params, sensorf, tk_list[2], EOP_dataf,
                                           XYs_df, meas_types=['ra', 'dec'])
         
         resids0 = (meas0 - Yk_list[0])*(1./arcsec2rad)
@@ -232,7 +232,7 @@ def single_rev_leo():
         for sensor_id in sensor_id_list:
             
             sensor = sensor_params[sensor_id]
-            all_meas = mfunc.compute_measurement(Xk, {}, sensor, UTC, EOP_data,
+            all_meas = mfunc.compute_measurement(Xk, {}, sensor_params, sensor_id, UTC, EOP_data,
                                                  XYs_df, meas_types=['ra', 'dec', 'rg', 'az', 'el'])
             
             el = float(all_meas[4])
@@ -362,7 +362,7 @@ def single_rev_leo_retro():
         for sensor_id in sensor_id_list:
             
             sensor = sensor_params[sensor_id]
-            all_meas = mfunc.compute_measurement(Xk, {}, sensor, UTC, EOP_data,
+            all_meas = mfunc.compute_measurement(Xk, {}, sensor_params, sensor_id, UTC, EOP_data,
                                                  XYs_df, meas_types=['ra', 'dec', 'rg', 'az', 'el'])
             
             el = float(all_meas[4])
@@ -493,7 +493,7 @@ def single_rev_meo():
         for sensor_id in sensor_id_list:
             
             sensor = sensor_params[sensor_id]
-            all_meas = mfunc.compute_measurement(Xk, {}, sensor, UTC, EOP_data,
+            all_meas = mfunc.compute_measurement(Xk, {}, sensor_params, sensor_id, UTC, EOP_data,
                                                  XYs_df, meas_types=['ra', 'dec', 'rg', 'az', 'el'])
             
             el = float(all_meas[4])
@@ -579,9 +579,9 @@ def single_rev_meo():
     # Check final output states and angles
     tof_2 = (tk_list[1] - tk_list[0]).total_seconds()
     tof_f = (tk_list[2] - tk_list[0]).total_seconds()
-    sensor0 = sensor_params[sensor_id_time_list[0]]
-    sensor2 = sensor_params[sensor_id_time_list[1]]
-    sensorf = sensor_params[sensor_id_time_list[2]]
+    sensor0 = sensor_id_time_list[0]
+    sensor2 = sensor_id_time_list[1]
+    sensorf = sensor_id_time_list[2]
     EOP_data0 = eop.get_eop_data(eop_alldata, tk_list[0])
     EOP_data2 = eop.get_eop_data(eop_alldata, tk_list[1])
     EOP_dataf = eop.get_eop_data(eop_alldata, tk_list[2])
@@ -591,12 +591,12 @@ def single_rev_meo():
         Xi_2 = astro.element_conversion(Xi_0, 1, 1, dt=tof_2)
         Xi_f = astro.element_conversion(Xi_0, 1, 1, dt=tof_f)
         
-        meas0 = mfunc.compute_measurement(Xi_0, {}, sensor0, tk_list[0], EOP_data0,
+        meas0 = mfunc.compute_measurement(Xi_0, {}, sensor_params, sensor0, tk_list[0], EOP_data0,
                                           XYs_df, meas_types=['ra', 'dec'])
         
-        meas2 = mfunc.compute_measurement(Xi_2, {}, sensor2, tk_list[1], EOP_data2,
+        meas2 = mfunc.compute_measurement(Xi_2, {}, sensor_params, sensor2, tk_list[1], EOP_data2,
                                           XYs_df, meas_types=['ra', 'dec'])
-        measf = mfunc.compute_measurement(Xi_f, {}, sensorf, tk_list[2], EOP_dataf,
+        measf = mfunc.compute_measurement(Xi_f, {}, sensor_params, sensorf, tk_list[2], EOP_dataf,
                                           XYs_df, meas_types=['ra', 'dec'])
         
         resids0 = (meas0 - Yk_list[0])*(1./arcsec2rad)
@@ -670,7 +670,7 @@ def single_rev_heo():
         for sensor_id in sensor_id_list:
             
             sensor = sensor_params[sensor_id]
-            all_meas = mfunc.compute_measurement(Xk, {}, sensor, UTC, EOP_data,
+            all_meas = mfunc.compute_measurement(Xk, {}, sensor_params, sensor_id, UTC, EOP_data,
                                                  XYs_df, meas_types=['ra', 'dec', 'rg', 'az', 'el'])
             
             el = float(all_meas[4])
@@ -756,9 +756,9 @@ def single_rev_heo():
     # Check final output states and angles
     tof_2 = (tk_list[1] - tk_list[0]).total_seconds()
     tof_f = (tk_list[2] - tk_list[0]).total_seconds()
-    sensor0 = sensor_params[sensor_id_time_list[0]]
-    sensor2 = sensor_params[sensor_id_time_list[1]]
-    sensorf = sensor_params[sensor_id_time_list[2]]
+    sensor0 = sensor_id_time_list[0]
+    sensor2 = sensor_id_time_list[1]
+    sensorf = sensor_id_time_list[2]
     EOP_data0 = eop.get_eop_data(eop_alldata, tk_list[0])
     EOP_data2 = eop.get_eop_data(eop_alldata, tk_list[1])
     EOP_dataf = eop.get_eop_data(eop_alldata, tk_list[2])
@@ -768,12 +768,12 @@ def single_rev_heo():
         Xi_2 = astro.element_conversion(Xi_0, 1, 1, dt=tof_2)
         Xi_f = astro.element_conversion(Xi_0, 1, 1, dt=tof_f)
         
-        meas0 = mfunc.compute_measurement(Xi_0, {}, sensor0, tk_list[0], EOP_data0,
+        meas0 = mfunc.compute_measurement(Xi_0, {}, sensor_params, sensor0, tk_list[0], EOP_data0,
                                           XYs_df, meas_types=['ra', 'dec'])
         
-        meas2 = mfunc.compute_measurement(Xi_2, {}, sensor2, tk_list[1], EOP_data2,
+        meas2 = mfunc.compute_measurement(Xi_2, {}, sensor_params, sensor2, tk_list[1], EOP_data2,
                                           XYs_df, meas_types=['ra', 'dec'])
-        measf = mfunc.compute_measurement(Xi_f, {}, sensorf, tk_list[2], EOP_dataf,
+        measf = mfunc.compute_measurement(Xi_f, {}, sensor_params, sensorf, tk_list[2], EOP_dataf,
                                           XYs_df, meas_types=['ra', 'dec'])
         
         resids0 = (meas0 - Yk_list[0])*(1./arcsec2rad)
@@ -854,7 +854,7 @@ def single_rev_gto():
         for sensor_id in sensor_id_list:
             
             sensor = sensor_params[sensor_id]
-            all_meas = mfunc.compute_measurement(Xk, {}, sensor, UTC, EOP_data,
+            all_meas = mfunc.compute_measurement(Xk, {}, sensor_params, sensor_id, UTC, EOP_data,
                                                  XYs_df, meas_types=['ra', 'dec', 'rg', 'az', 'el'])
             
             el = float(all_meas[4])
@@ -940,9 +940,9 @@ def single_rev_gto():
     # Check final output states and angles
     tof_2 = (tk_list[1] - tk_list[0]).total_seconds()
     tof_f = (tk_list[2] - tk_list[0]).total_seconds()
-    sensor0 = sensor_params[sensor_id_time_list[0]]
-    sensor2 = sensor_params[sensor_id_time_list[1]]
-    sensorf = sensor_params[sensor_id_time_list[2]]
+    sensor0 = sensor_id_time_list[0]
+    sensor2 = sensor_id_time_list[1]
+    sensorf = sensor_id_time_list[2]
     EOP_data0 = eop.get_eop_data(eop_alldata, tk_list[0])
     EOP_data2 = eop.get_eop_data(eop_alldata, tk_list[1])
     EOP_dataf = eop.get_eop_data(eop_alldata, tk_list[2])
@@ -952,12 +952,12 @@ def single_rev_gto():
         Xi_2 = astro.element_conversion(Xi_0, 1, 1, dt=tof_2)
         Xi_f = astro.element_conversion(Xi_0, 1, 1, dt=tof_f)
         
-        meas0 = mfunc.compute_measurement(Xi_0, {}, sensor0, tk_list[0], EOP_data0,
+        meas0 = mfunc.compute_measurement(Xi_0, {}, sensor_params, sensor0, tk_list[0], EOP_data0,
                                           XYs_df, meas_types=['ra', 'dec'])
         
-        meas2 = mfunc.compute_measurement(Xi_2, {}, sensor2, tk_list[1], EOP_data2,
+        meas2 = mfunc.compute_measurement(Xi_2, {}, sensor_params, sensor2, tk_list[1], EOP_data2,
                                           XYs_df, meas_types=['ra', 'dec'])
-        measf = mfunc.compute_measurement(Xi_f, {}, sensorf, tk_list[2], EOP_dataf,
+        measf = mfunc.compute_measurement(Xi_f, {}, sensor_params, sensorf, tk_list[2], EOP_dataf,
                                           XYs_df, meas_types=['ra', 'dec'])
         
         resids0 = (meas0 - Yk_list[0])*(1./arcsec2rad)
@@ -1038,7 +1038,7 @@ def single_rev_hyperbola():
         for sensor_id in sensor_id_list:
             
             sensor = sensor_params[sensor_id]
-            all_meas = mfunc.compute_measurement(Xk, {}, sensor, UTC, EOP_data,
+            all_meas = mfunc.compute_measurement(Xk, {}, sensor_params, sensor_id, UTC, EOP_data,
                                                  XYs_df, meas_types=['ra', 'dec', 'rg', 'az', 'el'])
             
             el = float(all_meas[4])
@@ -1124,9 +1124,9 @@ def single_rev_hyperbola():
     # Check final output states and angles
     tof_2 = (tk_list[1] - tk_list[0]).total_seconds()
     tof_f = (tk_list[2] - tk_list[0]).total_seconds()
-    sensor0 = sensor_params[sensor_id_time_list[0]]
-    sensor2 = sensor_params[sensor_id_time_list[1]]
-    sensorf = sensor_params[sensor_id_time_list[2]]
+    sensor0 = sensor_id_time_list[0]
+    sensor2 = sensor_id_time_list[1]
+    sensorf = sensor_id_time_list[2]
     EOP_data0 = eop.get_eop_data(eop_alldata, tk_list[0])
     EOP_data2 = eop.get_eop_data(eop_alldata, tk_list[1])
     EOP_dataf = eop.get_eop_data(eop_alldata, tk_list[2])
@@ -1136,12 +1136,12 @@ def single_rev_hyperbola():
         Xi_2 = astro.element_conversion(Xi_0, 1, 1, dt=tof_2)
         Xi_f = astro.element_conversion(Xi_0, 1, 1, dt=tof_f)
         
-        meas0 = mfunc.compute_measurement(Xi_0, {}, sensor0, tk_list[0], EOP_data0,
+        meas0 = mfunc.compute_measurement(Xi_0, {}, sensor_params, sensor0, tk_list[0], EOP_data0,
                                           XYs_df, meas_types=['ra', 'dec'])
         
-        meas2 = mfunc.compute_measurement(Xi_2, {}, sensor2, tk_list[1], EOP_data2,
+        meas2 = mfunc.compute_measurement(Xi_2, {}, sensor_params, sensor2, tk_list[1], EOP_data2,
                                           XYs_df, meas_types=['ra', 'dec'])
-        measf = mfunc.compute_measurement(Xi_f, {}, sensorf, tk_list[2], EOP_dataf,
+        measf = mfunc.compute_measurement(Xi_f, {}, sensor_params, sensorf, tk_list[2], EOP_dataf,
                                           XYs_df, meas_types=['ra', 'dec'])
         
         resids0 = (meas0 - Yk_list[0])*(1./arcsec2rad)
@@ -1218,7 +1218,7 @@ def multi_rev_geo():
         for sensor_id in sensor_id_list:
             
             sensor = sensor_params[sensor_id]
-            all_meas = mfunc.compute_measurement(Xk, {}, sensor, UTC, EOP_data,
+            all_meas = mfunc.compute_measurement(Xk, {}, sensor_params, sensor_id, UTC, EOP_data,
                                                  XYs_df, meas_types=['ra', 'dec', 'rg', 'az', 'el'])
             
             el = float(all_meas[4])
@@ -1304,9 +1304,9 @@ def multi_rev_geo():
     # Check final output states and angles
     tof_2 = (tk_list[1] - tk_list[0]).total_seconds()
     tof_f = (tk_list[2] - tk_list[0]).total_seconds()
-    sensor0 = sensor_params[sensor_id_time_list[0]]
-    sensor2 = sensor_params[sensor_id_time_list[1]]
-    sensorf = sensor_params[sensor_id_time_list[2]]
+    sensor0 = sensor_id_time_list[0]
+    sensor2 = sensor_id_time_list[1]
+    sensorf = sensor_id_time_list[2]
     EOP_data0 = eop.get_eop_data(eop_alldata, tk_list[0])
     EOP_data2 = eop.get_eop_data(eop_alldata, tk_list[1])
     EOP_dataf = eop.get_eop_data(eop_alldata, tk_list[2])
@@ -1316,12 +1316,12 @@ def multi_rev_geo():
         Xi_2 = astro.element_conversion(Xi_0, 1, 1, dt=tof_2)
         Xi_f = astro.element_conversion(Xi_0, 1, 1, dt=tof_f)
         
-        meas0 = mfunc.compute_measurement(Xi_0, {}, sensor0, tk_list[0], EOP_data0,
+        meas0 = mfunc.compute_measurement(Xi_0, {}, sensor_params, sensor0, tk_list[0], EOP_data0,
                                           XYs_df, meas_types=['ra', 'dec'])
         
-        meas2 = mfunc.compute_measurement(Xi_2, {}, sensor2, tk_list[1], EOP_data2,
+        meas2 = mfunc.compute_measurement(Xi_2, {}, sensor_params, sensor2, tk_list[1], EOP_data2,
                                           XYs_df, meas_types=['ra', 'dec'])
-        measf = mfunc.compute_measurement(Xi_f, {}, sensorf, tk_list[2], EOP_dataf,
+        measf = mfunc.compute_measurement(Xi_f, {}, sensor_params, sensorf, tk_list[2], EOP_dataf,
                                           XYs_df, meas_types=['ra', 'dec'])
         
         resids0 = (meas0 - Yk_list[0])*(1./arcsec2rad)
