@@ -3,11 +3,23 @@ import math
 import matplotlib.pyplot as plt
 import sys
 from datetime import datetime, timedelta
+import time
+import inspect
+import os
+from numba import types
+from numba.typed import Dict
 
-sys.path.append('../')
+filename = inspect.getframeinfo(inspect.currentframe()).filename
+current_dir = os.path.dirname(os.path.abspath(filename))
 
-import dynamics.dynamics_functions as dyn
-import utilities.astrodynamics as astro
+ind = current_dir.find('metis')
+metis_dir = current_dir[0:ind+5]
+sys.path.append(metis_dir)
+
+from dynamics import dynamics_functions as dyn
+from dynamics import numerical_integration as numint
+from dynamics import fast_integration as fastint
+from utilities import astrodynamics as astro
 from utilities.constants import GME, J2E, wE, Re
 
 
@@ -438,6 +450,256 @@ def test_orbit_timestep():
     return
 
 
+def test_dopri_computation():
+    
+    # Define state parameters
+    state_params = {}
+    state_params['GM'] = GME
+    
+    # Integration function and additional settings
+    int_params = {}    
+    int_params['integrator'] = 'solve_ivp'
+    int_params['ode_integrator'] = 'DOP853'
+    int_params['intfcn'] = dyn.ode_twobody
+    
+    int_params['rtol'] = 1e-12
+    int_params['atol'] = 1e-12
+    int_params['step'] = 10.
+    int_params['time_format'] = 'datetime'
+    
+    # Initial object state vector
+    # Sun-Synch Orbit
+#    Xo = np.reshape([757.700301, 5222.606566, 4851.49977,
+#                     2.213250611, 4.678372741, -5.371314404], (6,1))
+    
+    # Molniya
+    elem0 = [26600., 0.74, 63.4, 90., 270., 10.]
+    Xo = astro.kep2cart(elem0)
+    
+    UTC0 = datetime(1999, 10, 4, 1, 45, 0)
+    UTC1 = UTC0 + timedelta(days=2.)
+    tin = [UTC0, UTC1]
+    
+    # Run integrator
+    start = time.time()
+    tout, Xout = dyn.general_dynamics(Xo, tin, state_params, int_params)
+    solve_ivp_time = time.time() - start
+
+
+    print('\nSolve IVP Results')
+    print(tout)
+    print(Xout)
+    
+    Xnum = Xout[-1,:].reshape(6,1)
+    
+    # Analytic solution
+    dt_sec = (tin[-1] - tin[0]).total_seconds()
+    Xtrue = astro.element_conversion(Xo, 1, 1, GME, dt_sec)
+    
+    print(Xnum)
+    print(Xtrue)
+    
+    err = np.linalg.norm(Xnum - Xtrue)
+    print('err', err)
+    
+    
+    
+    # Setup and run DOPRI87
+    int_params['integrator'] = 'dopri87'
+    start = time.time()
+    tout, Xout = dyn.general_dynamics(Xo, tin, state_params, int_params)
+    dopri_time = time.time() - start
+    
+    
+    print('\nDOPRI87 Results')
+    print(tout)
+    print(Xout)
+    
+    Xnum = Xout[-1,:].reshape(6,1)
+    
+    # Analytic solution
+    dt_sec = (tin[-1] - tin[0]).total_seconds()
+    Xtrue = astro.element_conversion(Xo, 1, 1, GME, dt_sec)
+    
+    print(Xnum)
+    print(Xtrue)
+    
+    err = np.linalg.norm(Xnum - Xtrue)
+    print('err', err)
+    
+    
+    # Setup and run RKF78
+    int_params['integrator'] = 'rkf78'
+    int_params['local_extrap'] = True
+    start = time.time()
+    tout, Xout = dyn.general_dynamics(Xo, tin, state_params, int_params)
+    rkf_time = time.time() - start
+    
+    
+    print('\nRKF78 Results')
+    print(tout)
+    print(Xout)
+    
+    Xnum = Xout[-1,:].reshape(6,1)
+    
+    # Analytic solution
+    dt_sec = (tin[-1] - tin[0]).total_seconds()
+    Xtrue = astro.element_conversion(Xo, 1, 1, GME, dt_sec)
+    
+    print(Xnum)
+    print(Xtrue)
+    
+    err = np.linalg.norm(Xnum - Xtrue)
+    print('err', err)
+    
+    
+    
+    print('')
+    print('solve_ivp_time', solve_ivp_time)
+    print('dopri_time', dopri_time)
+    print('rkf78_time', rkf_time)
+    
+    
+    
+    return
+
+
+def test_jit_twobody():
+    
+    # Define state parameters
+    state_params = {}
+    state_params['GM'] = GME
+
+    
+    # Integration function and additional settings
+    int_params = {}
+    int_params['integrator'] = 'rk4'
+    int_params['intfcn'] = dyn.ode_twobody
+    int_params['step'] = 10.
+    int_params['time_format'] = 'datetime'
+    
+    # Initial object state vector
+    # Sun-Synch Orbit
+#    Xo = np.reshape([757.700301, 5222.606566, 4851.49977,
+#                     2.213250611, 4.678372741, -5.371314404], (6,1))
+    
+    # Molniya
+    elem0 = [26600., 0.74, 63.4, 90., 270., 10.]
+    Xo = astro.kep2cart(elem0)
+    
+    # Time vector
+    UTC1 = datetime(2022, 10, 20, 0, 0, 0)
+    UTC2 = datetime(2022, 10, 22, 0, 0, 0)
+    tvec = [UTC1, UTC2]
+    
+
+    # Run integrator
+    start = time.time()
+    tout, Xout = dyn.general_dynamics(Xo, tvec, state_params, int_params)
+    rk4_time = time.time() - start
+    
+    print(tout[-1])
+    print(Xout[-1])
+
+        
+    # Setup for JIT execution
+    int_params['integrator'] = 'rk4_jit'
+    int_params['intfcn'] = fastint.jit_twobody
+    
+    start = time.time()
+    tout, Xout = dyn.general_dynamics(Xo, tvec, state_params, int_params)
+    rk4_jit_time = time.time() - start
+    
+    print('rk4 time1', rk4_jit_time)
+    
+    start = time.time()
+    tout, Xout = dyn.general_dynamics(Xo, tvec, state_params, int_params)
+    rk4_jit_time = time.time() - start
+    
+    print(tout[-1])
+    print(Xout[-1])
+
+    
+    # Compute and plot errors
+    Xerr = np.zeros(Xout.shape)
+    for ii in range(len(tout)):
+        X_true = astro.element_conversion(Xo, 1, 1, dt=tout[ii])
+        Xerr[ii,:] = (Xout[ii,:].reshape(6,1) - X_true).flatten()
+        
+    plt.figure()
+    plt.subplot(3,1,1)
+    plt.plot(tout/3600., Xerr[:,0], 'k.')
+    plt.ylabel('X Err [km]')
+    plt.title('RK4 Errors')
+    plt.subplot(3,1,2)
+    plt.plot(tout/3600., Xerr[:,1], 'k.')
+    plt.ylabel('Y Err [km]')
+    plt.subplot(3,1,3)
+    plt.plot(tout/3600., Xerr[:,2], 'k.')
+    plt.ylabel('Z Err [km]')
+    plt.xlabel('Time [hours]')
+    
+    
+    # DOPRI87 Testing
+    int_params['integrator'] = 'dopri87'
+    int_params['intfcn'] = dyn.ode_twobody
+    int_params['rtol'] = 1e-12
+    int_params['atol'] = 1e-12
+    
+    start = time.time()
+    tout, Xout = dyn.general_dynamics(Xo, tvec, state_params, int_params)
+    dp87_time = time.time() - start
+    
+    print(tout[-1])
+    print(Xout[-1])
+    
+    # JIT execution
+    int_params['integrator'] = 'dopri87_jit'
+    int_params['intfcn'] = fastint.jit_twobody
+
+    start = time.time()
+    tout, Xout = dyn.general_dynamics(Xo, tvec, state_params, int_params)
+    dp87_jit_time = time.time() - start
+    
+    print('dp87 time1', dp87_jit_time)
+    
+    start = time.time()
+    tout, Xout = dyn.general_dynamics(Xo, tvec, state_params, int_params)
+    dp87_jit_time = time.time() - start
+    
+    print(tout[-1])
+    print(Xout[-1])
+    
+    # Compute and plot errors
+    Xerr = np.zeros(Xout.shape)
+    for ii in range(len(tout)):
+        X_true = astro.element_conversion(Xo, 1, 1, dt=tout[ii])
+        Xerr[ii,:] = (Xout[ii,:].reshape(6,1) - X_true).flatten()
+        
+    plt.figure()
+    plt.subplot(3,1,1)
+    plt.plot(tout/3600., Xerr[:,0], 'k.')
+    plt.ylabel('X Err [km]')
+    plt.title('DOPRI87 Errors')
+    plt.subplot(3,1,2)
+    plt.plot(tout/3600., Xerr[:,1], 'k.')
+    plt.ylabel('Y Err [km]')
+    plt.subplot(3,1,3)
+    plt.plot(tout/3600., Xerr[:,2], 'k.')
+    plt.ylabel('Z Err [km]')
+    plt.xlabel('Time [hours]')
+    
+    
+    print('rk4 time', rk4_time)
+    print('rk4 jit time', rk4_jit_time)
+    print('dp87 time', dp87_time)
+    print('dp87 jit time', dp87_jit_time)
+    
+    plt.show()
+    
+    return
+
+
 if __name__ == '__main__':
     
     plt.close('all')
@@ -446,7 +708,81 @@ if __name__ == '__main__':
     
 #    test_orbit_timestep()
     
-    test_hyperbolic_prop()
+#    test_hyperbolic_prop()
+    
+#    test_dopri_computation()
+    
+#    test_jit_twobody()
+    
+
+#    test, test2, test3, test4, test5 = fastint.test_jit()
+#    
+#    print(test)
+#    print(test2)
+#    print(test3)
+#    print(test4)
+#    print(test5)
+    
+    
+#    # Set up Runge-Kutta matrix
+#    A = np.zeros((13,13))
+#    A[1,0] = 1./18.
+#    A[2,0:2] = [1./48., 1./16.]
+#    A[3,0:3] = [1./32., 0., 3./32.]
+#    A[4,0:4] = [5./16., 0., -75./64., 75./64.]
+#    A[5,0:5] = [3./80., 0., 0., 3./16., 3./20.]
+#    A[6,0:6] = [29443841./614563906., 0., 0., 77736538./692538347., 
+#               -28693883./1125000000., 23124283./1800000000.]
+#    A[7,0:7] = [16016141./946692911., 0., 0., 61564180./158732637., 
+#                22789713./633445777., 545815736./2771057229., 
+#               -180193667./1043307555.]
+#    A[8,0:8] = [39632708./573591083., 0., 0., -433636366./683701615., 
+#               -421739975./2616292301., 100302831./723423059., 
+#                790204164./839813087., 800635310./3783071287.]
+#    A[9,0:9] = [246121993./1340847787., 0., 0., -37695042795./15268766246., 
+#               -309121744./1061227803., -12992083./490766935., 
+#                6005943493./2108947869., 393006217./1396673457., 
+#                123872331./1001029789.]
+#    A[10,0:10] = [-1028468189./846180014., 0., 0., 8478235783./508512852., 
+#                   1311729495./1432422823., -10304129995./1701304382., 
+#                  -48777925059./3047939560., 15336726248./1032824649., 
+#                  -45442868181./3398467696., 3065993473./597172653.]
+#    A[11,0:11] = [185892177./718116043., 0., 0., -3185094517./667107341., 
+#                 -477755414./1098053517., -703635378./230739211., 
+#                  5731566787./1027545527., 5232866602./850066563., 
+#                 -4093664535./808688257., 3962137247./1805957418., 
+#                  65686358./487910083.]
+#    A[12,0:12] = [403863854./491063109., 0., 0., -5068492393./434740067., 
+#                 -411421997./543043805., 652783627./914296604., 
+#                  11173962825./925320556., -13158990841./6184727034., 
+#                  3936647629./1978049680., -160528059./685178525., 
+#                  248638103./1413531060., 0.]
+#    
+#    
+#    k8 = np.zeros((4,13))
+#    
+#    
+#    k8[:,0] = 2.
+#    k8[:,1] = (k8[:,0]*A[1,0]).flatten()
+#    k8[:,2] = np.dot(k8[:,0:2],A[2,0:2].T).flatten()
+#    k8[:,3] = np.dot(k8[:,0:3],A[3,0:3].T).flatten()
+#    
+#    print(k8)
+#    
+#    ktest = np.zeros((4,13))
+#    
+#    
+#    ktest[:,0] = 2.
+#    ktest[:,1] = (ktest[:,0]*A[1,0]).flatten()
+#    ktest[:,2] = np.dot(ktest.T[0:2,:],A[2,0:2].T).flatten()
+#    ktest[:,3] = np.dot(ktest.T[0:3,:],A[3,0:3].T).flatten()
+#    
+#    print(ktest-k8)
+    
+    
+    
+    
+
     
     
     
