@@ -45,8 +45,8 @@ def lambert_iod(tk_list, Yk_list, sensor_params):
 
 
 @jit(nopython=True)
-def izzo_lambert(r1_vect, r2_vect, tof, M_star=np.nan, lr_star='none', 
-                 GM=GME, R=Re, results_flag='all', periapsis_check=True,
+def izzo_lambert(r1_vect, r2_vect, tof, M_star, lr_star, GM=GME, R=Re, 
+                 results_flag='prograde', periapsis_check=True,
                  maxiters=35, rtol=1e-8):
     '''
     This function implements a solution to the twobody orbit boundary value
@@ -166,27 +166,11 @@ def izzo_lambert(r1_vect, r2_vect, tof, M_star=np.nan, lr_star='none',
     
 #    print('T', T)
     
-    # Compute all possible x,y values that fit T
-    if np.isnan(M_star):
-        x_list1, y_list1, M_list1, lr_list1 = find_xy(lam, T, maxiters, rtol)
-    else:
-        x_list1, y_list1, M_list1, lr_list1 = \
-            find_single_xy(lam, T, M_star, lr_star, maxiters, rtol)
-        
-#    print('x_list1', x_list1)
-#    print('y_list1', y_list1)
-#    print('M_list1', M_list1)
+    # Compute x,y values that fit T
+    xi, yi, fail_flag = find_single_xy(lam, T, M_star, lr_star, maxiters, rtol)
     
-    # Loop over x,y values and compute output velocities
-    v1_list = []
-    v2_list = []
-    M_list = []
-    lr_list = []
-    for ii in range(len(x_list1)):
-        xi = x_list1[ii]
-        yi = y_list1[ii]
-        Mi = M_list1[ii]
-        lri = lr_list1[ii]
+    # If solution found, compute output velocities
+    if not fail_flag:
         
         Vr1 =  gamma*((lam*yi - xi) - rho*(lam*yi + xi))/r1
         Vr2 = -gamma*((lam*yi - xi) + rho*(lam*yi + xi))/r2
@@ -202,64 +186,10 @@ def izzo_lambert(r1_vect, r2_vect, tof, M_star=np.nan, lr_star='none',
 #        print('rp', rp)
 #        print('R', R)
         
-        if (periapsis_check or Mi > 0) and rp < R:
-            continue
-        
-        v1_list.append(v1_vect)
-        v2_list.append(v2_vect)
-        M_list.append(Mi)
-        lr_list.append(lri)
-    
-    # Generate list to identify output orbit type
-    if results_flag == 'retrograde':
-        type_list = ['retrograde']*len(M_list)
-    else:
-        type_list = ['prograde']*len(M_list)
-        
-        
-    # If it is desired to produce all possible cases, repeat execution for
-    # retrograde cases (previous results cover prograde cases)
-    if results_flag == 'all':
-        lam = -lam
-        ihat_t1 = -ihat_t1
-        ihat_t2 = -ihat_t2
-        
-        # Compute all possible x,y values that fit T
-        if np.isnan(M_star):
-            x_list2, y_list2, M_list2, lr_list2 = find_xy(lam, T, maxiters, rtol)
-        else:
-            x_list2, y_list2, M_list2, lr_list2 = \
-                find_single_xy(lam, T, M_star, lr_star, maxiters, rtol)
-        
-        # Loop over x,y values and compute output velocities
-        for ii in range(len(x_list2)):
-            xi = x_list2[ii]
-            yi = y_list2[ii]
-            Mi = M_list2[ii]
-            lri = lr_list2[ii]
-            
-            Vr1 =  gamma*((lam*yi - xi) - rho*(lam*yi + xi))/r1
-            Vr2 = -gamma*((lam*yi - xi) + rho*(lam*yi + xi))/r2
-            Vt1 =  gamma*sigma*(yi + lam*xi)/r1
-            Vt2 =  gamma*sigma*(yi + lam*xi)/r2
-            
-            v1_vect = Vr1*ihat_r1 + Vt1*ihat_t1
-            v2_vect = Vr2*ihat_r2 + Vt2*ihat_t2
-            
-            # Check for valid radius of periapsis
-            rp = compute_rp(r1_vect, v1_vect, GM)
-            if (periapsis_check or Mi > 0) and rp < R:
-                continue
-            
-            v1_list.append(v1_vect)
-            v2_list.append(v2_vect)
-            M_list.append(Mi)
-            lr_list.append(lri)
-            type_list.append('retrograde')
-            
-            
+        if (periapsis_check or M_star > 0) and rp < R:
+            fail_flag = True
 
-    return v1_list, v2_list, M_list, type_list, lr_list
+    return v1_vect, v2_vect, fail_flag
 
 
 
@@ -396,6 +326,7 @@ def find_xy(lam, T, maxiters=35, rtol=1e-8):
     return x_list, y_list, M_list, lr_list
 
 
+@jit(nopython=True)
 def find_single_xy(lam, T, M_star, lr_star, maxiters=35, rtol=1e-8):
     '''
     This function computes all possible x,y values that fit the input orbit
@@ -430,26 +361,23 @@ def find_single_xy(lam, T, M_star, lr_star, maxiters=35, rtol=1e-8):
     '''
     
     # Check inputs
-    assert abs(lam) <= 1.
+    assert np.abs(lam) <= 1.
     assert T > 0.  # note error in Izzo paper
     
     # Initialize output
-    x_list = []
-    y_list = []
-    M_list = []
-    lr_list = []
+    fail_flag = True
     
     # Compute maximum number of complete revolutions that would fit in 
     # the simplest sense T_0M = T_00 + M*pi
-    M_max = int(np.floor(T / math.pi))
+    M_max = int(np.floor(T / np.pi))
     if M_star > M_max:
-        return x_list, y_list, M_list, lr_list
+        return 0., 0., fail_flag
     
     # Evaluate non-dimensional time of flight T
     # T(x=0) denoted T_0M
     # T_00 is T_0 for single revolution (M=0) case  
     # T_0M = T_00 + M*pi
-    T_00 = math.acos(lam) + lam*np.sqrt(1. - lam**2.)
+    T_00 = np.acos(lam) + lam*np.sqrt(1. - lam**2.)
             
     # Compute T(x=1) parabolic case (Izzo Eq 21)
     T_1 = (2./3.) * (1. - lam**3.)
@@ -470,13 +398,10 @@ def find_single_xy(lam, T, M_star, lr_star, maxiters=35, rtol=1e-8):
             x_0 = np.exp(np.log(2.) * np.log(T / T_00) / np.log(T_1 / T_00)) - 1.        
             
         # Run Householder iterations for x_0 to get x,y for single rev case
-        x, exit_flag = householder(x_0, T, lam, M_star, maxiters, rtol)
+        xi, exit_flag = householder(x_0, T, lam, M_star, maxiters, rtol)
         if exit_flag == 1:
-            y = np.sqrt(1. - lam**2.*(1. - x**2.))
-            x_list.append(x)
-            y_list.append(y)
-            M_list.append(M_star)
-            lr_list.append('none')
+            yi = np.sqrt(1. - lam**2.*(1. - xi**2.))
+            fail_flag = False
             
     # Multiple revolution case
     else:
@@ -484,18 +409,15 @@ def find_single_xy(lam, T, M_star, lr_star, maxiters=35, rtol=1e-8):
         if lr_star == 'left':
 
             # Form initial x0_l from Izzo Eq 31
-            x0_l = (((M_star*math.pi + math.pi)/(8.*T))**(2./3.) - 1.) * \
-                1./(((M_star*math.pi + math.pi)/(8.*T))**(2./3.) + 1.)
+            x0_l = (((M_star*np.pi + np.pi)/(8.*T))**(2./3.) - 1.) * \
+                1./(((M_star*np.pi + np.pi)/(8.*T))**(2./3.) + 1.)
         
             # Run Householder iterations for x0_l and x0_r for multirev cases
-            xl, exit_flag = householder(x0_l, T, lam, M_star, maxiters, rtol)
+            xi, exit_flag = householder(x0_l, T, lam, M_star, maxiters, rtol)
             
             if exit_flag == 1:
-                yl = np.sqrt(1. - lam**2.*(1. - xl**2.))
-                x_list.append(xl)
-                y_list.append(yl)
-                M_list.append(M_star)
-                lr_list.append('left')
+                yi = np.sqrt(1. - lam**2.*(1. - xi**2.))
+                fail_flag = False
             
         elif lr_star == 'right':
             
@@ -503,18 +425,16 @@ def find_single_xy(lam, T, M_star, lr_star, maxiters=35, rtol=1e-8):
             x0_r = (((8.*T)/(M_star*math.pi))**(2./3.) - 1.) * \
                 1./(((8.*T)/(M_star*math.pi))**(2./3.) + 1.)
             
-            xr, exit_flag = householder(x0_r, T, lam, M_star, maxiters, rtol)
+            xi, exit_flag = householder(x0_r, T, lam, M_star, maxiters, rtol)
             
             if exit_flag == 1:
-                yr = np.sqrt(1. - lam**2.*(1. - xr**2.))
-                x_list.append(xr)
-                y_list.append(yr)
-                M_list.append(M_star)
-                lr_list.append('right')
+                yi = np.sqrt(1. - lam**2.*(1. - xi**2.))
+                fail_flag = False
 
-    return x_list, y_list, M_list, lr_list
+    return xi, yi, fail_flag
 
 
+@jit(nopython=True)
 def compute_T_min(lam, M, maxiters=35, rtol=1e-8):
     '''
     This function computes the minimum non-dimensional time of flight for a
@@ -566,6 +486,7 @@ def compute_T_min(lam, M, maxiters=35, rtol=1e-8):
     return x_T_min, T_min, exit_flag
 
 
+@jit(nopython=True)
 def halley(x0, T0, lam, M, maxiters=35, tol=1e-8):
     '''
     This function uses Halley iterations to solve the root finding problem to
@@ -629,7 +550,7 @@ def halley(x0, T0, lam, M, maxiters=35, tol=1e-8):
 #        print('ddT', ddT)
 #        print('dddT', dddT)
         
-        diff = abs(x - x0)
+        diff = np.abs(x - x0)
         x0 = float(x)
         iters += 1
         
@@ -640,6 +561,7 @@ def halley(x0, T0, lam, M, maxiters=35, tol=1e-8):
     return x, exit_flag
 
 
+@jit(nopython=True)
 def householder(x0, T_star, lam, M, maxiters=35, tol=1e-8):
     '''
     This function uses Halley iterations to solve the root-finding problem
@@ -694,7 +616,7 @@ def householder(x0, T_star, lam, M, maxiters=35, tol=1e-8):
 #        print('ddT', ddT)
 #        print('dddT', dddT)
     
-        diff = abs(x - x0)
+        diff = np.abs(x - x0)
         x0 = float(x)
         iters += 1
         
@@ -705,6 +627,7 @@ def householder(x0, T_star, lam, M, maxiters=35, tol=1e-8):
     return x, exit_flag
 
 
+@jit(nopython=True)
 def compute_T(x, lam, M):
     '''
     This function computes the non-dimensional time of flight T corresponding
@@ -740,12 +663,13 @@ def compute_T(x, lam, M):
     # Izzo Eq 18
     else:
         psi = compute_psi(x, y, lam)
-        T = (1./(1. - x**2.)) * ((psi + M*math.pi)/
-             np.sqrt(abs(1. - x**2.)) - x + lam*y)
+        T = (1./(1. - x**2.)) * ((psi + M*np.pi)/
+             np.sqrt(np.abs(1. - x**2.)) - x + lam*y)
     
     return T
 
 
+@jit(nopython=True)
 def compute_T_der(x, T, lam):
     '''
     This function computes the first three derivatives of T(x) wrt x used for
@@ -786,6 +710,7 @@ def compute_T_der(x, T, lam):
     return dT, ddT, dddT
 
 
+@jit(nopython=True)
 def compute_psi(x, y, lam):
     '''
     This function computes psi using Izzo Eq 17.
@@ -810,14 +735,14 @@ def compute_psi(x, y, lam):
     # Elliptic case
     if -1. <= x < 1.:
         cos_psi = x*y + lam*(1. - x**2.)
-        psi = math.acos(cos_psi)
+        psi = np.acos(cos_psi)
 #        sin_psi = (y - x*lam)*np.sqrt(1. - x**2.)
 #        psi = math.atan2(sin_psi, cos_psi)
         
     # Hyperbolic case
     elif x > 1.:
         sinh_psi = (y - x*lam)*np.sqrt(x**2. - 1.)
-        psi = math.asinh(sinh_psi)
+        psi = np.asinh(sinh_psi)
     
     # Parabolic
     else:
@@ -826,6 +751,7 @@ def compute_psi(x, y, lam):
     return psi
 
 
+@jit(nopython=True)
 def compute_hypergeom_2F1(a, b, c, d):
     '''
     Hypergeometric series function 2F1 adapted from poliastro code.
