@@ -767,7 +767,8 @@ def compile_transit_data(transit_dict, site, obj_id, UTC_list, az_list,
     return transit_dict
 
 
-def check_visibility(X, state_params, sensor, UTC, EOP_data, XYs_df):
+def check_visibility(X, state_params, sensor_params, sensor_id, UTC, EOP_data,
+                     XYs_df):
     '''
     This function returns the visibility status (true/false) of an object 
     according to sensor constraints in elevation, range, brightness, etc.
@@ -780,12 +781,14 @@ def check_visibility(X, state_params, sensor, UTC, EOP_data, XYs_df):
     vis_flag = True
     
     # Retrieve sensor location and rotate to GCRF
+    sensor = sensor_params[sensor_id]
     sensor_itrf = sensor['site_ecef']
     sensor_gcrf, dum = itrf2gcrf(sensor_itrf, np.zeros((3,1)), UTC, EOP_data, XYs_df)
     
     # Compute az, el, range [rad, rad, km]
     meas_types = ['az', 'el', 'rg']
-    meas = compute_measurement(X, state_params, sensor, UTC, EOP_data, XYs_df, meas_types)
+    meas = compute_measurement(X, state_params, sensor_params, sensor_id, UTC,
+                               EOP_data, XYs_df, meas_types)
     
     # Check az, el, range limits
     az_rad = float(meas[0])
@@ -840,7 +843,8 @@ def check_visibility(X, state_params, sensor, UTC, EOP_data, XYs_df):
                 sun_elmask = sensor['sun_elmask']
                     
                 # Compute sun elevation angle
-                sun_el = compute_measurement(sun_eci_app, state_params, sensor, UTC, EOP_data, XYs_df, ['el'])[0]
+                sun_el = compute_measurement(sun_eci_app, state_params, sensor_params,
+                                             sensor_id, UTC, EOP_data, XYs_df, ['el'])[0]
                 
                 if sun_el > sun_elmask:
                     vis_flag = False

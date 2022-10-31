@@ -1537,6 +1537,7 @@ def aegis_ukf(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):
     
     # Break out inputs
     state_params = params_dict['state_params']
+    filter_params = params_dict['filter_params']
     
     # State information
     state_tk = sorted(state_dict.keys())[-1]
@@ -1556,7 +1557,7 @@ def aegis_ukf(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):
     kappa = kurt - float(nstates)
 
     # Compute sigma point weights
-    alpha = state_params['alpha']
+    alpha = filter_params['alpha']
     lam = alpha**2.*(nstates + kappa) - nstates
     gam = np.sqrt(nstates + lam)
     Wm = 1./(2.*(nstates + lam)) * np.ones(2*nstates,)
@@ -1564,9 +1565,9 @@ def aegis_ukf(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):
     Wm = np.insert(Wm, 0, lam/(nstates + lam))
     Wc = np.insert(Wc, 0, lam/(nstates + lam) + (1 - alpha**2 + beta))
     diagWc = np.diag(Wc)
-    state_params['gam'] = gam
-    state_params['Wm'] = Wm
-    state_params['diagWc'] = diagWc
+    filter_params['gam'] = gam
+    filter_params['Wm'] = Wm
+    filter_params['diagWc'] = diagWc
 
     # Initialize output
     filter_output = {}
@@ -1877,7 +1878,7 @@ def aegis_corrector(GMM_bar, tk, Yk, sensor_id, meas_fcn, params_dict):
     GMM_in['weights'] = weights
     GMM_in['means'] = means
     GMM_in['covars'] = covars
-    GMM_dict = merge_GMM(GMM_in, state_params)
+    GMM_dict = merge_GMM(GMM_in, filter_params)
     
     # Compute post-fit residuals by merging all components
     params = {}
