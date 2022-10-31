@@ -25,8 +25,7 @@ from utilities.constants import arcsec2rad
 # Batch Estimation
 ###############################################################################
 
-def ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
-             sensor_params, int_params):
+def ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):
     '''
     This function implements the linearized batch estimator for the least
     squares cost function.
@@ -56,6 +55,11 @@ def ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         output state and covariance at all truth times
         
     '''
+    
+    # Break out params
+    state_params = params_dict['state_params']
+    int_params = params_dict['int_params']
+    sensor_params = params_dict['sensor_params']
 
     # State information
     state_tk = sorted(state_dict.keys())[-1]
@@ -304,8 +308,7 @@ def ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
     return filter_output, full_state_output
 
 
-def lp_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
-             sensor_params, int_params):
+def lp_batch(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):
     '''
     This function implements the linearized batch estimator for the minimum
     Lp-norm cost function, not including L1-norm (Least Absolute Deviations).
@@ -342,6 +345,12 @@ def lp_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         output state and covariance at all truth times
         
     '''
+    
+    # Break out params
+    state_params = params_dict['state_params']
+    int_params = params_dict['int_params']
+    sensor_params = params_dict['sensor_params']
+    filter_params = params_dict['filter_params']
 
     # State information
     state_tk = sorted(state_dict.keys())[-1]
@@ -349,7 +358,7 @@ def lp_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
     Po_bar = state_dict[state_tk]['P']
     
     # Cost function parameter
-    pnorm = state_params['pnorm']
+    pnorm = filter_params['pnorm']
     
     # Rescale noise for pnorm distribution
     scale = (math.gamma(3./pnorm)/math.gamma(1./pnorm)) * pnorm**(2./pnorm)
@@ -661,8 +670,7 @@ def lp_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
     return filter_output, full_state_output
 
 
-def unscented_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
-                    sensor_params, int_params):
+def unscented_batch(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):
     '''
     This function implements the unscented batch estimator for the least
     squares cost function.
@@ -692,6 +700,12 @@ def unscented_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         output state and covariance at all truth times
         
     '''
+    
+    # Break out params
+    state_params = params_dict['state_params']
+    int_params = params_dict['int_params']
+    sensor_params = params_dict['sensor_params']
+    filter_params = params_dict['filter_params']
 
     # State information
     state_tk = sorted(state_dict.keys())[-1]
@@ -708,7 +722,7 @@ def unscented_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
     kappa = kurt - float(n)
     
     # Compute sigma point weights
-    alpha = state_params['alpha']
+    alpha = filter_params['alpha']
     lam = alpha**2.*(n + kappa) - n
     gam = np.sqrt(n + lam)
     Wm = 1./(2.*(n + lam)) * np.ones(2*n,)
@@ -1016,8 +1030,7 @@ def unscented_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
 # Sequential Estimation
 ###############################################################################
 
-def ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
-           sensor_params, int_params):    
+def ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):    
     '''
     This function implements the linearized Extended Kalman Filter for the 
     least squares cost function.
@@ -1048,12 +1061,18 @@ def ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         
     '''
     
+    # Break out params
+    state_params = params_dict['state_params']
+    int_params = params_dict['int_params']
+    sensor_params = params_dict['sensor_params']
+    filter_params = params_dict['filter_params']
+    
     # State information
     state_tk = sorted(state_dict.keys())[-1]
     Xo_ref = state_dict[state_tk]['X']
     Po_bar = state_dict[state_tk]['P']
-    Q = state_params['Q']
-    gap_seconds = state_params['gap_seconds']
+    Q = filter_params['Q']
+    gap_seconds = filter_params['gap_seconds']
     time_format = int_params['time_format']
 
     # Setup
@@ -1283,8 +1302,7 @@ def ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
     return filter_output, full_state_output
 
 
-def ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
-           sensor_params, int_params):    
+def ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):    
     '''
     This function implements the Unscented Kalman Filter for the least
     squares cost function.
@@ -1315,12 +1333,18 @@ def ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         
     '''
     
+    # Break out params
+    state_params = params_dict['state_params']
+    int_params = params_dict['int_params']
+    sensor_params = params_dict['sensor_params']
+    filter_params = params_dict['filter_params']
+    
     # State information
     state_tk = sorted(state_dict.keys())[-1]
     Xk = state_dict[state_tk]['X']
     P = state_dict[state_tk]['P']
-    Q = state_params['Q']
-    gap_seconds = state_params['gap_seconds']
+    Q = filter_params['Q']
+    gap_seconds = filter_params['gap_seconds']
     time_format = int_params['time_format']
 
     n = len(Xk)
@@ -1333,7 +1357,7 @@ def ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
     kappa = kurt - float(n)
     
     # Compute sigma point weights
-    alpha = state_params['alpha']
+    alpha = filter_params['alpha']
     lam = alpha**2.*(n + kappa) - n
     gam = np.sqrt(n + lam)
     Wm = 1./(2.*(n + lam)) * np.ones(2*n,)
