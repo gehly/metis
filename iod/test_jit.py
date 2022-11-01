@@ -1,22 +1,38 @@
 import numpy as np
+import math
 from numba import jit
 from numba import types
 from numba.typed import Dict
 
 
 @jit(nopython=True)
-def test_jit(input_flag, num):
+def test_jit(input_flag, num, myarray):
+    
+    print(myarray)
     
     x = np.array([1., 2., 3.]).reshape(3,1)
     y = np.array([4., 5., 6.]).reshape(3,1)
     print(x)
     print(y)
     
+    z = np.concatenate((x,y),axis=0)
+    print(z)
+    
     test = np.array([[1.], [2.], [3.]])
     
     test = np.reshape(y, (1,3))
     
+    test = np.cos(0.5)
+    test = math.acos(0.5)
+    
+    test = np.empty(0, dtype=np.float64)
+    test = np.append(test, [1.2])
+    
+    
     print(test)
+    
+    print(np.sign(1.2))
+    print(np.sign(-2.3))
     
     if input_flag == 'sometext':
         print('yep')
@@ -66,7 +82,7 @@ def norm(avec):
 
 if __name__ == '__main__':
     
-    test_jit('notext', np.nan)
+    test_jit('notext', np.nan, np.random.rand(3,3))
     
     x = np.array([1., 2., 3.]).reshape(3,1)
     y = np.array([4., 5., 6.]).reshape(3,1)

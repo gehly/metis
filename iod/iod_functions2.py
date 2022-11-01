@@ -123,8 +123,8 @@ def izzo_lambert(r1_vect, r2_vect, tof, M_star, lr_star, GM=GME, R=Re,
     assert tof > 0
     
     # Compute chord and unit vectors
-    r1_vect = np.reshape(r1_vect, (3,1))
-    r2_vect = np.reshape(r2_vect, (3,1))
+    r1_vect = r1_vect.reshape(3,1)
+    r2_vect = r2_vect.reshape(3,1)
     c_vect = r2_vect - r1_vect
     
     r1 = norm(r1_vect)
@@ -377,7 +377,7 @@ def find_single_xy(lam, T, M_star, lr_star, maxiters=35, rtol=1e-8):
     # T(x=0) denoted T_0M
     # T_00 is T_0 for single revolution (M=0) case  
     # T_0M = T_00 + M*pi
-    T_00 = np.acos(lam) + lam*np.sqrt(1. - lam**2.)
+    T_00 = math.acos(lam) + lam*np.sqrt(1. - lam**2.)
             
     # Compute T(x=1) parabolic case (Izzo Eq 21)
     T_1 = (2./3.) * (1. - lam**3.)
@@ -422,8 +422,8 @@ def find_single_xy(lam, T, M_star, lr_star, maxiters=35, rtol=1e-8):
         elif lr_star == 'right':
             
             # Form initial x0_r from Izzo Eq 31
-            x0_r = (((8.*T)/(M_star*math.pi))**(2./3.) - 1.) * \
-                1./(((8.*T)/(M_star*math.pi))**(2./3.) + 1.)
+            x0_r = (((8.*T)/(M_star*np.pi))**(2./3.) - 1.) * \
+                1./(((8.*T)/(M_star*np.pi))**(2./3.) + 1.)
             
             xi, exit_flag = householder(x0_r, T, lam, M_star, maxiters, rtol)
             
@@ -735,14 +735,14 @@ def compute_psi(x, y, lam):
     # Elliptic case
     if -1. <= x < 1.:
         cos_psi = x*y + lam*(1. - x**2.)
-        psi = np.acos(cos_psi)
+        psi = math.acos(cos_psi)
 #        sin_psi = (y - x*lam)*np.sqrt(1. - x**2.)
 #        psi = math.atan2(sin_psi, cos_psi)
         
     # Hyperbolic case
     elif x > 1.:
         sinh_psi = (y - x*lam)*np.sqrt(x**2. - 1.)
-        psi = np.asinh(sinh_psi)
+        psi = math.asinh(sinh_psi)
     
     # Parabolic
     else:
@@ -808,8 +808,8 @@ def compute_rp(r_vect, v_vect, GM):
         radius of periapsis [km]
     
     '''
-    r_vect = np.reshape(r_vect, (3,1))
-    v_vect = np.reshape(v_vect, (3,1))
+    r_vect = r_vect.reshape(3,1)
+    v_vect = v_vect.reshape(3,1)
     r = norm(r_vect)
     v = norm(v_vect)
     
@@ -995,13 +995,17 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
     tof = (UTC_list[-1] - UTC_list[0]).total_seconds()
     
     # Sensor and LOS vectors
-    rho0_hat = Lmat[:,0].reshape(3,1)
-    q0_vect = Rmat[:,0].reshape(3,1)
-    rhof_hat = Lmat[:,-1].reshape(3,1)
-    qf_vect = Rmat[:,-1].reshape(3,1)
+    rho0_hat = np.zeros((3,1))
+    rhof_hat = np.zeros((3,1))
+    q0_vect = np.zeros((3,1))
+    qf_vect = np.zeros((3,1))
+    rho0_hat[0:3] = Lmat[:,0]
+    q0_vect[0:3] = Rmat[:,0]
+    rhof_hat[0:3] = Lmat[:,-1]
+    qf_vect[0:3] = Rmat[:,-1]
 
     # Compute maximum number of revolutions that could occur during tof
-    M_max = compute_M_max(Lmat, Rmat, tof, GM, R, orbit_regime)
+    M_max = compute_M_max(rho0_hat, rhof_hat, q0_vect, qf_vect, tof, GM, R, orbit_regime)
     M_candidates = list(range(M_max+1))
     
     print('M_max', M_max)
@@ -1295,16 +1299,27 @@ def M_star_to_3rho(Lmat, Rmat, UTC_list, tof, M_star, lr_star, orbit_type,
     '''
     
     # Sensor and LOS vectors
-    rho0_hat = Lmat[:,0].reshape(3,1)
-    q0_vect = Rmat[:,0].reshape(3,1)
-    rhof_hat = Lmat[:,-1].reshape(3,1)
-    qf_vect = Rmat[:,-1].reshape(3,1)
+    rho0_hat = np.zeros((3,1))
+    rhof_hat = np.zeros((3,1))
+    rhok_obs_hat = np.zeros((3,1))
+    q0_vect = np.zeros((3,1))
+    qf_vect = np.zeros((3,1))
+    qk_vect = np.zeros((3,1))
+    rho0_hat[0:3] = Lmat[:,0]
+    rhof_hat[0:3] = Lmat[:,-1]
+    rhok_obs_hat[0:3] = Lmat[:,1]
+    q0_vect[0:3] = Rmat[:,0]    
+    qf_vect[0:3] = Rmat[:,-1]
+    qk_vect[0:3] = Rmat[:,1]
+    
+    # Time in seconds
+    dt_k = (UTC_list[1] - UTC_list[0]).total_seconds()
     
     # Loop over initial range guesses, if a pair rho0,rhof produces a valid 
     # orbit solution, iterate to find orbit that matches intermediate 
     # observation(s)
-    rho0_output_list = []
-    rhof_output_list = []
+    rho0_output_list = np.empty(0, dtype=np.float64)
+    rhof_output_list = np.empty(0, dtype=np.float64)
     nrange = len(range_pairs_list)
     for ii in range(nrange):
         
@@ -1324,20 +1339,22 @@ def M_star_to_3rho(Lmat, Rmat, UTC_list, tof, M_star, lr_star, orbit_type,
         r0_vect = q0_vect + rho0*rho0_hat
         rf_vect = qf_vect + rhof*rhof_hat
         
-        v0_list, vf_list, M_list, type_list, lr_list = \
-            izzo_lambert(r0_vect, rf_vect, tof, M_star=M_star, lr_star=lr_star,
+        v0_vect, vf_vect, fail_flag = \
+            izzo_lambert(r0_vect, rf_vect, tof, M_star, lr_star,
                          results_flag=orbit_type,
                          periapsis_check=periapsis_check)
 
         # If there is a Lambert solution, iterate to find range solutions to
         # fit the middle observation(s)
-        if len(M_list) > 0:
+        if not fail_flag:
         
             # Lambert solver has returned exactly one solution, iterate to find
             # range values that fit middle observation(s)
             rho0_output_list, rhof_output_list = \
-                iterate_rho(rho0, rhof, tof, M_star, lr_star, orbit_type, Lmat,
-                            Rmat, UTC_list, rho0_output_list, rhof_output_list,
+                iterate_rho(rho0, rhof, tof, M_star, lr_star, orbit_type,
+                            rho0_hat, rhof_hat, q0_vect, qf_vect, rhok_obs_hat,
+                            qk_vect, dt_k,
+                            rho0_output_list, rhof_output_list,
                             periapsis_check=periapsis_check, HN=HN,
                             rootfind=rootfind)
             
@@ -1356,8 +1373,10 @@ def M_star_to_3rho(Lmat, Rmat, UTC_list, tof, M_star, lr_star, orbit_type,
     return rho0_output_list, rhof_output_list
 
 
-def iterate_rho(rho0_init, rhof_init, tof, M_star, lr_star, orbit_type, Lmat,
-                Rmat, UTC_list, rho0_output_list, rhof_output_list,
+@jit(nopython=True)
+def iterate_rho(rho0_init, rhof_init, tof, M_star, lr_star, orbit_type,
+                rho0_hat, rhof_hat, q0_vect, qf_vect, rhok_obs_hat, qk_vect, 
+                dt_k, rho0_output_list, rhof_output_list,
                 periapsis_check=True, HN=1., rootfind='zeros'):
     '''
     This function iteratively updates the initial and final range values until
@@ -1415,12 +1434,6 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, lr_star, orbit_type, Lmat,
     # Current guess
     rho0 = float(rho0_init)
     rhof = float(rhof_init)
-    
-    # Compute LOS unit vectors and sensor positions
-    rho0_hat = Lmat[:,0].reshape(3,1)
-    q0_vect = Rmat[:,0].reshape(3,1)    
-    rhof_hat = Lmat[:,-1].reshape(3,1)
-    qf_vect = Rmat[:,-1].reshape(3,1)
     
     # Gooding (1997) suggests 1e-12, orekit uses 1e-14
     tol = 1e-14
@@ -1493,17 +1506,18 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, lr_star, orbit_type, Lmat,
             break
 
         # Solve Lambert problem to get LOS vector at intermediate time
-        rhok_list, rhok_inds = \
+        rhok_calc_vect, fail_flag = \
             compute_intermediate_rho(rho0, rhof, tof, M_star, lr_star, 
-                                     orbit_type, Lmat, Rmat, UTC_list,
-                                     periapsis_check=periapsis_check)
+                                     orbit_type, rho0_hat, rhof_hat, q0_vect, qf_vect,
+                                     qk_vect, dt_k, periapsis_check=periapsis_check)
             
-        print('len rhok_list', len(rhok_list))
+        print('rhok_calc_vect', rhok_calc_vect)
+        print('fail_flag', fail_flag)
             
         # Exception Handling
         # If no solution to Lambert problem is found, exit and continue range
         # grid search
-        if len(rhok_list) == 0:
+        if fail_flag == 0:
 
             print('no Lambert solution')
             print('rho0', rho0)
@@ -1513,25 +1527,23 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, lr_star, orbit_type, Lmat,
             
         # All exceptions passed, valid range values and Lambert solution
         # Assume a single intermediate point for now
-        rhok_calc_vect = rhok_list[0]
-        rk_vect = Rmat[:,1].reshape(3,1) + rhok_calc_vect
+        rk_vect = qk_vect + rhok_calc_vect
         rk = np.linalg.norm(rk_vect)
         
         # Construct basis vectors
-        rhok_obs_hat = Lmat[:,1].reshape(3,1)
         u_vect = np.cross(rhok_obs_hat, rhok_calc_vect, axis=0)
         
         # Exception Handling
         # Solution can converge on rhok_calc_hat pointing 180 degrees away
         # from rhok_obs_hat, if so, exit and continue range grid search
         rhok_dot = float(np.dot(rhok_obs_hat.T, rhok_calc_vect))
-        if rhok_dot/np.linalg.norm(rhok_calc_vect) < -0.99:
+        if rhok_dot/norm(rhok_calc_vect) < -0.99:
 
             print('rhok point 180 degrees away')
             print('rho0', rho0)
             print('rhof', rhof)
             print(rhok_dot)
-            print(np.linalg.norm(rhok_calc_vect))
+            print(norm(rhok_calc_vect))
             
             break
         
@@ -1540,15 +1552,15 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, lr_star, orbit_type, Lmat,
         # Record range values and exit to continue range grid search (if
         # fewer than 3 valid solutions have been found for this case)
         if np.linalg.norm(u_vect) == 0.:
-            rho0_output_list.append(rho0)
-            rhof_output_list.append(rhof)            
+            rho0_output_list = np.append(rho0_output_list, [rho0])
+            rhof_output_list = np.append(rhof_output_list, [rhof])            
             break
         
         # Construct basis vectors
-        p_vect = np.cross(u_vect, rhok_obs_hat, axis=0)
-        p_hat = p_vect/np.linalg.norm(p_vect)
-        n_vect = np.cross(rhok_obs_hat, p_hat, axis=0)
-        n_hat = n_vect/np.linalg.norm(n_vect)
+        p_vect = cross(u_vect, rhok_obs_hat)
+        p_hat = p_vect/norm(p_vect)
+        n_vect = cross(rhok_obs_hat, p_hat)
+        n_hat = n_vect/norm(n_vect)
         
         # Compute basic f and g penalty functions
         f, g = compute_penalty(rhok_calc_vect, p_hat, n_hat)
@@ -1563,15 +1575,15 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, lr_star, orbit_type, Lmat,
         # It needs to be updated to account for previous solutions
         # Calculation of other parameters will be stored for later use in 
         # calculation of update to range values, to avoid previous solutions
-        epsilon_list = []
-        eta_list = []
-        beta_list = []
-        gamma_list = []
+        epsilon_list = np.empty(0, dtype=np.float64)
+        eta_list = np.empty(0, dtype=np.float64)
+        beta_list = np.empty(0, dtype=np.float64)
+        gamma_list = np.empty(0, dtype=np.float64)
         for ii in range(len(rho0_output_list)):
             rho0_ii = rho0_output_list[ii]
             rhof_ii = rhof_output_list[ii]
-            r0 = np.linalg.norm(q0_vect + rho0_ii*rho0_hat)
-            rf = np.linalg.norm(qf_vect + rhof_ii*rhof_hat)
+            r0 = norm(q0_vect + rho0_ii*rho0_hat)
+            rf = norm(qf_vect + rhof_ii*rhof_hat)
             
             epsilon = rho0 - rho0_ii
             eta = rhof - rhof_ii
@@ -1580,10 +1592,10 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, lr_star, orbit_type, Lmat,
                         
             fc *= gamma/beta
             
-            epsilon_list.append(epsilon)
-            eta_list.append(eta)
-            beta_list.append(beta)
-            gamma_list.append(gamma)
+            epsilon_list = np.append(epsilon_list, [epsilon])
+            eta_list = np.append(eta_list, [eta])
+            beta_list = np.append(beta_list, [beta])
+            gamma_list = np.append(gamma_list, [gamma])
 
         print('fc', fc)
 
@@ -1623,62 +1635,67 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, lr_star, orbit_type, Lmat,
             
             # Range rho0 minus delta_rho
             rho0_minus = rho0 - dx
-            rhok_list, rhok_inds = \
+            rhok_out, fail_flag = \
                 compute_intermediate_rho(rho0_minus, rhof, tof, M_star, lr_star,
-                                         orbit_type, Lmat, Rmat, UTC_list, 
+                                         orbit_type, rho0_hat, rhof_hat, q0_vect, qf_vect, 
+                                         qk_vect, dt_k, 
                                          periapsis_check=periapsis_check)
-            if len(rhok_list) == 0:
+            if fail_flag:
                 finite_diff_step *= 0.1
                 continue
                 
-            fm0, gm0 = compute_penalty(rhok_list[0], p_hat, n_hat)
+            fm0, gm0 = compute_penalty(rhok_out, p_hat, n_hat)
             
             # Range rho0 plus delta_rho
             rho0_plus = rho0 + dx
-            rhok_list, rhok_inds = \
+            rhok_out, fail_flag = \
                 compute_intermediate_rho(rho0_plus, rhof, tof, M_star, lr_star, 
-                                         orbit_type, Lmat, Rmat, UTC_list,
+                                         orbit_type, rho0_hat, rhof_hat, q0_vect, qf_vect,
+                                         qk_vect, dt_k, 
                                          periapsis_check=periapsis_check)
-            if len(rhok_list) == 0:
+            if fail_flag:
                 finite_diff_step *= 0.1
                 continue
                 
-            fp0, gp0 = compute_penalty(rhok_list[0], p_hat, n_hat)
+            fp0, gp0 = compute_penalty(rhok_out, p_hat, n_hat)
             
             # Range rhof minus delta_rho
             rhof_minus = rhof - dy
-            rhok_list, rhok_inds = \
+            rhok_out, fail_flag = \
                 compute_intermediate_rho(rho0, rhof_minus, tof, M_star, lr_star,
-                                         orbit_type, Lmat, Rmat, UTC_list,
+                                         orbit_type, rho0_hat, rhof_hat, q0_vect, qf_vect, 
+                                         qk_vect, dt_k, 
                                          periapsis_check=periapsis_check)
-            if len(rhok_list) == 0:
+            if fail_flag:
                 finite_diff_step *= 0.1
                 continue
                 
-            fmf, gmf = compute_penalty(rhok_list[0], p_hat, n_hat)
+            fmf, gmf = compute_penalty(rhok_out, p_hat, n_hat)
             
             # Range rhof plus delta_rho
             rhof_plus = rhof + dy
-            rhok_list, rhok_inds = \
+            rhok_out, fail_flag = \
                 compute_intermediate_rho(rho0, rhof_plus, tof, M_star, lr_star,
-                                         orbit_type, Lmat, Rmat, UTC_list,
+                                         orbit_type, rho0_hat, rhof_hat, q0_vect, qf_vect,
+                                         qk_vect, dt_k, 
                                          periapsis_check=periapsis_check)
-            if len(rhok_list) == 0:
+            if fail_flag:
                 finite_diff_step *= 0.1
                 continue
                 
-            fpf, gpf = compute_penalty(rhok_list[0], p_hat, n_hat)
+            fpf, gpf = compute_penalty(rhok_out, p_hat, n_hat)
             
             # Multivariate partial (rho0_plus and rhof_plus)
-            rhok_list, rhok_inds = \
+            rhok_out, fail_flag = \
                 compute_intermediate_rho(rho0_plus, rhof_plus, tof, M_star, lr_star,
-                                         orbit_type, Lmat, Rmat, UTC_list,
+                                         orbit_type, rho0_hat, rhof_hat, q0_vect, qf_vect,
+                                         qk_vect, dt_k,
                                          periapsis_check=periapsis_check)
-            if len(rhok_list) == 0:
+            if fail_flag:
                 finite_diff_step *= 0.1
                 continue
             
-            fp_0f, gp_0f = compute_penalty(rhok_list[0], p_hat, n_hat)
+            fp_0f, gp_0f = compute_penalty(rhok_out, p_hat, n_hat)
             
             # Compute derivatives
             fx = (fp0 - fm0)/(2.*dx)
@@ -1760,12 +1777,12 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, lr_star, orbit_type, Lmat,
                 print('crit_gm', crit_gm)
                 print('D_NR', D_NR)
                 print('test', D_NR/(fx*fy + gx*gy))
-                delta_rho0 = np.sign(delta_rho0_NR) * np.sqrt(abs(delta_rho0_NR*delta_rho0))
-                delta_rhof = np.sign(delta_rhof_NR) * np.sqrt(abs(delta_rhof_NR*delta_rhof))
+                delta_rho0 = np.sign(delta_rho0_NR) * np.sqrt(np.abs(delta_rho0_NR*delta_rho0))
+                delta_rhof = np.sign(delta_rhof_NR) * np.sqrt(np.abs(delta_rhof_NR*delta_rhof))
                 
             # If multiple solutions already found, use original f to check 
             # convergence criteria to be consistent for all solutions
-            conv_crit = abs(f)/max(rk, rhok_dot)
+            conv_crit = np.abs(f)/np.max(rk, rhok_dot)
 
         elif rootfind == 'min':
             
@@ -1787,17 +1804,17 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, lr_star, orbit_type, Lmat,
             print('hyy', hyy)
             print('Dmin', Dmin)
             
-            test_mat = np.array([[hxx, hxy],[hxy, hyy]])
-            matinv = np.linalg.inv(test_mat)
-            test = -np.dot(matinv, np.array([[hx],[hy]]))
-            
-            print('test delta rho', test)
+#            test_mat = np.array([[hxx, hxy],[hxy, hyy]])
+#            matinv = np.linalg.inv(test_mat)
+#            test = -np.dot(matinv, np.array([[hx],[hy]]))
+#            
+#            print('test delta rho', test)
             
             delta_rho0 = -(hyy*hx - hxy*hy)/Dmin
             delta_rhof = -(hxx*hy - hxy*hx)/Dmin
             
             # Use h function derivatives for convergence test
-            conv_crit = (abs(hx) + abs(hy))/max(rk, rhok_dot)
+            conv_crit = (np.abs(hx) + np.abs(hy))/np.max(rk, rhok_dot)
         
         # Store values for future comparison
         fc_old = float(fc)
@@ -1821,8 +1838,8 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, lr_star, orbit_type, Lmat,
         # For converged solution, store answer and exit to continue range
         # grid search
         if conv_crit < tol:
-            rho0_output_list.append(rho0)
-            rhof_output_list.append(rhof)
+            rho0_output_list = np.append(rho0_output_list, [rho0])
+            rhof_output_list = np.append(rhof_output_list, [rhof])
 
             print('rho0_output_list', rho0_output_list)
             print('rhof_output_list', rhof_output_list)
@@ -1841,7 +1858,8 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, lr_star, orbit_type, Lmat,
     return rho0_output_list, rhof_output_list
 
 
-def compute_M_max(Lmat, Rmat, tof, GM=GME, R=Re, orbit_regime='none'):
+@jit(nopython=True)
+def compute_M_max(rho0_hat, rhof_hat, q0_vect, qf_vect, tof, GM=GME, R=Re, orbit_regime='none'):
     '''
     The function computes the maximum number of orbit revolutions that can be
     completed in the given time of flight, with an optional restriction on
@@ -1880,8 +1898,6 @@ def compute_M_max(Lmat, Rmat, tof, GM=GME, R=Re, orbit_regime='none'):
 
 
     # Initial line of sight, sensor location, and position vectors
-    rho0_hat = Lmat[:,0].reshape(3,1)
-    q0_vect = Rmat[:,0].reshape(3,1)
     rho0_min = radius2rho(rmin, rho0_hat, q0_vect)
     r0_vect = q0_vect + rho0_min*rho0_hat
     
@@ -1891,8 +1907,6 @@ def compute_M_max(Lmat, Rmat, tof, GM=GME, R=Re, orbit_regime='none'):
     print(r0_vect)
     
     # Final line of sight, sensor location, and position vectors
-    rhof_hat = Lmat[:,-1].reshape(3,1)
-    qf_vect = Rmat[:,-1].reshape(3,1)
     rhof_min = radius2rho(rmin, rhof_hat, qf_vect)
     rf_vect = qf_vect + rhof_min*rhof_hat
     
@@ -1903,9 +1917,9 @@ def compute_M_max(Lmat, Rmat, tof, GM=GME, R=Re, orbit_regime='none'):
         
     # Compute chord and minimum energy ellipse
     c_vect = rf_vect - r0_vect    
-    r0 = np.linalg.norm(r0_vect)
-    rf = np.linalg.norm(rf_vect)
-    c = np.linalg.norm(c_vect)
+    r0 = norm(r0_vect)
+    rf = norm(rf_vect)
+    c = norm(c_vect)
     
     # Compute values to reconstruct output
     s = 0.5 * (r0 + rf + c)
@@ -1924,7 +1938,7 @@ def compute_M_max(Lmat, Rmat, tof, GM=GME, R=Re, orbit_regime='none'):
     print('T', T)
     
     # Compute maximum number of orbit revolutions
-    M_max = int(np.floor(T/math.pi))
+    M_max = int(np.floor(T/np.pi))
     
     return M_max
 
@@ -2075,6 +2089,7 @@ def compute_range_ind_list(range_pairs_list, search_mode='middle_out'):
     return range_ind_list
 
 
+@jit(nopython=True)
 def define_orbit_regime(orbit_regime):
     '''
     This function defines the basic parameters for each orbit regime.
@@ -2159,8 +2174,8 @@ def define_orbit_regime(orbit_regime):
         rmax = ra_max
         step = 1000.
         
-    rp_bounds = [rp_min, rp_max]
-    ra_bounds = [ra_min, ra_max]
+    rp_bounds = np.array([rp_min, rp_max])
+    ra_bounds = np.array([ra_min, ra_max])
     
     print('rmin', rmin)
     print('rmax', rmax)
@@ -2168,8 +2183,10 @@ def define_orbit_regime(orbit_regime):
     return step, rmin, rmax, rp_bounds, ra_bounds
 
 
+@jit(nopython=True)
 def compute_intermediate_rho(rho0, rhof, tof, M_star, lr_star, orbit_type,
-                             Lmat, Rmat, UTC_list, periapsis_check=False):
+                             rho0_hat, rhof_hat, q0_vect, qf_vect, qk_vect,
+                             dt_k, periapsis_check=False):
     '''
     This function computes the range value(s) at intermediate observation 
     time(s) to fit the Lambert solution produced by the input rho0 and rhof
@@ -2216,63 +2233,38 @@ def compute_intermediate_rho(rho0, rhof, tof, M_star, lr_star, orbit_type,
     # For now, assume only a single intermediate observation, but this can
     # be expanded to use multiple measurements with an appropriate cost 
     # function
-    kk_list = [1]
     
-    # Compute initial and final position vectors
-    rho0_hat = Lmat[:,0].reshape(3,1)
-    q0_vect = Rmat[:,0].reshape(3,1)    
-    rhof_hat = Lmat[:,-1].reshape(3,1)
-    qf_vect = Rmat[:,-1].reshape(3,1)
-    
+    # Position vectors
     r0_vect = q0_vect + rho0*rho0_hat
     rf_vect = qf_vect + rhof*rhof_hat
         
-    # Compute Lambert solution for these inputs
-    v0_list, vf_list, M_list, type_list, lr_list = \
-        izzo_lambert(r0_vect, rf_vect, tof, M_star=M_star, lr_star=lr_star,
-                     results_flag=orbit_type, periapsis_check=periapsis_check)
-    
-    # There should only be one solution with everything specified
-    if len(M_list) > 1:
-        print(v0_list)
-        print(vf_list)
-        print(M_list)
-        print(type_list)
-        mistake
-        
+    # Compute Lambert solution for these inputs        
+    v0_vect, vf_vect, fail_flag = \
+        izzo_lambert(r0_vect, rf_vect, tof, M_star, lr_star,
+                     results_flag=orbit_type, periapsis_check=periapsis_check)    
+
     # If no valid solutions are found, exit    
-    if len(v0_list) == 0:
-        return [], []
-        
-    v0_vect = v0_list[0]
-    
+    if fail_flag:
+        return 0., fail_flag
+
     # Hyperbolic orbit can pass periapsis check but still have unreasonable
     # semi-major axis. C3 of 160 is sufficient to reach Pluto and corresponds
     # to |SMA| = 2491 km. Any |SMA| < 1000 km can safely be rejected.
-    r0 = np.linalg.norm(r0_vect)
-    v0 = np.linalg.norm(v0_vect)
+    r0 = norm(r0_vect)
+    v0 = norm(v0_vect)
     a = 1/(2/r0 - v0**2./GME)
-    if abs(a) < 1000.:
-        return [], []
+    if np.abs(a) < 1000.:
+        return 0., True
     
     # Full cartesian state vector at t0
     Xo = np.concatenate((r0_vect, v0_vect), axis=0)
     
     # Loop over intermediate times and compute rho_vect
-    rhok_list = []   
-    rhok_inds = []
-    for kk in kk_list:
+    Xk = astro.element_conversion(Xo, 1, 1, dt=dt_k)
+    rk_vect = Xk[0:3].reshape(3,1)
+    rhok_vect = rk_vect - qk_vect
     
-        dt_sec = (UTC_list[kk] - UTC_list[0]).total_seconds()
-        qk_vect = Rmat[:,kk].reshape(3,1)
-        Xk = astro.element_conversion(Xo, 1, 1, dt=dt_sec)
-        rk_vect = Xk[0:3].reshape(3,1)
-        rhok_vect = rk_vect - qk_vect
-    
-        rhok_list.append(rhok_vect)
-        rhok_inds.append(kk)
-    
-    return rhok_list, rhok_inds
+    return rhok_vect, fail_flag
 
 
 def compute_penalty(rhok_vect, p_hat, n_hat):    
