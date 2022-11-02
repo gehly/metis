@@ -3,6 +3,10 @@ import math
 from numba import jit
 from numba import types
 from numba.typed import Dict
+import time
+
+import iod_functions2 as iod2
+from utilities import astrodynamics as astro
 
 
 @jit(nopython=True)
@@ -18,6 +22,14 @@ def test_jit(input_flag, num, myarray):
     z = np.concatenate((x,y),axis=0)
     print(z)
     
+    z2 = np.dot(x.T, y)
+    print(z2)
+    print(z2[0])
+    print(z2[0][0])
+    
+    print(np.max(x))
+    print(np.max(np.array([1., 4., 7.])))
+    
     test = np.array([[1.], [2.], [3.]])
     
     test = np.reshape(y, (1,3))
@@ -28,8 +40,14 @@ def test_jit(input_flag, num, myarray):
     test = np.empty(0, dtype=np.float64)
     test = np.append(test, [1.2])
     
+    test = 10. % (2.*np.pi)
+    test = -10. % (2.*np.pi)
     
-    print(test)
+    test = math.atan(0.5)
+    test = math.atan2(0.5, 1.)
+    
+    
+    print('test', test)
     
     print(np.sign(1.2))
     print(np.sign(-2.3))
@@ -77,26 +95,67 @@ def norm(avec):
 
 
 
+def compare_propagation():
+    
+#    elem0 = [7000., 0.001, 10., 200., 320., 175.]
+    rp = 7000.
+    vinf = 2.
+    e = 1 + rp*vinf**2./3.986e5
+    a = -3.986e5/vinf**2.
+    
+    elem0 = [a, e, 100., 345., 290., -40.]
+    
+    cart0 = astro.kep2cart(elem0)
+    
+    dt = 100000.
+    
+#    print(cart0)
+    
+    start = time.time()
+    for ii in range(1000):
+        X1 = astro.element_conversion(cart0, 1, 1, dt=dt)
+    basic_time = time.time() - start
+    
+    X2 = iod2.twobody_propagate(cart0, dt)
+    
+    start = time.time()
+    for ii in range(1000):
+        X2 = iod2.twobody_propagate(cart0, dt)
+    jit_time = time.time() - start
+    
+    print(X1)
+    print(X2)
+    
+    print('err', X1[0:3] - X2[0:3])
+    
+    print(basic_time)
+    print(jit_time)
+    
+    
+    
+    return
 
 
 
 if __name__ == '__main__':
     
     test_jit('notext', np.nan, np.random.rand(3,3))
+#    
+#    x = np.array([1., 2., 3.]).reshape(3,1)
+#    y = np.array([4., 5., 6.]).reshape(3,1)
+#    
+#    z1 = np.cross(x, y, axis=0)
+#    z2 = cross(x, y)
+#    
+#    print(z1)
+#    print(z2)
+#    
+#    
+#    print(np.linalg.norm(x), norm(x))
+#    print(np.linalg.norm(y), norm(y))
+#    print(np.linalg.norm(z1), norm(z1))
     
-    x = np.array([1., 2., 3.]).reshape(3,1)
-    y = np.array([4., 5., 6.]).reshape(3,1)
-    
-    z1 = np.cross(x, y, axis=0)
-    z2 = cross(x, y)
-    
-    print(z1)
-    print(z2)
-    
-    
-    print(np.linalg.norm(x), norm(x))
-    print(np.linalg.norm(y), norm(y))
-    print(np.linalg.norm(z1), norm(z1))
+#    compare_propagation()
     
     
     

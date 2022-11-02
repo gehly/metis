@@ -999,10 +999,10 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
     rhof_hat = np.zeros((3,1))
     q0_vect = np.zeros((3,1))
     qf_vect = np.zeros((3,1))
-    rho0_hat[0:3] = Lmat[:,0]
-    q0_vect[0:3] = Rmat[:,0]
-    rhof_hat[0:3] = Lmat[:,-1]
-    qf_vect[0:3] = Rmat[:,-1]
+    rho0_hat[0:3] = Lmat[:,0].reshape(3,1)
+    q0_vect[0:3] = Rmat[:,0].reshape(3,1)
+    rhof_hat[0:3] = Lmat[:,-1].reshape(3,1)
+    qf_vect[0:3] = Rmat[:,-1].reshape(3,1)
 
     # Compute maximum number of revolutions that could occur during tof
     M_max = compute_M_max(rho0_hat, rhof_hat, q0_vect, qf_vect, tof, GM, R, orbit_regime)
@@ -1305,12 +1305,12 @@ def M_star_to_3rho(Lmat, Rmat, UTC_list, tof, M_star, lr_star, orbit_type,
     q0_vect = np.zeros((3,1))
     qf_vect = np.zeros((3,1))
     qk_vect = np.zeros((3,1))
-    rho0_hat[0:3] = Lmat[:,0]
-    rhof_hat[0:3] = Lmat[:,-1]
-    rhok_obs_hat[0:3] = Lmat[:,1]
-    q0_vect[0:3] = Rmat[:,0]    
-    qf_vect[0:3] = Rmat[:,-1]
-    qk_vect[0:3] = Rmat[:,1]
+    rho0_hat[0:3] = Lmat[:,0].reshape(3,1)
+    rhof_hat[0:3] = Lmat[:,-1].reshape(3,1)
+    rhok_obs_hat[0:3] = Lmat[:,1].reshape(3,1)
+    q0_vect[0:3] = Rmat[:,0].reshape(3,1)
+    qf_vect[0:3] = Rmat[:,-1].reshape(3,1)
+    qk_vect[0:3] = Rmat[:,1].reshape(3,1)
     
     # Time in seconds
     dt_k = (UTC_list[1] - UTC_list[0]).total_seconds()
@@ -1450,7 +1450,9 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, lr_star, orbit_type,
     maxiters = 100
     exit_flag = 0
     crit_min = 1.
-    f_old = np.inf
+    fc_old = np.inf
+    rho0_old = 0.
+    rhof_old = 0.
     nfail = 0
     while len(rho0_output_list) < 3:
         
@@ -1531,12 +1533,12 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, lr_star, orbit_type,
         rk = np.linalg.norm(rk_vect)
         
         # Construct basis vectors
-        u_vect = np.cross(rhok_obs_hat, rhok_calc_vect, axis=0)
+        u_vect = cross(rhok_obs_hat, rhok_calc_vect)
         
         # Exception Handling
         # Solution can converge on rhok_calc_hat pointing 180 degrees away
         # from rhok_obs_hat, if so, exit and continue range grid search
-        rhok_dot = float(np.dot(rhok_obs_hat.T, rhok_calc_vect))
+        rhok_dot = np.dot(rhok_obs_hat.T, rhok_calc_vect)[0][0]
         if rhok_dot/norm(rhok_calc_vect) < -0.99:
 
             print('rhok point 180 degrees away')
@@ -1551,7 +1553,7 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, lr_star, orbit_type,
         # If rhok_obs_hat = rhok_calc_hat, the solution has converged
         # Record range values and exit to continue range grid search (if
         # fewer than 3 valid solutions have been found for this case)
-        if np.linalg.norm(u_vect) == 0.:
+        if norm(u_vect) == 0.:
             rho0_output_list = np.append(rho0_output_list, [rho0])
             rhof_output_list = np.append(rhof_output_list, [rhof])            
             break
@@ -1782,7 +1784,7 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, lr_star, orbit_type,
                 
             # If multiple solutions already found, use original f to check 
             # convergence criteria to be consistent for all solutions
-            conv_crit = np.abs(f)/np.max(rk, rhok_dot)
+            conv_crit = np.abs(f)/np.max(np.array([rk, rhok_dot]))
 
         elif rootfind == 'min':
             
@@ -1814,7 +1816,7 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, lr_star, orbit_type,
             delta_rhof = -(hxx*hy - hxy*hx)/Dmin
             
             # Use h function derivatives for convergence test
-            conv_crit = (np.abs(hx) + np.abs(hy))/np.max(rk, rhok_dot)
+            conv_crit = (np.abs(hx) + np.abs(hy))/np.max(np.array([rk, rhok_dot]))
         
         # Store values for future comparison
         fc_old = float(fc)
@@ -2234,6 +2236,9 @@ def compute_intermediate_rho(rho0, rhof, tof, M_star, lr_star, orbit_type,
     # be expanded to use multiple measurements with an appropriate cost 
     # function
     
+    # Initialize output
+    rhok_vect = np.zeros((3,1))
+    
     # Position vectors
     r0_vect = q0_vect + rho0*rho0_hat
     rf_vect = qf_vect + rhof*rhof_hat
@@ -2245,7 +2250,7 @@ def compute_intermediate_rho(rho0, rhof, tof, M_star, lr_star, orbit_type,
 
     # If no valid solutions are found, exit    
     if fail_flag:
-        return 0., fail_flag
+        return rhok_vect, fail_flag
 
     # Hyperbolic orbit can pass periapsis check but still have unreasonable
     # semi-major axis. C3 of 160 is sufficient to reach Pluto and corresponds
@@ -2254,19 +2259,196 @@ def compute_intermediate_rho(rho0, rhof, tof, M_star, lr_star, orbit_type,
     v0 = norm(v0_vect)
     a = 1/(2/r0 - v0**2./GME)
     if np.abs(a) < 1000.:
-        return 0., True
+        fail_flag = True
+        return rhok_vect, fail_flag
     
     # Full cartesian state vector at t0
     Xo = np.concatenate((r0_vect, v0_vect), axis=0)
     
     # Loop over intermediate times and compute rho_vect
-    Xk = astro.element_conversion(Xo, 1, 1, dt=dt_k)
-    rk_vect = Xk[0:3].reshape(3,1)
+    rk_vect = twobody_propagate(Xo, dt_k)
     rhok_vect = rk_vect - qk_vect
     
     return rhok_vect, fail_flag
 
 
+@jit(nopython=True)
+def twobody_propagate(Xo, dt, GM=GME):
+    '''
+    
+    '''
+    
+    # Retrieve input cartesian coordinates
+    r_vect = Xo[0:3].reshape(3,1)
+    v_vect = Xo[3:6].reshape(3,1)
+
+    # Calculate orbit parameters
+    r = norm(r_vect)
+    ir_vect = r_vect/r
+    v2 = norm(v_vect)**2
+    h_vect = cross(r_vect, v_vect)
+    h = norm(h_vect)
+
+    # Calculate semi-major axis and mean motion
+    a = 1./(2./r - v2/GM)     # km
+    
+    # Calculate eccentricity
+    e_vect = cross(v_vect, h_vect)/GM - ir_vect
+    e = norm(e_vect)
+
+    # Calculate RAAN and inclination
+    ih_vect = h_vect/h
+    RAAN = math.atan2(ih_vect[0][0], -ih_vect[1][0])   # rad
+    RAAN_hat = np.array([[np.cos(RAAN)], [np.sin(RAAN)], [0.]])
+    i = math.acos(ih_vect[2][0])   # rad
+    if RAAN < 0.:
+        RAAN += 2.*np.pi
+
+    # Apply correction for circular orbit, choose e_vect to point
+    # to ascending node
+    if e != 0:
+        ie_vect = e_vect/e
+    else:
+        ie_vect = np.array([[np.cos(RAAN)], [np.sin(RAAN)], [0.]])
+
+    # Calculate argument of periapsis
+    cross1 = cross(RAAN_hat, ie_vect)
+    tan1 = np.dot(cross1.T, ih_vect)
+    tan2 = np.dot(RAAN_hat.T, ie_vect)
+    w = math.atan2(tan1[0][0], tan2[0][0])    # rad
+    if w < 0.:
+        w += 2.*np.pi
+
+    # Calculate true anomaly
+    cross1 = cross(ie_vect, ir_vect)
+    tan1 = np.dot(cross1.T, ih_vect)
+    tan2 = np.dot(ie_vect.T, ir_vect)
+    theta0 = math.atan2(tan1[0][0], tan2[0][0])    # rad
+    
+    # Update range of true anomaly for elliptical orbits
+    if a > 0. and theta0 < 0.:
+        theta0 += 2.*np.pi   
+   
+    # Calculate M
+    if a > 0:
+        n = np.sqrt(GM/a**3)
+        Eo = 2.*math.atan(np.sqrt((1.-e)/(1.+e))*np.tan(theta0/2.))
+        Mo = Eo - e*np.sin(Eo)
+
+    elif a < 0:
+        n = np.sqrt(GM/-a**3)
+        Ho = 2.*math.atanh(np.sqrt((e-1.)/(e+1.))*np.tan(theta0/2.))        
+        Mo = e*np.sinh(Ho) - Ho  # rad
+
+    # Propagate mean anomaly
+    M = Mo + n*dt
+    
+    # Compute true anomaly
+    if a > 0:
+        E = mean2ecc(M, e)    # rad
+        theta = 2.*math.atan(np.sqrt((1.+e)/(1.-e))*np.tan(E/2))
+        r = a*(1. - e*np.cos(E))     # km
+        
+    elif a < 0:
+        H = mean2hyp(M, e)    # rad
+        theta = 2.*math.atan(np.sqrt((e+1.)/(e-1.))*np.tanh(H/2.)) 
+        r = a*(1. - e*np.cosh(H))     # km
+        
+    # Calculate r_vect and v_vect
+    r_vect = r * \
+        np.array([[np.cos(RAAN)*np.cos(theta+w) - np.sin(RAAN)*np.sin(theta+w)*np.cos(i)],
+                  [np.sin(RAAN)*np.cos(theta+w) + np.cos(RAAN)*np.sin(theta+w)*np.cos(i)],
+                  [np.sin(theta+w)*np.sin(i)]])
+
+#    vv1 = np.cos(RAAN)*(np.sin(theta+w) + e*np.sin(w)) + \
+#          np.sin(RAAN)*(np.cos(theta+w) + e*np.cos(w))*np.cos(i)
+#
+#    vv2 = np.sin(RAAN)*(np.sin(theta+w) + e*np.sin(w)) - \
+#          np.cos(RAAN)*(np.cos(theta+w) + e*np.cos(w))*np.cos(i)
+#
+#    vv3 = -(np.cos(theta+w) + e*np.cos(w))*np.sin(i)
+#    
+#    v_vect = -GM/h * np.array([[vv1], [vv2], [vv3]])
+#
+#    X = np.concatenate((r_vect, v_vect), axis=0)
+    
+    return r_vect
+
+
+@jit(nopython=True)
+def mean2ecc(M, e):
+    '''
+    This function converts from Mean Anomaly to Eccentric Anomaly
+
+    Parameters
+    ------
+    M : float
+      mean anomaly [rad]
+    e : float
+      eccentricity
+
+    Returns
+    ------
+    E : float
+      eccentric anomaly [rad]
+    '''
+
+    # Ensure M is between 0 and 2*pi
+    M = M % (2.*np.pi)
+    if M < 0:
+        M += 2*np.pi
+
+    # Starting guess for E
+    E = M + e*np.sin(M)/(1 - np.sin(M + e) + np.sin(M))
+
+    # Initialize loop variable
+    f = 1.
+    tol = 1e-8
+
+    # Iterate using Newton-Raphson Method
+    while np.abs(f) > tol:
+        f = E - e*np.sin(E) - M
+        df = 1. - e*np.cos(E)
+        E = E - f/df
+
+    return E
+
+
+@jit(nopython=True)
+def mean2hyp(M, e):
+    '''
+    This function converts from Mean Anomaly to Hyperbolic Anomaly
+
+    Parameters
+    ------
+    M : float
+      mean anomaly [rad]
+    e : float
+      eccentricity
+
+    Returns
+    ------
+    H : float
+      hyperbolic anomaly [rad]
+    '''
+
+    # Form starting guess for H
+    H = M
+
+    # Initialize loop variable
+    f = 1.
+    tol = 1e-8
+
+    # Iterate using Newton-Raphson Method
+    while np.abs(f) > tol:
+        f = e*np.sinh(H) - H - M
+        df = e*np.cosh(H) - 1.
+        H = H - f/df
+
+    return H
+
+
+@jit(nopython=True)
 def compute_penalty(rhok_vect, p_hat, n_hat):    
     '''
     This function computes the penalty function f,g values.
@@ -2290,12 +2472,13 @@ def compute_penalty(rhok_vect, p_hat, n_hat):
     '''
     
     # Compute basic f and g penalty functions
-    f = float(np.dot(p_hat.T, rhok_vect))
-    g = float(np.dot(n_hat.T, rhok_vect))
+    f = np.dot(p_hat.T, rhok_vect)[0][0]
+    g = np.dot(n_hat.T, rhok_vect)[0][0]
     
     return f, g
 
 
+@jit(nopython=True)
 def radius2rho(r, rho_hat_eci, site_eci):
     '''
     This function computes range value from a sensor to space object
@@ -2318,10 +2501,10 @@ def radius2rho(r, rho_hat_eci, site_eci):
     '''
     
     a = 1.
-    b = float(2.*np.dot(rho_hat_eci.T, site_eci))
-    c = float(np.dot(site_eci.T, site_eci)) - r**2.
+    b = 2.*np.dot(rho_hat_eci.T, site_eci)[0][0]
+    c = np.dot(site_eci.T, site_eci)[0][0] - r**2.
     
-    rho = float((-b + np.sqrt(b**2. - 4.*a*c))/(2.*a))
+    rho = (-b + np.sqrt(b**2. - 4.*a*c))/(2.*a)
     
     return rho
 

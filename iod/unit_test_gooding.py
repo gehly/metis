@@ -21,7 +21,7 @@ sys.path.append(metis_dir)
 import dynamics.dynamics_functions as dyn
 import estimation.analysis_functions as analysis
 import estimation.estimation_functions as est
-import iod.iod_functions as iod
+import iod.iod_functions2 as iod
 import sensors.measurement_functions as mfunc
 import sensors.sensors as sens
 import sensors.visibility_functions as visfunc
@@ -1359,13 +1359,13 @@ def multi_rev_geo():
 if __name__ == '__main__':
     
     
-#    single_rev_geo()
+    single_rev_geo()
     
 #    single_rev_leo()
     
 #    single_rev_leo_retro()
     
-    single_rev_meo()
+#    single_rev_meo()
     
 #    single_rev_heo()
     
