@@ -10,6 +10,7 @@ import inspect
 import copy
 import time
 from astroquery.jplhorizons import Horizons
+import cProfile
 
 filename = inspect.getframeinfo(inspect.currentframe()).filename
 current_dir = os.path.dirname(os.path.abspath(filename))
@@ -21,7 +22,7 @@ sys.path.append(metis_dir)
 import dynamics.dynamics_functions as dyn
 import estimation.analysis_functions as analysis
 import estimation.estimation_functions as est
-import iod.iod_functions2 as iod
+import iod.iod_functions_jit as iod
 import sensors.measurement_functions as mfunc
 import sensors.sensors as sens
 import sensors.visibility_functions as visfunc
@@ -1359,7 +1360,9 @@ def multi_rev_geo():
 if __name__ == '__main__':
     
     
-    single_rev_geo()
+    cProfile.run('single_rev_geo()')
+    
+#    single_rev_geo()
     
 #    single_rev_leo()
     

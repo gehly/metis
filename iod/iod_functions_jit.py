@@ -47,7 +47,7 @@ def lambert_iod(tk_list, Yk_list, sensor_params):
 @jit(nopython=True)
 def izzo_lambert(r1_vect, r2_vect, tof, M_star, lr_star, GM=GME, R=Re, 
                  results_flag='prograde', periapsis_check=True,
-                 maxiters=35, rtol=1e-8):
+                 maxiters=35, rtol=1e-8, debug=False):
     '''
     This function implements a solution to the twobody orbit boundary value
     problem (Lambert's Problem). Given initial and final position vectors and
@@ -860,7 +860,8 @@ def norm(avec):
 def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
                        time_format='datetime', eop_alldata=[], XYs_df=[],
                        orbit_regime='none', search_mode='middle_out',
-                       periapsis_check=True, HN=1., rootfind='zeros'):
+                       periapsis_check=True, HN=1., rootfind='zeros',
+                       debug=False):
     '''    
     This function implements the Gooding angles-only IOD method, which uses
     three or more line of sight vectors (defined by RA/DEC or Az/El 
@@ -1005,11 +1006,13 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
     qf_vect[0:3] = Rmat[:,-1].reshape(3,1)
 
     # Compute maximum number of revolutions that could occur during tof
-    M_max = compute_M_max(rho0_hat, rhof_hat, q0_vect, qf_vect, tof, GM, R, orbit_regime)
+    M_max = compute_M_max(rho0_hat, rhof_hat, q0_vect, qf_vect, tof, GM, R, orbit_regime, debug=debug)
     M_candidates = list(range(M_max+1))
     
-    print('M_max', M_max)
-    print('M_candidates', M_candidates)
+    if debug:
+        print('M_max', M_max)
+        print('M_candidates', M_candidates)
+
 
     # Loop over possible values of orbit revolution number M
     Xo_output = []
@@ -1022,12 +1025,13 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
     multirev_time_list = []
     for M_star in M_candidates:
         
-        print('\nM_star', M_star)        
+        if debug:
+            print('\nM_star', M_star)        
         
         # Compute the range pairs to use as initial guesses
         range_pairs_list, orbit_regime_fail = \
             compute_range_search_list(Lmat, Rmat, M_star, tof,
-                                      orbit_regime=orbit_regime)
+                                      orbit_regime=orbit_regime, debug=debug)
             
         # If no viable solutions for the given orbit regime and revolution
         # number, try next value
@@ -1047,13 +1051,15 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
             # Prograde single revolution case
             lr_star = 'none'
             orbit_type = 'prograde'
-            print(lr_star, orbit_type)
+            
+            if debug:
+                print(lr_star, orbit_type)
             
             rho0_list, rhof_list = \
                 M_star_to_3rho(Lmat, Rmat, UTC_list, tof, M_star, lr_star,
                                orbit_type, range_pairs_list, range_ind_list,
                                periapsis_check=periapsis_check, HN=HN,
-                               rootfind=rootfind)
+                               rootfind=rootfind, debug=debug)
                 
             
             # Build outputs
@@ -1071,13 +1077,15 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
             # Retrograde single revolution case
             lr_star = 'none'
             orbit_type = 'retrograde'
-            print(lr_star, orbit_type)
+            
+            if debug:
+                print(lr_star, orbit_type)
             
             rho0_list, rhof_list = \
                 M_star_to_3rho(Lmat, Rmat, UTC_list, tof, M_star, lr_star,
                                orbit_type, range_pairs_list, range_ind_list,
                                periapsis_check=periapsis_check, HN=HN,
-                               rootfind=rootfind)
+                               rootfind=rootfind, debug=debug)
             
             # Build outputs
             nout = len(rho0_list)
@@ -1097,13 +1105,15 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
             # Prograde multi-rev case - left branch
             lr_star = 'left'
             orbit_type = 'prograde'
-            print(lr_star, orbit_type)
+            
+            if debug:
+                print(lr_star, orbit_type)
             
             rho0_list, rhof_list = \
                 M_star_to_3rho(Lmat, Rmat, UTC_list, tof, M_star, lr_star,
                                orbit_type, range_pairs_list, range_ind_list,
                                periapsis_check=periapsis_check, HN=HN,
-                               rootfind=rootfind)
+                               rootfind=rootfind, debug=debug)
             
             # Build outputs
             nout = len(rho0_list)
@@ -1120,13 +1130,15 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
             # Prograde multi-rev case - right branch
             lr_star = 'right'
             orbit_type = 'prograde'
-            print(lr_star, orbit_type)
+            
+            if debug:
+                print(lr_star, orbit_type)
             
             rho0_list, rhof_list = \
                 M_star_to_3rho(Lmat, Rmat, UTC_list, tof, M_star, lr_star,
                                orbit_type, range_pairs_list, range_ind_list,
                                periapsis_check=periapsis_check, HN=HN,
-                               rootfind=rootfind)
+                               rootfind=rootfind, debug=debug)
             
             # Build outputs
             nout = len(rho0_list)
@@ -1143,13 +1155,15 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
             # Retrograde multi-rev case - left branch
             lr_star = 'left'
             orbit_type = 'retrograde'
-            print(lr_star, orbit_type)
+            
+            if debug:
+                print(lr_star, orbit_type)
             
             rho0_list, rhof_list = \
                 M_star_to_3rho(Lmat, Rmat, UTC_list, tof, M_star, lr_star,
                                orbit_type, range_pairs_list, range_ind_list,
                                periapsis_check=periapsis_check, HN=HN,
-                               rootfind=rootfind)
+                               rootfind=rootfind, debug=debug)
             
             # Build outputs
             nout = len(rho0_list)
@@ -1166,13 +1180,15 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
             # Retrograde multi-rev case - right branch
             lr_star = 'right'
             orbit_type = 'retrograde'
-            print(lr_star, orbit_type)
+            
+            if debug:
+                print(lr_star, orbit_type)
             
             rho0_list, rhof_list = \
                 M_star_to_3rho(Lmat, Rmat, UTC_list, tof, M_star, lr_star,
                                orbit_type, range_pairs_list, range_ind_list,
                                periapsis_check=periapsis_check, HN=HN,
-                               rootfind=rootfind)
+                               rootfind=rootfind, debug=debug)
             
             # Build outputs
             nout = len(rho0_list)
@@ -1204,9 +1220,10 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
         Xo = np.concatenate((r0_final, v0_final), axis=0)
         elem0 = astro.cart2kep(Xo)
         
-        print(r0_final)
-        print(v0_final)
-        print(elem0)
+        if debug:
+            print(r0_final)
+            print(v0_final)
+            print(elem0)
 
 #        # There should only be one solution with everything specified
 #        if len(M_final) > 1:
@@ -1234,7 +1251,7 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
 
 def M_star_to_3rho(Lmat, Rmat, UTC_list, tof, M_star, lr_star, orbit_type,
                    range_pairs_list, range_ind_list, periapsis_check=True,
-                   HN=1., rootfind='zeros'):
+                   HN=1., rootfind='zeros', debug=False):
     '''
     This function iteratively adjusts range values corresponding to the first
     and last angles-only observations until finding an orbit that matches the
@@ -1327,12 +1344,13 @@ def M_star_to_3rho(Lmat, Rmat, UTC_list, tof, M_star, lr_star, orbit_type,
         rho0 = float(range_pairs_list[range_ind][0])
         rhof = float(range_pairs_list[range_ind][1])
         
-        print('')
-        print('M_star_to_3rho')
-        print('ii', ii)
-        print('range_ind', range_ind)
-        print('rho0', rho0)
-        print('rhof', rhof)
+        if debug:
+            print('')
+            print('M_star_to_3rho')
+            print('ii', ii)
+            print('range_ind', range_ind)
+            print('rho0', rho0)
+            print('rhof', rhof)
         
         # Attempt to solve Lambert's problem for this rho0/rhof pair
         r0_vect = q0_vect + rho0*rho0_hat
@@ -1355,11 +1373,12 @@ def M_star_to_3rho(Lmat, Rmat, UTC_list, tof, M_star, lr_star, orbit_type,
                             qk_vect, dt_k,
                             rho0_output_list, rhof_output_list,
                             periapsis_check=periapsis_check, HN=HN,
-                            rootfind=rootfind)
+                            rootfind=rootfind, debug=debug)
             
-            print('M_star_to_3rho')
-            print(rho0_output_list)
-            print(rhof_output_list)            
+            if debug:
+                print('M_star_to_3rho')
+                print(rho0_output_list)
+                print(rhof_output_list)            
             
         # Per Gooding (1993) P6 and P19, a maximum of 3 solutions exist for any
         # given value of half-revolution number k. In this code, the full orbit
@@ -1376,7 +1395,7 @@ def M_star_to_3rho(Lmat, Rmat, UTC_list, tof, M_star, lr_star, orbit_type,
 def iterate_rho(rho0_init, rhof_init, tof, M_star, lr_star, orbit_type,
                 rho0_hat, rhof_hat, q0_vect, qf_vect, rhok_obs_hat, qk_vect, 
                 dt_k, rho0_output_list, rhof_output_list,
-                periapsis_check=True, HN=1., rootfind='zeros'):
+                periapsis_check=True, HN=1., rootfind='zeros', debug=False):
     '''
     This function iteratively updates the initial and final range values until
     converging on an orbit that matches the intermediate angles-only 
@@ -1458,10 +1477,11 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, lr_star, orbit_type,
         # Gooding (1997) suggests 1e-5, orekit uses 1e-6
         finite_diff_step = 1e-6
         
-        print('\nstart loop')
-        print('iters', iters)
-        print('rho0', rho0)
-        print('rhof', rhof)
+        if debug:
+            print('\nstart loop')
+            print('iters', iters)
+            print('rho0', rho0)
+            print('rhof', rhof)
 
 #        # Check exit condition
 #        if nfail > 4:
@@ -1476,9 +1496,10 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, lr_star, orbit_type,
         # If invalid range value, exit and continue range grid search
         if rho0 < 0 or rhof < 0:
 
-            print('rho out of range')
-            print('rho0', rho0)
-            print('rhof', rhof)
+            if debug:
+                print('rho out of range')
+                print('rho0', rho0)
+                print('rhof', rhof)
             
             break
         
@@ -1495,11 +1516,12 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, lr_star, orbit_type,
             else:                
                 restart_flag = True
 
-                print('converge on previous')
-                print('rho0', rho0)
-                print('rhof', rhof)
-                print('rho0_diff', rho0_diff)
-                print('rhof_diff', rhof_diff)                
+                if debug:
+                    print('converge on previous')
+                    print('rho0', rho0)
+                    print('rhof', rhof)
+                    print('rho0_diff', rho0_diff)
+                    print('rhof_diff', rhof_diff)                
                 
                 break
         
@@ -1511,18 +1533,20 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, lr_star, orbit_type,
             compute_intermediate_rho(rho0, rhof, tof, M_star, lr_star, 
                                      orbit_type, rho0_hat, rhof_hat, q0_vect, qf_vect,
                                      qk_vect, dt_k, periapsis_check=periapsis_check)
-            
-        print('rhok_calc_vect', rhok_calc_vect)
-        print('fail_flag', fail_flag)
+        
+        if debug:
+            print('rhok_calc_vect', rhok_calc_vect)
+            print('fail_flag', fail_flag)
             
         # Exception Handling
         # If no solution to Lambert problem is found, exit and continue range
         # grid search
         if fail_flag:
 
-            print('no Lambert solution')
-            print('rho0', rho0)
-            print('rhof', rhof)
+            if debug:
+                print('no Lambert solution')
+                print('rho0', rho0)
+                print('rhof', rhof)
             
             break
             
@@ -1540,11 +1564,12 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, lr_star, orbit_type,
         rhok_dot = np.dot(rhok_obs_hat.T, rhok_calc_vect)[0][0]
         if rhok_dot/norm(rhok_calc_vect) < -0.99:
 
-            print('rhok point 180 degrees away')
-            print('rho0', rho0)
-            print('rhof', rhof)
-            print(rhok_dot)
-            print(norm(rhok_calc_vect))
+            if debug:
+                print('rhok point 180 degrees away')
+                print('rho0', rho0)
+                print('rhof', rhof)
+                print(rhok_dot)
+                print(norm(rhok_calc_vect))
             
             break
         
@@ -1567,8 +1592,9 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, lr_star, orbit_type,
         f, g = compute_penalty(rhok_calc_vect, p_hat, n_hat)
         fc = float(f)
         
-        print('f', f)
-        print('g', g)
+        if debug:
+            print('f', f)
+            print('g', g)
         
         
         
@@ -1598,19 +1624,22 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, lr_star, orbit_type,
             beta_list = np.append(beta_list, [beta])
             gamma_list = np.append(gamma_list, [gamma])
 
-        print('fc', fc)
+        if debug:
+            print('fc', fc)
 
         # Exception Handling
         # If previous step has produced a much larger penalty value, update
         # range values and restart loop (Gooding 1997 Eq. 8)
         if iters > 0:
             
-            print('fc_old', fc_old)
+            if debug:
+                print('fc_old', fc_old)
             if fc > 2.*fc_old:
                 
-                print('step too large')
-                print('fc', fc)
-                print('fc_old', fc_old)
+                if debug:
+                    print('step too large')
+                    print('fc', fc)
+                    print('fc_old', fc_old)
                 rho0 = (fc*rho0_old + fc_old*rho0)/(fc + fc_old)
                 rhof = (fc*rhof_old + fc_old*rhof)/(fc + fc_old)
                 iters += 1
@@ -1631,8 +1660,9 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, lr_star, orbit_type,
             dx2 = dx**2.
             dy2 = dy**2.
             
-            print('dx', dx)
-            print('dy', dy)
+            if debug:
+                print('dx', dx)
+                print('dy', dy)
             
             # Range rho0 minus delta_rho
             rho0_minus = rho0 - dx
@@ -1747,9 +1777,10 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, lr_star, orbit_type,
             delta_rho0_NR = -(1./D_NR) * f * gy
             delta_rhof_NR =  (1./D_NR) * f * gx
             
-            print('D_NR', D_NR)
-            print('delta_rho0_NR', delta_rho0_NR)
-            print('delta_rhof_NR', delta_rhof_NR)
+            if debug:
+                print('D_NR', D_NR)
+                print('delta_rho0_NR', delta_rho0_NR)
+                print('delta_rhof_NR', delta_rhof_NR)
             
             # Compute Halley/mNR derivatives (Gooding 1997 Section 3.2)
             # If HN = 0.5 use Halley formula
@@ -1773,11 +1804,13 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, lr_star, orbit_type,
             
             # If below threshold, use geometric mean of NR and (Halley or mNR)
             if dd < crit_gm:
-                print('use geometric mean')
-                print('dd', dd)
-                print('crit_gm', crit_gm)
-                print('D_NR', D_NR)
-                print('test', D_NR/(fx*fy + gx*gy))
+                
+                if debug:
+                    print('use geometric mean')
+                    print('dd', dd)
+                    print('crit_gm', crit_gm)
+                    print('D_NR', D_NR)
+                    print('test', D_NR/(fx*fy + gx*gy))
                 delta_rho0 = np.sign(delta_rho0_NR) * np.sqrt(np.abs(delta_rho0_NR*delta_rho0))
                 delta_rhof = np.sign(delta_rhof_NR) * np.sqrt(np.abs(delta_rhof_NR*delta_rhof))
                 
@@ -1796,14 +1829,15 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, lr_star, orbit_type,
             hxy = f*fxy + fx*fy + gx*gy
             Dmin = hxx*hyy - hxy**2.
             
-            print('fx', fx)
-            print('fy', fy)
-            print('hx', hx)
-            print('hy', hy)
-            print('hxx', hxx)
-            print('hxy', hxy)
-            print('hyy', hyy)
-            print('Dmin', Dmin)
+            if debug:
+                print('fx', fx)
+                print('fy', fy)
+                print('hx', hx)
+                print('hy', hy)
+                print('hxx', hxx)
+                print('hxy', hxy)
+                print('hyy', hyy)
+                print('Dmin', Dmin)
             
 #            test_mat = np.array([[hxx, hxy],[hxy, hyy]])
 #            matinv = np.linalg.inv(test_mat)
@@ -1826,15 +1860,16 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, lr_star, orbit_type,
         rho0 += delta_rho0
         rhof += delta_rhof
         
-        print('delta_rho0', delta_rho0)
-        print('delta_rhof', delta_rhof)
-        
-        print('rho0', rho0)
-        print('rhof', rhof)
-        
-        
-        print('conv_crit', conv_crit)
-        print('denom', rk, rhok_dot)        
+        if debug:
+            print('delta_rho0', delta_rho0)
+            print('delta_rhof', delta_rhof)
+            
+            print('rho0', rho0)
+            print('rhof', rhof)
+            
+            
+            print('conv_crit', conv_crit)
+            print('denom', rk, rhok_dot)        
         
         # For converged solution, store answer and exit to continue range
         # grid search
@@ -1842,13 +1877,15 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, lr_star, orbit_type,
             rho0_output_list = np.append(rho0_output_list, [rho0])
             rhof_output_list = np.append(rhof_output_list, [rhof])
 
-            print('rho0_output_list', rho0_output_list)
-            print('rhof_output_list', rhof_output_list)
+            if debug:
+                print('rho0_output_list', rho0_output_list)
+                print('rhof_output_list', rhof_output_list)
             
             break        
 
-        print('rho0_output_list', rho0_output_list)
-        print('rhof_output_list', rhof_output_list)
+        if debug:
+            print('rho0_output_list', rho0_output_list)
+            print('rhof_output_list', rhof_output_list)
         
         # Increment counter and exit condition
         iters += 1
@@ -1860,7 +1897,8 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, lr_star, orbit_type,
 
 
 @jit(nopython=True)
-def compute_M_max(rho0_hat, rhof_hat, q0_vect, qf_vect, tof, GM=GME, R=Re, orbit_regime='none'):
+def compute_M_max(rho0_hat, rhof_hat, q0_vect, qf_vect, tof, GM=GME, R=Re, orbit_regime='none',
+                  debug=False):
     '''
     The function computes the maximum number of orbit revolutions that can be
     completed in the given time of flight, with an optional restriction on
@@ -1902,19 +1940,21 @@ def compute_M_max(rho0_hat, rhof_hat, q0_vect, qf_vect, tof, GM=GME, R=Re, orbit
     rho0_min = radius2rho(rmin, rho0_hat, q0_vect)
     r0_vect = q0_vect + rho0_min*rho0_hat
     
-    print(rho0_hat)
-    print(q0_vect)
-    print(rho0_min)
-    print(r0_vect)
+    if debug:
+        print(rho0_hat)
+        print(q0_vect)
+        print(rho0_min)
+        print(r0_vect)
     
     # Final line of sight, sensor location, and position vectors
     rhof_min = radius2rho(rmin, rhof_hat, qf_vect)
     rf_vect = qf_vect + rhof_min*rhof_hat
     
-    print(rhof_hat)
-    print(qf_vect)
-    print(rhof_min)
-    print(rf_vect)
+    if debug:
+        print(rhof_hat)
+        print(qf_vect)
+        print(rhof_min)
+        print(rf_vect)
         
     # Compute chord and minimum energy ellipse
     c_vect = rf_vect - r0_vect    
@@ -1932,11 +1972,12 @@ def compute_M_max(rho0_hat, rhof_hat, q0_vect, qf_vect, tof, GM=GME, R=Re, orbit
     # Compute non-dimensional time of flight T
     T = np.sqrt(2*GM/s**3.) * tof
     
-    print('r0', r0)
-    print('rf', rf)
-    print('c', c)
-    print('s', s)
-    print('T', T)
+    if debug:
+        print('r0', r0)
+        print('rf', rf)
+        print('c', c)
+        print('s', s)
+        print('T', T)
     
     # Compute maximum number of orbit revolutions
     M_max = int(np.floor(T/np.pi))
@@ -1945,7 +1986,7 @@ def compute_M_max(rho0_hat, rhof_hat, q0_vect, qf_vect, tof, GM=GME, R=Re, orbit
 
 
 def compute_range_search_list(Lmat, Rmat, M_star, tof, GM=GME,
-                              orbit_regime='none'):
+                              orbit_regime='none', debug=False):
     '''
     This function generates a list of rho0 and rhof value pairs for use as an
     initial guess in the Gooding angles-only IOD method. Minimum and maximum
@@ -2004,10 +2045,11 @@ def compute_range_search_list(Lmat, Rmat, M_star, tof, GM=GME,
 
         rmax_M = a_max*(1. + e_max)
         
-        print('M_star', M_star)
-        print('a_max', a_max)
-        print('e_max', e_max)
-        print('rmax_M', rmax_M)
+        if debug:
+            print('M_star', M_star)
+            print('a_max', a_max)
+            print('e_max', e_max)
+            print('rmax_M', rmax_M)
         
         # Exit condition
         # If the maximum orbit radius allowable to complete M_star revolutions
@@ -2028,10 +2070,11 @@ def compute_range_search_list(Lmat, Rmat, M_star, tof, GM=GME,
     rho0_max = radius2rho(rmax, rho0_hat, q0_vect)
     rhof_max = radius2rho(rmax, rhof_hat, qf_vect)  
     
-    print('rho0_min', rho0_min)
-    print('rho0_max', rho0_max)
-    print('rhof_min', rhof_min)
-    print('rhof_max', rhof_max)
+    if debug:
+        print('rho0_min', rho0_min)
+        print('rho0_max', rho0_max)
+        print('rhof_min', rhof_min)
+        print('rhof_max', rhof_max)
 
     # Compute range search arrays
     rho0_array = np.arange(rho0_min, rho0_max, step)
@@ -2121,7 +2164,7 @@ def define_orbit_regime(orbit_regime):
         
     '''
     
-    print('Orbit Regime', orbit_regime)
+#    print('Orbit Regime', orbit_regime)
     
     # These values have been modified somewhat from Ref 1. The intent is to 
     # restrict the range search grid in meaningful ways to improve 
@@ -2178,8 +2221,8 @@ def define_orbit_regime(orbit_regime):
     rp_bounds = np.array([rp_min, rp_max])
     ra_bounds = np.array([ra_min, ra_max])
     
-    print('rmin', rmin)
-    print('rmax', rmax)
+#    print('rmin', rmin)
+#    print('rmax', rmax)
         
     return step, rmin, rmax, rp_bounds, ra_bounds
 
@@ -2500,8 +2543,22 @@ def radius2rho(r, rho_hat_eci, site_eci):
     '''
     
     a = 1.
-    b = 2.*np.dot(rho_hat_eci.T, site_eci)[0][0]
-    c = np.dot(site_eci.T, site_eci)[0][0] - r**2.
+#    b = 2.*np.dot(rho_hat_eci.T, site_eci)[0][0]
+#    c = np.dot(site_eci.T, site_eci)[0][0] - r**2.
+#    
+#    print('b', b)
+#    print('c', c)
+    
+    b = 2.*(rho_hat_eci[0][0]*site_eci[0][0] + 
+             rho_hat_eci[1][0]*site_eci[1][0] +
+             rho_hat_eci[2][0]*site_eci[2][0])
+    
+    c = site_eci[0][0]**2. + site_eci[1][0]**2. + site_eci[2][0]**2. - r**2.
+    
+#    print('b2', b2)
+#    print('c2', c2)
+    
+
     
     rho = (-b + np.sqrt(b**2. - 4.*a*c))/(2.*a)
     
