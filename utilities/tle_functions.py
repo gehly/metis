@@ -20,8 +20,8 @@ ind = current_dir.find('metis')
 metis_dir = current_dir[0:ind+5]
 sys.path.append(metis_dir)
 
-from sensors.sensors import define_sensors
-from sensors.measurement_functions import ecef2azelrange_deg
+from sensors import sensors as sens
+from sensors import measurement_functions as mfunc
 from utilities.eop_functions import get_celestrak_eop_alldata
 from utilities.eop_functions import get_nutation_data
 from utilities.eop_functions import get_eop_data
@@ -175,8 +175,6 @@ def get_spacetrack_tle_data(obj_id_list = [], UTC_list = [], username='',
         else:
             print("Error: Page data request failed.")
 
-    
-
     return tle_dict, tle_df
 
 
@@ -298,7 +296,7 @@ def generate_tle_list(num_obj, UTC_list, max_obj_id, filename, username, passwor
                     
                     output_state = propagate_TLE([obj_id], [UTC], tle_dict)
                     r_ecef = output_state[obj_id]['r_ITRF'][0]
-                    az, el, rg = ecef2azelrange_deg(r_ecef, site_ecef)
+                    az, el, rg = mfunc.ecef2azelrange_deg(r_ecef, site_ecef)
                     
                     if el < 30:
                         
@@ -1575,7 +1573,7 @@ def plot_tle_radec(tle_dict, UTC_list=[], sensor_list=[], display_flag=False,
         eop_alldata = get_celestrak_eop_alldata(offline_flag)
 
         # Retrive sensor parameters and loop over sensors
-        sensor_dict = define_sensors(sensor_list)
+        sensor_dict = sens.define_sensors(sensor_list)
         for sensor_id in sensor_list:
             sensor = sensor_dict[sensor_id]
             latlonht = sensor['geodetic_latlonht']

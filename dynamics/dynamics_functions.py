@@ -53,6 +53,14 @@ def general_dynamics(Xo, tvec, state_params, int_params):
         
     
 #    print('tvec', tvec)
+        
+    # Exit if no integration needed
+    if tvec[0] == tvec[-1]:
+        Xout = np.zeros((len(tvec), len(Xo)))
+        Xout[0] = Xo.flatten()
+        Xout[-1] = Xo.flatten()
+        
+        return tvec, Xout
     
     # Setup and run integrator depending on user selection
     if integrator == 'rk4':

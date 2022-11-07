@@ -36,9 +36,11 @@ from utilities.coordinate_systems import ecef2enu
 from utilities.time_systems import utcdt2ttjd
 from utilities.time_systems import jd2cent
 from utilities.constants import Re, AU_km
-from sensors.measurement_functions import compute_measurement
-from sensors.measurement_functions import ecef2azelrange_deg
-from sensors.measurement_functions import ecef2azelrange_rad
+
+from sensors import measurement_functions as mfunc
+#from sensors.measurement_functions import compute_measurement
+#from sensors.measurement_functions import ecef2azelrange_deg
+#from sensors.measurement_functions import ecef2azelrange_rad
 
 
 def define_RSOs(obj_id_list, UTC_list, tle_dict={}, prev_flag=False,
@@ -618,7 +620,7 @@ def compute_transit_dict(UTC_window, obj_id_list, site_dict, increment=10.,
                 r_ecef = ITRF_list[ii]
                 
                 # Compute az, el, range
-                az, el, rg = ecef2azelrange_deg(r_ecef, site_ecef)
+                az, el, rg = mfunc.ecef2azelrange_deg(r_ecef, site_ecef)
                 
                 if el > 0.:
                     az_list.append(az)
@@ -787,8 +789,8 @@ def check_visibility(X, state_params, sensor_params, sensor_id, UTC, EOP_data,
     
     # Compute az, el, range [rad, rad, km]
     meas_types = ['az', 'el', 'rg']
-    meas = compute_measurement(X, state_params, sensor_params, sensor_id, UTC,
-                               EOP_data, XYs_df, meas_types)
+    meas = mfunc.compute_measurement(X, state_params, sensor_params, sensor_id, UTC,
+                                     EOP_data, XYs_df, meas_types)
     
     # Check az, el, range limits
     az_rad = float(meas[0])
@@ -843,8 +845,8 @@ def check_visibility(X, state_params, sensor_params, sensor_id, UTC, EOP_data,
                 sun_elmask = sensor['sun_elmask']
                     
                 # Compute sun elevation angle
-                sun_el = compute_measurement(sun_eci_app, state_params, sensor_params,
-                                             sensor_id, UTC, EOP_data, XYs_df, ['el'])[0]
+                sun_el = mfunc.compute_measurement(sun_eci_app, state_params, sensor_params,
+                                                   sensor_id, UTC, EOP_data, XYs_df, ['el'])[0]
                 
                 if sun_el > sun_elmask:
                     vis_flag = False
