@@ -105,7 +105,7 @@ def compute_measurement(X, state_params, sensor_params, sensor_id, UTC,
     return Y
 
 
-def tracklet_generator(Xo, UTC0, dt_interval, dt_max, sensor_id, params_dict,
+def tracklet_generator(obj_id, Xo, UTC0, dt_interval, dt_max, sensor_id, params_dict,
                        tracklet_dict={}, orbit_regime='none'):
     '''
     
@@ -134,7 +134,7 @@ def tracklet_generator(Xo, UTC0, dt_interval, dt_max, sensor_id, params_dict,
     tk_list = []
     Yk_list = []
     sensor_id_list = []
-    while tk < UTC0 + timedelta(days=2.):
+    while tk < UTC0 + timedelta(hours=6.):
         
         # Integrate for this step
         tin = [tk_prior, tk]
@@ -184,6 +184,7 @@ def tracklet_generator(Xo, UTC0, dt_interval, dt_max, sensor_id, params_dict,
         tracklet_dict[tracklet_id]['Yk_list'] = Yk_list
         tracklet_dict[tracklet_id]['sensor_id_list'] = sensor_id_list
         tracklet_dict[tracklet_id]['orbit_regime'] = orbit_regime
+        tracklet_dict[tracklet_id]['obj_id'] = obj_id
 
 
     return tracklet_dict
