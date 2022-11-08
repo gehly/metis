@@ -15,6 +15,7 @@ sys.path.append(metis_dir)
 #from sensors.brdf_models import compute_mapp
 from dynamics import dynamics_functions as dyn
 from sensors import visibility_functions as visfunc
+from utilities import astrodynamics as astro
 from utilities import coordinate_systems as coord
 from utilities import eop_functions as eop
 from utilities import tle_functions as tle
@@ -104,9 +105,8 @@ def compute_measurement(X, state_params, sensor_params, sensor_id, UTC,
     return Y
 
 
-def tracklet_generator(obj_id, UTC0, dt_interval, dt_max, sensor_id, params_dict,
-                       tracklet_dict={}, orbit_regime='none', username='',
-                       password=''):
+def tracklet_generator(Xo, UTC0, dt_interval, dt_max, sensor_id, params_dict,
+                       tracklet_dict={}, orbit_regime='none'):
     '''
     
     
@@ -126,20 +126,7 @@ def tracklet_generator(obj_id, UTC0, dt_interval, dt_max, sensor_id, params_dict
         tracklet_id = max(tracklet_dict.keys()) + 1
     else:
         tracklet_id = 0
-    
-    # Initial object state        
-    state_dict = tle.propagate_TLE([obj_id], [UTC0], username=username,
-                                   password=password)
-    
-    print(state_dict)
-    
-    r0 = state_dict[obj_id]['r_GCRF'][0]
-    v0 = state_dict[obj_id]['v_GCRF'][0]
-    Xo = np.concatenate((r0, v0), axis=0)
-    
-    print(r0)
-    print(v0)
-    print(Xo)
+
     
     tk_prior = UTC0
     tk = UTC0
@@ -153,6 +140,13 @@ def tracklet_generator(obj_id, UTC0, dt_interval, dt_max, sensor_id, params_dict
         tin = [tk_prior, tk]
         tout, Xout = dyn.general_dynamics(Xk, tin, state_params, int_params)
         Xk = Xout[-1,:].reshape(6, 1)
+        
+        Xk_check = astro.element_conversion(Xo, 1, 1, dt=(tk - UTC0).total_seconds())
+        
+        print(tk)
+        print('dt', (tk - UTC0).total_seconds())
+        print(Xk)
+        print(Xk_check)
         
         # Check visibility conditions and compute measurements
         EOP_data = eop.get_eop_data(eop_alldata, tk)

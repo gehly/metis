@@ -401,31 +401,41 @@ def test_orbit_timestep():
     int_params['ode_integrator'] = 'DOP853'
     int_params['intfcn'] = dyn.ode_twobody
     
-    int_params['tfirst'] = True
+#    int_params['tfirst'] = True
     int_params['rtol'] = 1e-12
     int_params['atol'] = 1e-12
-    int_params['step'] = 10.
-    int_params['max_step'] = 1000.
+#    int_params['step'] = 10.
+#    int_params['max_step'] = 1000.
     int_params['time_format'] = 'datetime'
     
     # Initial object state vector
     # Sun-Synch Orbit
-    Xo = np.reshape([757.700301, 5222.606566, 4851.49977,
-                     2.213250611, 4.678372741, -5.371314404], (6,1))
+#    Xo = np.reshape([757.700301, 5222.606566, 4851.49977,
+#                     2.213250611, 4.678372741, -5.371314404], (6,1))
+#    elem0 = astro.cart2kep(Xo)
     
+#    a = float(elem0[0])
+#    P = 2.*math.pi*np.sqrt(a**3./GM)
+##    fraction_list = [0., 0.2, 0.8, 1.2, 1.8, 10.2, 10.8]
+#    
+#    fraction_list = [0., 10.2]
+#    
+#    
+#    tvec = np.asarray([frac*P for frac in fraction_list])
+#    UTC0 = datetime(1999, 10, 4, 1, 45, 0)
+#    tin = [UTC0 + timedelta(seconds=ti) for ti in tvec]
+    
+    # QZS-1R
+    elem0 = [4.21639888e+04, 7.47880515e-02, 3.48399170e+01, 9.92089475e+01,
+            2.70695246e+02, 3.33331109e+02]
+    
+    Xo = astro.kep2cart(elem0)
+    
+    UTC0 = datetime(2022, 11, 7, 11, 0, 0)
+    UTC1 = datetime(2022, 11, 8, 14, 10, 0)
 
-    # Propagate several orbit fractions
-    elem0 = astro.cart2kep(Xo)
-    a = float(elem0[0])
-    P = 2.*math.pi*np.sqrt(a**3./GM)
-#    fraction_list = [0., 0.2, 0.8, 1.2, 1.8, 10.2, 10.8]
+    tin = [UTC0, UTC1]
     
-    fraction_list = [0., 10.2]
-    
-    
-    tvec = np.asarray([frac*P for frac in fraction_list])
-    UTC0 = datetime(1999, 10, 4, 1, 45, 0)
-    tin = [UTC0 + timedelta(seconds=ti) for ti in tvec]
     
     
     # Run integrator
@@ -706,7 +716,7 @@ if __name__ == '__main__':
     
 #    unit_test_orbit()
     
-#    test_orbit_timestep()
+    test_orbit_timestep()
     
 #    test_hyperbolic_prop()
     
