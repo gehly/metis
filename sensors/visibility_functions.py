@@ -21,9 +21,9 @@ sys.path.append(metis_dir)
 from sensors.sensors import define_sensors
 from sensors.brdf_models import compute_mapp_lambert
 from utilities.ephemeris import compute_sun_coords, compute_moon_coords
-from utilities.tle_functions import get_spacetrack_tle_data
-from utilities.tle_functions import find_closest_tle_epoch
-from utilities.tle_functions import propagate_TLE
+# from utilities.tle_functions import get_spacetrack_tle_data
+# from utilities.tle_functions import find_closest_tle_epoch
+# from utilities.tle_functions import propagate_TLE
 
 from utilities.eop_functions import get_eop_data
 from utilities.eop_functions import get_celestrak_eop_alldata
@@ -35,6 +35,10 @@ from utilities.coordinate_systems import itrf2gcrf
 from utilities.coordinate_systems import ecef2enu
 from utilities.time_systems import utcdt2ttjd
 from utilities.time_systems import jd2cent
+
+from utilities import tle_functions as tle
+
+
 from utilities.constants import Re, AU_km
 
 from sensors import measurement_functions as mfunc
@@ -75,7 +79,7 @@ def define_RSOs(obj_id_list, UTC_list, tle_dict={}, prev_flag=False,
     
     
     if source == 'spacetrack':
-        rso_dict = propagate_TLE(obj_id_list, UTC_list, tle_dict,
+        rso_dict = tle.propagate_TLE(obj_id_list, UTC_list, tle_dict,
                                  prev_flag, offline_flag, frame_flag,
                                  username, password)
     
@@ -567,7 +571,7 @@ def compute_transit_dict(UTC_window, obj_id_list, site_dict, increment=10.,
     if source == 'spacetrack':            
         
         UTC_window_more = [UTC0 - timedelta(days=3.), UTCf + timedelta(days=3.)]
-        tle_dict, tle_df = get_spacetrack_tle_data(obj_id_list, UTC_window_more,
+        tle_dict, tle_df = tle.get_spacetrack_tle_data(obj_id_list, UTC_window_more,
                                                     username, password)
     
     # Propagate TLEs for all times in actual window, using increment
@@ -583,7 +587,7 @@ def compute_transit_dict(UTC_window, obj_id_list, site_dict, increment=10.,
      
     print('\nGet TLE Time: ', time.time()-start)
     
-    state_dict = propagate_TLE(obj_id_list, UTC_list_full, tle_dict,
+    state_dict = tle.propagate_TLE(obj_id_list, UTC_list_full, tle_dict,
                                offline_flag, username, password)
     
     
