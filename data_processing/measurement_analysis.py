@@ -146,6 +146,9 @@ def characterize_measurement_errors(meas_file, truth_file, norad_id, sp3_id,
     dec_true *= 180./math.pi 
     az_true *= 180./math.pi
     el_true *= 180./math.pi
+    
+    print(ra_true+360.)
+    print(dec_true)
         
     # Generate plot
     plt.figure()
@@ -170,11 +173,17 @@ def characterize_measurement_errors(meas_file, truth_file, norad_id, sp3_id,
         if abs(ra_resids[ii] - ra_mean) > 3.*ra_std:
             outlier_inds.append(ii)
             
+        if abs(ra_resids[ii]) > 100:
+            outlier_inds.append(ii)
+            
     for ii in range(len(dec_resids)):
         if abs(dec_resids[ii] - dec_mean) > 3.*dec_std:
             outlier_inds.append(ii)
             
-    outlier_inds = list(set(outlier_inds))
+        if abs(dec_resids[ii]) > 100:
+            outlier_inds.append(ii)
+            
+    outlier_inds = sorted(list(set(outlier_inds)))
     
     print('\nError Statistics')
     print('RA mean and std [arcsec]: ' + '{:.3f}'.format(ra_mean) + ', {:.3f}'.format(ra_std))
@@ -182,6 +191,56 @@ def characterize_measurement_errors(meas_file, truth_file, norad_id, sp3_id,
     print('Outlier indices: ', outlier_inds)
     
     return ra_mean, dec_mean
+
+
+def convert_radec_to_deg(meas_file):
+    
+    df = pd.read_csv(meas_file, header=None)
+    
+    print(df)
+    
+    t0 = datetime(2019, 9, 3, 10, 9, 42)
+    
+    times = df.iloc[0,:]
+    ra = df.iloc[1,:]
+    dec = df.iloc[2,:]
+    
+    print(times)
+    print(ra)
+    print(dec)
+    
+    output = np.zeros((3,len(times)))    
+    for ii in range(len(times)):
+        
+        print(times[ii])
+        ti = datetime.strptime(times[ii], '%Y-%m-%dT%H:%M:%S.%f')
+        ti_sec = (ti - t0).total_seconds()
+        
+        ra_deg = (float(ra[ii][0:2]) + float(ra[ii][3:5])/60. + float(ra[ii][6:])/3600.)*15.
+        dec_deg = float(dec[ii][0:2]) + float(dec[ii][3:5])/60. + float(dec[ii][6:])/3600.
+                       
+        ra_rad = ra_deg*pi/180.
+        if ra_rad > pi:
+            ra_rad -= 2*pi
+        dec_rad = dec_deg*pi/180.
+        
+        output[0,ii] = ti_sec
+        output[1,ii] = ra_rad
+        output[2,ii] = dec_rad
+        
+    
+    
+    print(output)
+    meas_df = pd.DataFrame(output)    
+    csv_name = os.path.join(fdir, 'meas_data_input.csv')
+    meas_df.to_csv(csv_name, index=False)
+        
+        
+    
+    
+    return
+
+
 
 ###############################################################################
 # TLE Data Analysis

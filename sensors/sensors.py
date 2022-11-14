@@ -58,8 +58,8 @@ def define_sensors(sensor_id_list=[]):
     obs_gap = 1.
     
     # Station Coordinates
-    lat_gs = -37.68
-    lon_gs = 145.06
+    lat_gs = -37.68064
+    lon_gs = 145.0616
     ht_gs = 0.1724 # km	
     geodetic_latlonht = [lat_gs, lon_gs, ht_gs]
     site_ecef = coord.latlonht2ecef(lat_gs, lon_gs, ht_gs)
