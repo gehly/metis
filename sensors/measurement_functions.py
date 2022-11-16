@@ -106,7 +106,7 @@ def compute_measurement(X, state_params, sensor_params, sensor_id, UTC,
 
 
 def tracklet_generator(obj_id, Xo, UTC0, dt_interval, dt_max, sensor_id, params_dict,
-                       tracklet_dict={}, orbit_regime='none'):
+                       tracklet_dict={}, truth_dict={}, orbit_regime='none'):
     '''
     
     
@@ -126,6 +126,9 @@ def tracklet_generator(obj_id, Xo, UTC0, dt_interval, dt_max, sensor_id, params_
         tracklet_id = max(tracklet_dict.keys()) + 1
     else:
         tracklet_id = 0
+        
+    if obj_id not in truth_dict:
+        truth_dict[obj_id] = {}
 
     
     tk_prior = UTC0
@@ -165,7 +168,8 @@ def tracklet_generator(obj_id, Xo, UTC0, dt_interval, dt_max, sensor_id, params_
             # Store output
             tk_list.append(tk)
             Yk_list.append(Yk)
-            sensor_id_list.append(sensor_id)   
+            sensor_id_list.append(sensor_id)
+            truth_dict[obj_id][tk] = Xk
             
         # Exit condition
         if len(tk_list) > 0:
@@ -187,7 +191,7 @@ def tracklet_generator(obj_id, Xo, UTC0, dt_interval, dt_max, sensor_id, params_
         tracklet_dict[tracklet_id]['obj_id'] = obj_id
 
 
-    return tracklet_dict
+    return tracklet_dict, truth_dict
 
 
 
