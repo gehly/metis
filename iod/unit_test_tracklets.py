@@ -7,6 +7,9 @@ import pickle
 import getpass
 import os
 import inspect
+import copy
+import pandas as pd
+import time
 
 filename = inspect.getframeinfo(inspect.currentframe()).filename
 current_dir = os.path.dirname(os.path.abspath(filename))
@@ -15,7 +18,7 @@ ind = current_dir.find('metis')
 metis_dir = current_dir[0:ind+5]
 sys.path.append(metis_dir)
 
-from iod import iod_functions as iod
+from iod import iod_functions_jit as iod
 import estimation.analysis_functions as analysis
 import estimation.estimation_functions as est
 import dynamics.dynamics_functions as dyn
@@ -701,7 +704,7 @@ def test_tracklet_association():
     return
 
 
-def process_tracklets_full(tracklet_file):
+def process_tracklets_full(tracklet_file, summary_file):
     
     # Load data
     pklFile = open(tracklet_file, 'rb' )
@@ -710,6 +713,9 @@ def process_tracklets_full(tracklet_file):
     params_dict = data[1]
     truth_dict = data[2]
     pklFile.close()
+    
+    # Initialize output
+    df_list = []
     
     
     # Exclusion times
@@ -727,11 +733,11 @@ def process_tracklets_full(tracklet_file):
             
             # Check times and switch if needed
             if tracklet_jj['tk_list'][0] > tracklet_ii['tk_list'][-1]:
-                tracklet1 = tracklet_ii
-                tracklet2 = tracklet_jj
+                tracklet1 = copy.deepcopy(tracklet_ii)
+                tracklet2 = copy.deepcopy(tracklet_jj)
             else:
-                tracklet1 = tracklet_jj
-                tracklet2 = tracklet_ii
+                tracklet1 = copy.deepcopy(tracklet_jj)
+                tracklet2 = copy.deepcopy(tracklet_ii)
             
             # Check exclusion criteria
             if (tracklet2['tk_list'][0] - tracklet1['tk_list'][-1]).total_seconds() < exclude_short:
@@ -762,9 +768,13 @@ def process_tracklets_full(tracklet_file):
             sensor_params = params_dict['sensor_params']
             orbit_regime = tracklet1['orbit_regime']
             
+            print(tracklet1['tk_list'])
+            print(tracklet2['tk_list'])
+            
             print(tk_list)
             print(Yk_list)
             print(sensor_id_list)
+
 
             # Execute function
             X_list, M_list = iod.gooding_angles_iod(tk_list, Yk_list, sensor_id_list,
@@ -790,26 +800,40 @@ def process_tracklets_full(tracklet_file):
                 resids, ra_rms, dec_rms = \
                     compute_resids(X_list[ii], tk_list[0], tracklet1, tracklet2,
                                   params_dict)
+                                    
                 
-                
+                Xo_err = np.linalg.norm(X_list[ii] - Xo_true)
                 
                 print('')
                 print(ii)
                 print('Mi', M_list[ii])
                 print('Xi', X_list[ii])
                 print('elem', elem_ii)
-                print('Xo Err: ', np.linalg.norm(X_list[ii] - Xo_true))
+                print('Xo Err: ', Xo_err)
                 print('RA Resids RMS [arcsec]: ', ra_rms)
                 print('DEC Resids RMS [arcsec]: ', dec_rms)
                 
+                df_list.append([tracklet1['obj_id'], tracklet2['obj_id'],
+                               tracklet1['tk_list'][0], tracklet2['tk_list'][0],
+                               M_list[ii], Xo_err, ra_rms, dec_rms])
                 
-            mistake
+                print(df_list)
+                
+                
+
+            
+    df = pd.DataFrame(df_list, columns=['Tracklet1_Obj_ID', 'Tracklet2_Obj_ID', 't_10', 't_20', 'M [rev]', 'Xo Err', 'RA rms', 'DEC rms'])
+
+    df.to_csv(summary_file)
     
     
     return
 
 
 def compute_resids(Xo, UTC0, tracklet1, tracklet2, params_dict):
+    
+    tracklet1 = copy.deepcopy(tracklet1)
+    tracklet2 = copy.deepcopy(tracklet2)
     
     # Break out inputs
     state_params = params_dict['state_params']
@@ -851,9 +875,12 @@ def compute_resids(Xo, UTC0, tracklet1, tracklet2, params_dict):
         sensor_id = sensor_id_list1[kk]
         EOP_data = eop.get_eop_data(eop_alldata, tk)
         
-        tout, Xout = dyn.general_dynamics(Xo, [UTC0, tk], state_params,
-                                          int_params)
-        Xk = Xout[-1,:].reshape(6,1)
+        # tout, Xout = dyn.general_dynamics(Xo, [UTC0, tk], state_params,
+        #                                   int_params)
+        # Xk = Xout[-1,:].reshape(6,1)
+        
+        Xk = astro.element_conversion(Xo, 1, 1, dt=(tk-UTC0).total_seconds())
+        
         Yprop = mfunc.compute_measurement(Xk, state_params, sensor_params,
                                           sensor_id, tk, EOP_data, XYs_df)
         
@@ -910,11 +937,13 @@ if __name__ == '__main__':
     # check_tracklet_dict()
     
     
+    start = time.time()
     tracklets_file = os.path.join('test_cases', 'twobody_geo_3obj_10min_noise0.pkl')
-    process_tracklets_full(tracklets_file)
+    summary_file = os.path.join('test_cases', 'twobody_geo_3obj_10min_noise0_corr_summary_jit2.csv')
+    process_tracklets_full(tracklets_file, summary_file)
     
     
-    
+    print('Full run time', time.time() - start)
     
     
     

@@ -114,6 +114,10 @@ def compute_radec_errors(meas_file, truth_file, norad_id, sp3_id, sensor_id, mea
         az_true[ii] = float(Y[2])
         el_true[ii] = float(Y[3])
         
+        print(UTC)
+        print(ra_true[ii]*180/math.pi+360)
+        print(dec_true[ii]*180/math.pi)
+        
         # Compute and store resids
         ra_resids[ii] = ra_meas - ra_true[ii]
         dec_resids[ii] = dec_meas - dec_true[ii]

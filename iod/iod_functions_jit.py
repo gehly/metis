@@ -1491,6 +1491,10 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, lr_star, orbit_type,
 #        if len(rho0_output_list) == 0 and nfail > 4:
 #            exit_flag = -1
 #            break
+
+        # Check exit condition
+        if iters > maxiters:
+            break
         
         # Exception Handling
         # If invalid range value, exit and continue range grid search
@@ -1887,10 +1891,9 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, lr_star, orbit_type,
             print('rho0_output_list', rho0_output_list)
             print('rhof_output_list', rhof_output_list)
         
-        # Increment counter and exit condition
+        # Increment counter
         iters += 1
-        if iters > maxiters:
-            break
+        
 
 
     return rho0_output_list, rhof_output_list

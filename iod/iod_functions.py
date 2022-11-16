@@ -1450,6 +1450,10 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, lr_star, orbit_type, Lmat,
         print('iters', iters)
         print('rho0', rho0)
         print('rhof', rhof)
+        
+        # Check exit condition
+        if iters > maxiters:
+            break
 
 #        # Check exit condition
 #        if nfail > 4:
@@ -1834,10 +1838,9 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, lr_star, orbit_type, Lmat,
         print('rho0_output_list', rho0_output_list)
         print('rhof_output_list', rhof_output_list)
         
-        # Increment counter and exit condition
+        # Increment counter
         iters += 1
-        if iters > maxiters:
-            break
+        
 
 
     return rho0_output_list, rhof_output_list
