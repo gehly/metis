@@ -18,7 +18,7 @@ ind = current_dir.find('metis')
 metis_dir = current_dir[0:ind+5]
 sys.path.append(metis_dir)
 
-from iod import iod_functions_jit as iod
+from iod import iod_functions as iod
 import estimation.analysis_functions as analysis
 import estimation.estimation_functions as est
 import dynamics.dynamics_functions as dyn
@@ -167,7 +167,7 @@ def leo_tracklets_marco():
     return
 
 
-def geo_tracklets():
+def geo_tracklets(tracklets_file, noise):
     
     username = input('space-track username: ')
     password = getpass.getpass('space-track password: ')
@@ -188,9 +188,8 @@ def geo_tracklets():
     truth_dict = {}
     sensor_id = 'RMIT ROO'
     orbit_regime = 'GEO'    
-    dt_interval = 10.
-    dt_max = 600.
-    noise = 0.    
+    dt_interval = 1.
+    dt_max = 10.
     
     # Retrieve latest EOP data from celestrak.com
     eop_alldata = eop.get_celestrak_eop_alldata()
@@ -480,8 +479,7 @@ def geo_tracklets():
     
     print(tracklet_dict)
     
-    setup_file = os.path.join('test_cases', 'twobody_geo_3obj_10min_noise0.pkl')
-    pklFile = open( setup_file, 'wb' )
+    pklFile = open( tracklets_file, 'wb' )
     pickle.dump( [tracklet_dict, params_dict, truth_dict], pklFile, -1 )
     pklFile.close()
     
@@ -768,8 +766,8 @@ def process_tracklets_full(tracklet_file, summary_file):
             sensor_params = params_dict['sensor_params']
             orbit_regime = tracklet1['orbit_regime']
             
-            print(tracklet1['tk_list'])
-            print(tracklet2['tk_list'])
+            # print(tracklet1['tk_list'])
+            # print(tracklet2['tk_list'])
             
             print(tk_list)
             print(Yk_list)
@@ -781,7 +779,7 @@ def process_tracklets_full(tracklet_file, summary_file):
                                                     sensor_params, orbit_regime=orbit_regime,
                                                     search_mode='middle_out',
                                                     periapsis_check=True,
-                                                    rootfind='zeros')
+                                                    rootfind='min')
     
             # Retrieve truth
             obj_id = tracklet1['obj_id']
@@ -928,9 +926,16 @@ def check_tracklet_dict():
 if __name__ == '__main__':
     
     
+    fdir = r'D:\documents\research_projects\iod\data\sim\debug\2022_11_17_twobody_geo_3obj_10sec'
+    tracklets_file = os.path.join(fdir, 'twobody_geo_3obj_10sec_noise1.pkl')
+    summary_file = os.path.join(fdir, 'twobody_geo_3obj_10sec_noise1_corr_summary_min.csv')
+    
+    noise = 1.
+    
 #    leo_tracklets_marco()
     
-    # geo_tracklets()
+    
+    # geo_tracklets(tracklets_file, noise)
     
     # test_tracklet_association()
     
@@ -938,8 +943,7 @@ if __name__ == '__main__':
     
     
     start = time.time()
-    tracklets_file = os.path.join('test_cases', 'twobody_geo_3obj_10min_noise0.pkl')
-    summary_file = os.path.join('test_cases', 'twobody_geo_3obj_10min_noise0_corr_summary_jit2.csv')
+    
     process_tracklets_full(tracklets_file, summary_file)
     
     
