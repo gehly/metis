@@ -2253,11 +2253,11 @@ def compute_intermediate_rho(rho0, rhof, tof, M_star, lr_star, orbit_type,
     
     # Hyperbolic orbit can pass periapsis check but still have unreasonable
     # semi-major axis. C3 of 160 is sufficient to reach Pluto and corresponds
-    # to |SMA| = 2491 km. Any |SMA| < 1000 km can safely be rejected.
+    # to |SMA| = 2491 km. Any |SMA| < 2500 km can safely be rejected.
     r0 = np.linalg.norm(r0_vect)
     v0 = np.linalg.norm(v0_vect)
     a = 1/(2/r0 - v0**2./GME)
-    if abs(a) < 1000.:
+    if abs(a) < 2500.:
         return [], []
     
     # Full cartesian state vector at t0

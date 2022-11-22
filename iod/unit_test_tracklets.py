@@ -18,7 +18,7 @@ ind = current_dir.find('metis')
 metis_dir = current_dir[0:ind+5]
 sys.path.append(metis_dir)
 
-from iod import iod_functions as iod
+from iod import iod_functions_jit as iod
 import estimation.analysis_functions as analysis
 import estimation.estimation_functions as est
 import dynamics.dynamics_functions as dyn
@@ -178,7 +178,6 @@ def geo_tracklets(tracklets_file, noise):
     qzs3_norad = 42917
     qzs4_norad = 42965
     
-    ses15_norad = 42709
     amos5_norad = 37950
     coms1_norad = 36744
     
@@ -188,8 +187,8 @@ def geo_tracklets(tracklets_file, noise):
     truth_dict = {}
     sensor_id = 'RMIT ROO'
     orbit_regime = 'GEO'    
-    dt_interval = 1.
-    dt_max = 10.
+    dt_interval = 10.
+    dt_max = 600.
     
     # Retrieve latest EOP data from celestrak.com
     eop_alldata = eop.get_celestrak_eop_alldata()
@@ -267,40 +266,104 @@ def geo_tracklets(tracklets_file, noise):
         mfunc.tracklet_generator(obj_id, Xk, UTC, dt_interval, dt_max, sensor_id,
                                  params_dict, tracklet_dict, truth_dict, orbit_regime)
         
+    UTC = datetime(2022, 11, 10, 10, 0, 0)
+    tout, Xout = dyn.general_dynamics(Xo, [UTC0, UTC], state_params, int_params)
+    Xk = Xout[-1,:].reshape(6,1)
+    
+    tracklet_dict, truth_dict = \
+        mfunc.tracklet_generator(obj_id, Xk, UTC, dt_interval, dt_max, sensor_id,
+                                 params_dict, tracklet_dict, truth_dict, orbit_regime)
         
-    # ###########################################################################
-    # # QZS2
-    # ###########################################################################
+    UTC = datetime(2022, 11, 11, 12, 0, 0)
+    tout, Xout = dyn.general_dynamics(Xo, [UTC0, UTC], state_params, int_params)
+    Xk = Xout[-1,:].reshape(6,1)
     
-    # obj_id = qzs2_norad
-    # UTC0 = datetime(2022, 11, 7, 11, 10, 0)
-    # state_dict = tle.propagate_TLE([obj_id], [UTC0], username=username,
-    #                                password=password)
-    # r0 = state_dict[obj_id]['r_GCRF'][0]
-    # v0 = state_dict[obj_id]['v_GCRF'][0]
-    # Xo = np.concatenate((r0, v0), axis=0)
-    
-    
-    # tracklet_dict, truth_dict = \
-    #     mfunc.tracklet_generator(obj_id, Xo, UTC0, dt_interval, dt_max, sensor_id,
-    #                              params_dict, tracklet_dict, truth_dict, orbit_regime)
-    
-    
-    # UTC = datetime(2022, 11, 8, 14, 10, 0)
-    # tout, Xout = dyn.general_dynamics(Xo, [UTC0, UTC], state_params, int_params)
-    # Xk = Xout[-1,:].reshape(6,1)
-    
-    # tracklet_dict, truth_dict = \
-    #     mfunc.tracklet_generator(obj_id, Xk, UTC, dt_interval, dt_max, sensor_id,
-    #                              params_dict, tracklet_dict, truth_dict, orbit_regime)
+    tracklet_dict, truth_dict = \
+        mfunc.tracklet_generator(obj_id, Xk, UTC, dt_interval, dt_max, sensor_id,
+                                 params_dict, tracklet_dict, truth_dict, orbit_regime)
         
-    # UTC = datetime(2022, 11, 9, 16, 10, 0)
-    # tout, Xout = dyn.general_dynamics(Xo, [UTC0, UTC], state_params, int_params)
-    # Xk = Xout[-1,:].reshape(6,1)
+    UTC = datetime(2022, 11, 12, 13, 0, 0)
+    tout, Xout = dyn.general_dynamics(Xo, [UTC0, UTC], state_params, int_params)
+    Xk = Xout[-1,:].reshape(6,1)
     
-    # tracklet_dict, truth_dict = \
-    #     mfunc.tracklet_generator(obj_id, Xk, UTC, dt_interval, dt_max, sensor_id,
-    #                              params_dict, tracklet_dict, truth_dict, orbit_regime)
+    tracklet_dict, truth_dict = \
+        mfunc.tracklet_generator(obj_id, Xk, UTC, dt_interval, dt_max, sensor_id,
+                                 params_dict, tracklet_dict, truth_dict, orbit_regime)
+        
+    UTC = datetime(2022, 11, 13, 9, 0, 0)
+    tout, Xout = dyn.general_dynamics(Xo, [UTC0, UTC], state_params, int_params)
+    Xk = Xout[-1,:].reshape(6,1)
+    
+    tracklet_dict, truth_dict = \
+        mfunc.tracklet_generator(obj_id, Xk, UTC, dt_interval, dt_max, sensor_id,
+                                 params_dict, tracklet_dict, truth_dict, orbit_regime)
+        
+        
+    ###########################################################################
+    # QZS2
+    ###########################################################################
+    
+    obj_id = qzs2_norad
+    UTC0 = datetime(2022, 11, 7, 11, 10, 0)
+    state_dict = tle.propagate_TLE([obj_id], [UTC0], username=username,
+                                    password=password)
+    r0 = state_dict[obj_id]['r_GCRF'][0]
+    v0 = state_dict[obj_id]['v_GCRF'][0]
+    Xo = np.concatenate((r0, v0), axis=0)
+    
+    
+    tracklet_dict, truth_dict = \
+        mfunc.tracklet_generator(obj_id, Xo, UTC0, dt_interval, dt_max, sensor_id,
+                                  params_dict, tracklet_dict, truth_dict, orbit_regime)
+    
+    
+    UTC = datetime(2022, 11, 8, 14, 10, 0)
+    tout, Xout = dyn.general_dynamics(Xo, [UTC0, UTC], state_params, int_params)
+    Xk = Xout[-1,:].reshape(6,1)
+    
+    tracklet_dict, truth_dict = \
+        mfunc.tracklet_generator(obj_id, Xk, UTC, dt_interval, dt_max, sensor_id,
+                                  params_dict, tracklet_dict, truth_dict, orbit_regime)
+        
+    UTC = datetime(2022, 11, 9, 16, 10, 0)
+    tout, Xout = dyn.general_dynamics(Xo, [UTC0, UTC], state_params, int_params)
+    Xk = Xout[-1,:].reshape(6,1)
+    
+    tracklet_dict, truth_dict = \
+        mfunc.tracklet_generator(obj_id, Xk, UTC, dt_interval, dt_max, sensor_id,
+                                  params_dict, tracklet_dict, truth_dict, orbit_regime)
+        
+    UTC = datetime(2022, 11, 10, 10, 10, 0)
+    tout, Xout = dyn.general_dynamics(Xo, [UTC0, UTC], state_params, int_params)
+    Xk = Xout[-1,:].reshape(6,1)
+    
+    tracklet_dict, truth_dict = \
+        mfunc.tracklet_generator(obj_id, Xk, UTC, dt_interval, dt_max, sensor_id,
+                                  params_dict, tracklet_dict, truth_dict, orbit_regime)
+        
+    UTC = datetime(2022, 11, 11, 12, 10, 0)
+    tout, Xout = dyn.general_dynamics(Xo, [UTC0, UTC], state_params, int_params)
+    Xk = Xout[-1,:].reshape(6,1)
+    
+    tracklet_dict, truth_dict = \
+        mfunc.tracklet_generator(obj_id, Xk, UTC, dt_interval, dt_max, sensor_id,
+                                  params_dict, tracklet_dict, truth_dict, orbit_regime)
+        
+    UTC = datetime(2022, 11, 12, 13, 10, 0)
+    tout, Xout = dyn.general_dynamics(Xo, [UTC0, UTC], state_params, int_params)
+    Xk = Xout[-1,:].reshape(6,1)
+    
+    tracklet_dict, truth_dict = \
+        mfunc.tracklet_generator(obj_id, Xk, UTC, dt_interval, dt_max, sensor_id,
+                                  params_dict, tracklet_dict, truth_dict, orbit_regime)
+        
+    UTC = datetime(2022, 11, 13, 9, 10, 0)
+    tout, Xout = dyn.general_dynamics(Xo, [UTC0, UTC], state_params, int_params)
+    Xk = Xout[-1,:].reshape(6,1)
+    
+    tracklet_dict, truth_dict = \
+        mfunc.tracklet_generator(obj_id, Xk, UTC, dt_interval, dt_max, sensor_id,
+                                  params_dict, tracklet_dict, truth_dict, orbit_regime)
         
     
     ###########################################################################
@@ -337,76 +400,106 @@ def geo_tracklets(tracklets_file, noise):
         mfunc.tracklet_generator(obj_id, Xk, UTC, dt_interval, dt_max, sensor_id,
                                   params_dict, tracklet_dict, truth_dict, orbit_regime)
         
+    UTC = datetime(2022, 11, 10, 10, 20, 0)
+    tout, Xout = dyn.general_dynamics(Xo, [UTC0, UTC], state_params, int_params)
+    Xk = Xout[-1,:].reshape(6,1)
     
-    # ###########################################################################
-    # # QZS4
-    # ###########################################################################
-    
-    # obj_id = qzs4_norad
-    # UTC0 = datetime(2022, 11, 7, 11, 30, 0)
-    # state_dict = tle.propagate_TLE([obj_id], [UTC0], username=username,
-    #                                 password=password)
-    # r0 = state_dict[obj_id]['r_GCRF'][0]
-    # v0 = state_dict[obj_id]['v_GCRF'][0]
-    # Xo = np.concatenate((r0, v0), axis=0)
-    
-    
-    # tracklet_dict, truth_dict = \
-    #     mfunc.tracklet_generator(obj_id, Xo, UTC0, dt_interval, dt_max, sensor_id,
-    #                               params_dict, tracklet_dict, truth_dict, orbit_regime)
-    
-    
-    # UTC = datetime(2022, 11, 8, 14, 30, 0)
-    # tout, Xout = dyn.general_dynamics(Xo, [UTC0, UTC], state_params, int_params)
-    # Xk = Xout[-1,:].reshape(6,1)
-    
-    # tracklet_dict, truth_dict = \
-    #     mfunc.tracklet_generator(obj_id, Xk, UTC, dt_interval, dt_max, sensor_id,
-    #                               params_dict, tracklet_dict, truth_dict, orbit_regime)
+    tracklet_dict, truth_dict = \
+        mfunc.tracklet_generator(obj_id, Xk, UTC, dt_interval, dt_max, sensor_id,
+                                  params_dict, tracklet_dict, truth_dict, orbit_regime)
         
-    # UTC = datetime(2022, 11, 9, 16, 30, 0)
-    # tout, Xout = dyn.general_dynamics(Xo, [UTC0, UTC], state_params, int_params)
-    # Xk = Xout[-1,:].reshape(6,1)
+    UTC = datetime(2022, 11, 11, 12, 20, 0)
+    tout, Xout = dyn.general_dynamics(Xo, [UTC0, UTC], state_params, int_params)
+    Xk = Xout[-1,:].reshape(6,1)
     
-    # tracklet_dict, truth_dict = \
-    #     mfunc.tracklet_generator(obj_id, Xk, UTC, dt_interval, dt_max, sensor_id,
-    #                               params_dict, tracklet_dict, truth_dict, orbit_regime)
+    tracklet_dict, truth_dict = \
+        mfunc.tracklet_generator(obj_id, Xk, UTC, dt_interval, dt_max, sensor_id,
+                                  params_dict, tracklet_dict, truth_dict, orbit_regime)
         
-    # ###########################################################################
-    # # SES-15
-    # ###########################################################################
+    UTC = datetime(2022, 11, 12, 13, 20, 0)
+    tout, Xout = dyn.general_dynamics(Xo, [UTC0, UTC], state_params, int_params)
+    Xk = Xout[-1,:].reshape(6,1)
     
-    # obj_id = ses15_norad
-    # UTC0 = datetime(2022, 11, 7, 11, 40, 0)
-    # state_dict = tle.propagate_TLE([obj_id], [UTC0], username=username,
-    #                                 password=password)
-    # r0 = state_dict[obj_id]['r_GCRF'][0]
-    # v0 = state_dict[obj_id]['v_GCRF'][0]
-    # Xo = np.concatenate((r0, v0), axis=0)
-    
-    
-    # tracklet_dict, truth_dict = \
-    #     mfunc.tracklet_generator(obj_id, Xo, UTC0, dt_interval, dt_max, sensor_id,
-    #                               params_dict, tracklet_dict, truth_dict, orbit_regime)
-    
-    
-    # UTC = datetime(2022, 11, 8, 14, 40, 0)
-    # tout, Xout = dyn.general_dynamics(Xo, [UTC0, UTC], state_params, int_params)
-    # Xk = Xout[-1,:].reshape(6,1)
-    
-    # tracklet_dict, truth_dict = \
-    #     mfunc.tracklet_generator(obj_id, Xk, UTC, dt_interval, dt_max, sensor_id,
-    #                               params_dict, tracklet_dict, truth_dict, orbit_regime)
+    tracklet_dict, truth_dict = \
+        mfunc.tracklet_generator(obj_id, Xk, UTC, dt_interval, dt_max, sensor_id,
+                                  params_dict, tracklet_dict, truth_dict, orbit_regime)
         
-    # UTC = datetime(2022, 11, 9, 16, 40, 0)
-    # tout, Xout = dyn.general_dynamics(Xo, [UTC0, UTC], state_params, int_params)
-    # Xk = Xout[-1,:].reshape(6,1)
+    UTC = datetime(2022, 11, 13, 9, 20, 0)
+    tout, Xout = dyn.general_dynamics(Xo, [UTC0, UTC], state_params, int_params)
+    Xk = Xout[-1,:].reshape(6,1)
     
-    # tracklet_dict, truth_dict = \
-    #     mfunc.tracklet_generator(obj_id, Xk, UTC, dt_interval, dt_max, sensor_id,
-    #                               params_dict, tracklet_dict, truth_dict, orbit_regime)
+    tracklet_dict, truth_dict = \
+        mfunc.tracklet_generator(obj_id, Xk, UTC, dt_interval, dt_max, sensor_id,
+                                  params_dict, tracklet_dict, truth_dict, orbit_regime)
         
+    
+    ###########################################################################
+    # QZS4
+    ###########################################################################
+    
+    obj_id = qzs4_norad
+    UTC0 = datetime(2022, 11, 7, 11, 30, 0)
+    state_dict = tle.propagate_TLE([obj_id], [UTC0], username=username,
+                                    password=password)
+    r0 = state_dict[obj_id]['r_GCRF'][0]
+    v0 = state_dict[obj_id]['v_GCRF'][0]
+    Xo = np.concatenate((r0, v0), axis=0)
+    
+    
+    tracklet_dict, truth_dict = \
+        mfunc.tracklet_generator(obj_id, Xo, UTC0, dt_interval, dt_max, sensor_id,
+                                  params_dict, tracklet_dict, truth_dict, orbit_regime)
+    
+    
+    UTC = datetime(2022, 11, 8, 14, 30, 0)
+    tout, Xout = dyn.general_dynamics(Xo, [UTC0, UTC], state_params, int_params)
+    Xk = Xout[-1,:].reshape(6,1)
+    
+    tracklet_dict, truth_dict = \
+        mfunc.tracklet_generator(obj_id, Xk, UTC, dt_interval, dt_max, sensor_id,
+                                  params_dict, tracklet_dict, truth_dict, orbit_regime)
         
+    UTC = datetime(2022, 11, 9, 16, 30, 0)
+    tout, Xout = dyn.general_dynamics(Xo, [UTC0, UTC], state_params, int_params)
+    Xk = Xout[-1,:].reshape(6,1)
+    
+    tracklet_dict, truth_dict = \
+        mfunc.tracklet_generator(obj_id, Xk, UTC, dt_interval, dt_max, sensor_id,
+                                  params_dict, tracklet_dict, truth_dict, orbit_regime)
+        
+    UTC = datetime(2022, 11, 10, 10, 30, 0)
+    tout, Xout = dyn.general_dynamics(Xo, [UTC0, UTC], state_params, int_params)
+    Xk = Xout[-1,:].reshape(6,1)
+    
+    tracklet_dict, truth_dict = \
+        mfunc.tracklet_generator(obj_id, Xk, UTC, dt_interval, dt_max, sensor_id,
+                                  params_dict, tracklet_dict, truth_dict, orbit_regime)
+        
+    UTC = datetime(2022, 11, 11, 12, 30, 0)
+    tout, Xout = dyn.general_dynamics(Xo, [UTC0, UTC], state_params, int_params)
+    Xk = Xout[-1,:].reshape(6,1)
+    
+    tracklet_dict, truth_dict = \
+        mfunc.tracklet_generator(obj_id, Xk, UTC, dt_interval, dt_max, sensor_id,
+                                  params_dict, tracklet_dict, truth_dict, orbit_regime)
+        
+    UTC = datetime(2022, 11, 12, 13, 30, 0)
+    tout, Xout = dyn.general_dynamics(Xo, [UTC0, UTC], state_params, int_params)
+    Xk = Xout[-1,:].reshape(6,1)
+    
+    tracklet_dict, truth_dict = \
+        mfunc.tracklet_generator(obj_id, Xk, UTC, dt_interval, dt_max, sensor_id,
+                                  params_dict, tracklet_dict, truth_dict, orbit_regime)
+        
+    UTC = datetime(2022, 11, 13, 9, 30, 0)
+    tout, Xout = dyn.general_dynamics(Xo, [UTC0, UTC], state_params, int_params)
+    Xk = Xout[-1,:].reshape(6,1)
+    
+    tracklet_dict, truth_dict = \
+        mfunc.tracklet_generator(obj_id, Xk, UTC, dt_interval, dt_max, sensor_id,
+                                  params_dict, tracklet_dict, truth_dict, orbit_regime)
+        
+               
     ###########################################################################
     # AMOS-5
     ###########################################################################
@@ -441,39 +534,103 @@ def geo_tracklets(tracklets_file, noise):
         mfunc.tracklet_generator(obj_id, Xk, UTC, dt_interval, dt_max, sensor_id,
                                   params_dict, tracklet_dict, truth_dict, orbit_regime)
         
-    # ###########################################################################
-    # # COMS-1
-    # ###########################################################################
+    UTC = datetime(2022, 11, 10, 10, 50, 0)
+    tout, Xout = dyn.general_dynamics(Xo, [UTC0, UTC], state_params, int_params)
+    Xk = Xout[-1,:].reshape(6,1)
     
-    # obj_id = coms1_norad
-    # UTC0 = datetime(2022, 11, 7, 12, 0, 0)
-    # state_dict = tle.propagate_TLE([obj_id], [UTC0], username=username,
-    #                                password=password)
-    # r0 = state_dict[obj_id]['r_GCRF'][0]
-    # v0 = state_dict[obj_id]['v_GCRF'][0]
-    # Xo = np.concatenate((r0, v0), axis=0)
-    
-    
-    # tracklet_dict, truth_dict = \
-    #     mfunc.tracklet_generator(obj_id, Xo, UTC0, dt_interval, dt_max, sensor_id,
-    #                              params_dict, tracklet_dict, truth_dict, orbit_regime)
-    
-    
-    # UTC = datetime(2022, 11, 8, 15, 0, 0)
-    # tout, Xout = dyn.general_dynamics(Xo, [UTC0, UTC], state_params, int_params)
-    # Xk = Xout[-1,:].reshape(6,1)
-    
-    # tracklet_dict, truth_dict = \
-    #     mfunc.tracklet_generator(obj_id, Xk, UTC, dt_interval, dt_max, sensor_id,
-    #                              params_dict, tracklet_dict, truth_dict, orbit_regime)
+    tracklet_dict, truth_dict = \
+        mfunc.tracklet_generator(obj_id, Xk, UTC, dt_interval, dt_max, sensor_id,
+                                  params_dict, tracklet_dict, truth_dict, orbit_regime)
         
-    # UTC = datetime(2022, 11, 9, 17, 0, 0)
-    # tout, Xout = dyn.general_dynamics(Xo, [UTC0, UTC], state_params, int_params)
-    # Xk = Xout[-1,:].reshape(6,1)
+    UTC = datetime(2022, 11, 11, 12, 50, 0)
+    tout, Xout = dyn.general_dynamics(Xo, [UTC0, UTC], state_params, int_params)
+    Xk = Xout[-1,:].reshape(6,1)
     
-    # tracklet_dict, truth_dict = \
-    #     mfunc.tracklet_generator(obj_id, Xk, UTC, dt_interval, dt_max, sensor_id,
-    #                              params_dict, tracklet_dict, truth_dict, orbit_regime)
+    tracklet_dict, truth_dict = \
+        mfunc.tracklet_generator(obj_id, Xk, UTC, dt_interval, dt_max, sensor_id,
+                                  params_dict, tracklet_dict, truth_dict, orbit_regime)
+        
+    UTC = datetime(2022, 11, 12, 13, 50, 0)
+    tout, Xout = dyn.general_dynamics(Xo, [UTC0, UTC], state_params, int_params)
+    Xk = Xout[-1,:].reshape(6,1)
+    
+    tracklet_dict, truth_dict = \
+        mfunc.tracklet_generator(obj_id, Xk, UTC, dt_interval, dt_max, sensor_id,
+                                  params_dict, tracklet_dict, truth_dict, orbit_regime)
+        
+    UTC = datetime(2022, 11, 13, 9, 50, 0)
+    tout, Xout = dyn.general_dynamics(Xo, [UTC0, UTC], state_params, int_params)
+    Xk = Xout[-1,:].reshape(6,1)
+    
+    tracklet_dict, truth_dict = \
+        mfunc.tracklet_generator(obj_id, Xk, UTC, dt_interval, dt_max, sensor_id,
+                                  params_dict, tracklet_dict, truth_dict, orbit_regime)
+        
+    ###########################################################################
+    # COMS-1
+    ###########################################################################
+    
+    obj_id = coms1_norad
+    UTC0 = datetime(2022, 11, 7, 12, 0, 0)
+    state_dict = tle.propagate_TLE([obj_id], [UTC0], username=username,
+                                    password=password)
+    r0 = state_dict[obj_id]['r_GCRF'][0]
+    v0 = state_dict[obj_id]['v_GCRF'][0]
+    Xo = np.concatenate((r0, v0), axis=0)
+    
+    
+    tracklet_dict, truth_dict = \
+        mfunc.tracklet_generator(obj_id, Xo, UTC0, dt_interval, dt_max, sensor_id,
+                                  params_dict, tracklet_dict, truth_dict, orbit_regime)
+    
+    
+    UTC = datetime(2022, 11, 8, 15, 0, 0)
+    tout, Xout = dyn.general_dynamics(Xo, [UTC0, UTC], state_params, int_params)
+    Xk = Xout[-1,:].reshape(6,1)
+    
+    tracklet_dict, truth_dict = \
+        mfunc.tracklet_generator(obj_id, Xk, UTC, dt_interval, dt_max, sensor_id,
+                                  params_dict, tracklet_dict, truth_dict, orbit_regime)
+        
+    UTC = datetime(2022, 11, 9, 17, 0, 0)
+    tout, Xout = dyn.general_dynamics(Xo, [UTC0, UTC], state_params, int_params)
+    Xk = Xout[-1,:].reshape(6,1)
+    
+    tracklet_dict, truth_dict = \
+        mfunc.tracklet_generator(obj_id, Xk, UTC, dt_interval, dt_max, sensor_id,
+                                  params_dict, tracklet_dict, truth_dict, orbit_regime)
+        
+    UTC = datetime(2022, 11, 10, 11, 0, 0)
+    tout, Xout = dyn.general_dynamics(Xo, [UTC0, UTC], state_params, int_params)
+    Xk = Xout[-1,:].reshape(6,1)
+    
+    tracklet_dict, truth_dict = \
+        mfunc.tracklet_generator(obj_id, Xk, UTC, dt_interval, dt_max, sensor_id,
+                                  params_dict, tracklet_dict, truth_dict, orbit_regime)
+        
+    UTC = datetime(2022, 11, 11, 13, 0, 0)
+    tout, Xout = dyn.general_dynamics(Xo, [UTC0, UTC], state_params, int_params)
+    Xk = Xout[-1,:].reshape(6,1)
+    
+    tracklet_dict, truth_dict = \
+        mfunc.tracklet_generator(obj_id, Xk, UTC, dt_interval, dt_max, sensor_id,
+                                  params_dict, tracklet_dict, truth_dict, orbit_regime)
+        
+    UTC = datetime(2022, 11, 12, 14, 0, 0)
+    tout, Xout = dyn.general_dynamics(Xo, [UTC0, UTC], state_params, int_params)
+    Xk = Xout[-1,:].reshape(6,1)
+    
+    tracklet_dict, truth_dict = \
+        mfunc.tracklet_generator(obj_id, Xk, UTC, dt_interval, dt_max, sensor_id,
+                                  params_dict, tracklet_dict, truth_dict, orbit_regime)
+        
+    UTC = datetime(2022, 11, 13, 10, 0, 0)
+    tout, Xout = dyn.general_dynamics(Xo, [UTC0, UTC], state_params, int_params)
+    Xk = Xout[-1,:].reshape(6,1)
+    
+    tracklet_dict, truth_dict = \
+        mfunc.tracklet_generator(obj_id, Xk, UTC, dt_interval, dt_max, sensor_id,
+                                  params_dict, tracklet_dict, truth_dict, orbit_regime)
     
     
     
@@ -496,7 +653,6 @@ def test_tracklet_association():
     qzs3_norad = 42917
     qzs4_norad = 42965
     
-    ses15_norad = 42709
     amos5_norad = 37950
     coms1_norad = 36744
     
@@ -702,7 +858,7 @@ def test_tracklet_association():
     return
 
 
-def process_tracklets_full(tracklet_file, summary_file):
+def process_tracklets_full(tracklet_file, csv_file, correlation_file):
     
     # Load data
     pklFile = open(tracklet_file, 'rb' )
@@ -712,13 +868,20 @@ def process_tracklets_full(tracklet_file, summary_file):
     truth_dict = data[2]
     pklFile.close()
     
+    # EOP data
+    sensor_params = params_dict['sensor_params']
+    eop_alldata = sensor_params['eop_alldata']
+    XYs_df = sensor_params['XYs_df']
+    
     # Initialize output
     df_list = []
+    correlation_dict = {}
+    correlation_id = 0
     
     
     # Exclusion times
     exclude_short = 12*3600.
-    exclude_long = 5.*86400.
+    exclude_long = 10.*86400.
     
     # Loop through tracklets and compute association
     tracklet_id_list = list(tracklet_dict.keys())
@@ -733,9 +896,13 @@ def process_tracklets_full(tracklet_file, summary_file):
             if tracklet_jj['tk_list'][0] > tracklet_ii['tk_list'][-1]:
                 tracklet1 = copy.deepcopy(tracklet_ii)
                 tracklet2 = copy.deepcopy(tracklet_jj)
+                tracklet1_id = ii
+                tracklet2_id = jj
             else:
                 tracklet1 = copy.deepcopy(tracklet_jj)
                 tracklet2 = copy.deepcopy(tracklet_ii)
+                tracklet1_id = jj
+                tracklet2_id = ii
             
             # Check exclusion criteria
             if (tracklet2['tk_list'][0] - tracklet1['tk_list'][-1]).total_seconds() < exclude_short:
@@ -746,6 +913,11 @@ def process_tracklets_full(tracklet_file, summary_file):
             
             
             count += 1
+            
+            # if count < 714:
+            #     continue
+            
+            
             print('')
             print(count)
             print('tracklet1')
@@ -756,7 +928,7 @@ def process_tracklets_full(tracklet_file, summary_file):
             print(tracklet2['tk_list'][0])
     
             
-            # Run Gooding IOD
+            # Set up for correlation
             tk_list = [tracklet1['tk_list'][0], tracklet1['tk_list'][-1], tracklet2['tk_list'][-1]]
             Yk_list = [tracklet1['Yk_list'][0], tracklet1['Yk_list'][-1], tracklet2['Yk_list'][-1]]
             sensor_id_list = [tracklet1['sensor_id_list'][0],
@@ -772,19 +944,55 @@ def process_tracklets_full(tracklet_file, summary_file):
             print(tk_list)
             print(Yk_list)
             print(sensor_id_list)
-
-
-            # Execute function
-            X_list, M_list = iod.gooding_angles_iod(tk_list, Yk_list, sensor_id_list,
-                                                    sensor_params, orbit_regime=orbit_regime,
-                                                    search_mode='middle_out',
-                                                    periapsis_check=True,
-                                                    rootfind='min')
-    
-            # Retrieve truth
+            
+            # Compute true association details
             obj_id = tracklet1['obj_id']
             Xo_true = truth_dict[obj_id][tk_list[0]]
             elem_true = astro.cart2kep(Xo_true)
+            sma = elem_true[0]
+            period = astro.sma2period(sma)
+            M_true = int(np.floor((tk_list[-1]-tk_list[0]).total_seconds()/period))
+                
+            # Run Gooding IOD
+            X_list, M_list = iod.gooding_angles_iod(tk_list, Yk_list, sensor_id_list,
+                                                    sensor_params, 
+                                                    eop_alldata=eop_alldata,
+                                                    XYs_df=XYs_df,
+                                                    orbit_regime=orbit_regime,
+                                                    search_mode='middle_out',
+                                                    periapsis_check=True,
+                                                    rootfind='min', debug=False)
+
+            # mistake
+    
+            # If no solutions found, record basic data
+            if len(M_list) == 0:
+                
+                if tracklet1['obj_id'] == tracklet2['obj_id']:
+                    corr_truth = True
+                else:
+                    corr_truth = False
+                
+                correlation_dict[correlation_id] = {}
+                correlation_dict[correlation_id]['count'] = count
+                correlation_dict[correlation_id]['tracklet1_id'] = tracklet1_id
+                correlation_dict[correlation_id]['tracklet2_id'] = tracklet2_id
+                correlation_dict[correlation_id]['corr_truth'] = corr_truth
+                correlation_dict[correlation_id]['obj1_id'] = tracklet1['obj_id']
+                correlation_dict[correlation_id]['obj2_id'] = tracklet2['obj_id']
+                correlation_dict[correlation_id]['Xo_true'] = Xo_true
+                correlation_dict[correlation_id]['Xo'] = np.zeros((6,1))
+                correlation_dict[correlation_id]['M'] = 0
+                correlation_dict[correlation_id]['resids'] = np.ones((2,1))*np.inf
+                correlation_dict[correlation_id]['ra_rms'] = np.inf
+                correlation_dict[correlation_id]['dec_rms'] = np.inf
+                
+                correlation_id += 1
+                
+                df_list.append([count, tracklet1['obj_id'], tracklet2['obj_id'],
+                               tracklet1['tk_list'][0], tracklet2['tk_list'][0],
+                               0, np.inf, np.inf, np.inf, corr_truth])
+            
             
             print('Tracklet1 Elem Truth: ', elem_true)
             
@@ -792,37 +1000,68 @@ def process_tracklets_full(tracklet_file, summary_file):
             print('X_list', X_list)
             print('M_list', M_list)
             
-            for ii in range(len(M_list)):
+            for ind in range(len(M_list)):
                 
-                elem_ii = astro.cart2kep(X_list[ii])
+                elem = astro.cart2kep(X_list[ind])
                 resids, ra_rms, dec_rms = \
-                    compute_resids(X_list[ii], tk_list[0], tracklet1, tracklet2,
+                    compute_resids(X_list[ind], tk_list[0], tracklet1, tracklet2,
                                   params_dict)
                                     
                 
-                Xo_err = np.linalg.norm(X_list[ii] - Xo_true)
+                Xo_err = np.linalg.norm(X_list[ind] - Xo_true)
+                
+                # True correlation status
+                if (tracklet1['obj_id'] == tracklet2['obj_id']) and (M_list[ind] == M_true):
+                    corr_truth = True
+                else:
+                    corr_truth = False
                 
                 print('')
-                print(ii)
-                print('Mi', M_list[ii])
-                print('Xi', X_list[ii])
-                print('elem', elem_ii)
+                print(ind)
+                print('Mi', M_list[ind])
+                print('Xi', X_list[ind])
+                print('elem', elem)
                 print('Xo Err: ', Xo_err)
                 print('RA Resids RMS [arcsec]: ', ra_rms)
                 print('DEC Resids RMS [arcsec]: ', dec_rms)
                 
-                df_list.append([tracklet1['obj_id'], tracklet2['obj_id'],
+                df_list.append([count, tracklet1['obj_id'], tracklet2['obj_id'],
                                tracklet1['tk_list'][0], tracklet2['tk_list'][0],
-                               M_list[ii], Xo_err, ra_rms, dec_rms])
+                               M_list[ind], Xo_err, ra_rms, dec_rms, corr_truth])
                 
-                print(df_list)
+                # print(df_list)
+                
+                correlation_dict[correlation_id] = {}
+                correlation_dict[correlation_id]['count'] = count
+                correlation_dict[correlation_id]['tracklet1_id'] = tracklet1_id
+                correlation_dict[correlation_id]['tracklet2_id'] = tracklet2_id
+                correlation_dict[correlation_id]['corr_truth'] = corr_truth
+                correlation_dict[correlation_id]['obj1_id'] = tracklet1['obj_id']
+                correlation_dict[correlation_id]['obj2_id'] = tracklet2['obj_id']
+                correlation_dict[correlation_id]['Xo_true'] = Xo_true
+                correlation_dict[correlation_id]['Xo'] = X_list[ind]
+                correlation_dict[correlation_id]['M'] = M_list[ind]
+                correlation_dict[correlation_id]['resids'] = resids
+                correlation_dict[correlation_id]['ra_rms'] = ra_rms
+                correlation_dict[correlation_id]['dec_rms'] = dec_rms
+                
+                correlation_id += 1
+                
                 
                 
 
             
-    df = pd.DataFrame(df_list, columns=['Tracklet1_Obj_ID', 'Tracklet2_Obj_ID', 't_10', 't_20', 'M [rev]', 'Xo Err', 'RA rms', 'DEC rms'])
+    df = pd.DataFrame(df_list, columns=['Count', 'Tracklet1_Obj_ID',
+                                        'Tracklet2_Obj_ID', 't_10', 't_20',
+                                        'M [rev]', 'Xo Err', 'RA rms',
+                                        'DEC rms', 'Correlation Truth'])
 
-    df.to_csv(summary_file)
+    df.to_csv(csv_file)
+    
+    
+    pklFile = open( correlation_file, 'wb' )
+    pickle.dump( [correlation_dict, tracklet_dict, params_dict, truth_dict], pklFile, -1 )
+    pklFile.close()
     
     
     return
@@ -904,11 +1143,10 @@ def compute_resids(Xo, UTC0, tracklet1, tracklet2, params_dict):
     return resids, ra_rms, dec_rms
 
 
-def check_tracklet_dict():
+def check_tracklet_dict(tracklets_file):
     
     # Load data
-    setup_file = os.path.join('test_cases', 'twobody_geo_3obj_10min_noise0.pkl')
-    pklFile = open(setup_file, 'rb' )
+    pklFile = open(tracklets_file, 'rb' )
     data = pickle.load( pklFile )
     tracklet_dict = data[0]
     params_dict = data[1]
@@ -926,11 +1164,12 @@ def check_tracklet_dict():
 if __name__ == '__main__':
     
     
-    fdir = r'D:\documents\research_projects\iod\data\sim\debug\2022_11_17_twobody_geo_3obj_10sec'
-    tracklets_file = os.path.join(fdir, 'twobody_geo_3obj_10sec_noise1.pkl')
-    summary_file = os.path.join(fdir, 'twobody_geo_3obj_10sec_noise1_corr_summary_min.csv')
+    fdir = r'D:\documents\research_projects\iod\data\sim\debug\2022_11_19_twobody_geo_6obj_7day_10min'
+    tracklets_file = os.path.join(fdir, 'twobody_geo_6obj_10min_noise0.pkl')
+    csv_file = os.path.join(fdir, 'twobody_geo_6obj_10min_noise0_corr_summary_min.csv')
+    correlation_file = os.path.join(fdir, 'twobody_geo_6obj_10min_noise0_correlation.pkl')
     
-    noise = 1.
+    noise = 0.
     
 #    leo_tracklets_marco()
     
@@ -939,12 +1178,12 @@ if __name__ == '__main__':
     
     # test_tracklet_association()
     
-    # check_tracklet_dict()
+    # check_tracklet_dict(tracklets_file)
     
     
     start = time.time()
     
-    process_tracklets_full(tracklets_file, summary_file)
+    process_tracklets_full(tracklets_file, csv_file, correlation_file)
     
     
     print('Full run time', time.time() - start)

@@ -27,7 +27,7 @@ from utilities.constants import GME, J2E, Re, wE
 
 def meanmot2sma(n, GM=GME):
     '''
-    This function computs the semi-major axis given mean motion.
+    This function computes the semi-major axis given mean motion.
     
     Parameters
     ------
@@ -49,7 +49,7 @@ def meanmot2sma(n, GM=GME):
 
 def sma2meanmot(a, GM=GME):
     '''
-    This function computs the mean motion given semi-major axis.
+    This function computes the mean motion given semi-major axis.
     
     Parameters
     ------
@@ -67,6 +67,51 @@ def sma2meanmot(a, GM=GME):
     n = np.sqrt(GM/a**3.)
     
     return n
+
+
+def period2sma(P, GM=GME):
+    '''
+    This function computes the semi-major axis given orbit period.
+    
+    Parameters
+    ------
+    P : float
+        orbit period [sec]
+    GM : float, optional
+        gravitational parameter, default is earth GME [km^3/s^2]
+    
+    Returns
+    ------
+    a : float
+        semi-major axis [km]
+    '''
+    
+    n = 2.*np.pi/P
+    a = (GM/n**2.)**(1./3.)    
+    
+    return a
+
+
+def sma2period(a, GM=GME):
+    '''
+    This function computes the orbit period given semi-major axis.
+    
+    Parameters
+    ------
+    a : float
+        semi-major axis [km]    
+    GM : float, optional
+        gravitational parameter, default is earth GME [km^3/s^2]
+    
+    Returns
+    ------
+    P : float
+        orbit period [sec]
+    '''
+    
+    P = 2.*np.pi*np.sqrt(a**3./GM)
+    
+    return P
 
 
 def smaecc2semilatusrectum(a, e):

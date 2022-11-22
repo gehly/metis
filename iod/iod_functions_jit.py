@@ -1498,7 +1498,7 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, lr_star, orbit_type,
         
         # Exception Handling
         # If invalid range value, exit and continue range grid search
-        if rho0 < 0 or rhof < 0:
+        if rho0 < 0 or rhof < 0 or rho0 > 5e5 or rhof > 5e5:
 
             if debug:
                 print('rho out of range')
@@ -2292,6 +2292,10 @@ def compute_intermediate_rho(rho0, rhof, tof, M_star, lr_star, orbit_type,
     v0_vect, vf_vect, fail_flag = \
         izzo_lambert(r0_vect, rf_vect, tof, M_star, lr_star,
                      results_flag=orbit_type, periapsis_check=periapsis_check)    
+        
+    # print('v0_vect', v0_vect)
+    # print('vf_vect', vf_vect)
+    # print('fail_flag', fail_flag)
 
     # If no valid solutions are found, exit    
     if fail_flag:
@@ -2299,11 +2303,16 @@ def compute_intermediate_rho(rho0, rhof, tof, M_star, lr_star, orbit_type,
 
     # Hyperbolic orbit can pass periapsis check but still have unreasonable
     # semi-major axis. C3 of 160 is sufficient to reach Pluto and corresponds
-    # to |SMA| = 2491 km. Any |SMA| < 1000 km can safely be rejected.
+    # to |SMA| = 2491 km. Any |SMA| < 2500 km can safely be rejected.
     r0 = norm(r0_vect)
     v0 = norm(v0_vect)
     a = 1/(2/r0 - v0**2./GME)
-    if np.abs(a) < 1000.:
+    
+    # print('r0', r0)
+    # print('v0', v0)
+    # print('a', a)
+    
+    if np.abs(a) < 2500.:
         fail_flag = True
         return rhok_vect, fail_flag
     
@@ -2313,6 +2322,9 @@ def compute_intermediate_rho(rho0, rhof, tof, M_star, lr_star, orbit_type,
     # Loop over intermediate times and compute rho_vect
     rk_vect = twobody_propagate(Xo, dt_k)
     rhok_vect = rk_vect - qk_vect
+    
+    # print('rk_vect', rk_vect)
+    # print('rhok_vect', rhok_vect)
     
     return rhok_vect, fail_flag
 
@@ -2384,9 +2396,15 @@ def twobody_propagate(Xo, dt, GM=GME):
         n = np.sqrt(GM/-a**3)
         Ho = 2.*math.atanh(np.sqrt((e-1.)/(e+1.))*np.tan(theta0/2.))        
         Mo = e*np.sinh(Ho) - Ho  # rad
+        
+        # print('n', n)
+        # print('Ho', Ho)
+        # print('Mo', Mo)
 
     # Propagate mean anomaly
     M = Mo + n*dt
+    
+    # print('M', M)
     
     # Compute true anomaly
     if a > 0:
@@ -2398,6 +2416,10 @@ def twobody_propagate(Xo, dt, GM=GME):
         H = mean2hyp(M, e)    # rad
         theta = 2.*math.atan(np.sqrt((e+1.)/(e-1.))*np.tanh(H/2.)) 
         r = a*(1. - e*np.cosh(H))     # km
+        
+        # print('H', H)
+        # print('theta', theta)
+        # print('r', r)
         
     # Calculate r_vect and v_vect
     r_vect = r * \
