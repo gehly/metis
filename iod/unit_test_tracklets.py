@@ -876,8 +876,10 @@ def process_tracklets_full(tracklet_file, csv_file, correlation_file):
     # Initialize output
     df_list = []
     correlation_dict = {}
-    correlation_id = 0
     
+    # Execution time
+    gooding_time = 0.
+    resids_time = 0.
     
     # Exclusion times
     exclude_short = 12*3600.
@@ -885,7 +887,7 @@ def process_tracklets_full(tracklet_file, csv_file, correlation_file):
     
     # Loop through tracklets and compute association
     tracklet_id_list = list(tracklet_dict.keys())
-    count = 0
+    case_id = 0
     for ii in tracklet_id_list:
         tracklet_ii = tracklet_dict[ii]
         
@@ -912,14 +914,11 @@ def process_tracklets_full(tracklet_file, csv_file, correlation_file):
                 continue
             
             
-            count += 1
-            
-            # if count < 714:
-            #     continue
+            case_id += 1
             
             
             print('')
-            print(count)
+            print('case_id', case_id)
             print('tracklet1')
             print(tracklet1['obj_id'])
             print(tracklet1['tk_list'][0])
@@ -952,8 +951,16 @@ def process_tracklets_full(tracklet_file, csv_file, correlation_file):
             sma = elem_true[0]
             period = astro.sma2period(sma)
             M_true = int(np.floor((tk_list[-1]-tk_list[0]).total_seconds()/period))
+            
+            print('Tracklet1 Elem Truth: ', elem_true)
+            print('Xo_true', Xo_true)
+            print('sma', sma)
+            print('period', period/3600.)
+            print('M_frac', (tk_list[-1]-tk_list[0]).total_seconds()/period)
+            print('M_true', M_true)
                 
             # Run Gooding IOD
+            start = time.time()
             X_list, M_list = iod.gooding_angles_iod(tk_list, Yk_list, sensor_id_list,
                                                     sensor_params, 
                                                     eop_alldata=eop_alldata,
@@ -963,7 +970,14 @@ def process_tracklets_full(tracklet_file, csv_file, correlation_file):
                                                     periapsis_check=True,
                                                     rootfind='min', debug=False)
 
-            # mistake
+            
+            gooding_time += time.time() - start
+            
+            
+            
+            # print('Final Answers')
+            # print('X_list', X_list)
+            # print('M_list', M_list)
     
             # If no solutions found, record basic data
             if len(M_list) == 0:
@@ -973,39 +987,44 @@ def process_tracklets_full(tracklet_file, csv_file, correlation_file):
                 else:
                     corr_truth = False
                 
-                correlation_dict[correlation_id] = {}
-                correlation_dict[correlation_id]['count'] = count
-                correlation_dict[correlation_id]['tracklet1_id'] = tracklet1_id
-                correlation_dict[correlation_id]['tracklet2_id'] = tracklet2_id
-                correlation_dict[correlation_id]['corr_truth'] = corr_truth
-                correlation_dict[correlation_id]['obj1_id'] = tracklet1['obj_id']
-                correlation_dict[correlation_id]['obj2_id'] = tracklet2['obj_id']
-                correlation_dict[correlation_id]['Xo_true'] = Xo_true
-                correlation_dict[correlation_id]['Xo'] = np.zeros((6,1))
-                correlation_dict[correlation_id]['M'] = 0
-                correlation_dict[correlation_id]['resids'] = np.ones((2,1))*np.inf
-                correlation_dict[correlation_id]['ra_rms'] = np.inf
-                correlation_dict[correlation_id]['dec_rms'] = np.inf
+                correlation_dict[case_id] = {}
+                correlation_dict[case_id]['tracklet1_id'] = tracklet1_id
+                correlation_dict[case_id]['tracklet2_id'] = tracklet2_id
+                correlation_dict[case_id]['corr_truth_list'] = [corr_truth]
+                correlation_dict[case_id]['obj1_id'] = tracklet1['obj_id']
+                correlation_dict[case_id]['obj2_id'] = tracklet2['obj_id']
+                correlation_dict[case_id]['Xo_true'] = Xo_true
+                correlation_dict[case_id]['Xo_list'] = []
+                correlation_dict[case_id]['M_list'] = []
+                correlation_dict[case_id]['resids_list'] = []
+                correlation_dict[case_id]['ra_rms_list'] = []
+                correlation_dict[case_id]['dec_rms_list'] = []
                 
-                correlation_id += 1
+
                 
-                df_list.append([count, tracklet1['obj_id'], tracklet2['obj_id'],
+                df_list.append([case_id, tracklet1['obj_id'], tracklet2['obj_id'],
                                tracklet1['tk_list'][0], tracklet2['tk_list'][0],
                                0, np.inf, np.inf, np.inf, corr_truth])
             
             
-            print('Tracklet1 Elem Truth: ', elem_true)
+            # Compute sensor locations and observed measurements at all times
+            # not used for IOD solution
+            start = time.time()
+            tk_list1, Yk_list1, Rmat1 = reduce_tracklets(tracklet1, tracklet2,
+                                                         params_dict)
+            resids_time += time.time() - start
             
-            print('Final Answers')
-            print('X_list', X_list)
-            print('M_list', M_list)
             
             for ind in range(len(M_list)):
                 
+                
                 elem = astro.cart2kep(X_list[ind])
+                start = time.time()
                 resids, ra_rms, dec_rms = \
-                    compute_resids(X_list[ind], tk_list[0], tracklet1, tracklet2,
-                                  params_dict)
+                    compute_resids(X_list[ind], tk_list[0], tk_list1, Yk_list1,
+                                   Rmat1, params_dict)
+                    
+                resids_time += time.time() - start
                                     
                 
                 Xo_err = np.linalg.norm(X_list[ind] - Xo_true)
@@ -1019,39 +1038,45 @@ def process_tracklets_full(tracklet_file, csv_file, correlation_file):
                 print('')
                 print(ind)
                 print('Mi', M_list[ind])
-                print('Xi', X_list[ind])
-                print('elem', elem)
+                # print('Xi', X_list[ind])
+                # print('elem', elem)
                 print('Xo Err: ', Xo_err)
                 print('RA Resids RMS [arcsec]: ', ra_rms)
                 print('DEC Resids RMS [arcsec]: ', dec_rms)
                 
-                df_list.append([count, tracklet1['obj_id'], tracklet2['obj_id'],
+                df_list.append([case_id, tracklet1['obj_id'], tracklet2['obj_id'],
                                tracklet1['tk_list'][0], tracklet2['tk_list'][0],
                                M_list[ind], Xo_err, ra_rms, dec_rms, corr_truth])
                 
                 # print(df_list)
                 
-                correlation_dict[correlation_id] = {}
-                correlation_dict[correlation_id]['count'] = count
-                correlation_dict[correlation_id]['tracklet1_id'] = tracklet1_id
-                correlation_dict[correlation_id]['tracklet2_id'] = tracklet2_id
-                correlation_dict[correlation_id]['corr_truth'] = corr_truth
-                correlation_dict[correlation_id]['obj1_id'] = tracklet1['obj_id']
-                correlation_dict[correlation_id]['obj2_id'] = tracklet2['obj_id']
-                correlation_dict[correlation_id]['Xo_true'] = Xo_true
-                correlation_dict[correlation_id]['Xo'] = X_list[ind]
-                correlation_dict[correlation_id]['M'] = M_list[ind]
-                correlation_dict[correlation_id]['resids'] = resids
-                correlation_dict[correlation_id]['ra_rms'] = ra_rms
-                correlation_dict[correlation_id]['dec_rms'] = dec_rms
-                
-                correlation_id += 1
-                
-                
+                if ind == 0:
+                    correlation_dict[case_id] = {}
+                    correlation_dict[case_id]['tracklet1_id'] = tracklet1_id
+                    correlation_dict[case_id]['tracklet2_id'] = tracklet2_id
+                    correlation_dict[case_id]['corr_truth_list'] = [corr_truth]
+                    correlation_dict[case_id]['obj1_id'] = tracklet1['obj_id']
+                    correlation_dict[case_id]['obj2_id'] = tracklet2['obj_id']
+                    correlation_dict[case_id]['Xo_true'] = Xo_true
+                    correlation_dict[case_id]['Xo_list'] = X_list
+                    correlation_dict[case_id]['M_list'] = M_list
+                    correlation_dict[case_id]['resids_list'] = [resids]
+                    correlation_dict[case_id]['ra_rms_list'] = [ra_rms]
+                    correlation_dict[case_id]['dec_rms_list'] = [dec_rms]
+                    
+                else:
+                    correlation_dict[case_id]['corr_truth_list'].append(corr_truth)
+                    correlation_dict[case_id]['resids_list'].append(resids)
+                    correlation_dict[case_id]['ra_rms_list'].append(ra_rms)
+                    correlation_dict[case_id]['dec_rms_list'].append(dec_rms)
                 
 
+                
+            print('Gooding Time: ', gooding_time)
+            print('Resids Time: ', resids_time)
+
             
-    df = pd.DataFrame(df_list, columns=['Count', 'Tracklet1_Obj_ID',
+    df = pd.DataFrame(df_list, columns=['Case ID', 'Tracklet1_Obj_ID',
                                         'Tracklet2_Obj_ID', 't_10', 't_20',
                                         'M [rev]', 'Xo Err', 'RA rms',
                                         'DEC rms', 'Correlation Truth'])
@@ -1067,10 +1092,7 @@ def process_tracklets_full(tracklet_file, csv_file, correlation_file):
     return
 
 
-def compute_resids(Xo, UTC0, tracklet1, tracklet2, params_dict):
-    
-    tracklet1 = copy.deepcopy(tracklet1)
-    tracklet2 = copy.deepcopy(tracklet2)
+def reduce_tracklets(tracklet1, tracklet2, params_dict):
     
     # Break out inputs
     state_params = params_dict['state_params']
@@ -1088,6 +1110,11 @@ def compute_resids(Xo, UTC0, tracklet1, tracklet2, params_dict):
     Yk_list2 = tracklet2['Yk_list']
     sensor_id_list2 = tracklet2['sensor_id_list']
     
+    # Combine into single lists
+    tk_list1.extend(tk_list2)
+    Yk_list1.extend(Yk_list2)
+    sensor_id_list1.extend(sensor_id_list2)
+    
     # Remove entries used to compute Gooding IOD solution
     del tk_list1[-1]
     del tk_list1[0]
@@ -1099,29 +1126,58 @@ def compute_resids(Xo, UTC0, tracklet1, tracklet2, params_dict):
     del Yk_list2[-1]
     del sensor_id_list2[-1]
     
-    # Combine into single lists
-    tk_list1.extend(tk_list2)
-    Yk_list1.extend(Yk_list2)
-    sensor_id_list1.extend(sensor_id_list2)
+    # Compute sensor ECI coordinates
+    Rmat = np.zeros((3,len(tk_list1)))
+    for kk in range(len(tk_list1)):
+        tk = tk_list1[kk]
+        sensor_id = sensor_id_list1[kk]        
+        site_ecef = sensor_params[sensor_id]['site_ecef']
+        
+        # Compute sensor location in ECI
+        EOP_data = eop.get_eop_data(eop_alldata, tk)
+        site_eci, dum = coord.itrf2gcrf(site_ecef, np.zeros((3,1)), tk,
+                                        EOP_data, XYs_df)
+        
+        Rmat[:,kk] = site_eci.flatten()
+
+    
+    return tk_list1, Yk_list1, Rmat
+
+
+def compute_resids(Xo, UTC0, tk_list1, Yk_list1, Rmat1, params_dict):
+    
+
+    
+    # Break out inputs
+    state_params = params_dict['state_params']
+    int_params = params_dict['int_params']
+    sensor_params = params_dict['sensor_params']
     
     # Propagate initial orbit, compute measurements and resids
     resids = np.zeros((2, len(tk_list1)))
+    loop_start = time.time()
+    eop_time = 0.
+    astro_time = 0.
+    meas_time = 0.
     for kk in range(len(tk_list1)):
         tk = tk_list1[kk]
         Yk = Yk_list1[kk]
-        sensor_id = sensor_id_list1[kk]
-        EOP_data = eop.get_eop_data(eop_alldata, tk)
+        sensor_eci = Rmat1[:,kk].reshape(3,1)
         
-        # tout, Xout = dyn.general_dynamics(Xo, [UTC0, tk], state_params,
-        #                                   int_params)
-        # Xk = Xout[-1,:].reshape(6,1)
-        
+        start = time.time()
         Xk = astro.element_conversion(Xo, 1, 1, dt=(tk-UTC0).total_seconds())
+        astro_time += time.time() - start
         
-        Yprop = mfunc.compute_measurement(Xk, state_params, sensor_params,
-                                          sensor_id, tk, EOP_data, XYs_df)
+        start = time.time()
+        r_eci = Xk[0:3].reshape(3,1)
+        rho_eci = r_eci - sensor_eci
+        ra_calc = atan2(rho_eci[1], rho_eci[0])
+        dec_calc = asin(rho_eci[2]/np.linalg.norm(rho_eci))
+        Y_calc = np.reshape([ra_calc, dec_calc], (2,1))
+        meas_time += time.time() - start
         
-        diff = Yk - Yprop
+        
+        diff = Yk - Y_calc
         if diff[0] > np.pi:
             diff[0] -= 2.*np.pi
         if diff[0] < -np.pi:
@@ -1129,16 +1185,21 @@ def compute_resids(Xo, UTC0, tracklet1, tracklet2, params_dict):
 
         resids[:,kk] = diff.flatten()
         
+    # print('orbit prop/meas time', time.time() - loop_start)
+    # print('eop time', eop_time)
+    # print('astro time', astro_time)
+    # print('meas time', meas_time)
+        
     ra_resids = resids[0,:]
     dec_resids = resids[1,:]
     
     ra_rms = np.sqrt(np.dot(ra_resids, ra_resids)/len(ra_resids))*(1./arcsec2rad)
     dec_rms = np.sqrt(np.dot(dec_resids, dec_resids)/len(dec_resids))*(1./arcsec2rad)
     
-    print('ra std', np.std(ra_resids)*(1./arcsec2rad))
-    print('dec std', np.std(dec_resids)*(1./arcsec2rad))
+    # print('ra std', np.std(ra_resids)*(1./arcsec2rad))
+    # print('dec std', np.std(dec_resids)*(1./arcsec2rad))
     
-
+    # mistake
     
     return resids, ra_rms, dec_rms
 
@@ -1164,7 +1225,7 @@ def check_tracklet_dict(tracklets_file):
 if __name__ == '__main__':
     
     
-    fdir = r'D:\documents\research_projects\iod\data\sim\debug\2022_11_19_twobody_geo_6obj_7day_10min'
+    fdir = r'D:\documents\research_projects\iod\data\sim\debug\2022_11_23_twobody_geo_6obj_7day_10min'
     tracklets_file = os.path.join(fdir, 'twobody_geo_6obj_10min_noise0.pkl')
     csv_file = os.path.join(fdir, 'twobody_geo_6obj_10min_noise0_corr_summary_min.csv')
     correlation_file = os.path.join(fdir, 'twobody_geo_6obj_10min_noise0_correlation.pkl')
@@ -1188,6 +1249,8 @@ if __name__ == '__main__':
     
     print('Full run time', time.time() - start)
     
+    
+    # analysis.evaluate_tracklet_correlation(correlation_file)
     
     
     

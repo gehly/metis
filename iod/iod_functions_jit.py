@@ -1072,30 +1072,32 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
             
             single_rev_prograde_time = time.time() - start
             
-            start = time.time()
             
-            # Retrograde single revolution case
-            lr_star = 'none'
-            orbit_type = 'retrograde'
-            
-            if debug:
-                print(lr_star, orbit_type)
-            
-            rho0_list, rhof_list = \
-                M_star_to_3rho(Lmat, Rmat, UTC_list, tof, M_star, lr_star,
-                               orbit_type, range_pairs_list, range_ind_list,
-                               periapsis_check=periapsis_check, HN=HN,
-                               rootfind=rootfind, debug=debug)
-            
-            # Build outputs
-            nout = len(rho0_list)
-            rho0_output_list.extend(rho0_list)
-            rhof_output_list.extend(rhof_list)
-            M_list.extend([M_star]*nout)
-            lr_list.extend([lr_star]*nout)
-            type_list.extend([orbit_type]*nout)
-            
-            single_rev_retrograde_time = time.time() - start
+            if orbit_regime not in ['GEO']:
+                # Retrograde single revolution case
+                start = time.time()
+                            
+                lr_star = 'none'
+                orbit_type = 'retrograde'
+                
+                if debug:
+                    print(lr_star, orbit_type)
+                
+                rho0_list, rhof_list = \
+                    M_star_to_3rho(Lmat, Rmat, UTC_list, tof, M_star, lr_star,
+                                   orbit_type, range_pairs_list, range_ind_list,
+                                   periapsis_check=periapsis_check, HN=HN,
+                                   rootfind=rootfind, debug=debug)
+                
+                # Build outputs
+                nout = len(rho0_list)
+                rho0_output_list.extend(rho0_list)
+                rhof_output_list.extend(rhof_list)
+                M_list.extend([M_star]*nout)
+                lr_list.extend([lr_star]*nout)
+                type_list.extend([orbit_type]*nout)
+                
+                single_rev_retrograde_time = time.time() - start
 
             
         else:
@@ -1150,55 +1152,57 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
             
             multirev_time_list.append(time.time() - start)
             
-            start = time.time()
             
-            # Retrograde multi-rev case - left branch
-            lr_star = 'left'
-            orbit_type = 'retrograde'
-            
-            if debug:
-                print(lr_star, orbit_type)
-            
-            rho0_list, rhof_list = \
-                M_star_to_3rho(Lmat, Rmat, UTC_list, tof, M_star, lr_star,
-                               orbit_type, range_pairs_list, range_ind_list,
-                               periapsis_check=periapsis_check, HN=HN,
-                               rootfind=rootfind, debug=debug)
-            
-            # Build outputs
-            nout = len(rho0_list)
-            rho0_output_list.extend(rho0_list)
-            rhof_output_list.extend(rhof_list)
-            M_list.extend([M_star]*nout)
-            lr_list.extend([lr_star]*nout)
-            type_list.extend([orbit_type]*nout)
-            
-            multirev_time_list.append(time.time() - start)
-            
-            start = time.time()
-            
-            # Retrograde multi-rev case - right branch
-            lr_star = 'right'
-            orbit_type = 'retrograde'
-            
-            if debug:
-                print(lr_star, orbit_type)
-            
-            rho0_list, rhof_list = \
-                M_star_to_3rho(Lmat, Rmat, UTC_list, tof, M_star, lr_star,
-                               orbit_type, range_pairs_list, range_ind_list,
-                               periapsis_check=periapsis_check, HN=HN,
-                               rootfind=rootfind, debug=debug)
-            
-            # Build outputs
-            nout = len(rho0_list)
-            rho0_output_list.extend(rho0_list)
-            rhof_output_list.extend(rhof_list)
-            M_list.extend([M_star]*nout)
-            lr_list.extend([lr_star]*nout)
-            type_list.extend([orbit_type]*nout)
-            
-            multirev_time_list.append(time.time() - start)
+            if orbit_regime not in ['GEO']:
+                start = time.time()
+                
+                # Retrograde multi-rev case - left branch
+                lr_star = 'left'
+                orbit_type = 'retrograde'
+                
+                if debug:
+                    print(lr_star, orbit_type)
+                
+                rho0_list, rhof_list = \
+                    M_star_to_3rho(Lmat, Rmat, UTC_list, tof, M_star, lr_star,
+                                   orbit_type, range_pairs_list, range_ind_list,
+                                   periapsis_check=periapsis_check, HN=HN,
+                                   rootfind=rootfind, debug=debug)
+                
+                # Build outputs
+                nout = len(rho0_list)
+                rho0_output_list.extend(rho0_list)
+                rhof_output_list.extend(rhof_list)
+                M_list.extend([M_star]*nout)
+                lr_list.extend([lr_star]*nout)
+                type_list.extend([orbit_type]*nout)
+                
+                multirev_time_list.append(time.time() - start)
+                
+                start = time.time()
+                
+                # Retrograde multi-rev case - right branch
+                lr_star = 'right'
+                orbit_type = 'retrograde'
+                
+                if debug:
+                    print(lr_star, orbit_type)
+                
+                rho0_list, rhof_list = \
+                    M_star_to_3rho(Lmat, Rmat, UTC_list, tof, M_star, lr_star,
+                                   orbit_type, range_pairs_list, range_ind_list,
+                                   periapsis_check=periapsis_check, HN=HN,
+                                   rootfind=rootfind, debug=debug)
+                
+                # Build outputs
+                nout = len(rho0_list)
+                rho0_output_list.extend(rho0_list)
+                rhof_output_list.extend(rhof_list)
+                M_list.extend([M_star]*nout)
+                lr_list.extend([lr_star]*nout)
+                type_list.extend([orbit_type]*nout)
+                
+                multirev_time_list.append(time.time() - start)
                 
  
     # Compute solutions  
@@ -1238,14 +1242,15 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
         
     gooding_total = time.time() - gooding_start
         
-    print('')
-    print('Execution times')
-    print('single rev prograde', single_rev_prograde_time)
-    print('single rev retrograde', single_rev_retrograde_time)
-    print('M_candidates', M_candidates)
-    print('multirev times', multirev_time_list)
-    print('gooding total time', gooding_total)
-    
+    if debug:
+        print('')
+        print('Execution times')
+        # print('single rev prograde', single_rev_prograde_time)
+        # print('single rev retrograde', single_rev_retrograde_time)
+        print('M_candidates', M_candidates)
+        # print('multirev times', multirev_time_list)
+        print('gooding total time', gooding_total)
+        
     return Xo_output, M_output
 
 
@@ -1465,7 +1470,7 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, lr_star, orbit_type,
     # intermediate observation(s)
     conv_crit = 1.
     iters = 0
-    maxiters = 100
+    maxiters = 300
     exit_flag = 0
     crit_min = 1.
     fc_old = np.inf

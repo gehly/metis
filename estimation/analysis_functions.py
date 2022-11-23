@@ -1281,6 +1281,89 @@ def compute_real_orbit_errors(filter_output, full_state_output, truth_dict, nora
     return
 
 
+###############################################################################
+# Tracklet Correlation and IOD
+###############################################################################
+
+def evaluate_tracklet_correlation(correlation_file):
+    
+    # Load correlation data
+    pklFile = open(correlation_file, 'rb' )
+    data = pickle.load( pklFile )
+    correlation_dict = data[0]
+    tracklet_dict = data[1]
+    params_dict = data[2]
+    truth_dict = data[3]
+    pklFile.close()
+        
+    # Reformulate correlation dict according to cases
+    case_dict = {}
+    N_true = 0
+    N_false = 0
+    for ii in correlation_dict:
+        count = correlation_dict[ii]['count']
+        
+        # If this is a new case, retrieve and store values
+        if count not in case_dict:
+            case_dict[count] = {}
+            case_dict[count]['corr_truth_list'] = [correlation_dict[ii]['corr_truth']]
+            case_dict[count]['Xo_true'] = correlation_dict[ii]['Xo_true']
+            case_dict[count]['Xo_list'] = [correlation_dict[ii]['Xo']]
+            case_dict[count]['M_list'] = [correlation_dict[ii]['M']]
+            case_dict[count]['resids_list'] = [correlation_dict[ii]['resids']]
+            case_dict[count]['ra_rms_list'] = [correlation_dict[ii]['ra_rms']]
+            case_dict[count]['dec_rms_list'] = [correlation_dict[ii]['dec_rms']]
+            
+            if correlation_dict[ii]['obj1_id'] == correlation_dict[ii]['obj2_id']:
+                N_true += 1
+            else:
+                N_false += 1
+                    
+            
+        # If multiple entries are from the same case, append to lists for 
+        # later evaluation
+        else:
+            case_dict[count]['corr_truth_list'].append(correlation_dict[ii]['corr_truth'])
+            case_dict[count]['Xo_list'].append(correlation_dict[ii]['Xo'])
+            case_dict[count]['M_list'].append(correlation_dict[ii]['M'])
+            case_dict[count]['resids_list'].append(correlation_dict[ii]['resids'])
+            case_dict[count]['ra_rms_list'].append(correlation_dict[ii]['ra_rms'])
+            case_dict[count]['dec_rms_list'].append(correlation_dict[ii]['dec_rms'])
+           
+
+    # Compute number of true positives, true negatives and correlation 
+    # performance
+    N_cases = max(case_dict.keys())
+    # N_true = 0
+    # N_false = 0
+    # for case in case_dict:
+    #     corr_truth_list = case_dict[case]['corr_truth_list']
+        
+    #     # print(case)
+    #     # print(corr_truth_list)
+        
+    #     if True in corr_truth_list:
+    #         N_true += 1
+    #     else:
+    #         N_false += 1
+    
+    
+    
+    print('')
+    print('Total Number of Correlations: ', N_cases)
+    print('Number of True Correlations: ', N_true)
+    print('Number of False Correlations: ', N_false)
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    return
+
 
 
 
