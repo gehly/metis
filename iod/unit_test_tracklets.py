@@ -1000,7 +1000,6 @@ def process_tracklets_full(tracklet_file, csv_file, correlation_file):
                 correlation_dict[case_id]['ra_rms_list'] = []
                 correlation_dict[case_id]['dec_rms_list'] = []
                 
-
                 
                 df_list.append([case_id, tracklet1['obj_id'], tracklet2['obj_id'],
                                tracklet1['tk_list'][0], tracklet2['tk_list'][0],
@@ -1230,7 +1229,7 @@ if __name__ == '__main__':
     csv_file = os.path.join(fdir, 'twobody_geo_6obj_10min_noise0_corr_summary_min.csv')
     correlation_file = os.path.join(fdir, 'twobody_geo_6obj_10min_noise0_correlation.pkl')
     
-    noise = 0.
+    # noise = 0.
     
 #    leo_tracklets_marco()
     
@@ -1242,15 +1241,17 @@ if __name__ == '__main__':
     # check_tracklet_dict(tracklets_file)
     
     
-    start = time.time()
+    # start = time.time()
     
-    process_tracklets_full(tracklets_file, csv_file, correlation_file)
-    
-    
-    print('Full run time', time.time() - start)
+    # process_tracklets_full(tracklets_file, csv_file, correlation_file)
     
     
-    # analysis.evaluate_tracklet_correlation(correlation_file)
+    # print('Full run time', time.time() - start)
+    
+    
+    ra_lim = 500.
+    dec_lim = 500
+    analysis.evaluate_tracklet_correlation(correlation_file, ra_lim, dec_lim)
     
     
     
