@@ -9,6 +9,17 @@ from datetime import datetime, timedelta
 from numba import types
 from numba.typed import Dict
 
+# Load tudatpy modules  
+from tudatpy.kernel.interface import spice
+from tudatpy.kernel import numerical_simulation
+from tudatpy.kernel.numerical_simulation import environment_setup
+from tudatpy.kernel.numerical_simulation import propagation_setup
+from tudatpy.kernel.astro import element_conversion
+from tudatpy.kernel import constants
+from tudatpy.util import result2array
+
+
+
 filename = inspect.getframeinfo(inspect.currentframe()).filename
 current_dir = os.path.dirname(os.path.abspath(filename))
 
@@ -19,6 +30,7 @@ sys.path.append(metis_dir)
 from dynamics import numerical_integration as numint
 from dynamics import fast_integration as fastint
 from utilities import astrodynamics as astro
+from utilities import numerical_methods as num
 
 
 
@@ -52,7 +64,7 @@ def general_dynamics(Xo, tvec, state_params, int_params):
         tvec = [(ti - t0)*86400. for ti in tvec]
         
     
-#    print('tvec', tvec)
+    print('tvec', tvec)
         
     # Exit if no integration needed
     if tvec[0] == tvec[-1]:
@@ -308,6 +320,154 @@ def general_dynamics(Xo, tvec, state_params, int_params):
             k += 1
         
         tout = tvec
+        
+        return tout, Xout
+    
+    
+    if integrator == 'tudat':
+        
+        # Load spice kernels
+        spice.load_standard_kernels()
+        
+        # Set initial state vector
+        initial_state = Xo.flatten()*1000.
+
+        # Set simulation start and end epochs
+        if time_format == 'datetime':
+            simulation_start_epoch = (t0 - datetime(2000, 1, 1, 12, 0, 0)).total_seconds()
+            
+        if time_format == 'JD':
+            simulation_start_epoch = (t0 - 2451545.0) * 86400.
+        
+        simulation_end_epoch = simulation_start_epoch + tvec[-1]
+
+        # Retrive state and propagator settings
+        bodies_to_create = state_params['bodies_to_create']
+        global_frame_origin = state_params['global_frame_origin']
+        global_frame_orientation = state_params['global_frame_orientation']
+        central_bodies = state_params['central_bodies']
+        mass = state_params['mass']
+        Cd = state_params['Cd']
+        Cr = state_params['Cr']
+        drag_area_m2 = state_params['drag_area_m2']
+        srp_area_m2 = state_params['srp_area_m2']
+        sph_deg = state_params['sph_deg']
+        sph_ord = state_params['sph_ord']
+        
+        # Create bodies
+        body_settings = environment_setup.get_default_body_settings(
+            bodies_to_create, global_frame_origin, global_frame_orientation)
+        bodies = environment_setup.create_system_of_bodies(body_settings)
+        
+        # Create the vehicle
+        bodies.create_empty_body('rso')
+        bodies.get('rso').mass = mass
+        
+        # Acceleration Models
+        bodies_to_propagate = ['rso']
+
+        acceleration_settings_setup = {}        
+        if 'Earth' in bodies_to_create:
+            
+            # Gravity
+            if sph_deg == 0 and sph_ord == 0:
+                acceleration_settings_setup['Earth'] = [propagation_setup.acceleration.point_mass_gravity()]
+            else:
+                acceleration_settings_setup['Earth'] = [propagation_setup.acceleration.spherical_harmonic_gravity(sph_deg, sph_ord)]
+            
+            # Aerodynamic Drag
+            if Cd > 0.:
+                aero_coefficient_settings = environment_setup.aerodynamic_coefficients.constant(
+                    drag_area_m2, [Cd, 0, 0]
+                )
+                environment_setup.add_aerodynamic_coefficient_interface(
+                    bodies, 'rso', aero_coefficient_settings)
+                acceleration_settings_setup['Earth'].append(propagation_setup.acceleration.aerodynamic())
+            
+        if 'Sun' in bodies_to_create:
+            
+            # Gravity
+            acceleration_settings_setup['Sun'] = [propagation_setup.acceleration.point_mass_gravity()]
+            
+            # Solar Radiation Pressure
+            if Cr > 0.:
+                occulting_bodies = ['Earth']
+                radiation_pressure_settings = environment_setup.radiation_pressure.cannonball(
+                    'Sun', srp_area_m2, Cr, occulting_bodies
+                )
+                environment_setup.add_radiation_pressure_interface(
+                    bodies, 'rso', radiation_pressure_settings)
+                acceleration_settings_setup['Sun'].append(propagation_setup.acceleration.cannonball_radiation_pressure())
+
+        
+        if 'Moon' in bodies_to_create:
+            
+            # Gravity
+            acceleration_settings_setup['Moon'] = [propagation_setup.acceleration.point_mass_gravity()]
+        
+
+        acceleration_settings = {'rso': acceleration_settings_setup}
+        acceleration_models = propagation_setup.create_acceleration_models(
+            bodies, acceleration_settings, bodies_to_propagate, central_bodies
+        )
+        
+
+        # Create termination settings
+        termination_condition = propagation_setup.propagator.time_termination(simulation_end_epoch)
+
+        # Create propagation settings
+        propagator_settings = propagation_setup.propagator.translational(
+            central_bodies,
+            acceleration_models,
+            bodies_to_propagate,
+            initial_state,
+            termination_condition
+        )
+
+
+
+        # Create numerical integrator settings
+        if int_params['tudat_integrator'] == 'rk4':
+            fixed_step_size = int_params['step']
+            integrator_settings = propagation_setup.integrator.runge_kutta_4(
+                simulation_start_epoch, fixed_step_size
+            )
+            
+        elif int_params['tudat_integrator'] == 'rkf78':
+            initial_step_size = int_params['step']
+            maximum_step_size = int_params['max_step']
+            minimum_step_size = int_params['min_step']
+            rtol = int_params['rtol']
+            atol = int_params['atol']
+            integrator_settings = propagation_setup.integrator.runge_kutta_variable_step_size(
+                simulation_start_epoch,
+                initial_step_size,
+                propagation_setup.integrator.CoefficientSets.rkf_78,
+                minimum_step_size,
+                maximum_step_size,
+                rtol,
+                atol)
+
+
+        # Create simulation object and propagate the dynamics
+        dynamics_simulator = numerical_simulation.SingleArcSimulator(
+            bodies, integrator_settings, propagator_settings
+        )
+
+        # Extract the resulting state history and convert it to an ndarray
+        states = dynamics_simulator.state_history
+        states_array = result2array(states)        
+        
+        # Form output
+        tout = states_array[:,0] - simulation_start_epoch
+        Xout = states_array[:,1:7]*1e-3
+        
+        # RKF78 need to interpolate to replace last row for desired time
+        if int_params['tudat_integrator'] == 'rkf78':            
+            lastrow = num.interp_lagrange(tout, Xout, tvec[-1], 9)
+            tout[-1] = tvec[-1]
+            Xout[-1,:] = lastrow.flatten()
+        
         
         return tout, Xout
     

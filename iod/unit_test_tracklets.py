@@ -1227,7 +1227,7 @@ if __name__ == '__main__':
     fdir = r'D:\documents\research_projects\iod\data\sim\debug\2022_11_23_twobody_geo_6obj_7day_10min'
     tracklets_file = os.path.join(fdir, 'twobody_geo_6obj_10min_noise0.pkl')
     csv_file = os.path.join(fdir, 'twobody_geo_6obj_10min_noise0_corr_summary_min.csv')
-    correlation_file = os.path.join(fdir, 'twobody_geo_6obj_10min_noise0_correlation.pkl')
+    correlation_file = os.path.join(fdir, 'twobody_geo_6obj_10min_noise1_correlation.pkl')
     
     # noise = 0.
     
@@ -1249,12 +1249,34 @@ if __name__ == '__main__':
     # print('Full run time', time.time() - start)
     
     
-    ra_lim = 500.
-    dec_lim = 500
-    analysis.evaluate_tracklet_correlation(correlation_file, ra_lim, dec_lim)
+    # ra_lim = 500.
+    # dec_lim = 500
+    # analysis.evaluate_tracklet_correlation(correlation_file, ra_lim, dec_lim)
     
     
+    # qzs1r_norad = 49336
+    # qzs2_norad = 42738
+    # qzs3_norad = 42917
+    # qzs4_norad = 42965
     
+    # amos5_norad = 37950
+    # coms1_norad = 36744
+    
+    # obj_id_list = [49336, 42738, 42917, 42965, 37950, 36744]
+    
+    # UTC0 = datetime(2022, 11, 7, 11, 0, 0)
+    # state_dict = tle.propagate_TLE(obj_id_list, [UTC0])
+    
+    # for obj_id in obj_id_list:
+    #     r0 = state_dict[obj_id]['r_GCRF'][0]
+    #     v0 = state_dict[obj_id]['v_GCRF'][0]
+    #     Xo = np.concatenate((r0, v0), axis=0)
+        
+    #     elem = astro.cart2kep(Xo)
+        
+    #     print('')
+    #     print(obj_id)
+    #     print(elem)
     
     
     
