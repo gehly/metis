@@ -754,9 +754,23 @@ def test_tudat_prop():
         true_anomaly=np.deg2rad(139.87),
     )
     
-    Xo = np.reshape(initial_state, (6,1))*1e-3
+    print(initial_state)
+
+    initial_states = np.concatenate((initial_state, initial_state))
     
-    print(Xo)
+    print(initial_states)
+    
+    print(initial_states.shape)
+    
+
+    
+    # Xo = np.reshape(initial_state, (6,1))*1e-3
+    
+    # print(Xo)
+    
+    Xo = np.reshape(initial_states, (12,1))*1e-3
+    
+    
     
     
     # Setup dynamics and coordinate frame models    
@@ -796,10 +810,10 @@ def test_tudat_prop():
     
     
     # Compute and plot errors
-    Xerr = np.zeros(Xout.shape)
+    Xerr = np.zeros(Xout[:,0:6].shape)
     for ii in range(len(tout)):
-        X_true = astro.element_conversion(Xo, 1, 1, dt=tout[ii])
-        Xerr[ii,:] = (Xout[ii,:].reshape(6,1) - X_true).flatten()
+        X_true = astro.element_conversion(Xo[0:6], 1, 1, dt=tout[ii])
+        Xerr[ii,:] = (Xout[ii,6:12].reshape(6,1) - X_true).flatten()
         
     plt.figure()
     plt.subplot(3,1,1)

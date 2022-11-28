@@ -329,9 +329,9 @@ def general_dynamics(Xo, tvec, state_params, int_params):
         # Load spice kernels
         spice.load_standard_kernels()
         
-        # Set initial state vector
+        # Convert initial state vector from km to meters for TUDAT propagator
         initial_state = Xo.flatten()*1000.
-
+        
         # Set simulation start and end epochs
         if time_format == 'datetime':
             simulation_start_epoch = (t0 - datetime(2000, 1, 1, 12, 0, 0)).total_seconds()
@@ -359,12 +359,33 @@ def general_dynamics(Xo, tvec, state_params, int_params):
             bodies_to_create, global_frame_origin, global_frame_orientation)
         bodies = environment_setup.create_system_of_bodies(body_settings)
         
-        # Create the vehicle
-        bodies.create_empty_body('rso')
-        bodies.get('rso').mass = mass
-        
-        # Acceleration Models
-        bodies_to_propagate = ['rso']
+        # Create the bodies to propagate
+        # TUDAT always uses 6 element state vector
+        N = int(len(initial_state)/6)
+        central_bodies = central_bodies*N
+        bodies_to_propagate = []
+        for jj in range(N):
+            jj_str = str(jj)
+            bodies.create_empty_body(jj_str)
+            bodies.get(jj_str).mass = mass
+            bodies_to_propagate.append(jj_str)
+            
+            if Cd > 0.:
+                aero_coefficient_settings = environment_setup.aerodynamic_coefficients.constant(
+                    drag_area_m2, [Cd, 0, 0]
+                )
+                environment_setup.add_aerodynamic_coefficient_interface(
+                    bodies, jj_str, aero_coefficient_settings)
+                
+            if Cr > 0.:
+                occulting_bodies = ['Earth']
+                radiation_pressure_settings = environment_setup.radiation_pressure.cannonball(
+                    'Sun', srp_area_m2, Cr, occulting_bodies
+                )
+                environment_setup.add_radiation_pressure_interface(
+                    bodies, jj_str, radiation_pressure_settings)
+                
+                
 
         acceleration_settings_setup = {}        
         if 'Earth' in bodies_to_create:
@@ -376,12 +397,7 @@ def general_dynamics(Xo, tvec, state_params, int_params):
                 acceleration_settings_setup['Earth'] = [propagation_setup.acceleration.spherical_harmonic_gravity(sph_deg, sph_ord)]
             
             # Aerodynamic Drag
-            if Cd > 0.:
-                aero_coefficient_settings = environment_setup.aerodynamic_coefficients.constant(
-                    drag_area_m2, [Cd, 0, 0]
-                )
-                environment_setup.add_aerodynamic_coefficient_interface(
-                    bodies, 'rso', aero_coefficient_settings)
+            if Cd > 0.:                
                 acceleration_settings_setup['Earth'].append(propagation_setup.acceleration.aerodynamic())
             
         if 'Sun' in bodies_to_create:
@@ -390,13 +406,7 @@ def general_dynamics(Xo, tvec, state_params, int_params):
             acceleration_settings_setup['Sun'] = [propagation_setup.acceleration.point_mass_gravity()]
             
             # Solar Radiation Pressure
-            if Cr > 0.:
-                occulting_bodies = ['Earth']
-                radiation_pressure_settings = environment_setup.radiation_pressure.cannonball(
-                    'Sun', srp_area_m2, Cr, occulting_bodies
-                )
-                environment_setup.add_radiation_pressure_interface(
-                    bodies, 'rso', radiation_pressure_settings)
+            if Cr > 0.:                
                 acceleration_settings_setup['Sun'].append(propagation_setup.acceleration.cannonball_radiation_pressure())
 
         
@@ -406,10 +416,15 @@ def general_dynamics(Xo, tvec, state_params, int_params):
             acceleration_settings_setup['Moon'] = [propagation_setup.acceleration.point_mass_gravity()]
         
 
-        acceleration_settings = {'rso': acceleration_settings_setup}
+        acceleration_settings = {}
+        for jj in range(N):
+            acceleration_settings[str(jj)] = acceleration_settings_setup
+            
         acceleration_models = propagation_setup.create_acceleration_models(
             bodies, acceleration_settings, bodies_to_propagate, central_bodies
         )
+        
+        
         
 
         # Create termination settings
@@ -458,9 +473,11 @@ def general_dynamics(Xo, tvec, state_params, int_params):
         states = dynamics_simulator.state_history
         states_array = result2array(states)        
         
+        print('states_array', states_array.shape)
+        
         # Form output
         tout = states_array[:,0] - simulation_start_epoch
-        Xout = states_array[:,1:7]*1e-3
+        Xout = states_array[:,1:6*N+1]*1e-3
         
         # RKF78 need to interpolate to replace last row for desired time
         if int_params['tudat_integrator'] == 'rkf78':            
