@@ -764,9 +764,9 @@ def test_jit_twobody():
 def test_tudat_prop():
     
     
-    UTC0 = datetime(2000, 1, 1, 12, 0, 0)
-    UTC1 = datetime(2000, 1, 2, 12, 0, 0)
-    tvec = [UTC0, UTC1]
+    # UTC0 = datetime(2000, 1, 1, 12, 0, 0)
+    # UTC1 = datetime(2000, 1, 2, 12, 0, 0)
+    # tvec = [UTC0, UTC1]
     
     # Xo = np.reshape([ 7.03748400133e+06,  3.23805901792e+06,  2.1507241875e+06, -1.46565763e+03,
     #                  -4.09583949e+01,  6.62279761e+03], (6,1)) * 1e-3
@@ -799,7 +799,7 @@ def test_tudat_prop():
     # print(initial_state)
     # print(earth_gravitational_parameter)
 
-    initial_states = np.concatenate((initial_state, initial_state))
+    # initial_states = np.concatenate((initial_state, initial_state))
     
     # print(initial_states)
     
@@ -811,11 +811,11 @@ def test_tudat_prop():
     
     # print(Xo)
     
-    Xo = np.reshape(initial_states, (12,1))*1e-3
+    # Xo = np.reshape(initial_states, (12,1))*1e-3
     
     # GEO orbit
-    # elem = [42164.1, 0.001, 0.1, 90., 0., 0.]
-    # Xo = np.reshape(astro.kep2cart(elem), (6,1))
+    elem = [42164.1, 0.001, 0.1, 90., 0., 0.]
+    Xo = np.reshape(astro.kep2cart(elem), (6,1))
     
     
     
@@ -839,16 +839,35 @@ def test_tudat_prop():
     int_params['integrator'] = 'tudat'
     int_params['tudat_integrator'] = 'rkf78'
     int_params['step'] = 10.
-    int_params['max_step'] = 1000.
+    int_params['max_step'] = 100.
     int_params['min_step'] = 1.
     int_params['rtol'] = 1e-12
     int_params['atol'] = 1e-12
     int_params['time_format'] = 'datetime'
     
+    # Time vector
+    tk_list = []
+    for hr in range(24):
+        UTC = datetime(2021, 6, 21, hr, 0, 0)
+        tvec = np.arange(0., 601., 60.)
+        tk_list.extend([UTC + timedelta(seconds=ti) for ti in tvec])
     
+    X = Xo
+    tout = np.zeros(len(tk_list),)
+    Xout = np.zeros((len(tk_list), 6))
+    for kk in range(len(tk_list)):
+
+        
+        if kk > 0:
+            tin = [tk_list[kk-1], tk_list[kk]]
+            tout2, Xout2 = dyn.general_dynamics(X, tin, state_params, int_params)
+            X = Xout2[-1,:].reshape(6, 1)
+        
+            tout[kk] = tout2[-1] + tout[kk-1]
+        
+        Xout[kk,:] = X.flatten()
     
-    
-    tout, Xout = dyn.general_dynamics(Xo, tvec, state_params, int_params)
+    # tout, Xout = dyn.general_dynamics(Xo, tvec, state_params, int_params)
     
     print(tout)
     print(Xout)

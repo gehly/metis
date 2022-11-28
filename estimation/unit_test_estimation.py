@@ -504,7 +504,7 @@ def tudat_geo_setup():
     int_params['integrator'] = 'tudat'
     int_params['tudat_integrator'] = 'rk4'
     int_params['step'] = 10.
-    int_params['max_step'] = 1000.
+    int_params['max_step'] = 100.
     int_params['min_step'] = 1.
     int_params['rtol'] = 1e-12
     int_params['atol'] = 1e-12
@@ -1084,6 +1084,9 @@ def execute_tudat_ukf():
     
     meas_fcn = mfunc.unscented_radec
     params_dict['filter_params']['alpha'] = 1e-4
+    params_dict['filter_params']['Q'] = 1e-15 * np.diag([1, 1, 1])
+    params_dict['int_params']['tudat_integrator'] = 'rkf78'
+    
     
     # UKF Test
     filter_output, full_state_output = est.ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, params_dict)

@@ -428,7 +428,9 @@ def general_dynamics(Xo, tvec, state_params, int_params):
         
 
         # Create termination settings
-        termination_condition = propagation_setup.propagator.time_termination(simulation_end_epoch)
+        termination_condition = propagation_setup.propagator.time_termination(
+            simulation_end_epoch, terminate_exactly_on_final_condition=True
+        )
 
         # Create propagation settings
         propagator_settings = propagation_setup.propagator.translational(
@@ -474,57 +476,69 @@ def general_dynamics(Xo, tvec, state_params, int_params):
         states_array = result2array(states)        
         
         # print('states_array', states_array.shape)
-
         
-        # RKF78 need to interpolate or fixed step prop to replace last row for
-        # desired time
-        if int_params['tudat_integrator'] == 'rkf78':
-            
-            # if Xout.shape[1] > 9:
-            #     lastrow = num.interp_lagrange(tout, Xout, tvec[-1], 9)
-            #     tout[-1] = tvec[-1]
-            #     Xout[-1,:] = lastrow.flatten()
-            
-            simulation_start_epoch2 = states_array[-2,0]
-            initial_state2 = states_array[-2,1:]
-            
-            dt_end = simulation_end_epoch - simulation_start_epoch2
-            Nstep = np.floor(dt_end/int_params['step'])
-            
-            fixed_step_size = dt_end/Nstep
-            integrator_settings = propagation_setup.integrator.runge_kutta_4(
-                simulation_start_epoch2, fixed_step_size
-            )
-            
-            propagator_settings = propagation_setup.propagator.translational(
-                central_bodies,
-                acceleration_models,
-                bodies_to_propagate,
-                initial_state2,
-                termination_condition
-            )
-            
-            # Create simulation object and propagate the dynamics
-            dynamics_simulator = numerical_simulation.SingleArcSimulator(
-                bodies, integrator_settings, propagator_settings
-            )
-
-            # Extract the resulting state history and convert it to an ndarray
-            states2 = dynamics_simulator.state_history
-            states_array2 = result2array(states2) 
-            
-            states_array[-1,:] = states_array2[-1,:]
-            
-            
-        # Form output
         tout = states_array[:,0] - simulation_start_epoch
-        Xout = states_array[:,1:6*N+1]*1e-3   
-            
-            
-            
-            
-            
+        Xout = states_array[:,1:6*N+1]*1e-3
         
+        
+        # if int_params['tudat_integrator'] == 'rk4':
+        #     tout = states_array[:,0] - simulation_start_epoch
+        #     Xout = states_array[:,1:6*N+1]*1e-3  
+        
+        # # RKF78 need to interpolate or fixed step prop to replace last row for
+        # # desired time
+        # if int_params['tudat_integrator'] == 'rkf78':
+            
+            
+        #     # Interpolate whenever possible to avoid numerical issues with
+        #     # overstepping final time
+        #     N = int(states_array.shape[0])
+        #     if N > 6:
+                
+        #         p = min(N-1, 9)
+        #         tout = states_array[:,0] - simulation_start_epoch
+        #         Xout = states_array[:,1:6*N+1]*1e-3  
+                
+        #         lastrow = num.interp_lagrange(tout, Xout, tvec[-1], p)
+        #         tout[-1] = tvec[-1]
+        #         Xout[-1,:] = lastrow.flatten()
+                
+        #     else:            
+        #         simulation_start_epoch2 = states_array[-2,0]
+        #         initial_state2 = states_array[-2,1:]
+                
+        #         dt_end = simulation_end_epoch - simulation_start_epoch2
+        #         Nstep = np.floor(dt_end/int_params['step'])
+                
+        #         fixed_step_size = dt_end/Nstep
+        #         integrator_settings = propagation_setup.integrator.runge_kutta_4(
+        #             simulation_start_epoch2, fixed_step_size
+        #         )
+                
+        #         propagator_settings = propagation_setup.propagator.translational(
+        #             central_bodies,
+        #             acceleration_models,
+        #             bodies_to_propagate,
+        #             initial_state2,
+        #             termination_condition
+        #         )
+                
+        #         # Create simulation object and propagate the dynamics
+        #         dynamics_simulator = numerical_simulation.SingleArcSimulator(
+        #             bodies, integrator_settings, propagator_settings
+        #         )
+    
+        #         # Extract the resulting state history and convert it to an ndarray
+        #         states2 = dynamics_simulator.state_history
+        #         states_array2 = result2array(states2) 
+                
+        #         states_array[-1,:] = states_array2[-1,:]
+                        
+        #         # Form output
+        #         tout = states_array[:,0] - simulation_start_epoch
+        #         Xout = states_array[:,1:6*N+1]*1e-3   
+            
+
         
         return tout, Xout
     
