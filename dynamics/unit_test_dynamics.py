@@ -588,6 +588,44 @@ def test_jit_twobody():
     # Define state parameters
     state_params = {}
     state_params['GM'] = GME
+    
+    
+    
+    # Xo = np.reshape([ 7.03748400133e+06,  3.23805901792e+06,  2.1507241875e+06, -1.46565763e+03,
+    #                  -4.09583949e+01,  6.62279761e+03], (6,1)) * 1e-3
+    
+    # print(Xo)
+    
+    # Create default body settings for "Earth"
+    bodies_to_create = ["Earth"]
+
+    # Create default body settings for bodies_to_create, with "Earth"/"J2000" as the global frame origin and orientation
+    global_frame_origin = "Earth"
+    global_frame_orientation = "J2000"
+    body_settings = environment_setup.get_default_body_settings(
+        bodies_to_create, global_frame_origin, global_frame_orientation)
+
+    # Create system of bodies (in this case only Earth)
+    bodies = environment_setup.create_system_of_bodies(body_settings)
+    
+    earth_gravitational_parameter = bodies.get("Earth").gravitational_parameter
+    initial_state = element_conversion.keplerian_to_cartesian_elementwise(
+        gravitational_parameter=earth_gravitational_parameter,
+        semi_major_axis=7500.0e3,
+        eccentricity=0.1,
+        inclination=np.deg2rad(85.3),
+        argument_of_periapsis=np.deg2rad(235.7),
+        longitude_of_ascending_node=np.deg2rad(23.4),
+        true_anomaly=np.deg2rad(139.87),
+    )
+    
+    # print(initial_state)
+    
+    # Xo = np.reshape(initial_state, (6,1))*1e-3
+    
+    # GEO orbit
+    elem = [42164.1, 0.001, 0.1, 90., 0., 0.]
+    Xo = np.reshape(astro.kep2cart(elem), (6,1))
 
     
     # Integration function and additional settings
@@ -603,13 +641,17 @@ def test_jit_twobody():
 #                     2.213250611, 4.678372741, -5.371314404], (6,1))
     
     # Molniya
-    elem0 = [26600., 0.74, 63.4, 90., 270., 10.]
-    Xo = astro.kep2cart(elem0)
+    # elem0 = [26600., 0.74, 63.4, 90., 270., 10.]
+    # Xo = astro.kep2cart(elem0)
     
-    # Time vector
-    UTC1 = datetime(2022, 10, 20, 0, 0, 0)
-    UTC2 = datetime(2022, 10, 22, 0, 0, 0)
-    tvec = [UTC1, UTC2]
+    # # Time vector
+    # UTC1 = datetime(2022, 10, 20, 0, 0, 0)
+    # UTC2 = datetime(2022, 10, 22, 0, 0, 0)
+    # tvec = [UTC1, UTC2]
+    
+    UTC0 = datetime(2000, 1, 1, 12, 0, 0)
+    UTC1 = datetime(2000, 1, 2, 12, 0, 0)
+    tvec = [UTC0, UTC1]
     
 
     # Run integrator
@@ -642,7 +684,7 @@ def test_jit_twobody():
     # Compute and plot errors
     Xerr = np.zeros(Xout.shape)
     for ii in range(len(tout)):
-        X_true = astro.element_conversion(Xo, 1, 1, dt=tout[ii])
+        X_true = astro.element_conversion(Xo, 1, 1, dt=tout[ii])        
         Xerr[ii,:] = (Xout[ii,:].reshape(6,1) - X_true).flatten()
         
     plt.figure()
@@ -754,13 +796,14 @@ def test_tudat_prop():
         true_anomaly=np.deg2rad(139.87),
     )
     
-    print(initial_state)
+    # print(initial_state)
+    # print(earth_gravitational_parameter)
 
     initial_states = np.concatenate((initial_state, initial_state))
     
-    print(initial_states)
+    # print(initial_states)
     
-    print(initial_states.shape)
+    # print(initial_states.shape)
     
 
     
@@ -769,6 +812,10 @@ def test_tudat_prop():
     # print(Xo)
     
     Xo = np.reshape(initial_states, (12,1))*1e-3
+    
+    # GEO orbit
+    # elem = [42164.1, 0.001, 0.1, 90., 0., 0.]
+    # Xo = np.reshape(astro.kep2cart(elem), (6,1))
     
     
     
@@ -813,7 +860,7 @@ def test_tudat_prop():
     Xerr = np.zeros(Xout[:,0:6].shape)
     for ii in range(len(tout)):
         X_true = astro.element_conversion(Xo[0:6], 1, 1, dt=tout[ii])
-        Xerr[ii,:] = (Xout[ii,6:12].reshape(6,1) - X_true).flatten()
+        Xerr[ii,:] = (Xout[ii,0:6].reshape(6,1) - X_true).flatten()
         
     plt.figure()
     plt.subplot(3,1,1)
