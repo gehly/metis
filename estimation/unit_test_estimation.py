@@ -480,15 +480,15 @@ def tudat_geo_setup():
     state_params['GM'] = GME
     state_params['radius_m'] = 1.
     state_params['albedo'] = 0.1
-    state_params['bodies_to_create'] = ['Earth']
+    state_params['bodies_to_create'] = ['Earth', 'Sun', 'Moon']
     state_params['global_frame_origin'] = 'Earth'
     state_params['global_frame_orientation'] = 'J2000'
     state_params['central_bodies'] = ['Earth']
-    state_params['sph_deg'] = 0
-    state_params['sph_ord'] = 0
+    state_params['sph_deg'] = 8
+    state_params['sph_ord'] = 8
     state_params['mass'] = 400.
-    state_params['Cd'] = 0.
-    state_params['Cr'] = 0.
+    state_params['Cd'] = 2.2
+    state_params['Cr'] = 1.2
     state_params['drag_area_m2'] = 4.
     state_params['srp_area_m2'] = 4.
     
@@ -640,7 +640,7 @@ def tudat_geo_setup():
     params_dict['int_params'] = int_params
     params_dict['sensor_params'] = sensor_params
                 
-    setup_file = os.path.join('unit_test', 'tudat_geo_setup.pkl')
+    setup_file = os.path.join('unit_test', 'tudat_geo_perturbed_setup.pkl')
     pklFile = open( setup_file, 'wb' )
     pickle.dump( [state_dict, meas_fcn, meas_dict, params_dict, truth_dict], pklFile, -1 )
     pklFile.close()
@@ -1070,7 +1070,7 @@ def execute_twobody_test():
 
 def execute_tudat_ukf():
     
-    setup_file = os.path.join('unit_test', 'tudat_geo_setup.pkl')
+    setup_file = os.path.join('unit_test', 'tudat_geo_perturbed_setup.pkl')
     
     pklFile = open(setup_file, 'rb' )
     data = pickle.load( pklFile )
@@ -1087,6 +1087,23 @@ def execute_tudat_ukf():
     params_dict['filter_params']['Q'] = 1e-15 * np.diag([1, 1, 1])
     params_dict['int_params']['tudat_integrator'] = 'rkf78'
     
+    
+    # Reduced dynamics model
+    state_params = params_dict['state_params']
+    state_params['bodies_to_create'] = ['Earth', 'Sun', 'Moon']
+    state_params['sph_deg'] = 2
+    state_params['sph_ord'] = 0
+    state_params['mass'] = 400.
+    state_params['Cd'] = 2.2
+    state_params['Cr'] = 1.5
+    state_params['drag_area_m2'] = 4.
+    state_params['srp_area_m2'] = 4.
+    
+    params_dict['state_params'] = state_params
+    
+    # print(params_dict['state_params'])
+    
+    # mistake
     
     # UKF Test
     filter_output, full_state_output = est.ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, params_dict)
