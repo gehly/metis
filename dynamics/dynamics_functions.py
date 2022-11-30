@@ -327,8 +327,6 @@ def general_dynamics(Xo, tvec, state_params, int_params):
     
     if integrator == 'tudat':
         
-        
-        
         # Convert initial state vector from km to meters for TUDAT propagator
         initial_state = Xo.flatten()*1000.
         

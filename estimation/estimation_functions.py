@@ -1996,7 +1996,7 @@ def merge_GMM(GMM0, params) :
     nstates = len(m0[0])
 
     # Only keep GM components whose weight is above the threshold   
-    # DeMars threshold instead of Vo (just use T)
+    # This applies DeMars threshold instead of Vo which just uses T
     wmax = max(w0)
     w = [w0[ii] for ii in range(len(w0)) if w0[ii] > T*wmax]
     m = [m0[ii] for ii in range(len(w0)) if w0[ii] > T*wmax]

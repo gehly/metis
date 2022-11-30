@@ -15,7 +15,7 @@ sys.path.append(metis_dir)
 
 
 
-############################################################################
+###############################################################################
 # This file contains a number of basic functions useful for data association
 # and multitarget estimation problems.
 #
@@ -28,9 +28,321 @@ sys.path.append(metis_dir)
 #     Hypothesis Tracking Algorithm and Its Evaluation for the Purpose of 
 #     Visual Tracking," IEEE TPAMI 1996.
 #
-############################################################################
+###############################################################################
 
 
+
+###############################################################################
+# PHD Filter
+###############################################################################
+
+def phd_filter(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):
+    
+    # Break out inputs
+    state_params = params_dict['state_params']
+    filter_params = params_dict['filter_params']
+    
+    # State information
+    state_tk = sorted(state_dict.keys())[-1]
+    weights = state_dict[state_tk]['weights']
+    means = state_dict[state_tk]['means']
+    covars = state_dict[state_tk]['covars']
+    GMM_dict = {}
+    GMM_dict['weights'] = weights
+    GMM_dict['means'] = means
+    GMM_dict['covars'] = covars
+    nstates = len(means[0])    
+    
+    # Prior information about the distribution
+    pnorm = 2.
+    kurt = math.gamma(5./pnorm)*math.gamma(1./pnorm)/(math.gamma(3./pnorm)**2.)
+    beta = kurt - 1.
+    kappa = kurt - float(nstates)
+
+    # Compute sigma point weights
+    alpha = filter_params['alpha']
+    lam = alpha**2.*(nstates + kappa) - nstates
+    gam = np.sqrt(nstates + lam)
+    Wm = 1./(2.*(nstates + lam)) * np.ones(2*nstates,)
+    Wc = Wm.copy()
+    Wm = np.insert(Wm, 0, lam/(nstates + lam))
+    Wc = np.insert(Wc, 0, lam/(nstates + lam) + (1 - alpha**2 + beta))
+    diagWc = np.diag(Wc)
+    filter_params['gam'] = gam
+    filter_params['Wm'] = Wm
+    filter_params['diagWc'] = diagWc
+
+    # Initialize output
+    filter_output = {}
+
+    # Measurement times
+    tk_list = sorted(meas_dict.keys())
+    
+    # Number of epochs
+    N = len(tk_list)
+  
+    # Loop over times
+    for kk in range(N):
+    
+        # Current and previous time
+        if kk == 0:
+            tk_prior = state_tk
+        else:
+            tk_prior = tk_list[kk-1]
+
+        tk = tk_list[kk]
+
+        # Predictor Step
+        tin = [tk_prior, tk]
+        GMM_bar = phd_predictor(GMM_dict, tin, params_dict)
+        
+        # Corrector Step
+        Zk = meas_dict[tk]['Zk']
+        sensor_id_list = meas_dict[tk]['sensor_id_list']
+        GMM_dict = phd_corrector(GMM_bar, tk, Zk, sensor_id_list, meas_fcn,
+                                 params_dict)
+        
+        # Prune/Merge Step
+        GMM_dict = merge_GMM(GMM_dict, filter_params)
+        
+        # State extraction and residuals calculation
+        
+        
+        
+        # Store output
+        filter_output[tk] = {}
+        filter_output[tk]['weights'] = GMM_dict['weights']
+        filter_output[tk]['means'] = GMM_dict['means']
+        filter_output[tk]['covars'] = GMM_dict['covars']
+        filter_output[tk]['resids'] = resids_k
+        
+        
+    # TODO Generation of full_state_output not working correctly
+    # Use filter_output for error analysis
+    full_state_output = {}
+    
+    return filter_output, full_state_output
+    
+
+
+
+def phd_predictor(GMM_dict, tin, params_dict):
+    '''
+    
+    
+    '''
+    
+    
+    # Break out inputs
+    filter_params = params_dict['filter_params']
+    state_params = params_dict['state_params']
+    int_params = params_dict['int_params']
+    
+    # Copy input to ensure pass by value
+    GMM_dict = copy.deepcopy(GMM_dict)
+    filter_params = copy.deepcopy(filter_params)
+    state_params = copy.deepcopy(state_params)
+    int_params = copy.deepcopy(int_params)
+    
+    # Retrieve parameters
+    p_surv = filter_params['p_surv']
+    Q = filter_params['Q']
+    gam = filter_params['gam']
+    Wm = filter_params['Wm']
+    diagWc = filter_params['diagWc']    
+    gap_seconds = filter_params['gap_seconds']        
+    time_format = int_params['time_format']     
+    
+    # Fudge to work with general_dynamics
+    state_params['alpha'] = filter_params['alpha']
+    
+    q = int(Q.shape[0])
+    
+    tk_prior = tin[0]
+    tk = tin[1]
+    
+    if time_format == 'seconds':
+        delta_t = tk - tk_prior
+    elif time_format == 'JD':
+        delta_t = (tk - tk_prior)*86400.
+    elif time_format == 'datetime':
+        delta_t = (tk - tk_prior).total_seconds()
+    
+    # Check if propagation is needed
+    if delta_t == 0.:
+        return GMM_dict
+    
+    # Initialize for integrator
+    # Retrieve current GMM
+    weights = GMM_dict['weights']
+    means = GMM_dict['means']
+    covars = GMM_dict['covars']    
+    ncomp = len(weights)
+    nstates = len(means[0])
+
+    # Loop over components
+    for jj in range(ncomp):
+        
+#        print('\nstart loop')
+#        print('jj', jj)
+#        print('ncomp', len(weights))
+#        print('t0', t0_list[jj])
+        
+        # Retrieve component values
+        wj = weights[jj]
+        mj = means[jj]
+        Pj = covars[jj]
+        tin = [tk_prior, tk]
+            
+        # Compute sigma points
+        sqP = np.linalg.cholesky(Pj)
+        Xrep = np.tile(mj, (1, nstates))
+        chi = np.concatenate((mj, Xrep+(gam*sqP), Xrep-(gam*sqP)), axis=1)
+        chi_v = np.reshape(chi, (nstates*npoints, 1), order='F')
+        
+        # Integrate sigma points
+        int0 = chi_v.flatten()
+        tout, intout = \
+            dyn.general_dynamics(int0, tin, state_params, int_params)
+
+        # Retrieve output state        
+        chi_v = intout[-1,:]
+        chi = np.reshape(chi_v, (nstates, 1), order='F')
+
+        # State Noise Compensation
+        # Zero out SNC for long time gaps
+        if delta_t < gap_seconds:        
+
+            Gamma = np.zeros((nstates,q))
+            Gamma[0:q,:] = (delta_t**2./2) * np.eye(q)
+            Gamma[q:2*q,:] = delta_t * np.eye(q)
+
+        Xbar = np.dot(chi, Wm.T)
+        Xbar = np.reshape(Xbar, (nstates, 1))
+        chi_diff = chi - np.dot(Xbar, np.ones((1, (2*nstates+1))))
+        Pbar = np.dot(chi_diff, np.dot(diagWc, chi_diff.T)) + np.dot(Gamma, np.dot(Q, Gamma.T))
+
+        # Store output
+        weights[jj] *= p_surv
+        means[jj] = Xbar
+        covars[jj] = Pbar
+
+    # Form output
+    GMM_bar = {}
+    GMM_bar['weights'] = weights
+    GMM_bar['means'] = means
+    GMM_bar['covars'] = covars   
+
+
+    return GMM_bar
+
+
+
+def phd_corrector(GMM_bar, tk, Zk, sensor_id_list, meas_fcn, params_dict):
+    '''
+    
+    
+    '''
+    
+    
+    # Retrieve inputs
+    filter_params = params_dict['filter_params']
+    state_params = params_dict['state_params']
+    sensor_params = params_dict['sensor_params']
+    gam = filter_params['gam']
+    Wm = filter_params['Wm']
+    diagWc = filter_params['diagWc']
+    p_det = filter_params['p_det']
+    
+    # Break out GMM
+    weights0 = GMM_bar['weights']
+    means0 = GMM_bar['means']
+    covars0 = GMM_bar['covars']
+    nstates = len(means0[0])
+    
+    # Loop over components and compute measurement update
+    means = []
+    covars = []
+    beta_list = []
+    for jj in range(len(weights0)):        
+        
+        mj = means0[jj]
+        Pj = covars0[jj]
+        
+        # Compute sigma points
+        sqP = np.linalg.cholesky(Pj)
+        Xrep = np.tile(mj, (1, nstates))
+        chi = np.concatenate((mj, Xrep+(gam*sqP), Xrep-(gam*sqP)), axis=1)
+        chi_diff = chi - np.dot(mj, np.ones((1, npoints)))
+
+        # Computed measurements and covariance
+        gamma_til_k, Rk = meas_fcn(tk, chi, state_params, sensor_params, sensor_id)
+        ybar = np.dot(gamma_til_k, Wm.T)
+        ybar = np.reshape(ybar, (len(ybar), 1))
+        Y_diff = gamma_til_k - np.dot(ybar, np.ones((1, (2*nstates+1))))
+        Pyy = np.dot(Y_diff, np.dot(diagWc, Y_diff.T)) + Rk
+        Pxy = np.dot(chi_diff,  np.dot(diagWc, Y_diff.T))
+        
+        print('Yk', Yk)
+        print('ybar', ybar)
+        
+        # Kalman gain and measurement update
+        Kk = np.dot(Pxy, np.linalg.inv(Pyy))
+        mf = mj + np.dot(Kk, Yk-ybar)
+        
+        # Joseph form
+        cholPbar = np.linalg.inv(np.linalg.cholesky(Pj))
+        invPbar = np.dot(cholPbar.T, cholPbar)
+        P1 = (np.eye(nstates) - np.dot(np.dot(Kk, np.dot(Pyy, Kk.T)), invPbar))
+        P2 = np.dot(Kk, np.dot(Rk, Kk.T))
+        Pf = np.dot(P1, np.dot(Pj, P1.T)) + P2
+        
+        # Compute Gaussian likelihood
+        beta_j = gaussian_likelihood(Yk, ybar, Pyy)
+
+        # Store output
+        means.append(mf)
+        covars.append(Pf)
+        beta_list.append(beta_j)
+        
+    # Normalize updated weights
+#    denom = np.dot(beta_list, weights0)    
+#    weights = [a1*a2/denom for a1,a2 in zip(weights0, beta_list)]
+    weights = list(np.multiply(beta_list, weights0)/np.dot(beta_list, weights0))
+    
+    
+    return
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+###############################################################################
+# Utility Functions
+###############################################################################
 
 def auction(A) :
     '''
@@ -297,106 +609,9 @@ def murty(A0, kbest=1):
     return final_list
 
 
-def unit_test_auction():
-    '''
-    Example assignment problem from [1] Blackman and Popoli 
-    
-    '''
-    
-    # C is cost matrix to minimize
-    C = np.array([[10.,    5.,   8.,   9.],
-                  [7.,   100.,  20., 100.],
-                  [100.,  21., 100., 100.],
-                  [100.,  15.,  17., 100.],
-                  [100., 100.,  16.,  22.]])
-    
-    # A is score matrix to maximize
-    A = 100.*np.ones((5,4)) - C
-    
-    # Compute assignment
-    row_index, score, eps = auction(A)
-    
-    print(row_index, score, eps)
-    
-    truth = [7., 15., 16., 9.]
-    test_sum = 0.
-    for ii in range(4):
-        print(C[row_index[ii],ii])
-        test_sum += C[row_index[ii],ii] - truth[ii]
-        
-    if test_sum == 0.:
-        print('pass')
-    
-    
-    
-    return
-
-
-def unit_test_murty():
-    '''
-    Example assignment problem from [1] Blackman and Popoli
-    '''
-    
-    # C is cost matrix to minimize
-    C = np.array([[10.,    5.,   8.,   9.],
-                  [7.,   100.,  20., 100.],
-                  [100.,  21., 100., 100.],
-                  [100.,  15.,  17., 100.],
-                  [100., 100.,  16.,  22.]])
-    
-    # A is score matrix to maximize
-    A = 100.*np.ones((5,4)) - C
-    
-    # Compute assignment
-    kbest = 4
-    final_list = murty(A, kbest)
-    
-    print(final_list)
-    
-    for row_index in final_list:
-        for ii in range(4):
-            print(C[row_index[ii], ii])
-    
-    
-    
-    return
 
 
 
-
-if __name__ == '__main__':
-    
-    
-#    unit_test_auction()
-    
-    
-    unit_test_murty()
-    
-    
-    
-    
-
-#    # A is score matrix to maximize
-#    A = np.array([[1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-#                  [2, 10, 3, 6, 2, 12, 6, 9, 6, 10],
-#                  [3, 11, 1, 9, 4, 15, 5, 4, 9, 12],
-#                  [4, 6, 5, 4, 0, 3, 4, 6, 10, 11],
-#                  [5, 0, 6, 8, 1, 10, 3, 7, 8, 13],
-#                  [6, 11, 0, 6, 5, 9, 2, 5, 3, 8],
-#                  [7, 9, 2, 5, 6, 5, 1, 3, 6, 6],
-#                  [8, 8, 6, 9, 4, 0, 8, 2, 1, 5],
-#                  [10, 12, 11, 6, 5, 10, 9, 1, 6, 7],
-#                  [9, 10, 4, 8, 0, 9, 1, 0, 5, 9]])
-#
-#    
-#    # Compute assignment
-#    row_index, score, eps = auction(A)
-#    
-#    print(row_index, score, eps)
-#
-#    for ii in range(10):
-#        print(A[row_index[ii],ii])
-#    
 
 
 
