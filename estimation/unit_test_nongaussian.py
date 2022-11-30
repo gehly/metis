@@ -1002,11 +1002,11 @@ if __name__ == '__main__':
     
 #    twobody_heo_aegis_prop()
     
-#    demars_high_orbit()
+    demars_high_orbit()
     
-    aegis_ukf_setup()
+#    aegis_ukf_setup()
     
-    execute_aegis_test()
+#    execute_aegis_test()
     
     
     

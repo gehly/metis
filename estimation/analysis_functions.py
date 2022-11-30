@@ -1281,6 +1281,147 @@ def compute_real_orbit_errors(filter_output, full_state_output, truth_dict, nora
     return
 
 
+###############################################################################
+# Tracklet Correlation and IOD
+###############################################################################
+
+def evaluate_tracklet_correlation(correlation_file, ra_lim, dec_lim):
+    
+    # Load correlation data
+    pklFile = open(correlation_file, 'rb' )
+    data = pickle.load( pklFile )
+    correlation_dict = data[0]
+    tracklet_dict = data[1]
+    params_dict = data[2]
+    truth_dict = data[3]
+    pklFile.close()
+        
+    # # Reformulate correlation dict according to cases
+    # case_dict = {}
+    # N_true = 0
+    # N_false = 0
+    # for ii in correlation_dict:
+    #     count = correlation_dict[ii]['count']
+        
+    #     # If this is a new case, retrieve and store values
+    #     if count not in case_dict:
+    #         case_dict[count] = {}
+    #         case_dict[count]['corr_truth_list'] = [correlation_dict[ii]['corr_truth']]
+    #         case_dict[count]['Xo_true'] = correlation_dict[ii]['Xo_true']
+    #         case_dict[count]['Xo_list'] = [correlation_dict[ii]['Xo']]
+    #         case_dict[count]['M_list'] = [correlation_dict[ii]['M']]
+    #         case_dict[count]['resids_list'] = [correlation_dict[ii]['resids']]
+    #         case_dict[count]['ra_rms_list'] = [correlation_dict[ii]['ra_rms']]
+    #         case_dict[count]['dec_rms_list'] = [correlation_dict[ii]['dec_rms']]
+            
+    #         if correlation_dict[ii]['obj1_id'] == correlation_dict[ii]['obj2_id']:
+    #             N_true += 1
+    #         else:
+    #             N_false += 1
+                    
+            
+    #     # If multiple entries are from the same case, append to lists for 
+    #     # later evaluation
+    #     else:
+    #         case_dict[count]['corr_truth_list'].append(correlation_dict[ii]['corr_truth'])
+    #         case_dict[count]['Xo_list'].append(correlation_dict[ii]['Xo'])
+    #         case_dict[count]['M_list'].append(correlation_dict[ii]['M'])
+    #         case_dict[count]['resids_list'].append(correlation_dict[ii]['resids'])
+    #         case_dict[count]['ra_rms_list'].append(correlation_dict[ii]['ra_rms'])
+    #         case_dict[count]['dec_rms_list'].append(correlation_dict[ii]['dec_rms'])
+           
+
+    # Compute number of true positives, true negatives and correlation 
+    # performance
+    N_cases = len(correlation_dict.keys())
+    N_true = 0
+    N_false = 0
+    N_truepos = 0
+    N_trueneg = 0
+    N_falsepos = 0
+    N_falseneg = 0
+    for case_id in correlation_dict:
+        corr_truth_list = correlation_dict[case_id]['corr_truth_list']
+        
+        # True correlation status determined by object id
+        obj1_id = correlation_dict[case_id]['obj1_id']
+        obj2_id = correlation_dict[case_id]['obj2_id']
+        
+        if obj1_id == obj2_id:
+            N_true += 1
+            corr_truth = True
+        else:
+            N_false += 1
+            corr_truth = False
+        
+        # If no IOD solution fit, correlation is estimated to be false
+        if len(correlation_dict[case_id]['M_list']) == 0:
+            corr_est = False
+        
+        # Otherwise, estimate correlation status based on residuals
+        else:            
+            ra_rms_list = correlation_dict[case_id]['ra_rms_list']
+            dec_rms_list = correlation_dict[case_id]['dec_rms_list']
+            resids_list = correlation_dict[case_id]['resids_list']
+            
+            rms_list = []
+            for ii in range(len(resids_list)):
+                resids_ii = resids_list[ii]
+                resids_rms = np.sqrt(np.mean(np.sum(np.multiply(resids_ii, resids_ii), axis=0)))
+                rms_list.append(resids_rms)
+                
+            min_ind = rms_list.index(min(rms_list))
+            ra_min = ra_rms_list[min_ind]
+            dec_min = dec_rms_list[min_ind]
+            tot_min = rms_list[min_ind]*(1./arcsec2rad)
+            
+            if ra_min < ra_lim and dec_min < dec_lim:
+                corr_est = True
+            else:
+                corr_est = False
+        
+        # Evaluate correlation status for true/false positives and negatives
+        if corr_truth:
+            if corr_est:
+                N_truepos += 1
+            else:
+                N_falseneg += 1
+                print('')
+                print('False negative case id', case_id)
+                
+        else:
+            if corr_est:
+                N_falsepos += 1
+            else:
+                N_trueneg += 1
+        
+        # Check for fail conditions, if Gooding IOD didn't produce a solution
+        # with the correct rev number M
+        
+    
+    
+    
+    print('')
+    print('Total Number of Correlations: ', N_cases)
+    print('Number of True Correlations: ', N_true)
+    print('Number of False Correlations: ', N_false)
+    
+    print('')
+    print('True Pos:  %5.2f%% (%3d/%3d)' % ((N_truepos/N_true)*100., N_truepos, N_true))
+    print('True Neg:  %5.2f%% (%3d/%3d)' % ((N_trueneg/N_false)*100., N_trueneg, N_false))
+    print('False Pos: %5.2f%% (%3d/%3d)' % ((N_falsepos/N_false)*100., N_falsepos, N_false))
+    print('False Neg: %5.2f%% (%3d/%3d)' % ((N_falseneg/N_true)*100., N_falseneg, N_true))
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    return
+
 
 
 
