@@ -13,7 +13,10 @@ ind = current_dir.find('metis')
 metis_dir = current_dir[0:ind+5]
 sys.path.append(metis_dir)
 
-
+from dynamics import dynamics_functions as dyn
+from estimation import estimation_functions as est
+from sensors import measurement_functions as mfunc
+from utilities import time_systems as timesys
 
 ###############################################################################
 # This file contains a number of basic functions useful for data association
@@ -103,17 +106,21 @@ def phd_filter(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):
                                  params_dict)
         
         # Prune/Merge Step
-        GMM_dict = merge_GMM(GMM_dict, filter_params)
+        GMM_dict = est.merge_GMM(GMM_dict, filter_params)
         
         # State extraction and residuals calculation
-        
-        
+        wk_list, Xk_list, Pk_list, resids_k = \
+            phd_state_extraction(GMM_dict, tk, Zk, sensor_id_list, meas_fcn,
+                                 params_dict)
         
         # Store output
         filter_output[tk] = {}
         filter_output[tk]['weights'] = GMM_dict['weights']
         filter_output[tk]['means'] = GMM_dict['means']
         filter_output[tk]['covars'] = GMM_dict['covars']
+        filter_output[tk]['wk_list'] = wk_list
+        filter_output[tk]['Xk_list'] = Xk_list
+        filter_output[tk]['Pk_list'] = Pk_list
         filter_output[tk]['resids'] = resids_k
         
         
@@ -179,6 +186,7 @@ def phd_predictor(GMM_dict, tin, params_dict):
     covars = GMM_dict['covars']    
     ncomp = len(weights)
     nstates = len(means[0])
+    npoints = 2*nstates + 1
 
     # Loop over components
     for jj in range(ncomp):
@@ -219,7 +227,7 @@ def phd_predictor(GMM_dict, tin, params_dict):
 
         Xbar = np.dot(chi, Wm.T)
         Xbar = np.reshape(Xbar, (nstates, 1))
-        chi_diff = chi - np.dot(Xbar, np.ones((1, (2*nstates+1))))
+        chi_diff = chi - np.dot(Xbar, np.ones((1, npoints)))
         Pbar = np.dot(chi_diff, np.dot(diagWc, chi_diff.T)) + np.dot(Gamma, np.dot(Q, Gamma.T))
 
         # Store output
@@ -259,64 +267,141 @@ def phd_corrector(GMM_bar, tk, Zk, sensor_id_list, meas_fcn, params_dict):
     means0 = GMM_bar['means']
     covars0 = GMM_bar['covars']
     nstates = len(means0[0])
+    npoints = 2*nstates + 1
+    ncomp = len(weights0)
+    nmeas = len(Zk)
     
-    # Loop over components and compute measurement update
-    means = []
-    covars = []
-    beta_list = []
-    for jj in range(len(weights0)):        
+    # Components for missed detection case
+    weights = [(1. - p_det)*wj for wj in weights0]
+    means = copy.copy(means0)
+    covars = copy.copy(covars0)
+    
+    # Loop over each measurement and compute updates
+    for ii in range(nmeas):
         
-        mj = means0[jj]
-        Pj = covars0[jj]
+        # Retrieve measurement
+        zi = Zk[ii]
+        sensor_id = sensor_id_list[ii]
+    
+        # Loop over components   
+        qk_list = []
+        for jj in range(ncomp):        
+            
+            mj = means0[jj]
+            Pj = covars0[jj]
+            
+            # Compute sigma points
+            sqP = np.linalg.cholesky(Pj)
+            Xrep = np.tile(mj, (1, nstates))
+            chi = np.concatenate((mj, Xrep+(gam*sqP), Xrep-(gam*sqP)), axis=1)
+            chi_diff = chi - np.dot(mj, np.ones((1, npoints)))
+    
+            # Computed measurements and covariance
+            gamma_til_k, Rk = meas_fcn(tk, chi, state_params, sensor_params, sensor_id)
+            zbar = np.dot(gamma_til_k, Wm.T)
+            zbar = np.reshape(zbar, (len(zbar), 1))
+            z_diff = gamma_til_k - np.dot(zbar, np.ones((1, npoints)))
+            Pyy = np.dot(z_diff, np.dot(diagWc, z_diff.T)) + Rk
+            Pxy = np.dot(chi_diff,  np.dot(diagWc, z_diff.T))
+            
+            print('zi', zi)
+            print('zbar', zbar)
+            
+            # Kalman gain and measurement update
+            Kk = np.dot(Pxy, np.linalg.inv(Pyy))
+            mf = mj + np.dot(Kk, zi-zbar)
+            
+            # Joseph form
+            cholPbar = np.linalg.inv(np.linalg.cholesky(Pj))
+            invPbar = np.dot(cholPbar.T, cholPbar)
+            P1 = (np.eye(nstates) - np.dot(np.dot(Kk, np.dot(Pyy, Kk.T)), invPbar))
+            P2 = np.dot(Kk, np.dot(Rk, Kk.T))
+            Pf = np.dot(P1, np.dot(Pj, P1.T)) + P2
+            
+            # Compute Gaussian likelihood
+            qk_j = est.gaussian_likelihood(zi, zbar, Pyy)
+    
+            # Store output
+            means.append(mf)
+            covars.append(Pf)
+            qk_list.append(qk_j)
         
-        # Compute sigma points
-        sqP = np.linalg.cholesky(Pj)
-        Xrep = np.tile(mj, (1, nstates))
-        chi = np.concatenate((mj, Xrep+(gam*sqP), Xrep-(gam*sqP)), axis=1)
-        chi_diff = chi - np.dot(mj, np.ones((1, npoints)))
-
-        # Computed measurements and covariance
-        gamma_til_k, Rk = meas_fcn(tk, chi, state_params, sensor_params, sensor_id)
-        ybar = np.dot(gamma_til_k, Wm.T)
-        ybar = np.reshape(ybar, (len(ybar), 1))
-        Y_diff = gamma_til_k - np.dot(ybar, np.ones((1, (2*nstates+1))))
-        Pyy = np.dot(Y_diff, np.dot(diagWc, Y_diff.T)) + Rk
-        Pxy = np.dot(chi_diff,  np.dot(diagWc, Y_diff.T))
+        # Normalize updated weights
+        denom = p_det*np.dot(qk_list, weights0) + clutter_intensity(zi, sensor_id, sensor_params)
+        wf = [p_det*a1*a2/denom for a1,a2 in zip(weights0, qk_list)]
+        weights.extend(wf)
         
-        print('Yk', Yk)
-        print('ybar', ybar)
-        
-        # Kalman gain and measurement update
-        Kk = np.dot(Pxy, np.linalg.inv(Pyy))
-        mf = mj + np.dot(Kk, Yk-ybar)
-        
-        # Joseph form
-        cholPbar = np.linalg.inv(np.linalg.cholesky(Pj))
-        invPbar = np.dot(cholPbar.T, cholPbar)
-        P1 = (np.eye(nstates) - np.dot(np.dot(Kk, np.dot(Pyy, Kk.T)), invPbar))
-        P2 = np.dot(Kk, np.dot(Rk, Kk.T))
-        Pf = np.dot(P1, np.dot(Pj, P1.T)) + P2
-        
-        # Compute Gaussian likelihood
-        beta_j = gaussian_likelihood(Yk, ybar, Pyy)
-
-        # Store output
-        means.append(mf)
-        covars.append(Pf)
-        beta_list.append(beta_j)
-        
-    # Normalize updated weights
-#    denom = np.dot(beta_list, weights0)    
-#    weights = [a1*a2/denom for a1,a2 in zip(weights0, beta_list)]
-    weights = list(np.multiply(beta_list, weights0)/np.dot(beta_list, weights0))
+    # Form output  
+    GMM_dict = {}
+    GMM_dict['weights'] = weights
+    GMM_dict['means'] = means
+    GMM_dict['covars'] = covars
     
     
-    return
+    return GMM_dict
 
 
 
+def phd_state_extraction(GMM_dict, tk, Zk, sensor_id_list, meas_fcn, 
+                         params_dict):
+    '''
+    
+    
+    '''
+    
+    # Retrieve inputs
+    filter_params = params_dict['filter_params']
+    state_params = params_dict['state_params']
+    sensor_params = params_dict['sensor_params']
+    int_params = params_dict['int_params']
+    time_format = int_params['time_format']
+    
+    # Compute UTC
+    if time_format == 'JD':
+        UTC = timesys.jd2dt(tk)
+    elif time_format == 'datetime':
+        UTC = tk
+    
+    # Retrieve current GMM componets
+    weights = GMM_dict['weights']
+    means = GMM_dict['means']
+    covars = GMM_dict['covars']
 
-
+    
+    # Compute cardinality
+    Nk = int(round(sum(weights)))
+    if Nk > len(weights):
+        Nk = len(weights)
+    
+    # Select the Nk highest weighted components as the state estimate at 
+    # current time
+    sorted_inds = sorted(range(len(weights)), key=lambda k: weights[k], reverse=True)
+    max_inds = sorted_inds[0:Nk]
+    
+    # Values for output
+    wk_list = [weights[ii] for ii in max_inds]
+    Xk_list = [means[ii] for ii in max_inds]
+    Pk_list = [covars[ii] for ii in max_inds]
+    
+    # Calculate residuals
+    for ii in range(len(Zk)):
+        zi = Zk[ii]
+        sensor_id = sensor_id_list[ii]
+        
+        resids_list = []
+        for jj in range(len(Xk_list)):
+            Xj = Xk_list[jj]            
+            zbar = mfunc.compute_measurement(Xj, state_params, sensor_params,
+                                             sensor_id, UTC)
+            resids = zi - zbar
+            resids_list.append(resids)
+            
+        # Take smallest magnitude as residual for this measurement
+        min_list = [np.linalg.norm(resid) for resid in resids_list]
+        resids_k = resids_list[min_list.index(min(min_list))]
+    
+    
+    return wk_list, Xk_list, Pk_list, resids_k
 
 
 
@@ -343,6 +428,22 @@ def phd_corrector(GMM_bar, tk, Zk, sensor_id_list, meas_fcn, params_dict):
 ###############################################################################
 # Utility Functions
 ###############################################################################
+
+
+def clutter_intensity(zi, sensor_id, sensor_params):
+    
+    # Assume clutter is poisson-distributed in number and uniform in spatial
+    # distribution
+    sensor = sensor_params[sensor_id]
+    lam_clutter = sensor['lam_clutter']
+    V_sensor = sensor['V_sensor']
+    
+    kappa = lam_clutter/V_sensor    
+    
+    return kappa
+
+
+
 
 def auction(A) :
     '''
