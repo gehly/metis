@@ -24,15 +24,16 @@ ind = current_dir.find('metis')
 metis_dir = current_dir[0:ind+5]
 sys.path.append(metis_dir)
 
-import estimation.analysis_functions as analysis
-import estimation.estimation_functions as est
-import dynamics.dynamics_functions as dyn
-import sensors.measurement_functions as mfunc
-import sensors.sensors as sens
-import sensors.visibility_functions as visfunc
-import utilities.astrodynamics as astro
-import utilities.coordinate_systems as coord
-import utilities.eop_functions as eop
+from estimation import analysis_functions as analysis
+from estimation import estimation_functions as est
+from estimation import multitarget_functions as mult
+from dynamics import dynamics_functions as dyn
+from sensors import measurement_functions as mfunc
+from sensors import sensors as sens
+from sensors import visibility_functions as visfunc
+from utilities import astrodynamics as astro
+from utilities import coordinate_systems as coord
+from utilities import eop_functions as eop
 from utilities import tle_functions as tle
 from utilities.constants import GME, arcsec2rad
 
@@ -110,7 +111,7 @@ def unit_test_murty():
 
 
 
-def tudat_geo_2obj_setup():
+def tudat_geo_2obj_setup(setup_file):
     
     
     # Retrieve latest EOP data from celestrak.com
@@ -142,6 +143,10 @@ def tudat_geo_2obj_setup():
     filter_params['gap_seconds'] = 900.
     filter_params['alpha'] = 1e-4
     filter_params['pnorm'] = 2.
+    filter_params['prune_T'] = 1e-3
+    filter_params['merge_U'] = 36.
+    filter_params['p_surv'] = 1.
+    filter_params['p_det'] = 1.
     
     # Integration function and additional settings    
     int_params = {}
@@ -195,6 +200,12 @@ def tudat_geo_2obj_setup():
         sigma_dict['ra'] = 5.*arcsec2rad   # rad
         sigma_dict['dec'] = 5.*arcsec2rad  # rad
         sensor_params[sensor_id]['sigma_dict'] = sigma_dict
+        sensor_params[sensor_id]['lam_clutter'] = 0.
+        FOV_hlim = sensor_params[sensor_id]['FOV_hlim']
+        FOV_vlim = sensor_params[sensor_id]['FOV_vlim']        
+        sensor_params[sensor_id]['V_sensor'] = (FOV_hlim[1] - FOV_hlim[0])*(FOV_vlim[1] - FOV_vlim[0])
+
+        
 #    print(sensor_params)
     
 #    for sensor_id in sensor_id_list:
@@ -336,11 +347,35 @@ def tudat_geo_2obj_setup():
     params_dict['int_params'] = int_params
     params_dict['sensor_params'] = sensor_params
                 
-    setup_file = os.path.join('unit_test', 'tudat_geo_2obj_twobody_setup.pkl')
     pklFile = open( setup_file, 'wb' )
     pickle.dump( [state_dict, meas_fcn, meas_dict, params_dict, truth_dict], pklFile, -1 )
     pklFile.close()
                 
+    
+    
+    return
+
+
+def run_multitarget_filter(setup_file, results_file):
+    
+    
+    pklFile = open(setup_file, 'rb' )
+    data = pickle.load( pklFile )
+    state_dict = data[0]
+    meas_fcn = data[1]
+    meas_dict = data[2]
+    params_dict = data[3]
+    truth_dict = data[4]
+    pklFile.close()
+    
+    
+    filter_output, full_state_output = mult.phd_filter(state_dict, truth_dict, meas_dict, meas_fcn, params_dict)
+    
+    pklFile = open( results_file, 'wb' )
+    pickle.dump( [filter_output, full_state_output, params_dict, truth_dict], pklFile, -1 )
+    pklFile.close()
+    
+    # analysis.compute_orbit_errors(filter_output, full_state_output, truth_dict)
     
     
     return
@@ -352,10 +387,16 @@ if __name__ == '__main__':
     
     plt.close('all')
     
+    fdir = r'D:\documents\research_projects\multitarget\data\sim\test\2022_12_01_geo_2obj'
     
-    tudat_geo_2obj_setup()
+    
+    setup_file = os.path.join(fdir, 'tudat_geo_twobody_2obj_pd1_lam0_setup.pkl')
+    results_file = os.path.join(fdir, 'tudat_geo_twobody_2obj_pd1_lam0_phd_results.pkl')
     
     
+    tudat_geo_2obj_setup(setup_file)    
+    
+    run_multitarget_filter(setup_file, results_file)
     
     
     

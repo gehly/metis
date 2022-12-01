@@ -1,5 +1,5 @@
 import numpy as np
-from math import *
+import math
 import sys
 import os
 import inspect
@@ -100,7 +100,7 @@ def phd_filter(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):
         GMM_bar = phd_predictor(GMM_dict, tin, params_dict)
         
         # Corrector Step
-        Zk = meas_dict[tk]['Zk']
+        Zk = meas_dict[tk]['Zk_list']
         sensor_id_list = meas_dict[tk]['sensor_id_list']
         GMM_dict = phd_corrector(GMM_bar, tk, Zk, sensor_id_list, meas_fcn,
                                  params_dict)
@@ -215,13 +215,12 @@ def phd_predictor(GMM_dict, tin, params_dict):
 
         # Retrieve output state        
         chi_v = intout[-1,:]
-        chi = np.reshape(chi_v, (nstates, 1), order='F')
+        chi = np.reshape(chi_v, (nstates, npoints), order='F')
 
         # State Noise Compensation
         # Zero out SNC for long time gaps
-        if delta_t < gap_seconds:        
-
-            Gamma = np.zeros((nstates,q))
+        Gamma = np.zeros((nstates,q))
+        if delta_t < gap_seconds:   
             Gamma[0:q,:] = (delta_t**2./2) * np.eye(q)
             Gamma[q:2*q,:] = delta_t * np.eye(q)
 
@@ -384,6 +383,7 @@ def phd_state_extraction(GMM_dict, tk, Zk, sensor_id_list, meas_fcn,
     Pk_list = [covars[ii] for ii in max_inds]
     
     # Calculate residuals
+    resids_out = []
     for ii in range(len(Zk)):
         zi = Zk[ii]
         sensor_id = sensor_id_list[ii]
@@ -399,9 +399,10 @@ def phd_state_extraction(GMM_dict, tk, Zk, sensor_id_list, meas_fcn,
         # Take smallest magnitude as residual for this measurement
         min_list = [np.linalg.norm(resid) for resid in resids_list]
         resids_k = resids_list[min_list.index(min(min_list))]
+        resids_out.append(resids_k)
     
     
-    return wk_list, Xk_list, Pk_list, resids_k
+    return wk_list, Xk_list, Pk_list, resids_out
 
 
 

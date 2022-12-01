@@ -1282,6 +1282,446 @@ def compute_real_orbit_errors(filter_output, full_state_output, truth_dict, nora
 
 
 ###############################################################################
+# Multitarget Orbit Analysis
+###############################################################################
+
+def multitarget_orbit_errors(filter_output, full_state_output, truth_dict):
+    
+    # OSPA parameters
+    pnorm = 2.
+    c = 100.    # km, penalty for cardinality errors
+    
+    # Times
+    tk_list = list(full_state_output.keys())
+    t0 = sorted(truth_dict.keys())[0]
+    
+    print(t0)
+    print(tk_list[0])
+    thrs = [(tk - t0).total_seconds()/3600. for tk in tk_list]
+    
+    meas_tk_list = list(filter_output.keys())
+    meas_t0 = sorted(meas_tk_list)[0]
+    thrs_meas = [(tk - t0).total_seconds()/3600. for tk in meas_tk_list]
+    
+    # Number of states and measurements
+    Xo = filter_output[meas_t0]['means'][0]
+    resids0 = filter_output[meas_t0]['resids'][0]
+    n = len(Xo)
+    p = len(resids0)
+    
+    # Compute state errors
+    X_err = np.zeros((n, len(full_state_output)))
+    X_err_ric = np.zeros((3, len(full_state_output)))
+    X_err_meas = np.zeros((n, len(filter_output)))
+    X_err_ric_meas = np.zeros((3, len(filter_output)))
+    resids = np.zeros((p, len(filter_output)))
+    sig_x = np.zeros(len(full_state_output),)
+    sig_y = np.zeros(len(full_state_output),)
+    sig_z = np.zeros(len(full_state_output),)
+    sig_dx = np.zeros(len(full_state_output),)
+    sig_dy = np.zeros(len(full_state_output),)
+    sig_dz = np.zeros(len(full_state_output),)
+    sig_r = np.zeros(len(full_state_output),)
+    sig_i = np.zeros(len(full_state_output),)
+    sig_c = np.zeros(len(full_state_output),)
+    sig_beta = np.zeros(len(full_state_output),)
+    ncomp_array = np.zeros(len(full_state_output),)
+    sumweights = np.zeros(len(full_state_output),)
+    maxweights = np.zeros(len(full_state_output),)
+    
+    meas_ind = 0 
+    for kk in range(len(full_state_output)):
+        tk = tk_list[kk]
+        
+        # Retrieve GMM and extracted state estimate
+        weights = full_state_output[tk]['weights']
+        means = full_state_output[tk]['means']
+        covars = full_state_output[tk]['covars']
+        wk_list = full_state_output[tk]['wk_list']
+        Xk_list = full_state_output[tk]['Xk_list']
+        Pk_list = full_state_output[tk]['Pk_list']
+
+        ncomp_array[kk] = len(weights)
+        sumweights[kk] = sum(weights)
+        maxweights[kk] = max(weights)
+        
+        # Compute OSPA errors
+        Xt_list = truth_dict[tk]['Xt_list']
+        
+        OSPA, OSPA_pos, OSPA_vel, OSPA_card, row_indices = \
+            compute_ospa(Xt_list, Xk_list, pnorm, c)
+        
+        # Choose 1 object as representative case for error/covariance plots
+        if len(Xt_list) >= Xk_list:
+            ii = row_indices[0]            
+        else:
+            ii = row_indices.index(0)
+
+        Xt = Xt_list[0]
+        wk = wk_list[ii]
+        Xk = Xk_list[ii]
+        Pk = Pk_list[ii]
+        
+        X_err[:,kk] = (Xk - Xt).flatten()
+        sig_x[kk] = np.sqrt(Pk[0,0])
+        sig_y[kk] = np.sqrt(Pk[1,1])
+        sig_z[kk] = np.sqrt(Pk[2,2])
+        sig_dx[kk] = np.sqrt(Pk[3,3])
+        sig_dy[kk] = np.sqrt(Pk[4,4])
+        sig_dz[kk] = np.sqrt(Pk[5,5])
+
+        # RIC Errors and Covariance
+        rc_vect = Xt[0:3].reshape(3,1)
+        vc_vect = Xt[3:6].reshape(3,1)
+        err_eci = X_err[0:3,kk].reshape(3,1)
+        P_eci = Pk[0:3,0:3]
+        
+        err_ric = coord.eci2ric(rc_vect, vc_vect, err_eci)
+        P_ric = coord.eci2ric(rc_vect, vc_vect, P_eci)
+        X_err_ric[:,kk] = err_ric.flatten()
+        sig_r[kk] = np.sqrt(P_ric[0,0])
+        sig_i[kk] = np.sqrt(P_ric[1,1])
+        sig_c[kk] = np.sqrt(P_ric[2,2])
+        
+        # Store data at meas times
+        if tk in meas_tk_list:
+            X_err_meas[:,meas_ind] = (Xk - Xt).flatten()
+            X_err_ric_meas[:,meas_ind] = err_ric.flatten()
+            
+            
+            resids[:,meas_ind] = filter_output[tk]['resids'].flatten()
+            meas_ind += 1
+        
+        
+    # Fix Units
+    X_err *= 1000.      # convert to m, m/s
+    X_err_meas *= 1000.
+    X_err_ric *= 1000.
+    X_err_ric_meas *= 1000.
+    sig_x *= 1000.
+    sig_y *= 1000.
+    sig_z *= 1000.
+    sig_dx *= 1000.
+    sig_dy *= 1000.
+    sig_dz *= 1000.
+    sig_r *= 1000.
+    sig_i *= 1000.
+    sig_c *= 1000.
+    
+    if n > 6:
+        X_err[6,:] *= 1000.
+        X_err_meas[6,:] *= 1000.
+        sig_beta *= 1e6
+    
+    if p == 1:
+        resids[0,:] *= 1000.
+    if p == 2:
+        resids *= (1./arcsec2rad)
+    if p == 3:
+        resids[0,:] *= 1000.
+        resids[1:3,:] *= (1./arcsec2rad)
+    
+    
+
+    # Compute and print statistics
+    print('\n\nState Error and Residuals Analysis')
+    print('\n\t\t\t\t  Mean\t\tSTD')
+    print('----------------------------------------')
+    print('X ECI [m]\t\t', '{0:0.2E}'.format(np.mean(X_err[0,:])), '\t{0:0.2E}'.format(np.std(X_err[0,:])))
+    print('Y ECI [m]\t\t', '{0:0.2E}'.format(np.mean(X_err[1,:])), '\t{0:0.2E}'.format(np.std(X_err[1,:])))
+    print('Z ECI [m]\t\t', '{0:0.2E}'.format(np.mean(X_err[2,:])), '\t{0:0.2E}'.format(np.std(X_err[2,:])))
+    print('dX ECI [m/s]\t', '{0:0.2E}'.format(np.mean(X_err[3,:])), '\t{0:0.2E}'.format(np.std(X_err[3,:])))
+    print('dY ECI [m/s]\t', '{0:0.2E}'.format(np.mean(X_err[4,:])), '\t{0:0.2E}'.format(np.std(X_err[4,:])))
+    print('dZ ECI [m/s]\t', '{0:0.2E}'.format(np.mean(X_err[5,:])), '\t{0:0.2E}'.format(np.std(X_err[5,:])))
+    print('')
+    print('Radial [m]\t\t', '{0:0.2E}'.format(np.mean(X_err_ric[0,:])), '\t{0:0.2E}'.format(np.std(X_err_ric[0,:])))
+    print('In-Track [m]\t', '{0:0.2E}'.format(np.mean(X_err_ric[1,:])), '\t{0:0.2E}'.format(np.std(X_err_ric[1,:])))
+    print('Cross-Track [m]\t', '{0:0.2E}'.format(np.mean(X_err_ric[2,:])), '\t{0:0.2E}'.format(np.std(X_err_ric[2,:])))
+    print('')
+    
+    if n > 6:
+        print('Beta [m^2/kg]\t', '{0:0.2E}'.format(np.mean(X_err[6,:])), '\t{0:0.2E}'.format(np.std(X_err[6,:])))
+        print('')
+    
+    if p == 1:
+        print('Range [m]\t\t', '{0:0.2E}'.format(np.mean(resids[0,:])), '\t{0:0.2E}'.format(np.std(resids[0,:])))
+        
+    if p == 2:
+        print('RA [arcsec]\t\t', '{0:0.2E}'.format(np.mean(resids[0,:])), '\t{0:0.2E}'.format(np.std(resids[0,:])))
+        print('DEC [arcsec]\t', '{0:0.2E}'.format(np.mean(resids[1,:])), '\t{0:0.2E}'.format(np.std(resids[1,:])))
+    
+    if p == 3:
+        print('Range [m]\t\t', '{0:0.2E}'.format(np.mean(resids[0,:])), '\t{0:0.2E}'.format(np.std(resids[0,:])))
+        print('RA [arcsec]\t\t', '{0:0.2E}'.format(np.mean(resids[1,:])), '\t{0:0.2E}'.format(np.std(resids[1,:])))
+        print('DEC [arcsec]\t', '{0:0.2E}'.format(np.mean(resids[2,:])), '\t{0:0.2E}'.format(np.std(resids[2,:])))
+        
+
+
+    
+    # State Error Plots   
+    plt.figure()
+    plt.subplot(3,1,1)
+    plt.plot(thrs, X_err[0,:], 'k.')
+    plt.plot(thrs_meas, X_err_meas[0,:], 'b.')
+    plt.plot(thrs, 3*sig_x, 'k--')
+    plt.plot(thrs, -3*sig_x, 'k--')
+    plt.ylabel('X Err [m]')
+    
+    plt.subplot(3,1,2)
+    plt.plot(thrs, X_err[1,:], 'k.')
+    plt.plot(thrs_meas, X_err_meas[1,:], 'b.')
+    plt.plot(thrs, 3*sig_y, 'k--')
+    plt.plot(thrs, -3*sig_y, 'k--')
+    plt.ylabel('Y Err [m]')
+    
+    plt.subplot(3,1,3)
+    plt.plot(thrs, X_err[2,:], 'k.')
+    plt.plot(thrs_meas, X_err_meas[2,:], 'b.')
+    plt.plot(thrs, 3*sig_z, 'k--')
+    plt.plot(thrs, -3*sig_z, 'k--')
+    plt.ylabel('Z Err [m]')
+
+    plt.xlabel('Time [hours]')
+    
+    plt.figure()
+    plt.subplot(3,1,1)
+    plt.plot(thrs, X_err[3,:], 'k.')
+    plt.plot(thrs_meas, X_err_meas[3,:], 'b.')
+    plt.plot(thrs, 3*sig_dx, 'k--')
+    plt.plot(thrs, -3*sig_dx, 'k--')
+    plt.ylabel('dX Err [m/s]')
+    
+    plt.subplot(3,1,2)
+    plt.plot(thrs, X_err[4,:], 'k.')
+    plt.plot(thrs_meas, X_err_meas[4,:], 'b.')
+    plt.plot(thrs, 3*sig_dy, 'k--')
+    plt.plot(thrs, -3*sig_dy, 'k--')
+    plt.ylabel('dY Err [m/s]')
+    
+    plt.subplot(3,1,3)
+    plt.plot(thrs, X_err[5,:], 'k.')
+    plt.plot(thrs_meas, X_err_meas[5,:], 'b.')
+    plt.plot(thrs, 3*sig_dz, 'k--')
+    plt.plot(thrs, -3*sig_dz, 'k--')
+    plt.ylabel('dZ Err [m/s]')
+
+    plt.xlabel('Time [hours]')
+    
+    plt.figure()
+    plt.subplot(3,1,1)
+    plt.plot(thrs, X_err_ric[0,:], 'k.')
+    plt.plot(thrs_meas, X_err_ric_meas[0,:], 'b.')
+    plt.plot(thrs, 3*sig_r, 'k--')
+    plt.plot(thrs, -3*sig_r, 'k--')
+    plt.ylabel('Radial [m]')
+    
+    plt.subplot(3,1,2)
+    plt.plot(thrs, X_err_ric[1,:], 'k.')
+    plt.plot(thrs_meas, X_err_ric_meas[1,:], 'b.')
+    plt.plot(thrs, 3*sig_i, 'k--')
+    plt.plot(thrs, -3*sig_i, 'k--')
+    plt.ylabel('In-Track [m]')
+    
+    plt.subplot(3,1,3)
+    plt.plot(thrs, X_err_ric[2,:], 'k.')
+    plt.plot(thrs_meas, X_err_ric_meas[2,:], 'b.')
+    plt.plot(thrs, 3*sig_c, 'k--')
+    plt.plot(thrs, -3*sig_c, 'k--')
+    plt.ylabel('Cross-Track [m]')
+
+    plt.xlabel('Time [hours]')
+    
+    if n == 7:
+        plt.figure()
+        plt.plot(thrs, X_err[6,:], 'k.')
+        plt.plot(thrs_meas, X_err_meas[6,:], 'b.')
+        plt.plot(thrs, 3*sig_beta, 'k--')
+        plt.plot(thrs, -3*sig_beta, 'k--')
+        plt.ylabel('Beta [m^2/kg]')
+        plt.title('Additional Parameters')
+        
+        plt.xlabel('Time [hours]')
+    
+    
+    # Residuals
+    plt.figure()
+    if p == 1:
+        plt.plot(thrs_meas, resids[0,:], 'k.')
+        plt.ylabel('Range [m]')       
+        plt.xlabel('Time [hours]')
+    
+    if p == 2:
+        
+        plt.subplot(2,1,1)
+        plt.plot(thrs_meas, resids[0,:], 'k.')
+        plt.ylabel('RA [arcsec]')
+        
+        plt.subplot(2,1,2)
+        plt.plot(thrs_meas, resids[1,:], 'k.')
+        plt.ylabel('DEC [arcsec]')
+        
+        plt.xlabel('Time [hours]')
+    
+    if p == 3:
+        plt.subplot(3,1,1)
+        plt.plot(thrs_meas, resids[0,:], 'k.')
+        plt.ylabel('Range [m]')
+        
+        plt.subplot(3,1,2)
+        plt.plot(thrs_meas, resids[1,:], 'k.')
+        plt.ylabel('RA [arcsec]')
+        
+        plt.subplot(3,1,3)
+        plt.plot(thrs_meas, resids[2,:], 'k.')
+        plt.ylabel('DEC [arcsec]')
+        
+        plt.xlabel('Time [hours]')
+        
+        
+    # Components and weights
+    plt.figure()
+    plt.subplot(3,1,1)
+    plt.plot(thrs_meas, ncomp_array, 'k.')
+    plt.ylabel('Num Comps')    
+    plt.subplot(3,1,2)
+    plt.plot(thrs_meas, maxweights, 'k.')
+    plt.ylabel('Max Weight')    
+    plt.subplot(3,1,3)
+    plt.plot(thrs_meas, sumweights, 'k.')
+    plt.ylabel('Sum Weights')
+    plt.xlabel('Time [hours]')
+        
+    
+    plt.show()
+    
+    
+    
+    
+    return
+
+
+
+
+def compute_ospa(X1_list,X2_list,p=2.,c=100.) :
+    '''
+
+
+    '''
+
+    # Number of elements in RFSs, assign bigger set to Y,n
+    nstates = len(X1_list[0])
+    n1 = len(X1_list)
+    n2 = len(X2_list)
+
+    if n1 >= n2:
+        Y = X1_list
+        n = n1
+        X = X2_list
+        m = n2
+    else:
+        Y = X2_list
+        n = n2
+        X = X1_list
+        m = n1
+
+    # Step 0: Generate 2D Score Matrix
+    A = np.zeros((n,n))
+    for ii in range(n):
+        for jj in range(n):
+            
+            # Note: if ii > m, dc = c, A[ii,jj] = c - c = 0
+            if ii < m:
+                dc = compute_dc(X[ii],Y[jj],p=p,c=c)
+                A[ii,jj] = c - dc
+
+    # Step 1: Execute 2D Assignment Algorithm
+    if n == 1 :
+        row_indices = [0]
+    else :
+        row_indices = ospa_auction(A)
+
+    #Step 2: For the optimal assignment above, report the distance dc
+    #or the cutoff c for each assignment/unassigned point
+    alpha_full = np.zeros(n,)
+    alpha_pos = np.zeros(n,)
+    alpha_vel = np.zeros(n,)
+    for jj in range(n):
+        ii = row_indices[jj]
+        if ii < m:
+            alpha_full[ii] = compute_dc(X[ii],Y[jj],p=p,c=c)
+            alpha_pos[ii] = compute_dc(X[ii][0:3],Y[jj][0:3],p=p,c=c)
+            alpha_vel[ii] = compute_dc(X[ii][3:6],Y[jj][3:6],p=p,c=c)
+        else:
+            alpha_full[ii] = c
+
+    #Step 3: Compute OSPA and components
+    OSPA = ((1./n)*sum([ai**p for ai in alpha_full]))**(1./p)
+    OSPA_card = ((1./n)*sum([ai**p for ai in alpha_full[m:n]]))**(1./p)
+    OSPA_pos = ((1./n)*sum([ai**p for ai in alpha_pos[0:m]]))**(1./p)
+    OSPA_vel = ((1./n)*sum([ai**p for ai in alpha_vel[0:m]]))**(1./p)
+
+    return OSPA, OSPA_pos, OSPA_vel, OSPA_card, row_indices
+
+
+
+def compute_dc(x,y,p=2.,c=100.) :
+    '''
+
+
+    '''
+
+    z = x - y
+    
+    d = sum([abs(zi)**p for zi in z])**(1./p)
+
+    dc = min([c,d])
+
+    return dc
+
+
+def ospa_auction(A) :
+    '''
+
+    '''
+
+    #Get number of rows/columns
+    n = int(A.shape[0])
+
+    #Step 1: Initialize assignment matrix and track prices
+    assign_mat = np.zeros((n,n))
+    price = np.zeros((n,1))
+    eps = 1./(2.*n)
+
+    #Repeat until all assignments have been made
+    while np.sum(assign_mat) < n:
+        for jj in range(n):
+            
+            #Step 2: Check if column jj is unassigned
+            if np.sum(assign_mat[:,jj]) == 0:
+
+                #Step 3: Find the best row ii for column jj              
+                jvec = np.reshape(A[:,jj],(n,1)) - price
+                ii = np.argmax(jvec)
+
+                #Step 4: Assign row ii to column jj
+                assign_mat[ii,:] = np.zeros((1,n))
+                assign_mat[ii,jj] = 1.
+
+                #Step 5: Compute new price
+                jvec2 = np.sort(list(np.reshape(jvec,(1,n))))
+                yj = jvec2[0][-1] - jvec2[0][-2]                
+                price[ii] = price[ii] + yj + eps
+
+    #Set the column order to achieve assignment
+    row_indices = []
+    for jj in range(n):
+        x = np.nonzero(assign_mat[:,jj])       
+        row_indices.append(int(x[0]))
+
+    return row_indices
+
+
+###############################################################################
 # Tracklet Correlation and IOD
 ###############################################################################
 
