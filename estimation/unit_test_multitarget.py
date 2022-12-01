@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 import pickle
 import os
 import inspect
+import random
 
 # Load tudatpy modules  
 from tudatpy.kernel.interface import spice
@@ -109,7 +110,7 @@ def unit_test_murty():
 
 
 
-def geo_2obj_twobody_setup():
+def tudat_geo_2obj_setup():
     
     
     # Retrieve latest EOP data from celestrak.com
@@ -162,13 +163,13 @@ def geo_2obj_twobody_setup():
         tk_list.extend([UTC + timedelta(seconds=ti) for ti in tvec])
 
     # Inital State
-    elem1 = [42164.1, 0.001, 0.1, 90., 0., 0.]
+    elem1 = [42164.1, 0.001, 0.1, 225., 0., 0.]
     X1_true = np.reshape(astro.kep2cart(elem1), (6,1))
     P1 = np.diag([1., 1., 1., 1e-6, 1e-6, 1e-6])
     pert_vect1 = np.multiply(np.sqrt(np.diag(P1)), np.random.randn(6))
     X1_init = X1_true + np.reshape(pert_vect1, (6, 1))
     
-    elem2 = [42164.1, 0.001, 0.1, 90., 0., 1.]
+    elem2 = [42164.1, 0.001, 0.1, 225., 0., 1.]
     X2_true = np.reshape(astro.kep2cart(elem2), (6,1))
     P2 = np.diag([1., 1., 1., 1e-6, 1e-6, 1e-6])
     pert_vect2 = np.multiply(np.sqrt(np.diag(P2)), np.random.randn(6))
@@ -183,7 +184,7 @@ def geo_2obj_twobody_setup():
     
     
     # Sensor and measurement parameters
-    sensor_id_list = ['UNSW Falcon']
+    sensor_id_list = ['RMIT ROO']
     sensor_params = sens.define_sensors(sensor_id_list)
     sensor_params['eop_alldata'] = eop_alldata
     sensor_params['XYs_df'] = XYs_df
@@ -209,13 +210,13 @@ def geo_2obj_twobody_setup():
     truth_dict = {}
     meas_fcn = mfunc.unscented_radec
     meas_dict = {}
-    X = np.concatentate((X1_true, X2_true), axis=0)
+    X = np.concatenate((X1_true, X2_true), axis=0)
     for kk in range(len(tk_list)):
         
         if kk > 0:
             tin = [tk_list[kk-1], tk_list[kk]]
             tout, Xout = dyn.general_dynamics(X, tin, state_params, int_params)
-            X = Xout[-1,:].reshape(6, 1)
+            X = Xout[-1,:]
         
         X1_t = X[0:6].reshape(6,1)
         X2_t = X[6:12].reshape(6,1)
@@ -226,9 +227,10 @@ def geo_2obj_twobody_setup():
         UTC = tk_list[kk]
         EOP_data = eop.get_eop_data(eop_alldata, UTC)
         Zk_list = []
-        sensor_id_list = []
+        sensor_kk_list = []
         # Loop over sensors and objects
-        for sensor_id in sensor_id_list:  
+        for sensor_id in sensor_id_list:
+            sensor = sensor_params[sensor_id]
         
             for Xj in truth_dict[tk_list[kk]]['Xt_list']:            
                           
@@ -246,7 +248,7 @@ def geo_2obj_twobody_setup():
                     zj[1] += np.random.randn()*sigma_dict['dec']
                     
                     Zk_list.append(zj)
-                    sensor_id_list.append(sensor_id)
+                    sensor_kk_list.append(sensor_id)
             
             # Incorporate clutter measurements here
 
@@ -257,51 +259,76 @@ def geo_2obj_twobody_setup():
             random.shuffle(inds)
             
             meas_dict[UTC] = {}
-            meas_dict['Zk_list'] = [Zk_list[ii] for ii in inds]
-            meas_dict['sensor_id_list'] = [sensor_id_list[ii] for ii in inds]
+            meas_dict[UTC]['Zk_list'] = [Zk_list[ii] for ii in inds]
+            meas_dict[UTC]['sensor_id_list'] = [sensor_kk_list[ii] for ii in inds]
                 
 
     # Plot data
     tplot = [(tk - tk_list[0]).total_seconds()/3600. for tk in tk_list]
-    xplot = []
-    yplot = []
-    zplot = []
+    xplot1 = []
+    yplot1 = []
+    zplot1 = []
+    xplot2 = []
+    yplot2 = []
+    zplot2 = []
     for tk in tk_list:
-        X = truth_dict[tk]
-        xplot.append(X[0])
-        yplot.append(X[1])
-        zplot.append(X[2])
+        Xt_list = truth_dict[tk]['Xt_list']
+        X1_t = Xt_list[0]
+        X2_t = Xt_list[1]
         
-    meas_tk = meas_dict['tk_list']
+        xplot1.append(X1_t[0])
+        yplot1.append(X1_t[1])
+        zplot1.append(X1_t[2])
+        
+        xplot2.append(X2_t[0])
+        yplot2.append(X2_t[1])
+        zplot2.append(X2_t[2])
+        
+    
+    meas_tk = sorted(meas_dict.keys())
     meas_tplot = [(tk - tk_list[0]).total_seconds()/3600. for tk in meas_tk]
-    meas_sensor_id = meas_dict['sensor_id_list']
-    meas_sensor_index = [sensor_id_list.index(sensor_id) for sensor_id in meas_sensor_id]
+    nmeas_plot = []
+    for tk in meas_tk:
+            
+        Zk_list = meas_dict[tk]['Zk_list']
+        # sensor_id_list = meas_dict[tk]['sensor_id_list']
+        # meas_sensor_id = meas_dict[tk]['sensor_id_list']
+        # meas_sensor_index = [sensor_id_list.index(sensor_id) for sensor_id in meas_sensor_id]
+        
+        nmeas_plot.append(len(Zk_list))
     
         
     
     plt.figure()
     plt.subplot(3,1,1)
-    plt.plot(tplot, xplot, 'k.')
+    plt.plot(tplot, xplot1, 'b.')
+    plt.plot(tplot, xplot2, 'r.')
     plt.ylabel('X [km]')
     plt.subplot(3,1,2)
-    plt.plot(tplot, yplot, 'k.')
+    plt.plot(tplot, yplot2, 'b.')
+    plt.plot(tplot, yplot2, 'r.')
     plt.ylabel('Y [km]')
     plt.subplot(3,1,3)
-    plt.plot(tplot, zplot, 'k.')
+    plt.plot(tplot, zplot1, 'b.')
+    plt.plot(tplot, zplot2, 'r.')
     plt.ylabel('Z [km]')
     plt.xlabel('Time [hours]')
     
+    # plt.figure()
+    # plt.plot(meas_tplot, meas_sensor_index, 'k.')
+    # plt.xlabel('Time [hours]')
+    # plt.yticks([0], ['UNSW Falcon'])
+    # plt.ylabel('Sensor ID')
+    
     plt.figure()
-    plt.plot(meas_tplot, meas_sensor_index, 'k.')
+    plt.plot(meas_tplot, nmeas_plot, 'k.')
+    plt.ylabel('Number of Meas')
     plt.xlabel('Time [hours]')
-    plt.xlim([0, 25])
-    plt.yticks([0], ['UNSW Falcon'])
-    plt.ylabel('Sensor ID')
     
                 
     plt.show()   
     
-    print(meas_dict)
+    # print(meas_dict)
     
     params_dict = {}
     params_dict['state_params'] = state_params
@@ -309,7 +336,7 @@ def geo_2obj_twobody_setup():
     params_dict['int_params'] = int_params
     params_dict['sensor_params'] = sensor_params
                 
-    setup_file = os.path.join('unit_test', 'tudat_geo_perturbed_setup.pkl')
+    setup_file = os.path.join('unit_test', 'tudat_geo_2obj_twobody_setup.pkl')
     pklFile = open( setup_file, 'wb' )
     pickle.dump( [state_dict, meas_fcn, meas_dict, params_dict, truth_dict], pklFile, -1 )
     pklFile.close()
@@ -323,8 +350,10 @@ def geo_2obj_twobody_setup():
 
 if __name__ == '__main__':
     
+    plt.close('all')
     
     
+    tudat_geo_2obj_setup()
     
     
     
