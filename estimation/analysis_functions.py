@@ -1295,8 +1295,8 @@ def multitarget_orbit_errors(filter_output, full_state_output, truth_dict):
     tk_list = list(full_state_output.keys())
     t0 = sorted(truth_dict.keys())[0]
     
-    print(t0)
-    print(tk_list[0])
+    # print(t0)
+    # print(tk_list[0])
     thrs = [(tk - t0).total_seconds()/3600. for tk in tk_list]
     
     meas_tk_list = list(filter_output.keys())
@@ -1314,7 +1314,13 @@ def multitarget_orbit_errors(filter_output, full_state_output, truth_dict):
     X_err_ric = np.zeros((3, len(full_state_output)))
     X_err_meas = np.zeros((n, len(filter_output)))
     X_err_ric_meas = np.zeros((3, len(filter_output)))
-    resids = np.zeros((p, len(filter_output)))
+    ospa = np.zeros(len(full_state_output),)
+    ospa_pos = np.zeros(len(full_state_output),)
+    ospa_vel = np.zeros(len(full_state_output),)
+    ospa_card = np.zeros(len(full_state_output),)
+    
+    
+    # resids = np.zeros((p, len(filter_output)))
     sig_x = np.zeros(len(full_state_output),)
     sig_y = np.zeros(len(full_state_output),)
     sig_z = np.zeros(len(full_state_output),)
@@ -1333,6 +1339,9 @@ def multitarget_orbit_errors(filter_output, full_state_output, truth_dict):
     for kk in range(len(full_state_output)):
         tk = tk_list[kk]
         
+        print('')
+        print(tk)
+        
         # Retrieve GMM and extracted state estimate
         weights = full_state_output[tk]['weights']
         means = full_state_output[tk]['means']
@@ -1350,12 +1359,21 @@ def multitarget_orbit_errors(filter_output, full_state_output, truth_dict):
         
         OSPA, OSPA_pos, OSPA_vel, OSPA_card, row_indices = \
             compute_ospa(Xt_list, Xk_list, pnorm, c)
+            
+        ospa[kk] = OSPA
+        ospa_pos[kk] = OSPA_pos
+        ospa_vel[kk] = OSPA_vel
+        ospa_card[kk] = OSPA_card
         
         # Choose 1 object as representative case for error/covariance plots
-        if len(Xt_list) >= Xk_list:
+        if len(Xt_list) >= len(Xk_list):
             ii = row_indices[0]            
         else:
             ii = row_indices.index(0)
+
+        print(row_indices)
+        print(ii)
+        print(wk_list)
 
         Xt = Xt_list[0]
         wk = wk_list[ii]
@@ -1388,8 +1406,8 @@ def multitarget_orbit_errors(filter_output, full_state_output, truth_dict):
             X_err_meas[:,meas_ind] = (Xk - Xt).flatten()
             X_err_ric_meas[:,meas_ind] = err_ric.flatten()
             
-            
-            resids[:,meas_ind] = filter_output[tk]['resids'].flatten()
+            # resids_k = filter_output[tk]['resids']
+            # resids[:,meas_ind] = filter_output[tk]['resids'].flatten()
             meas_ind += 1
         
         
@@ -1398,6 +1416,9 @@ def multitarget_orbit_errors(filter_output, full_state_output, truth_dict):
     X_err_meas *= 1000.
     X_err_ric *= 1000.
     X_err_ric_meas *= 1000.
+    ospa *= 1000.
+    ospa_pos *= 1000.
+    ospa_vel *= 1000.
     sig_x *= 1000.
     sig_y *= 1000.
     sig_z *= 1000.
@@ -1408,52 +1429,48 @@ def multitarget_orbit_errors(filter_output, full_state_output, truth_dict):
     sig_i *= 1000.
     sig_c *= 1000.
     
-    if n > 6:
-        X_err[6,:] *= 1000.
-        X_err_meas[6,:] *= 1000.
-        sig_beta *= 1e6
+
     
-    if p == 1:
-        resids[0,:] *= 1000.
-    if p == 2:
-        resids *= (1./arcsec2rad)
-    if p == 3:
-        resids[0,:] *= 1000.
-        resids[1:3,:] *= (1./arcsec2rad)
+    # if p == 1:
+    #     resids[0,:] *= 1000.
+    # if p == 2:
+    #     resids *= (1./arcsec2rad)
+    # if p == 3:
+    #     resids[0,:] *= 1000.
+    #     resids[1:3,:] *= (1./arcsec2rad)
     
     
 
     # Compute and print statistics
+    conv_ind = int(len(full_state_output)/2)
     print('\n\nState Error and Residuals Analysis')
     print('\n\t\t\t\t  Mean\t\tSTD')
     print('----------------------------------------')
-    print('X ECI [m]\t\t', '{0:0.2E}'.format(np.mean(X_err[0,:])), '\t{0:0.2E}'.format(np.std(X_err[0,:])))
-    print('Y ECI [m]\t\t', '{0:0.2E}'.format(np.mean(X_err[1,:])), '\t{0:0.2E}'.format(np.std(X_err[1,:])))
-    print('Z ECI [m]\t\t', '{0:0.2E}'.format(np.mean(X_err[2,:])), '\t{0:0.2E}'.format(np.std(X_err[2,:])))
-    print('dX ECI [m/s]\t', '{0:0.2E}'.format(np.mean(X_err[3,:])), '\t{0:0.2E}'.format(np.std(X_err[3,:])))
-    print('dY ECI [m/s]\t', '{0:0.2E}'.format(np.mean(X_err[4,:])), '\t{0:0.2E}'.format(np.std(X_err[4,:])))
-    print('dZ ECI [m/s]\t', '{0:0.2E}'.format(np.mean(X_err[5,:])), '\t{0:0.2E}'.format(np.std(X_err[5,:])))
+    print('X ECI [m]\t\t', '{0:0.2E}'.format(np.mean(X_err[0,conv_ind:])), '\t{0:0.2E}'.format(np.std(X_err[0,conv_ind:])))
+    print('Y ECI [m]\t\t', '{0:0.2E}'.format(np.mean(X_err[1,conv_ind:])), '\t{0:0.2E}'.format(np.std(X_err[1,conv_ind:])))
+    print('Z ECI [m]\t\t', '{0:0.2E}'.format(np.mean(X_err[2,conv_ind:])), '\t{0:0.2E}'.format(np.std(X_err[2,conv_ind:])))
+    print('dX ECI [m/s]\t', '{0:0.2E}'.format(np.mean(X_err[3,conv_ind:])), '\t{0:0.2E}'.format(np.std(X_err[3,conv_ind:])))
+    print('dY ECI [m/s]\t', '{0:0.2E}'.format(np.mean(X_err[4,conv_ind:])), '\t{0:0.2E}'.format(np.std(X_err[4,conv_ind:])))
+    print('dZ ECI [m/s]\t', '{0:0.2E}'.format(np.mean(X_err[5,conv_ind:])), '\t{0:0.2E}'.format(np.std(X_err[5,conv_ind:])))
     print('')
-    print('Radial [m]\t\t', '{0:0.2E}'.format(np.mean(X_err_ric[0,:])), '\t{0:0.2E}'.format(np.std(X_err_ric[0,:])))
-    print('In-Track [m]\t', '{0:0.2E}'.format(np.mean(X_err_ric[1,:])), '\t{0:0.2E}'.format(np.std(X_err_ric[1,:])))
-    print('Cross-Track [m]\t', '{0:0.2E}'.format(np.mean(X_err_ric[2,:])), '\t{0:0.2E}'.format(np.std(X_err_ric[2,:])))
+    print('Radial [m]\t\t', '{0:0.2E}'.format(np.mean(X_err_ric[0,conv_ind:])), '\t{0:0.2E}'.format(np.std(X_err_ric[0,conv_ind:])))
+    print('In-Track [m]\t', '{0:0.2E}'.format(np.mean(X_err_ric[1,conv_ind:])), '\t{0:0.2E}'.format(np.std(X_err_ric[1,conv_ind:])))
+    print('Cross-Track [m]\t', '{0:0.2E}'.format(np.mean(X_err_ric[2,conv_ind:])), '\t{0:0.2E}'.format(np.std(X_err_ric[2,conv_ind:])))
     print('')
     
-    if n > 6:
-        print('Beta [m^2/kg]\t', '{0:0.2E}'.format(np.mean(X_err[6,:])), '\t{0:0.2E}'.format(np.std(X_err[6,:])))
-        print('')
+
     
-    if p == 1:
-        print('Range [m]\t\t', '{0:0.2E}'.format(np.mean(resids[0,:])), '\t{0:0.2E}'.format(np.std(resids[0,:])))
+    # if p == 1:
+    #     print('Range [m]\t\t', '{0:0.2E}'.format(np.mean(resids[0,:])), '\t{0:0.2E}'.format(np.std(resids[0,:])))
         
-    if p == 2:
-        print('RA [arcsec]\t\t', '{0:0.2E}'.format(np.mean(resids[0,:])), '\t{0:0.2E}'.format(np.std(resids[0,:])))
-        print('DEC [arcsec]\t', '{0:0.2E}'.format(np.mean(resids[1,:])), '\t{0:0.2E}'.format(np.std(resids[1,:])))
+    # if p == 2:
+    #     print('RA [arcsec]\t\t', '{0:0.2E}'.format(np.mean(resids[0,:])), '\t{0:0.2E}'.format(np.std(resids[0,:])))
+    #     print('DEC [arcsec]\t', '{0:0.2E}'.format(np.mean(resids[1,:])), '\t{0:0.2E}'.format(np.std(resids[1,:])))
     
-    if p == 3:
-        print('Range [m]\t\t', '{0:0.2E}'.format(np.mean(resids[0,:])), '\t{0:0.2E}'.format(np.std(resids[0,:])))
-        print('RA [arcsec]\t\t', '{0:0.2E}'.format(np.mean(resids[1,:])), '\t{0:0.2E}'.format(np.std(resids[1,:])))
-        print('DEC [arcsec]\t', '{0:0.2E}'.format(np.mean(resids[2,:])), '\t{0:0.2E}'.format(np.std(resids[2,:])))
+    # if p == 3:
+    #     print('Range [m]\t\t', '{0:0.2E}'.format(np.mean(resids[0,:])), '\t{0:0.2E}'.format(np.std(resids[0,:])))
+    #     print('RA [arcsec]\t\t', '{0:0.2E}'.format(np.mean(resids[1,:])), '\t{0:0.2E}'.format(np.std(resids[1,:])))
+    #     print('DEC [arcsec]\t', '{0:0.2E}'.format(np.mean(resids[2,:])), '\t{0:0.2E}'.format(np.std(resids[2,:])))
         
 
 
@@ -1531,53 +1548,83 @@ def multitarget_orbit_errors(filter_output, full_state_output, truth_dict):
 
     plt.xlabel('Time [hours]')
     
-    if n == 7:
-        plt.figure()
-        plt.plot(thrs, X_err[6,:], 'k.')
-        plt.plot(thrs_meas, X_err_meas[6,:], 'b.')
-        plt.plot(thrs, 3*sig_beta, 'k--')
-        plt.plot(thrs, -3*sig_beta, 'k--')
-        plt.ylabel('Beta [m^2/kg]')
-        plt.title('Additional Parameters')
+
+    
+    # # Residuals
+    # plt.figure()
+    # if p == 1:
+    #     plt.plot(thrs_meas, resids[0,:], 'k.')
+    #     plt.ylabel('Range [m]')       
+    #     plt.xlabel('Time [hours]')
+    
+    # if p == 2:
         
-        plt.xlabel('Time [hours]')
+    #     plt.subplot(2,1,1)
+    #     plt.plot(thrs_meas, resids[0,:], 'k.')
+    #     plt.ylabel('RA [arcsec]')
+        
+    #     plt.subplot(2,1,2)
+    #     plt.plot(thrs_meas, resids[1,:], 'k.')
+    #     plt.ylabel('DEC [arcsec]')
+        
+    #     plt.xlabel('Time [hours]')
     
-    
-    # Residuals
+    # if p == 3:
+    #     plt.subplot(3,1,1)
+    #     plt.plot(thrs_meas, resids[0,:], 'k.')
+    #     plt.ylabel('Range [m]')
+        
+    #     plt.subplot(3,1,2)
+    #     plt.plot(thrs_meas, resids[1,:], 'k.')
+    #     plt.ylabel('RA [arcsec]')
+        
+    #     plt.subplot(3,1,3)
+    #     plt.plot(thrs_meas, resids[2,:], 'k.')
+    #     plt.ylabel('DEC [arcsec]')
+        
+    #     plt.xlabel('Time [hours]')
+        
+        
+        
+    # OSPA
     plt.figure()
-    if p == 1:
-        plt.plot(thrs_meas, resids[0,:], 'k.')
-        plt.ylabel('Range [m]')       
-        plt.xlabel('Time [hours]')
+    plt.subplot(4,1,1)
+    plt.plot(thrs, ospa, 'k.')
+    plt.ylabel('OSPA')
+    plt.subplot(4,1,2)
+    plt.plot(thrs, ospa_pos, 'k.')
+    plt.ylabel('OSPA Pos [m]')
+    plt.subplot(4,1,3)
+    plt.plot(thrs, ospa_vel, 'k.')
+    plt.ylabel('OSPA Vel [m/s]')
+    plt.subplot(4,1,4)
+    plt.plot(thrs, ospa_card, 'k.')
+    plt.ylabel('OSPA Card')
+    plt.xlabel('Time [hours]')
+        
+    # Resids
+    plt.figure()
+    for kk in range(len(meas_tk_list)):
+        
+        tk = meas_tk_list[kk]
+        resids_k = filter_output[tk]['resids']
+        
+        for ii in range(len(resids_k)):
+            ra_arcsec = resids_k[ii][0]*(1./arcsec2rad)
+            dec_arcsec = resids_k[ii][1]*(1./arcsec2rad)
+            
+            plt.subplot(2,1,1)
+            plt.plot(thrs_meas[kk], ra_arcsec, 'k.')
+            plt.subplot(2,1,2)
+            plt.plot(thrs_meas[kk], dec_arcsec, 'k.')
+            
+    plt.subplot(2,1,1)
+    plt.ylabel('RA [arcsec]')
+    plt.subplot(2,1,2)
+    plt.ylabel('DEC [arcsec]')
+    plt.xlabel('Time [hours]')
     
-    if p == 2:
-        
-        plt.subplot(2,1,1)
-        plt.plot(thrs_meas, resids[0,:], 'k.')
-        plt.ylabel('RA [arcsec]')
-        
-        plt.subplot(2,1,2)
-        plt.plot(thrs_meas, resids[1,:], 'k.')
-        plt.ylabel('DEC [arcsec]')
-        
-        plt.xlabel('Time [hours]')
     
-    if p == 3:
-        plt.subplot(3,1,1)
-        plt.plot(thrs_meas, resids[0,:], 'k.')
-        plt.ylabel('Range [m]')
-        
-        plt.subplot(3,1,2)
-        plt.plot(thrs_meas, resids[1,:], 'k.')
-        plt.ylabel('RA [arcsec]')
-        
-        plt.subplot(3,1,3)
-        plt.plot(thrs_meas, resids[2,:], 'k.')
-        plt.ylabel('DEC [arcsec]')
-        
-        plt.xlabel('Time [hours]')
-        
-        
     # Components and weights
     plt.figure()
     plt.subplot(3,1,1)

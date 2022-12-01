@@ -2046,7 +2046,7 @@ def merge_GMM(GMM0, params) :
         I = np.arange(0, len(w))
 
     # Normalize weights
-    wf = list(np.asarray(wf)/sum(wf))
+    wf = list(np.asarray(wf)/sum(wf)*sum(w0))
     
     # Output
     GMM = {}

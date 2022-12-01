@@ -94,10 +94,19 @@ def phd_filter(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):
             tk_prior = tk_list[kk-1]
 
         tk = tk_list[kk]
+        
+        print('')
+        print(tk)
+        # print('ncomps', len(GMM_dict['weights']))
+        # print('Nk est', sum(GMM_dict['weights']))
 
         # Predictor Step
         tin = [tk_prior, tk]
         GMM_bar = phd_predictor(GMM_dict, tin, params_dict)
+        
+        # print('predictor')
+        # print('ncomps', len(GMM_bar['weights']))
+        # print('Nk est', sum(GMM_bar['weights']))
         
         # Corrector Step
         Zk = meas_dict[tk]['Zk_list']
@@ -105,13 +114,27 @@ def phd_filter(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):
         GMM_dict = phd_corrector(GMM_bar, tk, Zk, sensor_id_list, meas_fcn,
                                  params_dict)
         
+        # print('corrector')
+        # print('ncomps', len(GMM_dict['weights']))
+        # print('Nk est', sum(GMM_dict['weights']))
+        
         # Prune/Merge Step
         GMM_dict = est.merge_GMM(GMM_dict, filter_params)
+        
+        print('merge')
+        print('ncomps', len(GMM_dict['weights']))
+        print('Nk est', sum(GMM_dict['weights']))
+        
         
         # State extraction and residuals calculation
         wk_list, Xk_list, Pk_list, resids_k = \
             phd_state_extraction(GMM_dict, tk, Zk, sensor_id_list, meas_fcn,
                                  params_dict)
+            
+            
+        
+        # print('wk_list', wk_list)
+        
         
         # Store output
         filter_output[tk] = {}

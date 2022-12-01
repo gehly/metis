@@ -174,7 +174,7 @@ def tudat_geo_2obj_setup(setup_file):
     pert_vect1 = np.multiply(np.sqrt(np.diag(P1)), np.random.randn(6))
     X1_init = X1_true + np.reshape(pert_vect1, (6, 1))
     
-    elem2 = [42164.1, 0.001, 0.1, 225., 0., 1.]
+    elem2 = [42164.1, 0.001, 0.1, 225., 0., 5.]
     X2_true = np.reshape(astro.kep2cart(elem2), (6,1))
     P2 = np.diag([1., 1., 1., 1e-6, 1e-6, 1e-6])
     pert_vect2 = np.multiply(np.sqrt(np.diag(P2)), np.random.randn(6))
@@ -375,12 +375,25 @@ def run_multitarget_filter(setup_file, results_file):
     pickle.dump( [filter_output, full_state_output, params_dict, truth_dict], pklFile, -1 )
     pklFile.close()
     
-    # analysis.compute_orbit_errors(filter_output, full_state_output, truth_dict)
+    analysis.multitarget_orbit_errors(filter_output, filter_output, truth_dict)
     
     
     return
 
 
+def multitarget_analysis(results_file):
+    
+    pklFile = open(results_file, 'rb' )
+    data = pickle.load( pklFile )
+    filter_output = data[0]
+    full_state_output = data[1]
+    params_dict = data[2]
+    truth_dict = data[3]
+    pklFile.close()
+    
+    analysis.multitarget_orbit_errors(filter_output, filter_output, truth_dict)
+    
+    return
 
 
 if __name__ == '__main__':
@@ -390,15 +403,15 @@ if __name__ == '__main__':
     fdir = r'D:\documents\research_projects\multitarget\data\sim\test\2022_12_01_geo_2obj'
     
     
-    setup_file = os.path.join(fdir, 'tudat_geo_twobody_2obj_pd1_lam0_setup.pkl')
-    results_file = os.path.join(fdir, 'tudat_geo_twobody_2obj_pd1_lam0_phd_results.pkl')
+    setup_file = os.path.join(fdir, 'tudat_geo_twobody_2obj_pd1_lam0_setup2.pkl')
+    results_file = os.path.join(fdir, 'tudat_geo_twobody_2obj_pd1_lam0_phd_results2.pkl')
     
     
-    tudat_geo_2obj_setup(setup_file)    
+    # tudat_geo_2obj_setup(setup_file)    
     
-    run_multitarget_filter(setup_file, results_file)
+    # run_multitarget_filter(setup_file, results_file)
     
-    
+    multitarget_analysis(results_file)
     
     
     
