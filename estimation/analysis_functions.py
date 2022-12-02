@@ -1365,50 +1365,53 @@ def multitarget_orbit_errors(filter_output, full_state_output, truth_dict):
         ospa_vel[kk] = OSPA_vel
         ospa_card[kk] = OSPA_card
         
-        # Choose 1 object as representative case for error/covariance plots
-        if len(Xt_list) >= len(Xk_list):
-            ii = row_indices[0]            
-        else:
-            ii = row_indices.index(0)
+        # # Choose 1 object as representative case for error/covariance plots
+        # if len(Xt_list) >= len(Xk_list):
+        #     ii = row_indices[0]            
+        # else:
+        #     ii = row_indices.index(0)
 
-        print(row_indices)
-        print(ii)
-        print(wk_list)
+        # print(row_indices)
+        # print(ii)
+        # print(wk_list)
+        # print(Xt_list)
+        # print(Xk_list)
+        
 
-        Xt = Xt_list[0]
-        wk = wk_list[ii]
-        Xk = Xk_list[ii]
-        Pk = Pk_list[ii]
+        # Xt = Xt_list[0]
+        # wk = wk_list[ii]
+        # Xk = Xk_list[ii]
+        # Pk = Pk_list[ii]
         
-        X_err[:,kk] = (Xk - Xt).flatten()
-        sig_x[kk] = np.sqrt(Pk[0,0])
-        sig_y[kk] = np.sqrt(Pk[1,1])
-        sig_z[kk] = np.sqrt(Pk[2,2])
-        sig_dx[kk] = np.sqrt(Pk[3,3])
-        sig_dy[kk] = np.sqrt(Pk[4,4])
-        sig_dz[kk] = np.sqrt(Pk[5,5])
+        # X_err[:,kk] = (Xk - Xt).flatten()
+        # sig_x[kk] = np.sqrt(Pk[0,0])
+        # sig_y[kk] = np.sqrt(Pk[1,1])
+        # sig_z[kk] = np.sqrt(Pk[2,2])
+        # sig_dx[kk] = np.sqrt(Pk[3,3])
+        # sig_dy[kk] = np.sqrt(Pk[4,4])
+        # sig_dz[kk] = np.sqrt(Pk[5,5])
 
-        # RIC Errors and Covariance
-        rc_vect = Xt[0:3].reshape(3,1)
-        vc_vect = Xt[3:6].reshape(3,1)
-        err_eci = X_err[0:3,kk].reshape(3,1)
-        P_eci = Pk[0:3,0:3]
+        # # RIC Errors and Covariance
+        # rc_vect = Xt[0:3].reshape(3,1)
+        # vc_vect = Xt[3:6].reshape(3,1)
+        # err_eci = X_err[0:3,kk].reshape(3,1)
+        # P_eci = Pk[0:3,0:3]
         
-        err_ric = coord.eci2ric(rc_vect, vc_vect, err_eci)
-        P_ric = coord.eci2ric(rc_vect, vc_vect, P_eci)
-        X_err_ric[:,kk] = err_ric.flatten()
-        sig_r[kk] = np.sqrt(P_ric[0,0])
-        sig_i[kk] = np.sqrt(P_ric[1,1])
-        sig_c[kk] = np.sqrt(P_ric[2,2])
+        # err_ric = coord.eci2ric(rc_vect, vc_vect, err_eci)
+        # P_ric = coord.eci2ric(rc_vect, vc_vect, P_eci)
+        # X_err_ric[:,kk] = err_ric.flatten()
+        # sig_r[kk] = np.sqrt(P_ric[0,0])
+        # sig_i[kk] = np.sqrt(P_ric[1,1])
+        # sig_c[kk] = np.sqrt(P_ric[2,2])
         
-        # Store data at meas times
-        if tk in meas_tk_list:
-            X_err_meas[:,meas_ind] = (Xk - Xt).flatten()
-            X_err_ric_meas[:,meas_ind] = err_ric.flatten()
+        # # Store data at meas times
+        # if tk in meas_tk_list:
+        #     X_err_meas[:,meas_ind] = (Xk - Xt).flatten()
+        #     X_err_ric_meas[:,meas_ind] = err_ric.flatten()
             
-            # resids_k = filter_output[tk]['resids']
-            # resids[:,meas_ind] = filter_output[tk]['resids'].flatten()
-            meas_ind += 1
+        #     # resids_k = filter_output[tk]['resids']
+        #     # resids[:,meas_ind] = filter_output[tk]['resids'].flatten()
+        #     meas_ind += 1
         
         
     # Fix Units
@@ -1604,19 +1607,23 @@ def multitarget_orbit_errors(filter_output, full_state_output, truth_dict):
         
     # Resids
     plt.figure()
+    clist = ['r', 'g', 'b', 'c', 'k', 'y', 'm', 'c']
     for kk in range(len(meas_tk_list)):
         
         tk = meas_tk_list[kk]
         resids_k = filter_output[tk]['resids']
         
         for ii in range(len(resids_k)):
+            
+            ind = int(ii % len(clist))
+            color_ii = clist[ind]
             ra_arcsec = resids_k[ii][0]*(1./arcsec2rad)
             dec_arcsec = resids_k[ii][1]*(1./arcsec2rad)
             
             plt.subplot(2,1,1)
-            plt.plot(thrs_meas[kk], ra_arcsec, 'k.')
+            plt.plot(thrs_meas[kk], ra_arcsec, '.', c=color_ii)
             plt.subplot(2,1,2)
-            plt.plot(thrs_meas[kk], dec_arcsec, 'k.')
+            plt.plot(thrs_meas[kk], dec_arcsec, '.', c=color_ii)
             
     plt.subplot(2,1,1)
     plt.ylabel('RA [arcsec]')

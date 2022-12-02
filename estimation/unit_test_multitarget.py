@@ -7,6 +7,7 @@ import pickle
 import os
 import inspect
 import random
+import scipy.stats as ss
 
 # Load tudatpy modules  
 from tudatpy.kernel.interface import spice
@@ -146,7 +147,7 @@ def tudat_geo_2obj_setup(setup_file):
     filter_params['prune_T'] = 1e-3
     filter_params['merge_U'] = 36.
     filter_params['p_surv'] = 1.
-    filter_params['p_det'] = 1.
+    filter_params['p_det'] = 0.9
     
     # Integration function and additional settings    
     int_params = {}
@@ -174,7 +175,7 @@ def tudat_geo_2obj_setup(setup_file):
     pert_vect1 = np.multiply(np.sqrt(np.diag(P1)), np.random.randn(6))
     X1_init = X1_true + np.reshape(pert_vect1, (6, 1))
     
-    elem2 = [42164.1, 0.001, 0.1, 225., 0., 5.]
+    elem2 = [42164.1, 0.001, 0.1, 225., 0., 1.]
     X2_true = np.reshape(astro.kep2cart(elem2), (6,1))
     P2 = np.diag([1., 1., 1., 1e-6, 1e-6, 1e-6])
     pert_vect2 = np.multiply(np.sqrt(np.diag(P2)), np.random.randn(6))
@@ -200,7 +201,7 @@ def tudat_geo_2obj_setup(setup_file):
         sigma_dict['ra'] = 5.*arcsec2rad   # rad
         sigma_dict['dec'] = 5.*arcsec2rad  # rad
         sensor_params[sensor_id]['sigma_dict'] = sigma_dict
-        sensor_params[sensor_id]['lam_clutter'] = 0.
+        sensor_params[sensor_id]['lam_clutter'] = 5.
         FOV_hlim = sensor_params[sensor_id]['FOV_hlim']
         FOV_vlim = sensor_params[sensor_id]['FOV_vlim']        
         sensor_params[sensor_id]['V_sensor'] = (FOV_hlim[1] - FOV_hlim[0])*(FOV_vlim[1] - FOV_vlim[0])
@@ -239,29 +240,50 @@ def tudat_geo_2obj_setup(setup_file):
         EOP_data = eop.get_eop_data(eop_alldata, UTC)
         Zk_list = []
         sensor_kk_list = []
-        # Loop over sensors and objects
         for sensor_id in sensor_id_list:
+            
             sensor = sensor_params[sensor_id]
-        
+            p_det = filter_params['p_det']
+            center_flag = True            
             for Xj in truth_dict[tk_list[kk]]['Xt_list']:            
                           
                 if visfunc.check_visibility(Xj, state_params, sensor_params,
                                             sensor_id, UTC, EOP_data, XYs_df):
                     
-                    # Incorporate missed detection here
+                    # Incorporate missed detection
+                    if np.random.rand() > p_det:
+                        continue
                     
                     # Compute measurements
                     zj = mfunc.compute_measurement(Xj, state_params, sensor_params,
                                                    sensor_id, UTC, EOP_data, XYs_df,
                                                    meas_types=sensor['meas_types'])
                     
+                    # Store first measurement for each sensor as FOV center
+                    if center_flag:
+                        center = zj.copy()
+                        center_flag = False
+                    
+                    # Add noise and store measurement data
                     zj[0] += np.random.randn()*sigma_dict['ra']
                     zj[1] += np.random.randn()*sigma_dict['dec']
                     
                     Zk_list.append(zj)
                     sensor_kk_list.append(sensor_id)
             
-            # Incorporate clutter measurements here
+            # Incorporate clutter measurements
+            n_clutter = ss.poisson.rvs(sensor['lam_clutter'])
+
+            # Compute clutter meas in RA/DEC, uniform over FOV
+            for c_ind in range(n_clutter):
+                FOV_hlim = sensor['FOV_hlim']
+                FOV_vlim = sensor['FOV_vlim']
+                ra  = center[0] + (FOV_hlim[1]-FOV_hlim[0])*(np.random.rand() - 0.5)
+                dec = center[1] + (FOV_vlim[1]-FOV_vlim[0])*(np.random.rand() - 0.5)
+
+                zclutter = np.reshape([ra, dec], (2,1))
+                Zk_list.append(zclutter)
+                sensor_kk_list.append(sensor_id)
 
         # If measurements were collected, randomize order and store
         if len(Zk_list) > 0:
@@ -375,7 +397,7 @@ def run_multitarget_filter(setup_file, results_file):
     pickle.dump( [filter_output, full_state_output, params_dict, truth_dict], pklFile, -1 )
     pklFile.close()
     
-    analysis.multitarget_orbit_errors(filter_output, filter_output, truth_dict)
+    # analysis.multitarget_orbit_errors(filter_output, filter_output, truth_dict)
     
     
     return
@@ -403,15 +425,15 @@ if __name__ == '__main__':
     fdir = r'D:\documents\research_projects\multitarget\data\sim\test\2022_12_01_geo_2obj'
     
     
-    setup_file = os.path.join(fdir, 'tudat_geo_twobody_2obj_pd1_lam0_setup2.pkl')
-    results_file = os.path.join(fdir, 'tudat_geo_twobody_2obj_pd1_lam0_phd_results2.pkl')
+    setup_file = os.path.join(fdir, 'tudat_geo_twobody_2obj_pd09_lam0_setup.pkl')
+    results_file = os.path.join(fdir, 'tudat_geo_twobody_2obj_pd09_lam0_phd_results.pkl')
     
     
     # tudat_geo_2obj_setup(setup_file)    
     
-    # run_multitarget_filter(setup_file, results_file)
+    run_multitarget_filter(setup_file, results_file)
     
-    multitarget_analysis(results_file)
+    # multitarget_analysis(results_file)
     
     
     

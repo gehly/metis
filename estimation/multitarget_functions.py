@@ -97,16 +97,16 @@ def phd_filter(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):
         
         print('')
         print(tk)
-        # print('ncomps', len(GMM_dict['weights']))
-        # print('Nk est', sum(GMM_dict['weights']))
+        print('ncomps', len(GMM_dict['weights']))
+        print('Nk est', sum(GMM_dict['weights']))
 
         # Predictor Step
         tin = [tk_prior, tk]
         GMM_bar = phd_predictor(GMM_dict, tin, params_dict)
         
-        # print('predictor')
-        # print('ncomps', len(GMM_bar['weights']))
-        # print('Nk est', sum(GMM_bar['weights']))
+        print('predictor')
+        print('ncomps', len(GMM_bar['weights']))
+        print('Nk est', sum(GMM_bar['weights']))
         
         # Corrector Step
         Zk = meas_dict[tk]['Zk_list']
@@ -114,9 +114,9 @@ def phd_filter(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):
         GMM_dict = phd_corrector(GMM_bar, tk, Zk, sensor_id_list, meas_fcn,
                                  params_dict)
         
-        # print('corrector')
-        # print('ncomps', len(GMM_dict['weights']))
-        # print('Nk est', sum(GMM_dict['weights']))
+        print('corrector')
+        print('ncomps', len(GMM_dict['weights']))
+        print('Nk est', sum(GMM_dict['weights']))
         
         # Prune/Merge Step
         GMM_dict = est.merge_GMM(GMM_dict, filter_params)
@@ -329,6 +329,18 @@ def phd_corrector(GMM_bar, tk, Zk, sensor_id_list, meas_fcn, params_dict):
             print('zi', zi)
             print('zbar', zbar)
             
+            # Angle-rollover for RA
+            if 'ra' in sensor_params[sensor_id]['meas_types']:
+                ra_ind = sensor_params[sensor_id]['meas_types'].index('ra')
+                
+                if math.pi/2. < zbar[ra_ind] < math.pi:
+                    if -math.pi < zi[ra_ind] < -math.pi/2.:
+                        zi[ra_ind] += 2.*math.pi
+                        
+                if -math.pi < zbar[ra_ind] < -math.pi/2.:
+                    if math.pi/2. < zi[ra_ind] < math.pi:
+                        zi[ra_ind] -= 2.*math.pi
+            
             # Kalman gain and measurement update
             Kk = np.dot(Pxy, np.linalg.inv(Pyy))
             mf = mj + np.dot(Kk, zi-zbar)
@@ -352,6 +364,8 @@ def phd_corrector(GMM_bar, tk, Zk, sensor_id_list, meas_fcn, params_dict):
         denom = p_det*np.dot(qk_list, weights0) + clutter_intensity(zi, sensor_id, sensor_params)
         wf = [p_det*a1*a2/denom for a1,a2 in zip(weights0, qk_list)]
         weights.extend(wf)
+        
+        # print('clutter intensity', clutter_intensity(zi, sensor_id, sensor_params))
         
     # Form output  
     GMM_dict = {}
@@ -407,22 +421,24 @@ def phd_state_extraction(GMM_dict, tk, Zk, sensor_id_list, meas_fcn,
     
     # Calculate residuals
     resids_out = []
-    for ii in range(len(Zk)):
-        zi = Zk[ii]
-        sensor_id = sensor_id_list[ii]
-        
-        resids_list = []
-        for jj in range(len(Xk_list)):
-            Xj = Xk_list[jj]            
-            zbar = mfunc.compute_measurement(Xj, state_params, sensor_params,
-                                             sensor_id, UTC)
-            resids = zi - zbar
-            resids_list.append(resids)
+    
+    if len(wk_list) > 0:
+        for ii in range(len(Zk)):
+            zi = Zk[ii]
+            sensor_id = sensor_id_list[ii]
             
-        # Take smallest magnitude as residual for this measurement
-        min_list = [np.linalg.norm(resid) for resid in resids_list]
-        resids_k = resids_list[min_list.index(min(min_list))]
-        resids_out.append(resids_k)
+            resids_list = []
+            for jj in range(len(Xk_list)):
+                Xj = Xk_list[jj]            
+                zbar = mfunc.compute_measurement(Xj, state_params, sensor_params,
+                                                 sensor_id, UTC)
+                resids = zi - zbar
+                resids_list.append(resids)
+                
+            # Take smallest magnitude as residual for this measurement
+            min_list = [np.linalg.norm(resid) for resid in resids_list]
+            resids_k = resids_list[min_list.index(min(min_list))]
+            resids_out.append(resids_k)
     
     
     return wk_list, Xk_list, Pk_list, resids_out

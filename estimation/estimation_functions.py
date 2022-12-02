@@ -2001,6 +2001,9 @@ def merge_GMM(GMM0, params) :
     w = [w0[ii] for ii in range(len(w0)) if w0[ii] > T*wmax]
     m = [m0[ii] for ii in range(len(w0)) if w0[ii] > T*wmax]
     P = [P0[ii] for ii in range(len(w0)) if w0[ii] > T*wmax]
+    
+    # Normalize weights
+    w = list(np.asarray(w)/sum(w)*sum(w0))
 
     # Loop to merge components that are close
     wf = []
