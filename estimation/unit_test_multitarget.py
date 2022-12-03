@@ -1,5 +1,5 @@
 import numpy as np
-from math import pi, asin, atan2
+import math
 import matplotlib.pyplot as plt
 import sys
 from datetime import datetime, timedelta
@@ -114,6 +114,7 @@ def unit_test_murty():
 def vo_2d_motion_setup():
     
     
+    
     # Process Noise and State Covariance
     sig_w = 5.                 # m/s^2
     sig_u = 1.*np.pi/180.     # rad/s
@@ -158,6 +159,7 @@ def vo_2d_motion_setup():
     
     
     # Define state parameters
+    wturn = 2.*np.pi/180.
     state_params = {}
     
     
@@ -190,9 +192,11 @@ def vo_2d_motion_setup():
     sensor_params[sensor_id]['r_site'] = np.reshape([0., 0.], (2,1))
     sensor_params[sensor_id]['meas_types'] = ['az', 'rg']
     sensor_params[sensor_id]['sigma_dict'] = {}
-    sensor_params[sensor_id]['sigma_dict']['az'] = (2.*np.pi/180.)**2.
-    sensor_params[sensor_id]['sigma_dict']['rg'] = 10.**2.
+    sensor_params[sensor_id]['sigma_dict']['az'] = (2.*np.pi/180.)
+    sensor_params[sensor_id]['sigma_dict']['rg'] = 10.
     sensor_params[sensor_id]['lam_clutter'] = 15.
+    sensor_params[sensor_id]['az_lim'] = [0., np.pi]
+    sensor_params[sensor_id]['rg_lim'] = [0., 2000.]
     sensor_params[sensor_id]['V_sensor'] = np.pi*2000.   # rad*m
     
 
@@ -200,13 +204,192 @@ def vo_2d_motion_setup():
     tk_list = list(range(1,101))
     
     # Initial state vectors
+    object_dict = {}
+    object_dict[1] = {}
+    object_dict[1]['Xo'] = np.reshape([1000+3.8676, -10., 1500-11.7457, -10., wturn/8.], (5,1))
+    object_dict[1]['birth_time'] = 1.
+    object_dict[1]['death_time'] = 101.
+    object_dict[2] = {}
+    object_dict[2]['Xo'] = np.reshape([-250-5.8857,  20., 1000+11.4102, 3., -wturn/3.], (5,1))
+    object_dict[2]['birth_time'] = 10.
+    object_dict[2]['death_time'] = 101.
+    object_dict[3] = {}
+    object_dict[3]['Xo'] = np.reshape([-1500-7.3806, 11., 250+6.7993, 10., -wturn/2.], (5,1))
+    object_dict[3]['birth_time'] = 10.
+    object_dict[3]['death_time'] = 101.
+    object_dict[4] = {}
+    object_dict[4]['Xo'] = np.reshape([-1500., 43., 250., 0., 0.], (5,1))
+    object_dict[4]['birth_time'] = 10.
+    object_dict[4]['death_time'] = 66.
+    object_dict[5] = {}
+    object_dict[5]['Xo'] = np.reshape([250-3.8676, 11., 750-11.0747, 5., wturn/4.], (5,1))
+    object_dict[5]['birth_time'] = 20.
+    object_dict[5]['death_time'] = 80.
+    object_dict[6] = {}
+    object_dict[6]['Xo'] = np.reshape([-250+7.3806, -12., 1000-6.7993, -12., wturn/2.], (5,1))
+    object_dict[6]['birth_time'] = 40.
+    object_dict[6]['death_time'] = 101.
+    object_dict[7] = {}
+    object_dict[7]['Xo'] = np.reshape([1000., 0., 1500., -10., wturn/4.], (5,1))
+    object_dict[7]['birth_time'] = 40.
+    object_dict[7]['death_time'] = 101.
+    object_dict[8] = {}
+    object_dict[8]['Xo'] = np.reshape([250., -50., 750., 0., -wturn/4.], (5,1))
+    object_dict[8]['birth_time'] = 40.
+    object_dict[8]['death_time'] = 80.
+    object_dict[9] = {}
+    object_dict[9]['Xo'] = np.reshape([1000., -50., 1500., 0., -wturn/4.], (5,1))
+    object_dict[9]['birth_time'] = 60.
+    object_dict[9]['death_time'] = 101.
+    object_dict[10] = {}
+    object_dict[10]['Xo'] = np.reshape([250., -40., 750., 25., wturn/4.], (5,1))
+    object_dict[10]['birth_time'] = 60.
+    object_dict[10]['death_time'] = 101.
+
+    # Generate truth and meas data
+    truth_dict = {}
+    meas_dict = {}
+    sensor_id = 1
+    for kk in range(len(tk_list)):
+        
+        tk = tk_list[kk]
+        if kk > 0:
+            tk_prior = tk_list[kk-1]
+        
+        truth_dict[tk] = {}
+        Zk_list = []
+        sensor_kk_list = []
+        sensor = sensor_params[sensor_id]
+        for obj_id in object_dict:
+            
+            if tk == object_dict[obj_id]['birth_time']:
+                truth_dict[tk][obj_id] = object_dict[obj_id]['Xo']                                
+            
+            if tk > object_dict[obj_id]['birth_time'] and tk <= object_dict[obj_id]['death_time']:
+                Xo = truth_dict[tk_prior][obj_id]
+                tin = [0., (tk - tk_prior)]
+                tout, Xout = dyn.general_dynamics(Xo, tin, state_params, int_params)
+                X = Xout[-1,:].reshape(5,1)
+                truth_dict[tk][obj_id] = X
+                
+            
+            # If object exists at this time, compute measurement
+            if obj_id in truth_dict[tk]:
+                Xk = truth_dict[tk][obj_id]
+                r_site = sensor_params[sensor_id]['r_site']
+                xy = np.reshape([Xk[0], Xk[2]], (2,1))
+                rho_vect = xy - r_site
+                az = math.atan2(rho_vect[1], rho_vect[0])
+                rg = np.linalg.norm(rho_vect)
+                
+                # Incorporate missed detections
+                if np.random.rand() <= filter_params['p_det']:
+                    
+                    sigma_dict = sensor_params[sensor_id]['sigma_dict']
+                    az += np.random.randn()*sigma_dict['az']
+                    rg += np.random.randn()*sigma_dict['rg']
+                    zi = np.reshape([az, rg], (2,1))
+                    Zk_list.append(zi)
+                    sensor_kk_list.append(sensor_id)
+                    
+            
+        # Incorporate clutter
+        n_clutter = ss.poisson.rvs(sensor['lam_clutter'])
+
+        # Compute clutter meas in RA/DEC, uniform over FOV
+        for c_ind in range(n_clutter):
+            az_lim = sensor['az_lim']
+            rg_lim = sensor['rg_lim']
+            az = (az_lim[1]-az_lim[0])*np.random.rand() + az_lim[0]
+            rg = (rg_lim[1]-rg_lim[0])*np.random.rand() + rg_lim[0]
+
+            zclutter = np.reshape([az, rg], (2,1))
+            Zk_list.append(zclutter)
+            sensor_kk_list.append(sensor_id)
+        
+        # Shuffle order of measurements
+        if len(Zk_list) > 0:
+            
+            inds = list(range(len(Zk_list)))
+            random.shuffle(inds)
+            
+            meas_dict[tk] = {}
+            meas_dict[tk]['Zk_list'] = [Zk_list[ii] for ii in inds]
+            meas_dict[tk]['sensor_id_list'] = [sensor_kk_list[ii] for ii in inds]
+                
+    
+    # Plot truth data
+    plot_dict = {}
+    for obj_id in object_dict:
+        plot_dict[obj_id] = {}
+        plot_dict[obj_id]['tk_list'] = []
+        plot_dict[obj_id]['x_list'] = []
+        plot_dict[obj_id]['y_list'] = []
+        
+        for tk in tk_list:
+            if obj_id in truth_dict[tk]:
+                plot_dict[obj_id]['tk_list'].append(tk)
+                plot_dict[obj_id]['x_list'].append(truth_dict[tk][obj_id][0])
+                plot_dict[obj_id]['y_list'].append(truth_dict[tk][obj_id][2])
+                
+    fig1 = plt.figure()
+    fig2 = plt.figure()
+    # color_list = ['r', 'g', 'b', 'y', 'c', 'm', 'k']
+    cm = plt.get_cmap('hsv')
+    num_colors = len(object_dict)
+    ii = 0
+    for obj_id in object_dict:
+        tk_plot = plot_dict[obj_id]['tk_list']
+        x_plot = plot_dict[obj_id]['x_list']
+        y_plot = plot_dict[obj_id]['y_list']
+        
+        color_ii = cm(1*ii/num_colors)
+        
+        plt.figure(fig1)
+        plt.subplot(2,1,1)
+        plt.plot(tk_plot, x_plot, '-', color=color_ii)
+        plt.ylabel('x [m]')
+        plt.subplot(2,1,2)
+        plt.plot(tk_plot, y_plot, '-', color=color_ii)
+        plt.ylabel('y [m]')
+        plt.xlabel('Time [sec]')
+        
+        plt.figure(fig2)
+        plt.plot(x_plot, y_plot, '-', color=color_ii)
+        plt.plot(x_plot[0], y_plot[0], 'o', color=color_ii)
+        plt.plot(x_plot[-1], y_plot[-1], 'x', color=color_ii)
+        plt.xlabel('x [m]')
+        plt.ylabel('y [m]')
+        plt.xlim([-2000., 2000.])
+        plt.ylim([0., 2000.])
+        
+        ii += 1
+        
+    plt.figure(fig1)
+    for tk in meas_dict:
+        
+        print('tk', tk)        
+        Zk_list = meas_dict[tk]['Zk_list']
+        
+        print('nmeas', len(Zk_list))
+        
+        for zi in Zk_list:
+            az = float(zi[0])
+            rg = float(zi[1])
+            
+            x = rg*np.cos(az)
+            y = rg*np.sin(az)
+            
+            plt.subplot(2,1,1)
+            plt.plot(tk, x, 'kx', alpha=0.5, ms=3)
+            plt.subplot(2,1,2)
+            plt.plot(tk, y, 'kx', alpha=0.5, ms=3)
+        
+        
+    plt.show()
     
     
-    
-    
-    # Generate truth data
-    
-    
+
     
     return
 
@@ -531,12 +714,12 @@ if __name__ == '__main__':
     
     # tudat_geo_2obj_setup(setup_file)    
     
-    run_multitarget_filter(setup_file, results_file)
+    # run_multitarget_filter(setup_file, results_file)
     
     # multitarget_analysis(results_file)
     
     
-    
+    vo_2d_motion_setup()
     
     
     
