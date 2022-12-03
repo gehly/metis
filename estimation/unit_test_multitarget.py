@@ -114,7 +114,7 @@ def unit_test_murty():
 def vo_2d_motion_setup():
     
     
-    # Process Noise
+    # Process Noise and State Covariance
     sig_w = 5.                 # m/s^2
     sig_u = 1.*np.pi/180.     # rad/s
     
@@ -128,13 +128,33 @@ def vo_2d_motion_setup():
     Q[0:4,0:4] = sig_w**2.*np.dot(G, G.T)
     Q[4,4] = sig_u**2.
     
+    P_birth = np.diag([50.**2., 50.**2., 50.**2., 50.**2., (6.*np.pi/180.)**2.])
+    
+    
     # Birth model
     birth_model = {}
     birth_model[1] = {}
     birth_model[1]['r_birth'] = 0.02
     birth_model[1]['weights'] = [1.]
     birth_model[1]['means'] = [np.reshape([-1500., 0., 250., 0., 0.], (5,1))]
-    birth_model[1]['covars'] = []
+    birth_model[1]['covars'] = [P_birth]
+    birth_model[2] = {}
+    birth_model[2]['r_birth'] = 0.02
+    birth_model[2]['weights'] = [1.]
+    birth_model[2]['means'] = [np.reshape([-250., 0., 1000., 0., 0.], (5,1))]
+    birth_model[2]['covars'] = [P_birth]
+    birth_model[3] = {}
+    birth_model[3]['r_birth'] = 0.03
+    birth_model[3]['weights'] = [1.]
+    birth_model[3]['means'] = [np.reshape([250., 0., 750., 0., 0.], (5,1))]
+    birth_model[3]['covars'] = [P_birth]
+    birth_model[4] = {}
+    birth_model[4]['r_birth'] = 0.03
+    birth_model[4]['weights'] = [1.]
+    birth_model[4]['means'] = [np.reshape([1000., 0., 1500., 0., 0.], (5,1))]
+    birth_model[4]['covars'] = [P_birth]
+    
+    
     
     
     # Define state parameters
@@ -153,6 +173,7 @@ def vo_2d_motion_setup():
     filter_params['merge_U'] = 36.
     filter_params['p_surv'] = 0.99
     filter_params['p_det'] = 0.98
+    filter_params['birth_model'] = birth_model
     
     # Integration function and additional settings    
     int_params = {}
@@ -160,13 +181,30 @@ def vo_2d_motion_setup():
     int_params['intfcn'] = dyn.ode_coordturn
     int_params['step'] = 0.1
     int_params['time_format'] = 'seconds'
-
+    
+    
+    # Sensor parameters
+    sensor_params = {}
+    sensor_id = 1
+    sensor_params[sensor_id] = {}
+    sensor_params[sensor_id]['r_site'] = np.reshape([0., 0.], (2,1))
+    sensor_params[sensor_id]['meas_types'] = ['az', 'rg']
+    sensor_params[sensor_id]['sigma_dict'] = {}
+    sensor_params[sensor_id]['sigma_dict']['az'] = (2.*np.pi/180.)**2.
+    sensor_params[sensor_id]['sigma_dict']['rg'] = 10.**2.
+    sensor_params[sensor_id]['lam_clutter'] = 15.
+    sensor_params[sensor_id]['V_sensor'] = np.pi*2000.   # rad*m
+    
 
     # Time vector
     tk_list = list(range(1,101))
     
     # Initial state vectors
     
+    
+    
+    
+    # Generate truth data
     
     
     
