@@ -653,7 +653,39 @@ def ode_balldrop_ukf(t, X, params):
     return dX
 
 
+def ode_coordturn(t, X, params):
+    '''
+    This function works with ode to propagate an object moving and turning.
 
+    Parameters
+    ------
+    X : 5 element array
+      state vector 
+    t : float 
+      current time in seconds
+    params : dictionary
+        additional arguments
+
+    Returns
+    ------
+    dX : 5 element array array
+      state derivative vector
+    
+    '''
+    
+    x = float(X[0])
+    dx = float(X[1])
+    y = float(X[2])
+    dy = float(X[3])
+    w = float(X[4])
+    
+    dX = np.zeros(5,)
+    dX[0] = dx   #dx*np.cos(w*t) - dy*np.sin(w*t)
+    dX[1] = -w*dx*np.sin(w*t) - w*dy*np.cos(w*t)
+    dX[2] = dy   #dx*np.sin(w*t) + dy*np.cos(w*t)
+    dX[3] = w*dx*np.cos(w*t) - w*dy*np.sin(w*t)
+    
+    return dX
 
 
 ###############################################################################

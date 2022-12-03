@@ -111,6 +111,68 @@ def unit_test_murty():
     return
 
 
+def vo_2d_motion_setup():
+    
+    
+    # Process Noise
+    sig_w = 5.                 # m/s^2
+    sig_u = 1.*np.pi/180.     # rad/s
+    
+    G = np.zeros((4,2))
+    G[0,0] = 0.5
+    G[1,0] = 1.
+    G[2,1] = 0.5
+    G[3,1] = 1.
+    
+    Q = np.zeros((5,5))
+    Q[0:4,0:4] = sig_w**2.*np.dot(G, G.T)
+    Q[4,4] = sig_u**2.
+    
+    # Birth model
+    birth_model = {}
+    birth_model[1] = {}
+    birth_model[1]['r_birth'] = 0.02
+    birth_model[1]['weights'] = [1.]
+    birth_model[1]['means'] = [np.reshape([-1500., 0., 250., 0., 0.], (5,1))]
+    birth_model[1]['covars'] = []
+    
+    
+    # Define state parameters
+    state_params = {}
+    
+    
+    
+    
+    
+    # Filter parameters
+    filter_params = {}
+    filter_params['Q'] = Q
+    filter_params['alpha'] = 1e-4
+    filter_params['pnorm'] = 2.
+    filter_params['prune_T'] = 1e-3
+    filter_params['merge_U'] = 36.
+    filter_params['p_surv'] = 0.99
+    filter_params['p_det'] = 0.98
+    
+    # Integration function and additional settings    
+    int_params = {}
+    int_params['integrator'] = 'rk4'
+    int_params['intfcn'] = dyn.ode_coordturn
+    int_params['step'] = 0.1
+    int_params['time_format'] = 'seconds'
+
+
+    # Time vector
+    tk_list = list(range(1,101))
+    
+    # Initial state vectors
+    
+    
+    
+    
+    return
+
+
 
 def tudat_geo_2obj_setup(setup_file):
     
