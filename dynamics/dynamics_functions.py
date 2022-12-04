@@ -688,6 +688,46 @@ def ode_coordturn(t, X, params):
     return dX
 
 
+def ode_coordturn_ukf(t, X, params):
+    '''
+    This function works with ode to propagate an object moving and turning.
+
+    Parameters
+    ------
+    X : 5 element array
+      state vector 
+    t : float 
+      current time in seconds
+    params : dictionary
+        additional arguments
+
+    Returns
+    ------
+    dX : 5 element array array
+      state derivative vector
+    
+    '''
+    
+    n = 5
+    dX = np.zeros(len(X),)
+    for ind in range(0, 2*n+1):
+
+        # Pull out relevant values from X
+        x  = float(X[ind*n+0])
+        dx = float(X[ind*n+1])
+        y  = float(X[ind*n+2])
+        dy = float(X[ind*n+3])
+        w  = float(X[ind*n+4])
+
+        # Set components of dX
+        dX[ind*n+0] = dx   #dx*np.cos(w*t) - dy*np.sin(w*t)
+        dX[ind*n+1] = -w*dx*np.sin(w*t) - w*dy*np.cos(w*t)
+        dX[ind*n+2] = dy   #dx*np.sin(w*t) + dy*np.cos(w*t)
+        dX[ind*n+3] = w*dx*np.cos(w*t) - w*dy*np.sin(w*t)
+    
+    return dX
+
+
 ###############################################################################
 # Orbit Propagation Routines
 ###############################################################################

@@ -616,6 +616,7 @@ def lmb_predictor(LMB_dict, tin, params_dict):
     
     if time_format == 'seconds':
         delta_t = tk - tk_prior
+        tin = [0., delta_t]
     elif time_format == 'JD':
         delta_t = (tk - tk_prior)*86400.
     elif time_format == 'datetime':
@@ -704,9 +705,8 @@ def lmb_predictor(LMB_dict, tin, params_dict):
                     Q = np.zeros((q,q))
                 
                 Pbar = np.dot(chi_diff, np.dot(diagWc, chi_diff.T)) + Q
-                
     
-            # Store output
+            # Store GMM components
             weights[jj] = wj
             means[jj] = Xbar
             covars[jj] = Pbar
@@ -723,7 +723,7 @@ def lmb_predictor(LMB_dict, tin, params_dict):
 
 
 
-def lmb_corrector(GMM_bar, tk, Zk, sensor_id_list, meas_fcn, params_dict):
+def lmb_corrector(LMB_bar, tk, Zk, sensor_id_list, meas_fcn, params_dict):
     '''
     
     
@@ -832,7 +832,23 @@ def lmb_corrector(GMM_bar, tk, Zk, sensor_id_list, meas_fcn, params_dict):
     return GMM_dict
 
 
-
+def lmb2glmb(LMB_dict, H_total=1000):
+    
+    # Get existence probability for each track
+    label_list = list(LMB_dict.keys())
+    r_vect = np.asarray([LMB_dict[label]['r'] for label in label_list])
+    
+    # Compute negative log cost for K-shortest path algorithm
+    cost_vect = np.asarray([(ri/(1.-ri)) for ri in r_vect])
+    neglog_vect = -np.log(cost_vect)
+    
+    
+    
+    
+        
+    
+    
+    return GLMB_dict
 
 
 
@@ -855,6 +871,22 @@ def clutter_intensity(zi, sensor_id, sensor_params):
     kappa = lam_clutter/V_sensor    
     
     return kappa
+
+
+def initialize_kpath(G):
+    
+    n = int(G.shape[1])
+    m = len(np.argwhere(G))
+    tail = np.argwhere(G)[:,0]
+    head = np.argwhere(G)[:,1]
+    W = np.zeros(m,)
+    for ii in range(m):
+        W[ii] = G[tail[ii], head[ii]]
+    
+    p = np.zeros((n,1))
+    D = np.inf*np.ones((n,1))
+    
+    return m, n, p, D, tail, head, W
 
 
 
