@@ -738,15 +738,14 @@ def lmb_corrector(LMB_bar, tk, Zk, sensor_id_list, meas_fcn, params_dict):
     Wm = filter_params['Wm']
     diagWc = filter_params['diagWc']
     p_det = filter_params['p_det']
-    
-    # Break out GMM
-    weights0 = GMM_bar['weights']
-    means0 = GMM_bar['means']
-    covars0 = GMM_bar['covars']
-    nstates = len(means0[0])
+    nstates = state_params['nstates']
     npoints = 2*nstates + 1
-    ncomp = len(weights0)
     nmeas = len(Zk)
+    
+    # Form GLMB from input LMB
+    GLMB_dict = lmb2glmb(LMB_bar)
+    
+    
     
     # Components for missed detection case
     weights = [(1. - p_det)*wj for wj in weights0]
@@ -832,26 +831,69 @@ def lmb_corrector(LMB_bar, tk, Zk, sensor_id_list, meas_fcn, params_dict):
     return GMM_dict
 
 
-def lmb2glmb(LMB_dict, H_total=1000):
+def lmb2glmb(LMB_dict):
     
     # Get existence probability for each track
     label_list = list(LMB_dict.keys())
-    r_vect = np.asarray([LMB_dict[label]['r'] for label in label_list])
+    r_list = [LMB_dict[label]['r'] for label in label_list]
     
-    # Compute negative log cost for K-shortest path algorithm
-    cost_vect = np.asarray([(ri/(1.-ri)) for ri in r_vect])
-    neglog_vect = -np.log(cost_vect)
+    # # Compute negative log cost for K-shortest path algorithm
+    # cost_vect = np.asarray([(ri/(1.-ri)) for ri in r_vect])
+    # neglog_vect = -np.log(cost_vect)
     
+    # Compute dictionary of hypothesis weights and labels
+    hyp_dict = compute_hypothesis_dict(r_list, label_list)
     
-    
-    
+    # Form GLMB dictionary
+    GLMB_dict = {}
+    for hyp in hyp_dict:
+        GLMB_dict[hyp] = {}
+        GLMB_dict[hyp]['hyp_weight'] = hyp_dict[hyp]['weight']
+        GLMB_dict[hyp]['label_list'] = hyp_dict[hyp]['label_list']
         
-    
-    
+        for label in hyp_dict[hyp]['label_list']:
+            GLMB_dict[hyp][label] = LMB_dict[label]
+
     return GLMB_dict
 
 
-
+def compute_hypothesis_dict(r_list, label_list):
+    
+    hyp_dict = {}
+    
+    # Generate all subsets of labels and existence probabilities
+    N = len(label_list)
+    ind_list = list(range(N))
+    
+    subset_list = compute_subsets(ind_list)
+    
+    print('ind_list', ind_list)
+    print('subset_list', subset_list)
+    
+    for hyp in range(len(subset_list)):        
+        
+        # Indices to include for this hypothesis
+        subset = subset_list[hyp]
+        
+        # Compute hypothesis weight and store labels
+        hyp_weight = 1.
+        hyp_label_list = []
+        for ii in ind_list:
+            if ii in subset:
+                hyp_weight *= r_list[ii]
+                hyp_label_list.append(label_list[ii])
+            else:
+                hyp_weight *= (1. - r_list[ii])
+            
+        # Store results
+        hyp_dict[hyp] = {}
+        hyp_dict[hyp]['weight'] = hyp_weight
+        hyp_dict[hyp]['label_list'] = hyp_label_list
+        
+        
+    print(hyp_dict)
+    
+    return hyp_dict
 
 
 
@@ -873,6 +915,16 @@ def clutter_intensity(zi, sensor_id, sensor_params):
     return kappa
 
 
+def compute_subsets(input_list):
+    
+    N = len(input_list)
+    subset_list = []
+    for ii in range(1 << N):        
+        subset_list.append([input_list[jj] for jj in range(N) if (ii & (1 << jj))])
+        
+    return subset_list
+
+
 def initialize_kpath(G):
     
     n = int(G.shape[1])
@@ -883,11 +935,49 @@ def initialize_kpath(G):
     for ii in range(m):
         W[ii] = G[tail[ii], head[ii]]
     
-    p = np.zeros((n,1))
+    p = -1*np.ones((n,1))
     D = np.inf*np.ones((n,1))
     
     return m, n, p, D, tail, head, W
 
+
+def BFMSpathOT(G,r):
+    
+    m, n, p, D, tail, head, W = initialize_kpath(G)
+    p[r] = 0.
+    D[r] = 0.
+    for iters in range(n-1):
+        optimal = True
+        for arc in range(m):
+            u = int(tail[arc])
+            v = int(head[arc])
+            duv = W[arc]
+            if D[v] > D[u] + duv:
+                D[v] = D[u] + duv
+                p[v] = u
+                optimal = False
+            
+        if optimal:
+            break
+
+    return p, D, iters
+
+
+def BFMSpathwrap(ncm, source, destination):
+    
+    p, D, iters = BFMSpathOT(ncm, source)
+    dist = D[destination]
+    pred = p.flatten()
+    
+    if np.isinf(dist):
+        path = []
+    else:
+        path = [destination]
+        while path[0] != source:
+            path.insert(0, int(pred[path[0]]))
+    
+    
+    return dist, path, pred
 
 
 

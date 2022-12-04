@@ -720,9 +720,11 @@ if __name__ == '__main__':
     # multitarget_analysis(results_file)
     
     
-    vo_2d_motion_setup()
+    # vo_2d_motion_setup()
     
-    
+    r_list = [0.6, 0.7]
+    label_list = [1, 2]
+    mult.compute_hypothesis_dict(r_list, label_list)
     
 #    unit_test_auction()
     
