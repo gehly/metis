@@ -745,81 +745,103 @@ def lmb_corrector(LMB_bar, tk, Zk, sensor_id_list, meas_fcn, params_dict):
     # Form GLMB from input LMB
     GLMB_dict = lmb2glmb(LMB_bar)
     
-    
-    
     # Components for missed detection case
-    weights = [(1. - p_det)*wj for wj in weights0]
-    means = copy.copy(means0)
-    covars = copy.copy(covars0)
+    track_update = {}
+    label_list = list(LMB_bar.keys())
+    ii = 0
+    for label in label_list:
+        track_update[ii] = {}
+        track_update[ii]['label'] = label
+        track_update[ii]['r'] = LMB_bar[label]['r']
+        track_update[ii]['weights'] = LMB_bar[label]['weights']
+        track_update[ii]['means'] = LMB_bar[label]['means']
+        track_update[ii]['covars'] = LMB_bar[label]['covars']
+        ii += 1
     
+
     # Loop over each measurement and compute updates
+    allcost_mat = np.zeros((len(label_list), nmeas))
     for ii in range(nmeas):
         
         # Retrieve measurement
         zi = Zk[ii]
         sensor_id = sensor_id_list[ii]
     
-        # Loop over components   
-        qk_list = []
-        for jj in range(ncomp):        
+        # Loop over tracks
+        for tt in range(len(label_list)):
+            label = label_list[tt]
+            weights0 = LMB_bar[label]['weights']
+            means0 = LMB_bar[label]['means']
+            covars0 = LMB_bar[label]['covars']
             
-            mj = means0[jj]
-            Pj = covars0[jj]
-            
-            # Compute sigma points
-            sqP = np.linalg.cholesky(Pj)
-            Xrep = np.tile(mj, (1, nstates))
-            chi = np.concatenate((mj, Xrep+(gam*sqP), Xrep-(gam*sqP)), axis=1)
-            chi_diff = chi - np.dot(mj, np.ones((1, npoints)))
-    
-            # Computed measurements and covariance
-            gamma_til_k, Rk = meas_fcn(tk, chi, state_params, sensor_params, sensor_id)
-            zbar = np.dot(gamma_til_k, Wm.T)
-            zbar = np.reshape(zbar, (len(zbar), 1))
-            z_diff = gamma_til_k - np.dot(zbar, np.ones((1, npoints)))
-            Pyy = np.dot(z_diff, np.dot(diagWc, z_diff.T)) + Rk
-            Pxy = np.dot(chi_diff,  np.dot(diagWc, z_diff.T))
-            
-            print('zi', zi)
-            print('zbar', zbar)
-            
-            # Angle-rollover for RA
-            if 'ra' in sensor_params[sensor_id]['meas_types']:
-                ra_ind = sensor_params[sensor_id]['meas_types'].index('ra')
+            # Loop over components
+            ncomp = len(weights0)
+            qk_list = []
+            means = []
+            covars = []
+            for jj in range(ncomp):        
                 
-                if math.pi/2. < zbar[ra_ind] < math.pi:
-                    if -math.pi < zi[ra_ind] < -math.pi/2.:
-                        zi[ra_ind] += 2.*math.pi
-                        
-                if -math.pi < zbar[ra_ind] < -math.pi/2.:
-                    if math.pi/2. < zi[ra_ind] < math.pi:
-                        zi[ra_ind] -= 2.*math.pi
-            
-            # Kalman gain and measurement update
-            Kk = np.dot(Pxy, np.linalg.inv(Pyy))
-            mf = mj + np.dot(Kk, zi-zbar)
-            
-            # Joseph form
-            cholPbar = np.linalg.inv(np.linalg.cholesky(Pj))
-            invPbar = np.dot(cholPbar.T, cholPbar)
-            P1 = (np.eye(nstates) - np.dot(np.dot(Kk, np.dot(Pyy, Kk.T)), invPbar))
-            P2 = np.dot(Kk, np.dot(Rk, Kk.T))
-            Pf = np.dot(P1, np.dot(Pj, P1.T)) + P2
-            
-            # Compute Gaussian likelihood
-            qk_j = est.gaussian_likelihood(zi, zbar, Pyy)
-    
-            # Store output
-            means.append(mf)
-            covars.append(Pf)
-            qk_list.append(qk_j)
+                mj = means0[jj]
+                Pj = covars0[jj]
+                
+                # Compute sigma points
+                sqP = np.linalg.cholesky(Pj)
+                Xrep = np.tile(mj, (1, nstates))
+                chi = np.concatenate((mj, Xrep+(gam*sqP), Xrep-(gam*sqP)), axis=1)
+                chi_diff = chi - np.dot(mj, np.ones((1, npoints)))
         
-        # Normalize updated weights
-        denom = p_det*np.dot(qk_list, weights0) + clutter_intensity(zi, sensor_id, sensor_params)
-        wf = [p_det*a1*a2/denom for a1,a2 in zip(weights0, qk_list)]
-        weights.extend(wf)
+                # Computed measurements and covariance
+                gamma_til_k, Rk = meas_fcn(tk, chi, state_params, sensor_params, sensor_id)
+                zbar = np.dot(gamma_til_k, Wm.T)
+                zbar = np.reshape(zbar, (len(zbar), 1))
+                z_diff = gamma_til_k - np.dot(zbar, np.ones((1, npoints)))
+                Pyy = np.dot(z_diff, np.dot(diagWc, z_diff.T)) + Rk
+                Pxy = np.dot(chi_diff,  np.dot(diagWc, z_diff.T))
+                
+                print('zi', zi)
+                print('zbar', zbar)
+                
+                # Angle-rollover for RA
+                if 'ra' in sensor_params[sensor_id]['meas_types']:
+                    ra_ind = sensor_params[sensor_id]['meas_types'].index('ra')
+                    
+                    if math.pi/2. < zbar[ra_ind] < math.pi:
+                        if -math.pi < zi[ra_ind] < -math.pi/2.:
+                            zi[ra_ind] += 2.*math.pi
+                            
+                    if -math.pi < zbar[ra_ind] < -math.pi/2.:
+                        if math.pi/2. < zi[ra_ind] < math.pi:
+                            zi[ra_ind] -= 2.*math.pi
+                
+                # Kalman gain and measurement update
+                Kk = np.dot(Pxy, np.linalg.inv(Pyy))
+                mf = mj + np.dot(Kk, zi-zbar)
+                
+                # Joseph form
+                cholPbar = np.linalg.inv(np.linalg.cholesky(Pj))
+                invPbar = np.dot(cholPbar.T, cholPbar)
+                P1 = (np.eye(nstates) - np.dot(np.dot(Kk, np.dot(Pyy, Kk.T)), invPbar))
+                P2 = np.dot(Kk, np.dot(Rk, Kk.T))
+                Pf = np.dot(P1, np.dot(Pj, P1.T)) + P2
+                
+                # Compute Gaussian likelihood
+                qk_j = est.gaussian_likelihood(zi, zbar, Pyy)
         
-        # print('clutter intensity', clutter_intensity(zi, sensor_id, sensor_params))
+                # Store output
+                means.append(mf)
+                covars.append(Pf)
+                qk_list.append(qk_j)
+            
+            # Normalize updated weights
+            denom = p_det*np.dot(qk_list, weights0) + clutter_intensity(zi, sensor_id, sensor_params)
+            wf = [p_det*a1*a2/denom for a1,a2 in zip(weights0, qk_list)]
+            weights = wf
+        
+        
+        
+        
+        
+        
         
     # Form output  
     GMM_dict = {}
