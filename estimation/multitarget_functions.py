@@ -461,6 +461,375 @@ def phd_state_extraction(GMM_dict, tk, Zk, sensor_id_list, meas_fcn,
 ###############################################################################
 
 
+def lmb_filter(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):
+    
+    # Break out inputs
+    state_params = params_dict['state_params']
+    filter_params = params_dict['filter_params']
+    nstates = state_params['nstates']
+    
+    # State information
+    state_tk = sorted(state_dict.keys())[-1]
+    LMB_dict = {}
+    for label in state_dict[state_tk].keys():
+        if label == 'unlabeled':
+            continue
+        
+        LMB_dict[label] = state_dict[state_tk][label]
+
+
+    # Prior information about the distribution
+    pnorm = 2.
+    kurt = math.gamma(5./pnorm)*math.gamma(1./pnorm)/(math.gamma(3./pnorm)**2.)
+    beta = kurt - 1.
+    kappa = kurt - float(nstates)
+
+    # Compute sigma point weights
+    alpha = filter_params['alpha']
+    lam = alpha**2.*(nstates + kappa) - nstates
+    gam = np.sqrt(nstates + lam)
+    Wm = 1./(2.*(nstates + lam)) * np.ones(2*nstates,)
+    Wc = Wm.copy()
+    Wm = np.insert(Wm, 0, lam/(nstates + lam))
+    Wc = np.insert(Wc, 0, lam/(nstates + lam) + (1 - alpha**2 + beta))
+    diagWc = np.diag(Wc)
+    filter_params['gam'] = gam
+    filter_params['Wm'] = Wm
+    filter_params['diagWc'] = diagWc
+
+    # Initialize output
+    filter_output = {}
+
+    # Measurement times
+    tk_list = sorted(meas_dict.keys())
+    
+    # Number of epochs
+    N = len(tk_list)
+  
+    # Loop over times
+    for kk in range(N):
+    
+        # Current and previous time
+        if kk == 0:
+            tk_prior = state_tk
+        else:
+            tk_prior = tk_list[kk-1]
+
+        tk = tk_list[kk]
+        
+        print('')
+        print(tk)
+        # print('ncomps', len(GMM_dict['weights']))
+        # print('Nk est', sum(GMM_dict['weights']))
+
+        # Predictor Step
+        tin = [tk_prior, tk]
+        LMB_bar = lmb_predictor(LMB_dict, tin, params_dict)
+        
+        print('predictor')
+        # print('ncomps', len(GMM_bar['weights']))
+        # print('Nk est', sum(GMM_bar['weights']))
+        
+        # Corrector Step
+        Zk = meas_dict[tk]['Zk_list']
+        sensor_id_list = meas_dict[tk]['sensor_id_list']
+        GMM_dict = lmb_corrector(LMB_bar, tk, Zk, sensor_id_list, meas_fcn,
+                                 params_dict)
+        
+        print('corrector')
+        # print('ncomps', len(GMM_dict['weights']))
+        # print('Nk est', sum(GMM_dict['weights']))
+        
+        # Prune/Merge Step
+        GMM_dict = est.merge_GMM(GMM_dict, filter_params)
+        
+        print('merge')
+        # print('ncomps', len(GMM_dict['weights']))
+        # print('Nk est', sum(GMM_dict['weights']))
+        
+        
+        # State extraction and residuals calculation
+        wk_list, Xk_list, Pk_list, resids_k = \
+            lmb_state_extraction(GMM_dict, tk, Zk, sensor_id_list, meas_fcn,
+                                 params_dict)
+            
+            
+        
+        # print('wk_list', wk_list)
+        
+        
+        # Store output
+        filter_output[tk] = {}
+        filter_output[tk]['weights'] = GMM_dict['weights']
+        filter_output[tk]['means'] = GMM_dict['means']
+        filter_output[tk]['covars'] = GMM_dict['covars']
+        filter_output[tk]['wk_list'] = wk_list
+        filter_output[tk]['Xk_list'] = Xk_list
+        filter_output[tk]['Pk_list'] = Pk_list
+        filter_output[tk]['resids'] = resids_k
+        
+        
+    # TODO Generation of full_state_output not working correctly
+    # Use filter_output for error analysis
+    full_state_output = {}
+    
+    return filter_output, full_state_output
+    
+
+
+
+def lmb_predictor(LMB_dict, tin, params_dict):
+    '''
+    
+    
+    '''
+    
+    
+    # Break out inputs
+    filter_params = params_dict['filter_params']
+    state_params = params_dict['state_params']
+    int_params = params_dict['int_params']
+    
+    # Copy input to ensure pass by value
+    LMB_dict = copy.deepcopy(LMB_dict)
+    filter_params = copy.deepcopy(filter_params)
+    state_params = copy.deepcopy(state_params)
+    int_params = copy.deepcopy(int_params)
+    
+    # Retrieve parameters
+    p_surv = filter_params['p_surv']
+    snc_flag = filter_params['snc_flag']
+    Q = filter_params['Q']
+    gam = filter_params['gam']
+    Wm = filter_params['Wm']
+    diagWc = filter_params['diagWc']    
+    gap_seconds = filter_params['gap_seconds']        
+    time_format = int_params['time_format']     
+    
+    # Fudge to work with general_dynamics
+    state_params['alpha'] = filter_params['alpha']
+    
+    q = int(Q.shape[0])
+    
+    tk_prior = tin[0]
+    tk = tin[1]
+    
+    if time_format == 'seconds':
+        delta_t = tk - tk_prior
+    elif time_format == 'JD':
+        delta_t = (tk - tk_prior)*86400.
+    elif time_format == 'datetime':
+        delta_t = (tk - tk_prior).total_seconds()
+
+
+    # Birth Components
+    birth_model = filter_params['birth_model']
+    LMB_bar = {}
+    for ii in birth_model.keys():
+        label = (tk, ii)
+        LMB_bar[label]['r'] = birth_model[ii]['r_birth']
+        LMB_bar[label]['weights'] = birth_model[ii]['weights']
+        LMB_bar[label]['means'] = birth_model[ii]['means']
+        LMB_bar[label]['covars'] = birth_model[ii]['covars']
+
+
+    # Check if propagation is needed
+    if delta_t == 0.:
+        LMB_bar.update(LMB_dict)
+        return LMB_bar
+    
+    # Surviving components
+    # Initialize for integrator
+    # Loop over labels
+    label_list = list(LMB_dict.keys())
+    for label in label_list:
+        
+        # Retrieve current GMM
+        r = LMB_dict[label]['r']
+        weights = LMB_dict[label]['weights']
+        means = LMB_dict[label]['means']
+        covars = LMB_dict[label]['covars']    
+        ncomp = len(weights)
+        nstates = len(means[0])
+        npoints = 2*nstates + 1
+    
+        # Loop over components
+        for jj in range(ncomp):
+            
+    #        print('\nstart loop')
+    #        print('jj', jj)
+    #        print('ncomp', len(weights))
+    #        print('t0', t0_list[jj])
+            
+            # Retrieve component values
+            wj = weights[jj]
+            mj = means[jj]
+            Pj = covars[jj]
+            tin = [tk_prior, tk]
+                
+            # Compute sigma points
+            sqP = np.linalg.cholesky(Pj)
+            Xrep = np.tile(mj, (1, nstates))
+            chi = np.concatenate((mj, Xrep+(gam*sqP), Xrep-(gam*sqP)), axis=1)
+            chi_v = np.reshape(chi, (nstates*npoints, 1), order='F')
+            
+            # Integrate sigma points
+            int0 = chi_v.flatten()
+            tout, intout = \
+                dyn.general_dynamics(int0, tin, state_params, int_params)
+    
+            # Retrieve output state        
+            chi_v = intout[-1,:]
+            chi = np.reshape(chi_v, (nstates, npoints), order='F')
+    
+            Xbar = np.dot(chi, Wm.T)
+            Xbar = np.reshape(Xbar, (nstates, 1))
+            chi_diff = chi - np.dot(Xbar, np.ones((1, npoints)))
+    
+            # State Noise Compensation            
+            if snc_flag == 'gamma':
+                
+                # Zero out SNC for long time gaps
+                Gamma = np.zeros((nstates,q))
+                if delta_t < gap_seconds:   
+                    Gamma[0:q,:] = (delta_t**2./2) * np.eye(q)
+                    Gamma[q:2*q,:] = delta_t * np.eye(q)
+                
+                Pbar = np.dot(chi_diff, np.dot(diagWc, chi_diff.T)) + np.dot(Gamma, np.dot(Q, Gamma.T))
+                
+            elif snc_flag == 'qfull':
+                
+                # Zero out SNC for long time gaps
+                if delta_t < gap_seconds:   
+                    Q = np.zeros((q,q))
+                
+                Pbar = np.dot(chi_diff, np.dot(diagWc, chi_diff.T)) + Q
+                
+    
+            # Store output
+            weights[jj] = wj
+            means[jj] = Xbar
+            covars[jj] = Pbar
+
+        # Store LMB
+        LMB_bar[label] = {}
+        LMB_bar[label]['r'] = r*p_surv
+        LMB_bar[label]['weights'] = weights
+        LMB_bar[label]['means'] = means
+        LMB_bar[label]['covars'] = covars
+
+
+    return LMB_bar
+
+
+
+def lmb_corrector(GMM_bar, tk, Zk, sensor_id_list, meas_fcn, params_dict):
+    '''
+    
+    
+    '''
+    
+    
+    # Retrieve inputs
+    filter_params = params_dict['filter_params']
+    state_params = params_dict['state_params']
+    sensor_params = params_dict['sensor_params']
+    gam = filter_params['gam']
+    Wm = filter_params['Wm']
+    diagWc = filter_params['diagWc']
+    p_det = filter_params['p_det']
+    
+    # Break out GMM
+    weights0 = GMM_bar['weights']
+    means0 = GMM_bar['means']
+    covars0 = GMM_bar['covars']
+    nstates = len(means0[0])
+    npoints = 2*nstates + 1
+    ncomp = len(weights0)
+    nmeas = len(Zk)
+    
+    # Components for missed detection case
+    weights = [(1. - p_det)*wj for wj in weights0]
+    means = copy.copy(means0)
+    covars = copy.copy(covars0)
+    
+    # Loop over each measurement and compute updates
+    for ii in range(nmeas):
+        
+        # Retrieve measurement
+        zi = Zk[ii]
+        sensor_id = sensor_id_list[ii]
+    
+        # Loop over components   
+        qk_list = []
+        for jj in range(ncomp):        
+            
+            mj = means0[jj]
+            Pj = covars0[jj]
+            
+            # Compute sigma points
+            sqP = np.linalg.cholesky(Pj)
+            Xrep = np.tile(mj, (1, nstates))
+            chi = np.concatenate((mj, Xrep+(gam*sqP), Xrep-(gam*sqP)), axis=1)
+            chi_diff = chi - np.dot(mj, np.ones((1, npoints)))
+    
+            # Computed measurements and covariance
+            gamma_til_k, Rk = meas_fcn(tk, chi, state_params, sensor_params, sensor_id)
+            zbar = np.dot(gamma_til_k, Wm.T)
+            zbar = np.reshape(zbar, (len(zbar), 1))
+            z_diff = gamma_til_k - np.dot(zbar, np.ones((1, npoints)))
+            Pyy = np.dot(z_diff, np.dot(diagWc, z_diff.T)) + Rk
+            Pxy = np.dot(chi_diff,  np.dot(diagWc, z_diff.T))
+            
+            print('zi', zi)
+            print('zbar', zbar)
+            
+            # Angle-rollover for RA
+            if 'ra' in sensor_params[sensor_id]['meas_types']:
+                ra_ind = sensor_params[sensor_id]['meas_types'].index('ra')
+                
+                if math.pi/2. < zbar[ra_ind] < math.pi:
+                    if -math.pi < zi[ra_ind] < -math.pi/2.:
+                        zi[ra_ind] += 2.*math.pi
+                        
+                if -math.pi < zbar[ra_ind] < -math.pi/2.:
+                    if math.pi/2. < zi[ra_ind] < math.pi:
+                        zi[ra_ind] -= 2.*math.pi
+            
+            # Kalman gain and measurement update
+            Kk = np.dot(Pxy, np.linalg.inv(Pyy))
+            mf = mj + np.dot(Kk, zi-zbar)
+            
+            # Joseph form
+            cholPbar = np.linalg.inv(np.linalg.cholesky(Pj))
+            invPbar = np.dot(cholPbar.T, cholPbar)
+            P1 = (np.eye(nstates) - np.dot(np.dot(Kk, np.dot(Pyy, Kk.T)), invPbar))
+            P2 = np.dot(Kk, np.dot(Rk, Kk.T))
+            Pf = np.dot(P1, np.dot(Pj, P1.T)) + P2
+            
+            # Compute Gaussian likelihood
+            qk_j = est.gaussian_likelihood(zi, zbar, Pyy)
+    
+            # Store output
+            means.append(mf)
+            covars.append(Pf)
+            qk_list.append(qk_j)
+        
+        # Normalize updated weights
+        denom = p_det*np.dot(qk_list, weights0) + clutter_intensity(zi, sensor_id, sensor_params)
+        wf = [p_det*a1*a2/denom for a1,a2 in zip(weights0, qk_list)]
+        weights.extend(wf)
+        
+        # print('clutter intensity', clutter_intensity(zi, sensor_id, sensor_params))
+        
+    # Form output  
+    GMM_dict = {}
+    GMM_dict['weights'] = weights
+    GMM_dict['means'] = means
+    GMM_dict['covars'] = covars
+    
+    
+    return GMM_dict
 
 
 

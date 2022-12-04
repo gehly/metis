@@ -161,7 +161,7 @@ def vo_2d_motion_setup():
     # Define state parameters
     wturn = 2.*np.pi/180.
     state_params = {}
-    
+    state_params['nstates'] = 5
     
     
     
@@ -169,10 +169,11 @@ def vo_2d_motion_setup():
     # Filter parameters
     filter_params = {}
     filter_params['Q'] = Q
-    filter_params['alpha'] = 1e-4
+    filter_params['snc_flag'] = 'qfull'
+    filter_params['alpha'] = 1.
     filter_params['pnorm'] = 2.
-    filter_params['prune_T'] = 1e-3
-    filter_params['merge_U'] = 36.
+    filter_params['prune_T'] = 1e-5
+    filter_params['merge_U'] = 4.
     filter_params['p_surv'] = 0.99
     filter_params['p_det'] = 0.98
     filter_params['birth_model'] = birth_model
