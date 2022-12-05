@@ -729,11 +729,13 @@ def lmb_corrector(LMB_bar, tk, Zk, sensor_id_list, meas_fcn, params_dict):
     
     '''
     
+    machine_eps = np.finfo(float).eps
     
     # Retrieve inputs
     filter_params = params_dict['filter_params']
     state_params = params_dict['state_params']
     sensor_params = params_dict['sensor_params']
+    H_max = filter_params['H_max']
     gam = filter_params['gam']
     Wm = filter_params['Wm']
     diagWc = filter_params['diagWc']
@@ -745,11 +747,14 @@ def lmb_corrector(LMB_bar, tk, Zk, sensor_id_list, meas_fcn, params_dict):
     # Form GLMB from input LMB
     GLMB_dict = lmb2glmb(LMB_bar)
     
+    # Get unique sensor id's
+    unique_sensors = list(set(sensor_id_list))
+    
     # Components for missed detection case
     track_update = {}
-    label_list = list(LMB_bar.keys())
+    full_label_list = list(LMB_bar.keys())
     tind = 0
-    for label in label_list:
+    for label in full_label_list:
         track_update[tind] = {}
         track_update[tind]['label'] = label
         track_update[tind]['r'] = LMB_bar[label]['r']
@@ -760,7 +765,7 @@ def lmb_corrector(LMB_bar, tk, Zk, sensor_id_list, meas_fcn, params_dict):
     
 
     # Loop over each measurement and compute updates
-    allcost_mat = np.zeros((len(label_list), nmeas))
+    allcost_mat = np.zeros((len(full_label_list), nmeas))
     for ii in range(nmeas):
         
         # Retrieve measurement
@@ -768,8 +773,8 @@ def lmb_corrector(LMB_bar, tk, Zk, sensor_id_list, meas_fcn, params_dict):
         sensor_id = sensor_id_list[ii]
     
         # Loop over tracks
-        for tt in range(len(label_list)):
-            label = label_list[tt]
+        for tt in range(len(full_label_list)):
+            label = full_label_list[tt]
             weights0 = LMB_bar[label]['weights']
             means0 = LMB_bar[label]['means']
             covars0 = LMB_bar[label]['covars']
@@ -835,7 +840,7 @@ def lmb_corrector(LMB_bar, tk, Zk, sensor_id_list, meas_fcn, params_dict):
             # Normalize updated weights
             denom = np.dot(qk_list, weights0)
             weights = [a1*a2/denom for a1,a2 in zip(weights0, qk_list)]
-        
+                    
             # Update track dictionary
             track_update[tind] = {}
             track_update[tind]['label'] = label
@@ -846,23 +851,108 @@ def lmb_corrector(LMB_bar, tk, Zk, sensor_id_list, meas_fcn, params_dict):
             
             tind += 1
             
-            # Update cost matrix
-            allcost_mat[tt,ii] = denom
+            # Update cost matrix (Vo, Vo, Phung 2014 Eq 26)
+            allcost_mat[tt,ii] = machine_eps + \
+                denom*(p_det)/(1.-p_det)*(1./clutter_intensity(zi, sensor_id, sensor_params))
             
             
             
+    # Measurement update
+    # All missed detections
+    hyp_list = list(GLMB_dict.keys())
+    new_hyp_ind = hyp_list[-1] + 1
+    if nmeas == 0:
+        
+        for hyp in hyp_list:
+        
+            hyp_weight = GLMB_dict[hyp]['hyp_weight']
+            label_list = GLMB_dict[hyp]['label_list']
+            nlabel = len(label_list)
+            GLMB_dict[hyp]['hyp_weight'] = hyp_weight*(1-p_det)**nlabel
             
+            # No measurements to update tracks/state estimates
+    else:
+        
+        # Loop over hypotheses
+        for hyp in hyp_list:
+            
+            hyp_weight = GLMB_dict[hyp]['hyp_weight']
+            label_list = GLMB_dict[hyp]['label_list']
+            nlabel = len(label_list)
+            
+            # No tracks means all measurements are clutter
+            if nlabel == 0:
+                
+                # Compute probability for this number of clutter measurements
+                p_meas = 1.
+                for sensor_id in unique_sensors:
+                    lam_clutter = sensor_params[sensor_id]['lam_clutter']
+                    nmeas_sensor = sensor_id_list.count(sensor_id)
+                    p_poiss = lam_clutter**nmeas_sensor*np.exp(-lam_clutter)/math.factorial(nmeas_sensor)
+                    
+                    p_meas *= p_poiss
+                
+                # Update hypothesis weight, no tracks to update
+                GLMB_dict[hyp]['hyp_weight'] = hyp_weight*p_meas
+            
+            # Compute measurement to track associations
+            else:
+                
+                
+                # Need to replace the current hypothesis with new ones spawned
+                # by it
+                
+                
+                # Retrieve costs for these labels and measurements
+                label_inds = []
+                for label in label_list:
+                    label_inds.append(full_label_list.index(label))
+                   
+                # Get negative log cost (Vo, Vo, Phung 2014 Eq 26)
+                cost_mat = allcost_mat[label_inds,:]
+                neglog_mat = -np.log(cost_mat)
+                
+                # Compute measurement to track assignments
+                kbest = np.round(H_max*hyp_weight)
+                assign_lists = glmb_kbest_assignments(neglog_mat, kbest)
+                
+                for alist in assign_lists:
+                    
+                    # Loop over tracks
+                    assign_cost = 1.
+                    for jj in range(len(alist)):
+                        
+                        label = label_list[jj]
+                        meas_ind = alist[jj]
+                        
+                        # Missed detection
+                        if meas_ind > nmeas:
+                            assign_cost *= (1. - p_det)
+                            tind = full_label_list.index(label)
+
+                            r = track_update[tind]['r']
+                            weights = track_update[tind]['weights']
+                            means = track_update[tind]['means']
+                            covars = track_update[tind]['covars']
+                            
+                            weights = [(1. - p_det)*wi for wi in weights]
+                            
+                            GLMB_dict[hyp_ind]
+                            
+                            
+                        # Detection
+                        else:
+                            
+            
+        
         
         
         
     # Form output  
-    GMM_dict = {}
-    GMM_dict['weights'] = weights
-    GMM_dict['means'] = means
-    GMM_dict['covars'] = covars
+    LMB_dict = {}
     
     
-    return GMM_dict
+    return LMB_dict
 
 
 def lmb2glmb(LMB_dict):
@@ -1012,6 +1102,43 @@ def BFMSpathwrap(ncm, source, destination):
     
     
     return dist, path, pred
+
+
+def glmb_kbest_assignments(C, kbest=1):
+    
+    
+    # Assume input C has tracks on rows and measurements on columns
+    
+    # Need to minimize cost
+    
+    # Murty/Auction functions need more rows than columns and seek to maximize
+    
+    # Augment C with dummy variables
+    n1 = int(C.shape[0])
+    n2 = int(C.shape[1])
+    dum = -np.log(np.ones((n1,n1)))
+    C1 = np.concatenate((C, dum), axis=1)
+    
+    # Transpose and reformulate as maximization problem
+    A = C.T
+    A = np.max(A) - A
+    
+    # Run Murty to get kbest solutions
+    final_list = murty(A, kbest)
+    
+    
+    
+    
+    
+    # # Set assignments to dummy variables to -1 (missed detection)
+    # final_list2 = []
+    # for alist in final_list:
+    #     for ii in range(len(alist)):
+    #         if alist[ii] > n2:
+    #             alist[ii] = -1
+    #     final_list2.append(alist)
+    
+    return final_list
 
 
 

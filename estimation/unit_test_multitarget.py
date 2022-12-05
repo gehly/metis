@@ -63,7 +63,7 @@ def unit_test_auction():
     A = 100.*np.ones((5,4)) - C
     
     # Compute assignment
-    row_index, score, eps = auction(A)
+    row_index, score, eps = mult.auction(A)
     
     print(row_index, score, eps)
     
@@ -98,7 +98,7 @@ def unit_test_murty():
     
     # Compute assignment
     kbest = 4
-    final_list = murty(A, kbest)
+    final_list = mult.murty(A, kbest)
     
     print(final_list)
     
@@ -722,14 +722,14 @@ if __name__ == '__main__':
     
     # vo_2d_motion_setup()
     
-    r_list = [0.6, 0.7]
-    label_list = [1, 2]
-    mult.compute_hypothesis_dict(r_list, label_list)
+    # r_list = [0.6, 0.7]
+    # label_list = [1, 2]
+    # mult.compute_hypothesis_dict(r_list, label_list)
     
-#    unit_test_auction()
+    # unit_test_auction()
     
     
-    # unit_test_murty()
+    unit_test_murty()
     
     
     
