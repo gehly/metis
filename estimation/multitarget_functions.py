@@ -837,9 +837,12 @@ def lmb_corrector(LMB_bar, tk, Zk, sensor_id_list, meas_fcn, params_dict):
                 covars.append(Pf)
                 qk_list.append(qk_j)
             
-            # Normalize updated weights
-            denom = np.dot(qk_list, weights0)
-            weights = [a1*a2/denom for a1,a2 in zip(weights0, qk_list)]
+            # Normalize updated weights (this will always sum to 1?)
+            # Vo, Vo, Phung 2014 Eq 27-28
+            factor = p_det/clutter_intensity(zi, sensor_id, sensor_params)            
+            weights = [a1*a2*factor + machine_eps for a1,a2 in zip(weights0, qk_list)]
+            sum_weights = sum(weights)
+            weights = [wi/sum_weights for wi in weights]
                     
             # Update track dictionary
             track_update[tind] = {}
@@ -848,12 +851,12 @@ def lmb_corrector(LMB_bar, tk, Zk, sensor_id_list, meas_fcn, params_dict):
             track_update[tind]['weights'] = weights
             track_update[tind]['means'] = means
             track_update[tind]['covars'] = covars
+            track_update[tind]['qk_list'] = qk_list
             
             tind += 1
             
             # Update cost matrix (Vo, Vo, Phung 2014 Eq 26)
-            allcost_mat[tt,ii] = machine_eps + \
-                denom*(p_det)/(1.-p_det)*(1./clutter_intensity(zi, sensor_id, sensor_params))
+            allcost_mat[tt,ii] = machine_eps + factor*sum_weights/(1.-p_det)
             
             
             
@@ -861,6 +864,7 @@ def lmb_corrector(LMB_bar, tk, Zk, sensor_id_list, meas_fcn, params_dict):
     # All missed detections
     hyp_list = list(GLMB_dict.keys())
     new_hyp_ind = hyp_list[-1] + 1
+    hyp_del_list = []
     if nmeas == 0:
         
         for hyp in hyp_list:
@@ -898,10 +902,9 @@ def lmb_corrector(LMB_bar, tk, Zk, sensor_id_list, meas_fcn, params_dict):
             # Compute measurement to track associations
             else:
                 
-                
                 # Need to replace the current hypothesis with new ones spawned
                 # by it
-                
+                hyp_del_list.append(hyp)
                 
                 # Retrieve costs for these labels and measurements
                 label_inds = []
@@ -915,21 +918,27 @@ def lmb_corrector(LMB_bar, tk, Zk, sensor_id_list, meas_fcn, params_dict):
                 # Compute measurement to track assignments
                 kbest = np.round(H_max*hyp_weight)
                 assign_lists = glmb_kbest_assignments(neglog_mat, kbest)
-                
+                likelihood_list = []
+                new_hyp_list = []
                 for alist in assign_lists:
                     
+                    # Create a new hypothesis for each new assignment
+                    GLMB_dict[new_hyp_ind] = {}
+                    GLMB_dict[new_hyp_ind]['hyp_weight'] = hyp_weight
+                    GLMB_dict[new_hyp_ind]['label_list'] = label_list
+                    
                     # Loop over tracks
-                    assign_cost = 1.
+                    assignment_likelihood = 1.
                     for jj in range(len(alist)):
                         
                         label = label_list[jj]
                         meas_ind = alist[jj]
                         
-                        # Missed detection
+                        # Missed detection                        
                         if meas_ind > nmeas:
-                            assign_cost *= (1. - p_det)
+                            
+                            # Compute update to track GMM
                             tind = full_label_list.index(label)
-
                             r = track_update[tind]['r']
                             weights = track_update[tind]['weights']
                             means = track_update[tind]['means']
@@ -937,15 +946,77 @@ def lmb_corrector(LMB_bar, tk, Zk, sensor_id_list, meas_fcn, params_dict):
                             
                             weights = [(1. - p_det)*wi for wi in weights]
                             
-                            GLMB_dict[hyp_ind]
+                            # Incorporate likelihood
+                            assignment_likelihood *= sum(weights)
                             
-                            
+                            # Store in GLMB_dict
+                            GLMB_dict[new_hyp_ind][label]['r'] = r
+                            GLMB_dict[new_hyp_ind][label]['weights'] = weights
+                            GLMB_dict[new_hyp_ind][label]['means'] = means
+                            GLMB_dict[new_hyp_ind][label]['covars'] = covars
+
                         # Detection
                         else:
                             
+                            zi = Zk[meas_ind]
+                            sensor_id = sensor_id_list[meas_ind]
+                            
+                            # Compute update to track GMM
+                            tind = meas_ind*len(full_label_list) + full_label_list.index(label)
+                            r = track_update[tind]['r']
+                            weights = track_update[tind]['weights']
+                            means = track_update[tind]['means']
+                            covars = track_update[tind]['covars']
+                            qk_list = track_update[tind]['qk_list']
+                            
+                            # Incorporate likelihood
+                            assignment_likelihood *= sum(weights)
+                            
+                            # Store in GLMB_dict
+                            GLMB_dict[new_hyp_ind][label]['r'] = r
+                            GLMB_dict[new_hyp_ind][label]['weights'] = weights
+                            GLMB_dict[new_hyp_ind][label]['means'] = means
+                            GLMB_dict[new_hyp_ind][label]['covars'] = covars
+                            
+                            
+                    # Account for measurements not assigned to tracks as clutter
+                    # Not needed, included in denominator of factor?
+                    
+                            
+                    # Store likelihood
+                    new_hyp_list.append(new_hyp_ind)
+                    likelihood_list.append(assignment_likelihood)
             
+                    # Increment hypothesis index
+                    new_hyp_ind += 1
+                    
+                # Normalize likelihood list to get updated hypothesis weights
+                prob_list = [eta/sum(likelihood_list) for eta in likelihood_list]
+                
+                # Update hypothesis weights in GLMB_dict
+                for hh in range(len(new_hyp_list)):
+                    new_hyp_ind = new_hyp_list[hh]
+                    prob = prob_list[hh]
+                    
+                    GLMB_dict[new_hyp_ind]['hyp_weight'] *= prob
+                    
+                
+    # Delete old hypotheses
+    for hyp in hyp_del_list:
+        del GLMB_dict[hyp]
         
+    # Renormalize hypothesis weights
+    hyp_list = list(GLMB_dict.keys())
+    prob_list = []
+    for hyp in hyp_list:
+        prob_list.append(GLMB_dict[hyp]['hyp_weight'])
+    
+    final_prob = [prob/sum(prob_list) for prob in prob_list]
+    for hyp in hyp_list:
+        GLMB_dict[hyp]['hyp_weight'] = prob_list[hyp_list.index(hyp)]
         
+    # Convert GLMB to LMB
+    
         
         
     # Form output  
