@@ -748,15 +748,15 @@ def lmb_corrector(LMB_bar, tk, Zk, sensor_id_list, meas_fcn, params_dict):
     # Components for missed detection case
     track_update = {}
     label_list = list(LMB_bar.keys())
-    ii = 0
+    tind = 0
     for label in label_list:
-        track_update[ii] = {}
-        track_update[ii]['label'] = label
-        track_update[ii]['r'] = LMB_bar[label]['r']
-        track_update[ii]['weights'] = LMB_bar[label]['weights']
-        track_update[ii]['means'] = LMB_bar[label]['means']
-        track_update[ii]['covars'] = LMB_bar[label]['covars']
-        ii += 1
+        track_update[tind] = {}
+        track_update[tind]['label'] = label
+        track_update[tind]['r'] = LMB_bar[label]['r']
+        track_update[tind]['weights'] = LMB_bar[label]['weights']
+        track_update[tind]['means'] = LMB_bar[label]['means']
+        track_update[tind]['covars'] = LMB_bar[label]['covars']
+        tind += 1
     
 
     # Loop over each measurement and compute updates
@@ -833,13 +833,25 @@ def lmb_corrector(LMB_bar, tk, Zk, sensor_id_list, meas_fcn, params_dict):
                 qk_list.append(qk_j)
             
             # Normalize updated weights
-            denom = p_det*np.dot(qk_list, weights0) + clutter_intensity(zi, sensor_id, sensor_params)
-            wf = [p_det*a1*a2/denom for a1,a2 in zip(weights0, qk_list)]
-            weights = wf
+            denom = np.dot(qk_list, weights0)
+            weights = [a1*a2/denom for a1,a2 in zip(weights0, qk_list)]
         
-        
-        
-        
+            # Update track dictionary
+            track_update[tind] = {}
+            track_update[tind]['label'] = label
+            track_update[tind]['r'] = LMB_bar[label]['r']
+            track_update[tind]['weights'] = weights
+            track_update[tind]['means'] = means
+            track_update[tind]['covars'] = covars
+            
+            tind += 1
+            
+            # Update cost matrix
+            allcost_mat[tt,ii] = denom
+            
+            
+            
+            
         
         
         
