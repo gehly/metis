@@ -111,6 +111,39 @@ def unit_test_murty():
     return
 
 
+def test_utilities():
+    
+    r_list = [0.8, 0.9]
+    card = mult.compute_multibern_card(r_list) 
+    Nk = np.argmax(card)
+    print(card)
+    print(Nk)
+    
+    r_list = [0.8, 0.9, 1.0]
+    card = mult.compute_multibern_card(r_list)  
+    Nk = np.argmax(card)
+    print(card)
+    print(Nk)
+    
+    
+    r_list = np.random.rand(10,)
+    card = mult.compute_multibern_card(r_list)  
+    Nk = np.argmax(card)
+    print(card)
+    print(Nk)
+    
+    print('')
+    print('r_list', r_list)
+    sorted_inds = sorted(range(len(r_list)), key=lambda k: r_list[k], reverse=True)
+    print('reverse sort inds', sorted_inds)
+    r_sort = [r_list[ii] for ii in sorted_inds]
+    print('r_sort', r_sort)
+    
+    
+    
+    return
+
+
 def vo_2d_motion_setup():
     
     
@@ -174,6 +207,9 @@ def vo_2d_motion_setup():
     filter_params['pnorm'] = 2.
     filter_params['prune_T'] = 1e-5
     filter_params['merge_U'] = 4.
+    filter_params['H_max'] = 1000
+    filter_params['T_max'] = 100
+    filter_params['T_threshold'] = 1e-3
     filter_params['p_surv'] = 0.99
     filter_params['p_det'] = 0.98
     filter_params['birth_model'] = birth_model
@@ -297,7 +333,7 @@ def vo_2d_motion_setup():
         # Incorporate clutter
         n_clutter = ss.poisson.rvs(sensor['lam_clutter'])
 
-        # Compute clutter meas in RA/DEC, uniform over FOV
+        # Compute clutter meas, uniform over FOV
         for c_ind in range(n_clutter):
             az_lim = sensor['az_lim']
             rg_lim = sensor['rg_lim']
@@ -729,7 +765,9 @@ if __name__ == '__main__':
     # unit_test_auction()
     
     
-    unit_test_murty()
+    # unit_test_murty()
+    
+    test_utilities()
     
     
     

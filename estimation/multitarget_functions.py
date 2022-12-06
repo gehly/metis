@@ -533,7 +533,7 @@ def lmb_filter(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):
         # Corrector Step
         Zk = meas_dict[tk]['Zk_list']
         sensor_id_list = meas_dict[tk]['sensor_id_list']
-        GMM_dict = lmb_corrector(LMB_bar, tk, Zk, sensor_id_list, meas_fcn,
+        LMB_dict = lmb_corrector(LMB_bar, tk, Zk, sensor_id_list, meas_fcn,
                                  params_dict)
         
         print('corrector')
@@ -541,7 +541,7 @@ def lmb_filter(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):
         # print('Nk est', sum(GMM_dict['weights']))
         
         # Prune/Merge Step
-        GMM_dict = est.merge_GMM(GMM_dict, filter_params)
+        LMB_dict = lmb_cleanup(LMB_dict, params_dict)
         
         print('merge')
         # print('ncomps', len(GMM_dict['weights']))
@@ -1021,11 +1021,13 @@ def lmb_corrector(LMB_bar, tk, Zk, sensor_id_list, meas_fcn, params_dict):
         GLMB_dict[hyp]['hyp_weight'] = prob_list[hyp_list.index(hyp)]
         
     # Convert GLMB to LMB
-    
-
-    
+    LMB_dict = glmb2lmb(GLMB_dict, full_label_list)
     
     return LMB_dict
+
+
+
+
 
 
 def lmb2glmb(LMB_dict):
@@ -1094,11 +1096,132 @@ def glmb2lmb(GLMB_dict, full_label_list):
         LMB_dict[label]['means'] = label_means
         LMB_dict[label]['covars'] = label_covars
     
-    
-    
-    
-    
     return LMB_dict
+
+
+def lmb_cleanup(LMB_in, params_dict):
+    
+    filter_params = params_dict['filter_params']
+    T_max = filter_params['T_max']
+    T_threshold = filter_params['T_threshold']
+    
+    # Get existence probabilities
+    full_label_list = list(LMB_in.keys())
+    r_list = []
+    for label in full_label_list:
+        r_list.append(LMB_in[label]['r'])
+        
+    # Compute minimum existence probability to keep
+    if len(r_list) > T_max:
+        sorted_r = sorted(r_list)
+        rmin = min([T_threshold, sorted_r[T_max]])
+    else:
+        rmin = T_threshold
+        
+    # Only keep tracks with r greater than rmin
+    LMB_dict = {}
+    for ii in range(len(r_list)):
+        ri = r_list[ii]
+        if ri > rmin:
+            label = full_label_list[ii]
+            
+            # Merge and prune GMM for this track label
+            GMM_dict = {}
+            GMM_dict['weights'] = LMB_in[label]['weights']
+            GMM_dict['means'] = LMB_in[label]['means']
+            GMM_dict['covars'] = LMB_in[label]['covars']
+
+            GMM_dict = est.merge_GMM(GMM_dict, filter_params)
+        
+            # Store output
+            LMB_dict[label] = {}
+            LMB_dict[label]['r'] = ri
+            LMB_dict[label]['weights'] = GMM_dict['weights']
+            LMB_dict[label]['means'] = GMM_dict['means']
+            LMB_dict[label]['covars'] = GMM_dict['covars']
+
+    return LMB_dict
+
+
+def lmb_state_extraction(LMB_dict, tk, Zk, sensor_id_list, meas_fcn,
+                         params_dict):
+    
+    # Break out inputs
+    state_params = params_dict['state_params']
+    sensor_params = params_dict['sensor_params']
+    
+    label_list = list(LMB_dict.keys())
+    r_list = []
+    for label in label_list:
+        r_list.append(LMB_dict[label]['r'])
+        
+    # Compute cardinality and MAP estimate of Nk
+    pk = compute_multibern_card(r_list)
+    Nk = np.argmax(pk)
+    
+    
+    # r_sort = [r_list[ii] for ii in sorted_inds]
+    # label_sort = [label_list[ii] for ii in sorted_inds]
+    
+    # Extract state estimates for Nk highest tracks
+    sorted_inds = sorted(range(len(r_list)), key=lambda k: r_list[k], reverse=True)
+    rk_list = []
+    Xk_list = []
+    Pk_list = []
+    labelk_list = []
+    params = {}
+    params['prune_T'] = 1e-5
+    params['merge_U'] = 1e6
+    for nn in range(Nk):
+        ii = sorted_inds[nn]
+        ri = r_list[ii]
+        label_i = label_list[ii]
+        
+        # Merge GMM to get single component output
+        GMM_dict = {}
+        GMM_dict['weights'] = LMB_dict[label_i]['weights']
+        GMM_dict['means'] = LMB_dict[label_i]['means']
+        GMM_dict['covars'] = LMB_dict[label_i]['covars']
+        
+        GMM_dict = est.merge_GMM(GMM_dict, params)
+        
+        weights = GMM_dict['weights']
+        means = GMM_dict['means']
+        covars = GMM_dict['covars']
+        
+        ind = np.argmax(weights)
+        Xk = means[ind]
+        Pk = covars[ind]
+        
+        # Store output
+        rk_list.append(ri)
+        labelk_list.append(label_i)
+        Xk_list.append(Xk)
+        Pk_list.append(Pk)
+    
+    
+    # Calculate residuals
+    resids_out = []
+    if len(rk_list) > 0:
+        for ii in range(len(Zk)):
+            zi = Zk[ii]
+            sensor_id = sensor_id_list[ii]
+            
+            resids_list = []
+            for jj in range(len(Xk_list)):
+                Xj = Xk_list[jj]            
+                zbar = mfunc.compute_measurement(Xj, state_params, sensor_params,
+                                                 sensor_id, tk)
+                resids = zi - zbar
+                resids_list.append(resids)
+                
+            # Take smallest magnitude as residual for this measurement
+            min_list = [np.linalg.norm(resid) for resid in resids_list]
+            resids_k = resids_list[min_list.index(min(min_list))]
+            resids_out.append(resids_k)
+    
+    
+    return Nk, labelk_list, rk_list, Xk_list, Pk_list, resids_out
 
 
 def compute_hypothesis_dict(r_list, label_list):
@@ -1167,6 +1290,81 @@ def compute_subsets(input_list):
         subset_list.append([input_list[jj] for jj in range(N) if (ii & (1 << jj))])
         
     return subset_list
+
+
+def compute_multibern_card(r_list):
+    
+    card = np.zeros(len(r_list)+1,)
+
+    qprod = 1.
+    qvec = []
+    for j in range(len(r_list)):
+        
+        rj = r_list[j]
+        if rj >= 1.:
+            rj = 0.999
+        if rj < 1e-3:
+            rj = 1e-3
+
+        qprod *= (1.-rj)
+        qvec.append((rj/(1.-rj)))
+
+    sigman_list = compute_sigmaj(qvec)
+    for n in range(len(card)):
+        card[n] = qprod * sigman_list[n]
+    
+    return card
+
+
+def compute_sigmaj(qvec):
+    '''
+    This function computes the elementary symmetric function
+
+    Parameters
+    ------
+    qvec : list
+
+    Returns
+    ------
+    sigma_j : list
+
+    Reference
+    ------
+    Mahler, 2007, P. 641
+
+    '''
+
+    # Length of list
+    m = len(qvec)
+
+    if m == 0:
+        sigma_j = [1.]
+    else:
+
+        # Initialize list of lists
+        sig_mat = [[]]*m
+
+        # Build first list of just sums
+        sig_i1 = []
+        for i in range(1, m+1):
+            sig_i1.append(sum(qvec[0:i]))
+
+        sig_mat[0] = sig_i1
+
+        # Build rest of lists
+        for i in range(2, m+1):
+            sig_mat[i-1] = [0.]*(m-i+1)
+            sig_mat[i-1][0] = qvec[i-1] * sig_mat[i-2][0]
+            for k in range(i+1, m+1):
+                sig_ki = sig_mat[i-1][k-i-1] + qvec[k-1]*sig_mat[i-2][k-i]
+                sig_mat[i-1][k-i] = sig_ki
+
+        # Construct output vector
+        sigma_j = [1.]
+        for ind in range(0, m):
+            sigma_j.append(sig_mat[ind][-1])
+
+    return sigma_j
 
 
 def initialize_kpath(G):
