@@ -470,13 +470,7 @@ def lmb_filter(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):
     
     # State information
     state_tk = sorted(state_dict.keys())[-1]
-    LMB_dict = {}
-    for label in state_dict[state_tk].keys():
-        if label == 'unlabeled':
-            continue
-        
-        LMB_dict[label] = state_dict[state_tk][label]
-
+    LMB_dict = state_dict[state_tk]['LMB_dict']
 
     # Prior information about the distribution
     pnorm = 2.
@@ -549,8 +543,8 @@ def lmb_filter(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):
         
         
         # State extraction and residuals calculation
-        wk_list, Xk_list, Pk_list, resids_k = \
-            lmb_state_extraction(GMM_dict, tk, Zk, sensor_id_list, meas_fcn,
+        pk, Nk, labelk_list, rk_list, Xk_list, Pk_list, resids_k = \
+            lmb_state_extraction(LMB_dict, tk, Zk, sensor_id_list, meas_fcn,
                                  params_dict)
             
             
@@ -560,13 +554,15 @@ def lmb_filter(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):
         
         # Store output
         filter_output[tk] = {}
-        filter_output[tk]['weights'] = GMM_dict['weights']
-        filter_output[tk]['means'] = GMM_dict['means']
-        filter_output[tk]['covars'] = GMM_dict['covars']
-        filter_output[tk]['wk_list'] = wk_list
+        filter_output[tk]['LMB_dict'] = copy.deepcopy(LMB_dict)
+        filter_output[tk]['card'] = pk
+        filter_output[tk]['N'] = Nk
+        filter_output[tk]['label_list'] = labelk_list
+        filter_output[tk]['rk_list'] = rk_list
         filter_output[tk]['Xk_list'] = Xk_list
         filter_output[tk]['Pk_list'] = Pk_list
         filter_output[tk]['resids'] = resids_k
+
         
         
     # TODO Generation of full_state_output not working correctly
@@ -1221,7 +1217,7 @@ def lmb_state_extraction(LMB_dict, tk, Zk, sensor_id_list, meas_fcn,
             resids_out.append(resids_k)
     
     
-    return Nk, labelk_list, rk_list, Xk_list, Pk_list, resids_out
+    return pk, Nk, labelk_list, rk_list, Xk_list, Pk_list, resids_out
 
 
 def compute_hypothesis_dict(r_list, label_list):

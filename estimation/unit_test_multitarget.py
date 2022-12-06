@@ -144,7 +144,7 @@ def test_utilities():
     return
 
 
-def vo_2d_motion_setup():
+def vo_2d_motion_setup(setup_file):
     
     
     
@@ -199,6 +199,7 @@ def vo_2d_motion_setup():
     
     
     
+    
     # Filter parameters
     filter_params = {}
     filter_params['Q'] = Q
@@ -239,6 +240,11 @@ def vo_2d_motion_setup():
 
     # Time vector
     tk_list = list(range(1,101))
+    
+    # Initial filter state
+    state_dict = {}
+    state_dict[tk_list[0]] = {}
+    state_dict[tk_list[0]]['LMB_dict'] = {}
     
     # Initial state vectors
     object_dict = {}
@@ -286,6 +292,7 @@ def vo_2d_motion_setup():
     # Generate truth and meas data
     truth_dict = {}
     meas_dict = {}
+    meas_fcn = mfunc.unscented_coordturn_azrg
     sensor_id = 1
     for kk in range(len(tk_list)):
         
@@ -426,6 +433,15 @@ def vo_2d_motion_setup():
     plt.show()
     
     
+    params_dict = {}
+    params_dict['state_params'] = state_params
+    params_dict['filter_params'] = filter_params
+    params_dict['int_params'] = int_params
+    params_dict['sensor_params'] = sensor_params
+                
+    pklFile = open( setup_file, 'wb' )
+    pickle.dump( [state_dict, meas_fcn, meas_dict, params_dict, truth_dict], pklFile, -1 )
+    pklFile.close()
 
     
     return
