@@ -934,6 +934,11 @@ def lmb_corrector(LMB_bar, tk, Zk, sensor_id_list, meas_fcn, params_dict):
                         label = label_list[jj]
                         meas_ind = alist[jj]
                         
+                        #######################################################
+                        # TODO CHECK RETRIEVAL OF TIND
+                        #######################################################
+                        
+                        
                         # Missed detection                        
                         if meas_ind > nmeas:
                             
@@ -1017,10 +1022,7 @@ def lmb_corrector(LMB_bar, tk, Zk, sensor_id_list, meas_fcn, params_dict):
         
     # Convert GLMB to LMB
     
-        
-        
-    # Form output  
-    LMB_dict = {}
+
     
     
     return LMB_dict
@@ -1050,6 +1052,53 @@ def lmb2glmb(LMB_dict):
             GLMB_dict[hyp][label] = LMB_dict[label]
 
     return GLMB_dict
+
+
+def glmb2lmb(GLMB_dict, full_label_list):
+    
+    # Reuter Eq 42-43
+    
+    LMB_dict = {}
+    hyp_list = list(GLMB_dict.keys())    
+    for label in full_label_list:
+        
+        r = 0.
+        label_weights = []
+        label_means = []
+        label_covars = []
+        for hyp in hyp_list:
+            hyp_labels = GLMB_dict[hyp]['label_list']
+            if label in hyp_labels:
+                
+                # Retrieve data for this label in this hypothesis
+                hyp_weight = GLMB_dict[hyp]['hyp_weight']
+                w_list = GLMB_dict[hyp][label]['weights']
+                m_list = GLMB_dict[hyp][label]['means']
+                P_list = GLMB_dict[hyp][label]['covars']
+                w_list = [hyp_weight*wi for wi in w_list]
+                
+                # Add to GMM lists representing the state
+                label_weights.extend(w_list)
+                label_means.extend(m_list)
+                label_covars.extent(P_list)
+                
+                r += hyp_weight
+                
+        # Divide by r to get correct weights (should normalize to 1?)
+        label_weights = [wi/r for wi in label_weights]
+        
+        # Store data in LMB
+        LMB_dict[label] = {}
+        LMB_dict[label]['r'] = r
+        LMB_dict[label]['weights'] = label_weights
+        LMB_dict[label]['means'] = label_means
+        LMB_dict[label]['covars'] = label_covars
+    
+    
+    
+    
+    
+    return LMB_dict
 
 
 def compute_hypothesis_dict(r_list, label_list):
