@@ -139,6 +139,324 @@ def test_utilities():
     r_sort = [r_list[ii] for ii in sorted_inds]
     print('r_sort', r_sort)
     
+
+    
+    
+    return
+
+
+def test_lmb_glmb_conversions():
+    
+    # Test case based on Reuter et al. (2014) Examples in Figs 1-3
+    
+    
+    # INitial GLMB
+    GLMB_dict = {}
+    
+    # First hypothesis, no tracks
+    GLMB_dict[0] = {}
+    GLMB_dict[0]['hyp_weight'] = 0.2
+    GLMB_dict[0]['label_list'] = []
+    
+    # Second hypothesis, track 1 only
+    GLMB_dict[1] = {}
+    GLMB_dict[1]['hyp_weight'] = 0.1
+    GLMB_dict[1]['label_list'] = [(0,1)]
+    GLMB_dict[1][(0,1)] = {}
+    GLMB_dict[1][(0,1)]['weights'] = [1.]
+    GLMB_dict[1][(0,1)]['means'] = [np.array([[-7.]])]
+    GLMB_dict[1][(0,1)]['covars'] = [np.array([[1.]])]
+    
+    # Third hypothesis, track 2 only
+    GLMB_dict[2] = {}
+    GLMB_dict[2]['hyp_weight'] = 0.2
+    GLMB_dict[2]['label_list'] = [(0,2)]
+    GLMB_dict[2][(0,2)] = {}
+    GLMB_dict[2][(0,2)]['weights'] = [1.]
+    GLMB_dict[2][(0,2)]['means'] = [np.array([[4.]])]
+    GLMB_dict[2][(0,2)]['covars'] = [np.array([[2.]])]
+    
+    # Fourth hypothesis, track 1 and 2
+    GLMB_dict[3] = {}
+    GLMB_dict[3]['hyp_weight'] = 0.5
+    GLMB_dict[3]['label_list'] = [(0,1), (0,2)]
+    GLMB_dict[3][(0,1)] = {}
+    GLMB_dict[3][(0,1)]['weights'] = [1.]
+    GLMB_dict[3][(0,1)]['means'] = [np.array([[-5.]])]
+    GLMB_dict[3][(0,1)]['covars'] = [np.array([[0.9]])]
+    GLMB_dict[3][(0,2)] = {}
+    GLMB_dict[3][(0,2)]['weights'] = [1.]
+    GLMB_dict[3][(0,2)]['means'] = [np.array([[4.]])]
+    GLMB_dict[3][(0,2)]['covars'] = [np.array([[1.]])]
+    
+    
+    fig = plt.figure()
+    ax1 = fig.add_subplot(4,1,1)
+    ax1.set_xlim([-10, 10])
+    ax1.set_ylim([0., 0.5])
+    ax1.text(-1., 0.35, '$w^{(3)}=$'+str(GLMB_dict[0]['hyp_weight']))
+    
+    
+    ax2 = fig.add_subplot(4,1,2)
+    w = GLMB_dict[1][(0,1)]['weights'][0]
+    m = GLMB_dict[1][(0,1)]['means'][0]
+    P = GLMB_dict[1][(0,1)]['covars'][0]
+    x = np.arange(-10, 10.01, 0.01)
+    y = np.zeros(x.shape)
+    for ii in range(len(x)):
+        pg = est.gaussian_likelihood(x[ii], m, P)
+        y[ii] = w*pg
+        
+    ax2.plot(x, y, 'b--')    
+    ax2.set_xlim([-10, 10])
+    ax2.set_ylim([0., 0.5])
+    ax2.legend(['$p^{(1)}(0,1)$'])
+    ax2.text(-1., 0.35, '$w^{(3)}=$'+str(GLMB_dict[1]['hyp_weight']))
+    
+    
+    ax3 = fig.add_subplot(4,1,3)
+    w = GLMB_dict[2][(0,2)]['weights'][0]
+    m = GLMB_dict[2][(0,2)]['means'][0]
+    P = GLMB_dict[2][(0,2)]['covars'][0]
+    x = np.arange(-10, 10.01, 0.01)
+    y = np.zeros(x.shape)
+    for ii in range(len(x)):
+        pg = est.gaussian_likelihood(x[ii], m, P)
+        y[ii] = w*pg
+        
+    ax3.plot(x, y, 'r--')    
+    ax3.set_xlim([-10, 10])
+    ax3.set_ylim([0., 0.5])
+    ax3.legend(['$p^{(2)}(0,2)$'])
+    ax3.text(-1., 0.35, '$w^{(3)}=$'+str(GLMB_dict[2]['hyp_weight']))
+    
+    
+    ax4 = fig.add_subplot(4,1,4)
+    w = GLMB_dict[3][(0,1)]['weights'][0]
+    m = GLMB_dict[3][(0,1)]['means'][0]
+    P = GLMB_dict[3][(0,1)]['covars'][0]
+    x = np.arange(-10, 10.01, 0.01)
+    y = np.zeros(x.shape)
+    for ii in range(len(x)):
+        pg = est.gaussian_likelihood(x[ii], m, P)
+        y[ii] = w*pg
+        
+    ax4.plot(x, y, 'b--')
+    
+    w = GLMB_dict[3][(0,2)]['weights'][0]
+    m = GLMB_dict[3][(0,2)]['means'][0]
+    P = GLMB_dict[3][(0,2)]['covars'][0]
+    x = np.arange(-10, 10.01, 0.01)
+    y = np.zeros(x.shape)
+    for ii in range(len(x)):
+        pg = est.gaussian_likelihood(x[ii], m, P)
+        y[ii] = w*pg
+        
+    ax4.plot(x, y, 'r--')
+    ax4.set_xlim([-10, 10])
+    ax4.set_ylim([0., 0.5])
+    ax4.legend(['$p^{(3)}(0,1)$', '$p^{(3)}(0,2)$'], loc='upper right')
+    ax4.text(-1., 0.35, '$w^{(3)}=$'+str(GLMB_dict[3]['hyp_weight']))
+    
+    
+    plt.setp(ax1.get_xticklabels(), visible=False)
+    plt.setp(ax2.get_xticklabels(), visible=False)
+    plt.setp(ax3.get_xticklabels(), visible=False)
+    
+    
+    # Convert GLMB to LMB
+    LMB_dict = mult.glmb2lmb(GLMB_dict)
+    
+    print('Original d-GLMB')
+    print(GLMB_dict)
+    print('')
+    print('Transformed LMB')
+    print(LMB_dict)
+    
+    
+    fig = plt.figure()
+    ax1 = fig.add_subplot(2,1,1)
+    w0 = LMB_dict[(0,1)]['weights'][0]
+    m0 = LMB_dict[(0,1)]['means'][0]
+    P0 = LMB_dict[(0,1)]['covars'][0]
+    w1 = LMB_dict[(0,1)]['weights'][1]
+    m1 = LMB_dict[(0,1)]['means'][1]
+    P1 = LMB_dict[(0,1)]['covars'][1]
+    
+    x = np.arange(-10, 10.01, 0.01)
+    y0 = np.zeros(x.shape)
+    y1 = np.zeros(x.shape)
+    for ii in range(len(x)):
+        pg0 = est.gaussian_likelihood(x[ii], m0, P0)
+        pg1 = est.gaussian_likelihood(x[ii], m1, P1)
+        y0[ii] = w0*pg0
+        y1[ii] = w1*pg1
+        
+    y = y0 + y1   
+
+    ax1.plot(x, y0, 'b--')
+    ax1.plot(x, y1, 'b--')
+    ax1.plot(x, y, 'b-', label='$p(0,1)$')
+    ax1.set_xlim([-10, 10])
+    ax1.set_ylim([0., 0.5])
+    ax1.legend()
+    ax1.text(-1., 0.35, '$r^{(0,1)}=$'+str(LMB_dict[(0,1)]['r']))
+    
+    ax2 = fig.add_subplot(2,1,2)
+    w0 = LMB_dict[(0,2)]['weights'][0]
+    m0 = LMB_dict[(0,2)]['means'][0]
+    P0 = LMB_dict[(0,2)]['covars'][0]
+    w1 = LMB_dict[(0,2)]['weights'][1]
+    m1 = LMB_dict[(0,2)]['means'][1]
+    P1 = LMB_dict[(0,2)]['covars'][1]
+    
+    x = np.arange(-10, 10.01, 0.01)
+    y0 = np.zeros(x.shape)
+    y1 = np.zeros(x.shape)
+    for ii in range(len(x)):
+        pg0 = est.gaussian_likelihood(x[ii], m0, P0)
+        pg1 = est.gaussian_likelihood(x[ii], m1, P1)
+        y0[ii] = w0*pg0
+        y1[ii] = w1*pg1
+        
+    y = y0 + y1   
+
+    ax2.plot(x, y0, 'r--')
+    ax2.plot(x, y1, 'r--')
+    ax2.plot(x, y, 'r-', label='$p(0,2)$')
+    ax2.set_xlim([-10, 10])
+    ax2.set_ylim([0., 0.5])
+    ax2.legend()
+    ax2.text(-1., 0.35, '$r^{(0,2)}=$'+str(LMB_dict[(0,2)]['r']))
+    
+    plt.setp(ax1.get_xticklabels(), visible=False)
+    
+    
+    # Convert LMB to d-GLMB
+    GLMB_dict2 = mult.lmb2glmb(LMB_dict)
+    
+    print('')
+    print('Transformed d-GLMB')
+    print(GLMB_dict2)
+    
+    # Convert d-GLMB to LMB again
+    LMB_dict2 = mult.glmb2lmb(GLMB_dict2)
+    
+    print('')
+    print('Retransformed LMB')
+    print(LMB_dict2)
+    
+    
+    
+    fig = plt.figure()
+    ax1 = fig.add_subplot(4,1,1)
+    ax1.set_xlim([-10, 10])
+    ax1.set_ylim([0., 0.5])
+    ax1.text(-1., 0.35, '$w^{(3)}=$'+str(round(GLMB_dict2[0]['hyp_weight'],2)))
+    
+    
+    ax2 = fig.add_subplot(4,1,2)
+    w0 = GLMB_dict2[1][(0,1)]['weights'][0]
+    m0 = GLMB_dict2[1][(0,1)]['means'][0]
+    P0 = GLMB_dict2[1][(0,1)]['covars'][0]
+    w1 = GLMB_dict2[1][(0,1)]['weights'][1]
+    m1 = GLMB_dict2[1][(0,1)]['means'][1]
+    P1 = GLMB_dict2[1][(0,1)]['covars'][1]
+    x = np.arange(-10, 10.01, 0.01)
+    y0 = np.zeros(x.shape)
+    y1 = np.zeros(x.shape)
+    for ii in range(len(x)):
+        pg0 = est.gaussian_likelihood(x[ii], m0, P0)
+        pg1 = est.gaussian_likelihood(x[ii], m1, P1)
+        y0[ii] = w0*pg0
+        y1[ii] = w1*pg1
+        
+    y = y0 + y1  
+        
+    ax2.plot(x, y, 'b-')    
+    ax2.set_xlim([-10, 10])
+    ax2.set_ylim([0., 0.5])
+    ax2.legend(['$p^{(1)}(0,1)$'])
+    ax2.text(-1., 0.35, '$w^{(3)}=$'+str(round(GLMB_dict2[1]['hyp_weight'],2)))
+    
+    
+    ax3 = fig.add_subplot(4,1,3)
+    w0 = GLMB_dict2[2][(0,2)]['weights'][0]
+    m0 = GLMB_dict2[2][(0,2)]['means'][0]
+    P0 = GLMB_dict2[2][(0,2)]['covars'][0]
+    w1 = GLMB_dict2[2][(0,2)]['weights'][1]
+    m1 = GLMB_dict2[2][(0,2)]['means'][1]
+    P1 = GLMB_dict2[2][(0,2)]['covars'][1]
+    x = np.arange(-10, 10.01, 0.01)
+    y0 = np.zeros(x.shape)
+    y1 = np.zeros(x.shape)
+    for ii in range(len(x)):
+        pg0 = est.gaussian_likelihood(x[ii], m0, P0)
+        pg1 = est.gaussian_likelihood(x[ii], m1, P1)
+        y0[ii] = w0*pg0
+        y1[ii] = w1*pg1
+        
+    y = y0 + y1 
+        
+    ax3.plot(x, y, 'r-')    
+    ax3.set_xlim([-10, 10])
+    ax3.set_ylim([0., 0.5])
+    ax3.legend(['$p^{(2)}(0,2)$'])
+    ax3.text(-1., 0.35, '$w^{(3)}=$'+str(round(GLMB_dict2[2]['hyp_weight'],2)))
+    
+    
+    ax4 = fig.add_subplot(4,1,4)
+    w0 = GLMB_dict2[3][(0,1)]['weights'][0]
+    m0 = GLMB_dict2[3][(0,1)]['means'][0]
+    P0 = GLMB_dict2[3][(0,1)]['covars'][0]
+    w1 = GLMB_dict2[3][(0,1)]['weights'][1]
+    m1 = GLMB_dict2[3][(0,1)]['means'][1]
+    P1 = GLMB_dict2[3][(0,1)]['covars'][1]
+    x = np.arange(-10, 10.01, 0.01)
+    y0 = np.zeros(x.shape)
+    y1 = np.zeros(x.shape)
+    for ii in range(len(x)):
+        pg0 = est.gaussian_likelihood(x[ii], m0, P0)
+        pg1 = est.gaussian_likelihood(x[ii], m1, P1)
+        y0[ii] = w0*pg0
+        y1[ii] = w1*pg1
+        
+    y = y0 + y1 
+        
+    ax4.plot(x, y, 'b-')
+    
+    w0 = GLMB_dict2[3][(0,2)]['weights'][0]
+    m0 = GLMB_dict2[3][(0,2)]['means'][0]
+    P0 = GLMB_dict2[3][(0,2)]['covars'][0]
+    w1 = GLMB_dict2[3][(0,2)]['weights'][1]
+    m1 = GLMB_dict2[3][(0,2)]['means'][1]
+    P1 = GLMB_dict2[3][(0,2)]['covars'][1]
+    x = np.arange(-10, 10.01, 0.01)
+    y0 = np.zeros(x.shape)
+    y1 = np.zeros(x.shape)
+    for ii in range(len(x)):
+        pg0 = est.gaussian_likelihood(x[ii], m0, P0)
+        pg1 = est.gaussian_likelihood(x[ii], m1, P1)
+        y0[ii] = w0*pg0
+        y1[ii] = w1*pg1
+        
+    y = y0 + y1 
+        
+    ax4.plot(x, y, 'r-')
+    ax4.set_xlim([-10, 10])
+    ax4.set_ylim([0., 0.5])
+    ax4.legend(['$p^{(3)}(0,1)$', '$p^{(3)}(0,2)$'], loc='upper right')
+    ax4.text(-1., 0.35, '$w^{(3)}=$'+str(round(GLMB_dict2[3]['hyp_weight'],2)))
+    
+    
+    plt.setp(ax1.get_xticklabels(), visible=False)
+    plt.setp(ax2.get_xticklabels(), visible=False)
+    plt.setp(ax3.get_xticklabels(), visible=False)
+    
+    
+    
+    plt.show()
+    
     
     
     return
@@ -783,9 +1101,9 @@ if __name__ == '__main__':
     
     # unit_test_murty()
     
-    test_utilities()
+    # test_utilities()
     
-    
+    test_lmb_glmb_conversions()
     
     
 

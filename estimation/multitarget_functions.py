@@ -1052,9 +1052,19 @@ def lmb2glmb(LMB_dict):
     return GLMB_dict
 
 
-def glmb2lmb(GLMB_dict, full_label_list):
+def glmb2lmb(GLMB_dict, full_label_list=[]):
     
     # Reuter Eq 42-43
+    
+    
+    if len(full_label_list) == 0:
+        for hyp in GLMB_dict:
+            label_list = GLMB_dict[hyp]['label_list']
+            for label in label_list:
+                if label not in full_label_list:
+                    full_label_list.append(label)
+    
+    
     
     LMB_dict = {}
     hyp_list = list(GLMB_dict.keys())    
@@ -1078,7 +1088,7 @@ def glmb2lmb(GLMB_dict, full_label_list):
                 # Add to GMM lists representing the state
                 label_weights.extend(w_list)
                 label_means.extend(m_list)
-                label_covars.extent(P_list)
+                label_covars.extend(P_list)
                 
                 r += hyp_weight
                 
@@ -1230,8 +1240,8 @@ def compute_hypothesis_dict(r_list, label_list):
     
     subset_list = compute_subsets(ind_list)
     
-    print('ind_list', ind_list)
-    print('subset_list', subset_list)
+    # print('ind_list', ind_list)
+    # print('subset_list', subset_list)
     
     for hyp in range(len(subset_list)):        
         
@@ -1254,7 +1264,7 @@ def compute_hypothesis_dict(r_list, label_list):
         hyp_dict[hyp]['label_list'] = hyp_label_list
         
         
-    print(hyp_dict)
+    # print(hyp_dict)
     
     return hyp_dict
 
