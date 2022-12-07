@@ -8,6 +8,7 @@ import os
 import inspect
 import random
 import scipy.stats as ss
+import scipy
 
 # Load tudatpy modules  
 from tudatpy.kernel.interface import spice
@@ -767,6 +768,35 @@ def vo_2d_motion_setup(setup_file):
     return
 
 
+def gen_mat_file(setup_file_pkl, setup_file_mat):
+    
+    pklFile = open(setup_file_pkl, 'rb' )
+    data = pickle.load( pklFile )
+    state_dict = data[0]
+    meas_fcn = data[1]
+    meas_dict = data[2]
+    params_dict = data[3]
+    truth_dict = data[4]
+    pklFile.close()
+    
+    tk_list = sorted(list(meas_dict.keys()))
+    
+    matlab_dict = {}
+    matlab_dict['tk_list'] = tk_list
+    
+    for tk in tk_list:
+        Zk_list = meas_dict[tk]['Zk_list']
+        label = 'Zk_' + str(tk)
+        matlab_dict[label] = Zk_list
+        
+    print(matlab_dict)
+    
+    scipy.io.savemat(setup_file_mat, matlab_dict)
+    
+    
+    return
+
+
 
 def tudat_geo_2obj_setup(setup_file):
     
@@ -1094,12 +1124,16 @@ if __name__ == '__main__':
     
     
     setup_file = os.path.join(fdir, 'vo_coordturn_10obj_setup.pkl')
+    setup_file_mat = os.path.join(fdir, 'vo_coordturn_10obj_setup.mat')
     results_file = os.path.join(fdir, 'vo_coordturn_10boj_lmb_results.pkl')
     
     
     # vo_2d_motion_setup(setup_file)
     
-    run_multitarget_filter(setup_file, results_file)
+    gen_mat_file(setup_file, setup_file_mat)
+    
+    
+    # run_multitarget_filter(setup_file, results_file)
     
     # multitarget_analysis(results_file)
     
