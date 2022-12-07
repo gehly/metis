@@ -499,6 +499,12 @@ def lmb_filter(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):
     
     # Number of epochs
     N = len(tk_list)
+    
+    print(LMB_dict)
+    print(state_tk)
+    print(tk_list)
+    print(N)
+
   
     # Loop over times
     for kk in range(N):
@@ -513,22 +519,24 @@ def lmb_filter(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):
         
         print('')
         print(tk)
-        # print('ncomps', len(GMM_dict['weights']))
-        # print('Nk est', sum(GMM_dict['weights']))
+        print(LMB_dict)
+        print('ntracks', len(LMB_dict))
 
         # Predictor Step
         tin = [tk_prior, tk]
-        LMB_bar = lmb_predictor(LMB_dict, tin, params_dict)
+        LMB_birth, LMB_surv = lmb_predictor(LMB_dict, tin, params_dict)
         
         print('predictor')
-        # print('ncomps', len(GMM_bar['weights']))
-        # print('Nk est', sum(GMM_bar['weights']))
-        
+        print(LMB_birth)
+        print(LMB_surv)
+        print('birth tracks', len(LMB_birth))
+        print('surv tracks', len(LMB_surv))
+
         # Corrector Step
         Zk = meas_dict[tk]['Zk_list']
         sensor_id_list = meas_dict[tk]['sensor_id_list']
-        LMB_dict = lmb_corrector(LMB_bar, tk, Zk, sensor_id_list, meas_fcn,
-                                 params_dict)
+        LMB_dict = lmb_corrector(LMB_birth, LMB_surv, tk, Zk, sensor_id_list,
+                                 meas_fcn, params_dict)
         
         print('corrector')
         # print('ncomps', len(GMM_dict['weights']))
@@ -621,24 +629,27 @@ def lmb_predictor(LMB_dict, tin, params_dict):
 
     # Birth Components
     birth_model = filter_params['birth_model']
-    LMB_bar = {}
+    LMB_birth = {}
     for ii in birth_model.keys():
         label = (tk, ii)
-        LMB_bar[label]['r'] = birth_model[ii]['r_birth']
-        LMB_bar[label]['weights'] = birth_model[ii]['weights']
-        LMB_bar[label]['means'] = birth_model[ii]['means']
-        LMB_bar[label]['covars'] = birth_model[ii]['covars']
+        LMB_birth[label] = {}        
+        LMB_birth[label]['r'] = birth_model[ii]['r_birth']
+        LMB_birth[label]['weights'] = birth_model[ii]['weights']
+        LMB_birth[label]['means'] = birth_model[ii]['means']
+        LMB_birth[label]['covars'] = birth_model[ii]['covars']
 
+    
 
     # Check if propagation is needed
     if delta_t == 0.:
-        LMB_bar.update(LMB_dict)
-        return LMB_bar
+        LMB_surv = LMB_dict
+        return LMB_birth, LMB_surv
     
     # Surviving components
     # Initialize for integrator
     # Loop over labels
     label_list = list(LMB_dict.keys())
+    LMB_surv = {}
     for label in label_list:
         
         # Retrieve current GMM
@@ -708,22 +719,27 @@ def lmb_predictor(LMB_dict, tin, params_dict):
             covars[jj] = Pbar
 
         # Store LMB
-        LMB_bar[label] = {}
-        LMB_bar[label]['r'] = r*p_surv
-        LMB_bar[label]['weights'] = weights
-        LMB_bar[label]['means'] = means
-        LMB_bar[label]['covars'] = covars
+        LMB_surv[label] = {}
+        LMB_surv[label]['r'] = r*p_surv
+        LMB_surv[label]['weights'] = weights
+        LMB_surv[label]['means'] = means
+        LMB_surv[label]['covars'] = covars
 
 
-    return LMB_bar
+    return LMB_birth, LMB_surv
 
 
 
-def lmb_corrector(LMB_bar, tk, Zk, sensor_id_list, meas_fcn, params_dict):
+def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, sensor_id_list, meas_fcn, params_dict):
     '''
     
     
     '''
+    
+    print('')
+    print('lmb_corrector function')
+    print('tk', tk)
+    print('Zk', Zk)
     
     machine_eps = np.finfo(float).eps
     
@@ -732,6 +748,7 @@ def lmb_corrector(LMB_bar, tk, Zk, sensor_id_list, meas_fcn, params_dict):
     state_params = params_dict['state_params']
     sensor_params = params_dict['sensor_params']
     H_max = filter_params['H_max']
+    H_max_birth = filter_params['H_max_birth']
     gam = filter_params['gam']
     Wm = filter_params['Wm']
     diagWc = filter_params['diagWc']
@@ -741,14 +758,41 @@ def lmb_corrector(LMB_bar, tk, Zk, sensor_id_list, meas_fcn, params_dict):
     nmeas = len(Zk)
     
     # Form GLMB from input LMB
-    GLMB_dict = lmb2glmb(LMB_bar)
+    GLMB_birth = lmb2glmb(LMB_birth, H_max_birth)
+    GLMB_surv = lmb2glmb(LMB_surv, H_max)
+    
+    print('GLMB_birth')
+    print(GLMB_birth)
+    print('GLMB_surv')
+    print(GLMB_surv)
+
+    
+    # Combine and normalize weights
+    GLMB_dict = combine_glmb(GLMB_birth, GLMB_surv)
+    wsum = 0.
+    for hyp in GLMB_dict:
+        wsum += GLMB_dict[hyp]['hyp_weight']
+    for hyp in GLMB_dict:
+        GLMB_dict[hyp]['hyp_weight'] *= (1./wsum)
+        
+    
+    print('GLMB_dict', GLMB_dict)
+    print('wsum', wsum)
+    total_weight = 0.
+    for hyp in GLMB_dict:
+        total_weight += GLMB_dict[hyp]['hyp_weight']
+        
+    print('total hyp weight', total_weight)
+    
+    mistake
     
     # Get unique sensor id's
     unique_sensors = list(set(sensor_id_list))
     
     # Components for missed detection case
-    track_update = {}
+    LMB_bar = combine_lmb(LMB_birth, LMB_surv)
     full_label_list = list(LMB_bar.keys())
+    track_update = {}
     tind = 0
     for label in full_label_list:
         track_update[tind] = {}
@@ -758,7 +802,9 @@ def lmb_corrector(LMB_bar, tk, Zk, sensor_id_list, meas_fcn, params_dict):
         track_update[tind]['means'] = LMB_bar[label]['means']
         track_update[tind]['covars'] = LMB_bar[label]['covars']
         tind += 1
-    
+        
+    print(track_update)
+
 
     # Loop over each measurement and compute updates
     allcost_mat = np.zeros((len(full_label_list), nmeas))
@@ -1026,7 +1072,7 @@ def lmb_corrector(LMB_bar, tk, Zk, sensor_id_list, meas_fcn, params_dict):
 
 
 
-def lmb2glmb(LMB_dict):
+def lmb2glmb(LMB_dict, H_max=1000):
     
     # Get existence probability for each track
     label_list = list(LMB_dict.keys())
@@ -1037,7 +1083,7 @@ def lmb2glmb(LMB_dict):
     # neglog_vect = -np.log(cost_vect)
     
     # Compute dictionary of hypothesis weights and labels
-    hyp_dict = compute_hypothesis_dict(r_list, label_list)
+    hyp_dict = compute_hypothesis_dict(r_list, label_list, H_max)
     
     # Form GLMB dictionary
     GLMB_dict = {}
@@ -1101,6 +1147,67 @@ def glmb2lmb(GLMB_dict, full_label_list=[]):
         LMB_dict[label]['weights'] = label_weights
         LMB_dict[label]['means'] = label_means
         LMB_dict[label]['covars'] = label_covars
+    
+    return LMB_dict
+
+
+def combine_glmb(GLMB_birth, GLMB_surv):
+    
+    
+    hyp_list_birth = list(GLMB_birth.keys())
+    hyp_list_surv = list(GLMB_surv.keys())
+    
+    GLMB_dict = {}
+    hyp_ind = 0
+    for shyp in hyp_list_surv:
+        shyp_weight = GLMB_surv[shyp]['hyp_weight']
+        shyp_labels = GLMB_surv[shyp]['label_list']        
+        
+        for bhyp in hyp_list_birth:
+            bhyp_weight = GLMB_birth[bhyp]['hyp_weight']
+            bhyp_labels = GLMB_birth[bhyp]['label_list']
+            
+            # Build entry for the output GLMB
+            GLMB_dict[hyp_ind] = {}
+            GLMB_dict[hyp_ind]['hyp_weight'] = shyp_weight*bhyp_weight
+            
+            # Combined labels for this hypothesis
+            label_list = []
+            label_list.extend(shyp_labels)
+            label_list.extend(bhyp_labels)
+            GLMB_dict[hyp_ind]['label_list'] = label_list
+            
+            
+            # print('shyp_labels', shyp_labels)
+            # print('bhyp_labels', bhyp_labels)
+            # print('label_list', label_list)
+            
+            # Retrieve state represenation for this label
+            for label in label_list:
+                GLMB_dict[hyp_ind][label] = {}
+                
+                # print(label)
+                
+                if label in shyp_labels:
+                    # print('shyp')
+                    GLMB_dict[hyp_ind][label] = GLMB_surv[shyp][label]
+                
+                if label in bhyp_labels:
+                    # print('bhyp')
+                    GLMB_dict[hyp_ind][label] = GLMB_birth[bhyp][label]
+
+            # Increment hypothesis index
+            hyp_ind += 1
+    
+    
+    return GLMB_dict
+
+
+def combine_lmb(LMB_dict1, LMB_dict2):
+    
+    LMB_dict = {}
+    LMB_dict.update(LMB_dict1)
+    LMB_dict.update(LMB_dict2)
     
     return LMB_dict
 
@@ -1230,7 +1337,7 @@ def lmb_state_extraction(LMB_dict, tk, Zk, sensor_id_list, meas_fcn,
     return pk, Nk, labelk_list, rk_list, Xk_list, Pk_list, resids_out
 
 
-def compute_hypothesis_dict(r_list, label_list):
+def compute_hypothesis_dict(r_list, label_list, H_max=1000):
     
     hyp_dict = {}
     
@@ -1243,6 +1350,7 @@ def compute_hypothesis_dict(r_list, label_list):
     # print('ind_list', ind_list)
     # print('subset_list', subset_list)
     
+    weight_list = []
     for hyp in range(len(subset_list)):        
         
         # Indices to include for this hypothesis
@@ -1262,9 +1370,26 @@ def compute_hypothesis_dict(r_list, label_list):
         hyp_dict[hyp] = {}
         hyp_dict[hyp]['weight'] = hyp_weight
         hyp_dict[hyp]['label_list'] = hyp_label_list
+        weight_list.append(hyp_weight)
         
         
-    # print(hyp_dict)
+    # Reduce to only include H_max highest probability entries
+    if len(weight_list) > H_max:
+        sorted_weights = sorted(weight_list, reverse=True)
+        wmin = sorted_weights[H_max-1]
+        
+        wsum = 0.
+        hyp_list = list(hyp_dict.keys())
+        for hyp in hyp_list:
+            if hyp_dict[hyp]['weight'] < wmin:
+                del hyp_dict[hyp]
+            else:
+                wsum += hyp_dict[hyp]['weight']
+        
+        # Renormalize weights
+        for hyp in hyp_dict:
+            hyp_dict[hyp]['weight'] *= (1./wsum)
+
     
     return hyp_dict
 

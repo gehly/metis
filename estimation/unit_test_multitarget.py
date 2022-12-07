@@ -522,11 +522,13 @@ def vo_2d_motion_setup(setup_file):
     filter_params = {}
     filter_params['Q'] = Q
     filter_params['snc_flag'] = 'qfull'
+    filter_params['gap_seconds'] = 1000.
     filter_params['alpha'] = 1.
     filter_params['pnorm'] = 2.
     filter_params['prune_T'] = 1e-5
     filter_params['merge_U'] = 4.
     filter_params['H_max'] = 1000
+    filter_params['H_max_birth'] = 5
     filter_params['T_max'] = 100
     filter_params['T_threshold'] = 1e-3
     filter_params['p_surv'] = 0.99
@@ -1045,7 +1047,11 @@ def run_multitarget_filter(setup_file, results_file):
     pklFile.close()
     
     
-    filter_output, full_state_output = mult.phd_filter(state_dict, truth_dict, meas_dict, meas_fcn, params_dict)
+    # filter_output, full_state_output = mult.phd_filter(state_dict, truth_dict, meas_dict, meas_fcn, params_dict)
+    
+    
+    filter_output, full_state_output = mult.lmb_filter(state_dict, truth_dict, meas_dict, meas_fcn, params_dict)
+    
     
     pklFile = open( results_file, 'wb' )
     pickle.dump( [filter_output, full_state_output, params_dict, truth_dict], pklFile, -1 )
@@ -1076,21 +1082,28 @@ if __name__ == '__main__':
     
     plt.close('all')
     
-    fdir = r'D:\documents\research_projects\multitarget\data\sim\test\2022_12_01_geo_2obj'
+    fdir = r'D:\documents\research_projects\multitarget\data\sim\test\2022_12_07_vo_coordturn_10obj'
     
     
-    setup_file = os.path.join(fdir, 'tudat_geo_twobody_2obj_pd09_lam0_setup.pkl')
-    results_file = os.path.join(fdir, 'tudat_geo_twobody_2obj_pd09_lam0_phd_results.pkl')
+    # setup_file = os.path.join(fdir, 'tudat_geo_twobody_2obj_pd09_lam0_setup.pkl')
+    # results_file = os.path.join(fdir, 'tudat_geo_twobody_2obj_pd09_lam0_phd_results.pkl')
     
     
     # tudat_geo_2obj_setup(setup_file)    
     
-    # run_multitarget_filter(setup_file, results_file)
+    
+    
+    setup_file = os.path.join(fdir, 'vo_coordturn_10obj_setup.pkl')
+    results_file = os.path.join(fdir, 'vo_coordturn_10boj_lmb_results.pkl')
+    
+    
+    # vo_2d_motion_setup(setup_file)
+    
+    run_multitarget_filter(setup_file, results_file)
     
     # multitarget_analysis(results_file)
     
     
-    # vo_2d_motion_setup()
     
     # r_list = [0.6, 0.7]
     # label_list = [1, 2]
@@ -1103,7 +1116,7 @@ if __name__ == '__main__':
     
     # test_utilities()
     
-    test_lmb_glmb_conversions()
+    # test_lmb_glmb_conversions()
     
     
 
