@@ -554,7 +554,7 @@ def vo_2d_motion_setup(setup_file):
     sensor_params[sensor_id]['sigma_dict']['az'] = (2.*np.pi/180.)
     sensor_params[sensor_id]['sigma_dict']['rg'] = 10.
     sensor_params[sensor_id]['lam_clutter'] = 15.
-    sensor_params[sensor_id]['az_lim'] = [0., np.pi]
+    sensor_params[sensor_id]['az_lim'] = [-np.pi/2., np.pi/2.]
     sensor_params[sensor_id]['rg_lim'] = [0., 2000.]
     sensor_params[sensor_id]['V_sensor'] = np.pi*2000.   # rad*m
     
@@ -644,7 +644,7 @@ def vo_2d_motion_setup(setup_file):
                 r_site = sensor_params[sensor_id]['r_site']
                 xy = np.reshape([Xk[0], Xk[2]], (2,1))
                 rho_vect = xy - r_site
-                az = math.atan2(rho_vect[1], rho_vect[0])
+                az = math.atan2(rho_vect[0], rho_vect[1])
                 rg = np.linalg.norm(rho_vect)
                 
                 # Incorporate missed detections
@@ -742,8 +742,8 @@ def vo_2d_motion_setup(setup_file):
             az = float(zi[0])
             rg = float(zi[1])
             
-            x = rg*np.cos(az)
-            y = rg*np.sin(az)
+            x = rg*np.sin(az)
+            y = rg*np.cos(az)
             
             plt.subplot(2,1,1)
             plt.plot(tk, x, 'kx', alpha=0.5, ms=3)
@@ -1130,10 +1130,10 @@ if __name__ == '__main__':
     
     # vo_2d_motion_setup(setup_file)
     
-    gen_mat_file(setup_file, setup_file_mat)
+    # gen_mat_file(setup_file, setup_file_mat)
     
     
-    # run_multitarget_filter(setup_file, results_file)
+    run_multitarget_filter(setup_file, results_file)
     
     # multitarget_analysis(results_file)
     

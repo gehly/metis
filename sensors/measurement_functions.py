@@ -423,7 +423,7 @@ def unscented_coordturn_azrg(tk, chi, state_params, sensor_params, sensor_id):
         y = chi[2,jj]
         pos = np.reshape([x, y], (2,1))
         rho_vect = pos - r_site
-        az = atan2(rho_vect[1], rho_vect[0])
+        az = atan2(rho_vect[0], rho_vect[1])
         rg = np.linalg.norm(rho_vect)
 
         gamma_til[0,jj] = az

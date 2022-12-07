@@ -883,6 +883,15 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, sensor_id_list, meas_fcn, params_
             # Normalize updated weights (this will always sum to 1?)
             # Vo, Vo, Phung 2014 Eq 27-28
             factor = p_det/clutter_intensity(zi, sensor_id, sensor_params)            
+            
+            print('factor', factor)
+            print('p_det', p_det)
+            print('clutter', clutter_intensity(zi, sensor_id, sensor_params))
+            print('weights0', weights0)
+            print('qk_list', qk_list)
+            print('machine_eps', machine_eps)
+            
+            
             weights = [a1*a2*factor + machine_eps for a1,a2 in zip(weights0, qk_list)]
             sum_weights = sum(weights)
             # weights = [wi/sum_weights for wi in weights]
@@ -904,6 +913,8 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, sensor_id_list, meas_fcn, params_
             allcost_mat[tt,ii] = sum_weights/(1. - p_det)
           
     print(allcost_mat)
+    
+    mistake
     
     
     # # TEST ONLY
