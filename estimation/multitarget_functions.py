@@ -843,7 +843,10 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, sensor_id_list, meas_fcn, params_
                 Pyy = np.dot(z_diff, np.dot(diagWc, z_diff.T)) + Rk
                 Pxy = np.dot(chi_diff,  np.dot(diagWc, z_diff.T))
                 
+                print('')
+                print('ii', ii)
                 print('zi', zi)
+                print('label', label)
                 print('zbar', zbar)
                 
                 # Angle-rollover for RA
@@ -910,12 +913,23 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, sensor_id_list, meas_fcn, params_
             
             # Update cost matrix (Vo, Vo, Phung 2014 Eq 26)
             # allcost_mat[tt,ii] = machine_eps + factor*sum_weights/(1.-p_det)
+            
+            weights2 = [a1*a2 + machine_eps for a1,a2 in zip(weights0, qk_list)]
+            print('sum_weights', sum_weights)
+            print('sum_weights2', sum(weights2))
+            print('entry check', p_det/(1. - p_det)*sum(weights2)/clutter_intensity(zi, sensor_id, sensor_params))
+            
             allcost_mat[tt,ii] = sum_weights/(1. - p_det)
+            
+        print('check column allcost_mat')
+        print('meas_ind', ii)
+        print('zi', zi)
+        print(allcost_mat[:,ii])
+        
+        # mistake
           
     print(allcost_mat)
-    
-    mistake
-    
+
     
     # # TEST ONLY
     # # Get negative log cost (Vo, Vo, Phung 2014 Eq 26)
@@ -1118,26 +1132,31 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, sensor_id_list, meas_fcn, params_
                     new_hyp_ind += 1
                     
                 # Normalize likelihood list to get updated hypothesis weights
-                prob_list = [eta/sum(likelihood_list) for eta in likelihood_list]
+                # prob_list = [eta/sum(likelihood_list) for eta in likelihood_list]
                 
                 
                 print('new_hyp_list', new_hyp_list)
                 print('likelihood_list', likelihood_list)
-                print('prob_list', prob_list)
+                # print('prob_list', prob_list)
                 
-                mistake
+                
                 
                 # Update hypothesis weights in GLMB_dict
                 for hh in range(len(new_hyp_list)):
-                    new_hyp_ind = new_hyp_list[hh]
-                    prob = prob_list[hh]
+                    new_hyp_ind2 = new_hyp_list[hh]
+                    # prob = prob_list[hh]
+                    likelihood = likelihood_list[hh]
                     
-                    GLMB_dict[new_hyp_ind]['hyp_weight'] *= prob
+                    GLMB_dict[new_hyp_ind2]['hyp_weight'] *= likelihood
                     
                 
     # Delete old hypotheses
     for hyp in hyp_del_list:
         del GLMB_dict[hyp]
+        
+    print('')
+    print('GLMB before normalize')
+    print(GLMB_dict)
         
     # Renormalize hypothesis weights
     hyp_list = list(GLMB_dict.keys())
@@ -1147,10 +1166,20 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, sensor_id_list, meas_fcn, params_
     
     final_prob = [prob/sum(prob_list) for prob in prob_list]
     for hyp in hyp_list:
-        GLMB_dict[hyp]['hyp_weight'] = prob_list[hyp_list.index(hyp)]
+        GLMB_dict[hyp]['hyp_weight'] = final_prob[hyp_list.index(hyp)]
+        
+    print('')
+    print('GLMB after normalize')
+    print(GLMB_dict)
         
     # Convert GLMB to LMB
     LMB_dict = glmb2lmb(GLMB_dict, full_label_list)
+    
+    print('')
+    print('LMB posterior')
+    print(LMB_dict)
+    
+    mistake
     
     return LMB_dict
 
