@@ -1057,8 +1057,15 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, sensor_id_list, meas_fcn, params_
                     GLMB_dict[new_hyp_ind]['hyp_weight'] = hyp_weight
                     GLMB_dict[new_hyp_ind]['label_list'] = label_list
                     
+                    # TODO - Work out how to handle multisensor case where each
+                    # could have a different clutter rate lam_clutter
+                    
+                    # Single sensor case
+                    sensor_id = sensor_id_list[0]
+                    lam_clutter = sensor_params[sensor_id]['lam_clutter']
+                    likelihood = np.exp(-lam_clutter)
+                    
                     # Loop over tracks
-                    assignment_likelihood = 1.
                     for jj in range(len(alist)):
                         
                         label = label_list[jj]
