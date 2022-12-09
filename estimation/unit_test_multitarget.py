@@ -1076,6 +1076,9 @@ def run_multitarget_filter(setup_file, results_file):
     truth_dict = data[4]
     pklFile.close()
     
+    # Update to use UKF propagator function
+    params_dict['int_params']['intfcn'] = dyn.ode_coordturn_ukf
+    
     
     # filter_output, full_state_output = mult.phd_filter(state_dict, truth_dict, meas_dict, meas_fcn, params_dict)
     
