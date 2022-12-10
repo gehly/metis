@@ -7,6 +7,7 @@ import pickle
 import getpass
 import os
 import inspect
+import pandas as pd
 
 filename = inspect.getframeinfo(inspect.currentframe()).filename
 current_dir = os.path.dirname(os.path.abspath(filename))
@@ -599,7 +600,7 @@ def compute_resids(Xo, UTC0, tracklet1, tracklet2, params_dict):
     return resids, ra_rms, dec_rms
 
 
-def geo_tracklet_visibility():
+def tracklet_visibility(vis_file):
     
     # Object IDs
     qzs1r_norad = 49336
@@ -620,14 +621,13 @@ def geo_tracklet_visibility():
     # Build truth dict
     truth_dict = {}
     truth_dict[UTC0] = {}
-    truth_dict[UTC0]['Xt_list'] = []
     for obj_id in obj_id_list:
     
         r0 = tle_dict[obj_id]['r_GCRF'][0]
         v0 = tle_dict[obj_id]['v_GCRF'][0]
         Xt = np.concatenate((r0, v0), axis=0)
         
-        truth_dict[UTC0]['Xt_list'].append(Xt)
+        truth_dict[UTC0][obj_id] = Xt
         
         
     # Retrieve latest EOP data from celestrak.com
@@ -664,15 +664,161 @@ def geo_tracklet_visibility():
     int_params['atol'] = 1e-12
     int_params['time_format'] = 'datetime'
 
-
     # Time vector
     tk_list = []
     ndays = 7.
     tvec = np.arange(0., ndays*86400.+1., 10.)
     tk_list.append([UTC0 + timedelta(seconds=ti) for ti in tvec])
     
+    # Sensor and measurement parameters
+    sensor_id_list = ['RMIT ROO']
+    sensor_params = sens.define_sensors(sensor_id_list)
+    sensor_params['eop_alldata'] = eop_alldata
+    sensor_params['XYs_df'] = XYs_df
     
+    for sensor_id in sensor_id_list:
+        sensor_params[sensor_id]['meas_types'] = ['ra', 'dec']
+        sigma_dict = {}
+        sigma_dict['ra'] = 5.*arcsec2rad   # rad
+        sigma_dict['dec'] = 5.*arcsec2rad  # rad
+        sensor_params[sensor_id]['sigma_dict'] = sigma_dict
+        sensor_params[sensor_id]['lam_clutter'] = 5.
+        FOV_hlim = sensor_params[sensor_id]['FOV_hlim']
+        FOV_vlim = sensor_params[sensor_id]['FOV_vlim']        
+        sensor_params[sensor_id]['V_sensor'] = (FOV_hlim[1] - FOV_hlim[0])*(FOV_vlim[1] - FOV_vlim[0])
+
+    # Loop over times to build truth dict and check visibility conditions
+    vis_dict = {}
+    for kk in range(len(tk_list)):
         
+        tk = tk_list[kk]
+        
+        if kk > 0:
+            
+            # Prior truth state
+            tk_prior = tk_list[kk-1]
+            X = np.array([])
+            for obj_id in obj_id_list:
+                Xj = truth_dict[tk_prior][obj_id]
+                X = np.append(X, Xj)
+            
+            tin = [tk_prior, tk]
+            tout, Xout = dyn.general_dynamics(X, tin, state_params, int_params)
+            X = Xout[-1,:]
+
+            ind = 0
+            for obj_id in obj_id_list:
+                truth_dict[tk] = {}
+                truth_dict[tk][obj_id] = X[ind:ind+6].reshape(6,1)
+                ind += 6
+        
+        # Check visibility conditions
+        EOP_data = eop.get_eop_data(eop_alldata, tk)
+        
+        for sensor_id in sensor_id_list:
+            
+            sensor = sensor_params[sensor_id]
+            
+            vis_obj_tk = []
+            for obj_id in obj_id_list:
+        
+                Xj = truth_dict[tk][obj_id]          
+                          
+                if visfunc.check_visibility(Xj, state_params, sensor_params,
+                                            sensor_id, tk, EOP_data, XYs_df):
+                    
+                    vis_obj_tk.append(obj_id)
+                    
+            vis_dict[tk] = vis_obj_tk
+                    
+                    
+                    
+    # Generate visibility report
+    vis_times = sorted(list(vis_dict.keys()))
+    output = {}
+    output['Time [UTC]'] = vis_times
+    
+    for obj_id in obj_id_list:
+        output[obj_id] = []
+        
+    for tk in vis_times:
+        for obj_id in obj_id_list:
+            if obj_id in vis_dict:
+                output[obj_id].append(True)
+            else:
+                output[obj_id].append(False)
+                
+            
+    # Form dataframe and CSV output
+    output_df = pd.DataFrame.from_dict(output)
+    output_df.to_csv(vis_file)
+
+
+    return
+
+
+def generate_tracklets():
+    
+    
+    
+    # # Check visibility conditions
+    # EOP_data = eop.get_eop_data(eop_alldata, tk)
+    # Zk_list = []
+    # sensor_kk_list = []
+    # for sensor_id in sensor_id_list:
+        
+    #     sensor = sensor_params[sensor_id]
+    #     p_det = filter_params['p_det']
+    #     center_flag = True            
+    #     for Xj in truth_dict[tk_list[kk]]['Xt_list']:            
+                      
+    #         if visfunc.check_visibility(Xj, state_params, sensor_params,
+    #                                     sensor_id, UTC, EOP_data, XYs_df):
+                
+    #             # Incorporate missed detection
+    #             if np.random.rand() > p_det:
+    #                 continue
+                
+    #             # Compute measurements
+    #             zj = mfunc.compute_measurement(Xj, state_params, sensor_params,
+    #                                            sensor_id, UTC, EOP_data, XYs_df,
+    #                                            meas_types=sensor['meas_types'])
+                
+    #             # Store first measurement for each sensor as FOV center
+    #             if center_flag:
+    #                 center = zj.copy()
+    #                 center_flag = False
+                
+    #             # Add noise and store measurement data
+    #             zj[0] += np.random.randn()*sigma_dict['ra']
+    #             zj[1] += np.random.randn()*sigma_dict['dec']
+                
+    #             Zk_list.append(zj)
+    #             sensor_kk_list.append(sensor_id)
+        
+    #     # Incorporate clutter measurements
+    #     n_clutter = ss.poisson.rvs(sensor['lam_clutter'])
+
+    #     # Compute clutter meas in RA/DEC, uniform over FOV
+    #     for c_ind in range(n_clutter):
+    #         FOV_hlim = sensor['FOV_hlim']
+    #         FOV_vlim = sensor['FOV_vlim']
+    #         ra  = center[0] + (FOV_hlim[1]-FOV_hlim[0])*(np.random.rand() - 0.5)
+    #         dec = center[1] + (FOV_vlim[1]-FOV_vlim[0])*(np.random.rand() - 0.5)
+
+    #         zclutter = np.reshape([ra, dec], (2,1))
+    #         Zk_list.append(zclutter)
+    #         sensor_kk_list.append(sensor_id)
+
+    # # If measurements were collected, randomize order and store
+    # if len(Zk_list) > 0:
+        
+    #     inds = list(range(len(Zk_list)))
+    #     random.shuffle(inds)
+        
+    #     meas_dict[UTC] = {}
+    #     meas_dict[UTC]['Zk_list'] = [Zk_list[ii] for ii in inds]
+    #     meas_dict[UTC]['sensor_id_list'] = [sensor_kk_list[ii] for ii in inds]
     
     
     return
@@ -688,7 +834,12 @@ if __name__ == '__main__':
     
 #    geo_tracklets()
     
-    test_tracklet_association()
+    # test_tracklet_association()
+    
+    fdir = r'D:\documents\research_projects\iod\data\sim\test\aas2023_geo_6obj_7day'
+    fname = 'geo_twobody_6obj_day_visibility.csv'
+    vis_file = os.path.join(fdir, fname)
+    tracklet_visibility(vis_file)
     
     
     
