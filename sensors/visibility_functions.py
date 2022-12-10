@@ -808,7 +808,7 @@ def check_visibility(X, state_params, sensor_params, sensor_id, UTC, EOP_data,
         
     if rg_km < sensor['rg_lim'][0] or rg_km > sensor['rg_lim'][1]:
         vis_flag = False
-        
+                
     # Check optional constraints
     if vis_flag:
         

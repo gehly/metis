@@ -327,8 +327,6 @@ def general_dynamics(Xo, tvec, state_params, int_params):
     
     if integrator == 'tudat':
         
-        
-        
         # Convert initial state vector from km to meters for TUDAT propagator
         initial_state = Xo.flatten()*1000.
         
@@ -655,7 +653,79 @@ def ode_balldrop_ukf(t, X, params):
     return dX
 
 
+def ode_coordturn(t, X, params):
+    '''
+    This function works with ode to propagate an object moving and turning.
 
+    Parameters
+    ------
+    X : 5 element array
+      state vector 
+    t : float 
+      current time in seconds
+    params : dictionary
+        additional arguments
+
+    Returns
+    ------
+    dX : 5 element array array
+      state derivative vector
+    
+    '''
+    
+    x = float(X[0])
+    dx = float(X[1])
+    y = float(X[2])
+    dy = float(X[3])
+    w = float(X[4])
+    
+    dX = np.zeros(5,)
+    dX[0] = dx   #dx*np.cos(w*t) - dy*np.sin(w*t)
+    dX[1] = -w*dx*np.sin(w*t) - w*dy*np.cos(w*t)
+    dX[2] = dy   #dx*np.sin(w*t) + dy*np.cos(w*t)
+    dX[3] = w*dx*np.cos(w*t) - w*dy*np.sin(w*t)
+    
+    return dX
+
+
+def ode_coordturn_ukf(t, X, params):
+    '''
+    This function works with ode to propagate an object moving and turning.
+
+    Parameters
+    ------
+    X : 5 element array
+      state vector 
+    t : float 
+      current time in seconds
+    params : dictionary
+        additional arguments
+
+    Returns
+    ------
+    dX : 5 element array array
+      state derivative vector
+    
+    '''
+    
+    n = 5
+    dX = np.zeros(len(X),)
+    for ind in range(0, 2*n+1):
+
+        # Pull out relevant values from X
+        x  = float(X[ind*n+0])
+        dx = float(X[ind*n+1])
+        y  = float(X[ind*n+2])
+        dy = float(X[ind*n+3])
+        w  = float(X[ind*n+4])
+
+        # Set components of dX
+        dX[ind*n+0] = dx   #dx*np.cos(w*t) - dy*np.sin(w*t)
+        dX[ind*n+1] = -w*dx*np.sin(w*t) - w*dy*np.cos(w*t)
+        dX[ind*n+2] = dy   #dx*np.sin(w*t) + dy*np.cos(w*t)
+        dX[ind*n+3] = w*dx*np.cos(w*t) - w*dy*np.sin(w*t)
+    
+    return dX
 
 
 ###############################################################################

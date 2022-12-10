@@ -895,6 +895,7 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, sensor_id_list, meas_fcn, params_
             print('machine_eps', machine_eps)
             
             
+            # Do not normalize weights - used later for likelihood calculation
             weights = [a1*a2*factor + machine_eps for a1,a2 in zip(weights0, qk_list)]
             sum_weights = sum(weights)
             # weights = [wi/sum_weights for wi in weights]
@@ -1012,8 +1013,15 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, sensor_id_list, meas_fcn, params_
                     zi = Zk[ii]
                     sensor_id = sensor_id_list[ii]
                     likelihood *= clutter_intensity(zi, sensor_id, sensor_params)
-                    
-                    
+                
+                # Update hypothesis weight, no tracks to update
+                GLMB_dict[hyp]['hyp_weight'] *= likelihood
+                
+                
+                print('no meas all clutter')
+                print('likelihood', GLMB_dict[hyp]['hyp_weight'])
+                
+                mistake
                     
             
             # Compute measurement to track associations
@@ -1064,6 +1072,13 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, sensor_id_list, meas_fcn, params_
                     sensor_id = sensor_id_list[0]
                     lam_clutter = sensor_params[sensor_id]['lam_clutter']
                     likelihood = np.exp(-lam_clutter)
+                    for ii in range(nmeas):
+                        zi = Zk[ii]
+                        sensor_id = sensor_id_list[ii]
+                        likelihood *= clutter_intensity(zi, sensor_id, sensor_params)
+                    
+                    # TODO - incorporate state and label dependent p_det
+                    likelihood *= (1-p_det)**nlabel
                     
                     # Loop over tracks
                     for jj in range(len(alist)):
@@ -1100,7 +1115,7 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, sensor_id_list, meas_fcn, params_
                             
                             # Incorporate likelihood
                             eta = sum(weights)
-                            assignment_likelihood *= eta
+                            likelihood *= eta
                             
                             # Normalize weights
                             weights = [wi/eta for wi in weights]
@@ -1133,7 +1148,7 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, sensor_id_list, meas_fcn, params_
                             
                             # Incorporate likelihood
                             eta = sum(weights)
-                            assignment_likelihood *= eta
+                            likelihood *= eta
                             
                             # Normalize weights
                             weights = [wi/eta for wi in weights]
@@ -1145,37 +1160,25 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, sensor_id_list, meas_fcn, params_
                             GLMB_dict[new_hyp_ind][label]['means'] = means
                             GLMB_dict[new_hyp_ind][label]['covars'] = covars
                             
-                            
-                    # Account for measurements not assigned to tracks as clutter
-                    # Not needed, included in denominator of factor?
-                    
-                    
-                    
-                    
+
                             
                     # Store likelihood
                     new_hyp_list.append(new_hyp_ind)
-                    likelihood_list.append(assignment_likelihood)
+                    likelihood_list.append(likelihood)
             
                     # Increment hypothesis index
                     new_hyp_ind += 1
                     
-                # Normalize likelihood list to get updated hypothesis weights
-                # prob_list = [eta/sum(likelihood_list) for eta in likelihood_list]
-                
                 
                 print('new_hyp_list', new_hyp_list)
                 print('likelihood_list', likelihood_list)
-                # print('prob_list', prob_list)
-                
+
                 
                 
                 # Update hypothesis weights in GLMB_dict
                 for hh in range(len(new_hyp_list)):
                     new_hyp_ind2 = new_hyp_list[hh]
-                    # prob = prob_list[hh]
-                    likelihood = likelihood_list[hh]
-                    
+                    likelihood = likelihood_list[hh]                    
                     GLMB_dict[new_hyp_ind2]['hyp_weight'] *= likelihood
                     
                 

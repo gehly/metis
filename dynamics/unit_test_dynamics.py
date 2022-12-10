@@ -902,6 +902,89 @@ def test_tudat_prop():
     return
 
 
+def test_coord_turn():
+    
+    wturn = 2.*math.pi/180.
+    Xo = np.reshape([ 1000+3.8676, -10, 1500-11.7457, -10, wturn/8 ], (5,1))
+    
+    state_params = {}
+    
+    int_params = {}
+    int_params['integrator'] = 'rk4'
+    int_params['step'] = 0.1
+    int_params['intfcn'] = dyn.ode_coordturn
+    int_params['time_format'] = 'seconds'
+    
+    
+    print(Xo)
+    X = Xo.copy()
+    X_num = Xo.copy()
+    tk_list = list(range(1,101))
+    X_plot = np.zeros((5,len(tk_list)))
+    Xnum_plot = np.zeros((5,len(tk_list)))
+    for kk in range(len(tk_list)):
+        
+        t = 1.
+        w = X[4]
+        
+        F = np.zeros((5,5))
+        F[0,0] = 1.
+        F[0,1] = np.sin(w*t)/w
+        F[0,3] = -(1. - np.cos(w*t))/w
+        F[1,1] = np.cos(w*t)
+        F[1,3] = -np.sin(w*t)
+        F[2,1] = (1. - np.cos(w*t))/w
+        F[2,2] = 1.
+        F[2,3] = np.sin(w*t)/w
+        F[3,1] = np.sin(w*t)
+        F[3,3] = np.cos(w*t)
+        F[4,4] = 1.
+        
+        X = np.dot(F, X)        
+        X_plot[:,kk] = X.flatten()
+        
+        tout, Xout = dyn.general_dynamics(X_num, [0., 1.], state_params, int_params)
+        
+        X_num = Xout[-1,:].reshape(5,1)
+        Xnum_plot[:,kk] = X_num.flatten()
+        
+        
+        # print(X)
+        # print(X_num)
+        # print(X_num - X)
+        
+        # mistake
+        
+        
+    plt.figure()
+    plt.subplot(2,1,1)
+    plt.plot(tk_list, X_plot[0,:], 'k.')
+    plt.plot(tk_list, Xnum_plot[0,:], 'b.')
+    plt.ylabel('X [m]')
+    plt.subplot(2,1,2)
+    plt.plot(tk_list, X_plot[2,:], 'k.')
+    plt.plot(tk_list, Xnum_plot[2,:], 'b.')
+    plt.ylabel('Y [m]')
+    plt.xlabel('Time [sec]')
+    
+    plt.figure()
+    plt.plot(X_plot[0,:], X_plot[2,:], 'k.')
+    plt.plot(Xnum_plot[0,:], Xnum_plot[2,:], 'b.')
+    plt.xlabel('X [m]')
+    plt.ylabel('Y [m]')
+    plt.xlim([-2000., 2000])
+    plt.ylim([0., 2000.])
+    
+        
+        
+    plt.show()
+                   
+        
+    
+    
+    return
+
+
 if __name__ == '__main__':
     
     plt.close('all')
@@ -916,7 +999,9 @@ if __name__ == '__main__':
     
     # test_jit_twobody()
     
-    test_tudat_prop()
+    # test_tudat_prop()
+    
+    test_coord_turn()
     
 
 #    test, test2, test3, test4, test5 = fastint.test_jit()

@@ -398,6 +398,40 @@ def unscented_balldrop(tk, chi, state_params, sensor_params, sensor_id):
     return gamma_til, Rk
 
 
+def unscented_coordturn_azrg(tk, chi, state_params, sensor_params, sensor_id):
+    
+    # Number of states
+    n = int(chi.shape[0])
+    
+    # Measurement information
+    sensor_kk = sensor_params[sensor_id]
+    r_site = sensor_kk['r_site']
+    meas_types = sensor_kk['meas_types']
+    sigma_dict = sensor_kk['sigma_dict']
+    p = len(meas_types)
+    Rk = np.zeros((p, p))
+    for ii in range(p):
+        mtype = meas_types[ii]
+        sig = sigma_dict[mtype]
+        Rk[ii,ii] = sig**2.
+    
+    # Compute transformed sigma points   
+    gamma_til = np.zeros((p, (2*n+1)))
+    for jj in range(2*n+1):
+        
+        x = chi[0,jj]
+        y = chi[2,jj]
+        pos = np.reshape([x, y], (2,1))
+        rho_vect = pos - r_site
+        az = atan2(rho_vect[0], rho_vect[1])
+        rg = np.linalg.norm(rho_vect)
+
+        gamma_til[0,jj] = az
+        gamma_til[1,jj] = rg
+
+    return gamma_til, Rk
+
+
 
 
 ###############################################################################
