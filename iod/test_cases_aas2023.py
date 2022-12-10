@@ -600,7 +600,7 @@ def compute_resids(Xo, UTC0, tracklet1, tracklet2, params_dict):
     return resids, ra_rms, dec_rms
 
 
-def tracklet_visibility(vis_file):
+def geo_twobody_setup(setup_file):
     
     # Object IDs
     qzs1r_norad = 49336
@@ -663,12 +663,6 @@ def tracklet_visibility(vis_file):
     int_params['rtol'] = 1e-12
     int_params['atol'] = 1e-12
     int_params['time_format'] = 'datetime'
-
-    # Time vector
-    tk_list = []
-    ndays = 7.
-    tvec = np.arange(0., ndays*86400.+1., 10.)
-    tk_list.append([UTC0 + timedelta(seconds=ti) for ti in tvec])
     
     # Sensor and measurement parameters
     sensor_id_list = ['RMIT ROO']
@@ -686,12 +680,51 @@ def tracklet_visibility(vis_file):
         FOV_hlim = sensor_params[sensor_id]['FOV_hlim']
         FOV_vlim = sensor_params[sensor_id]['FOV_vlim']        
         sensor_params[sensor_id]['V_sensor'] = (FOV_hlim[1] - FOV_hlim[0])*(FOV_vlim[1] - FOV_vlim[0])
+        
+        
+    # Save truth and params
+    pklFile = open( setup_file, 'wb' )
+    pickle.dump( [truth_dict, state_params, int_params, sensor_params], pklFile, -1 )
+    pklFile.close()
+    
+    
+    return
+
+
+def tracklet_visibility(vis_file, prev_file, truth_file):
+    
+    
+    pklFile = open(prev_file, 'rb' )
+    data = pickle.load( pklFile )
+    truth_dict = data[0]
+    state_params = data[1]
+    int_params = data[2]
+    sensor_params = data[3]
+    pklFile.close()
+    
+    # Break out inputs
+    eop_alldata = sensor_params['eop_alldata']
+    XYs_df = sensor_params['XYs_df']
+    sensor_id_list = ['RMIT ROO']
+    
+    
+
+    # Time vector
+    prev_tk_list = sorted(list(truth_dict.keys()))
+    UTC0 = prev_tk_list[-1]
+    obj_id_list = list(truth_dict[UTC0].keys())
+    ndays = 0.5
+    tvec = np.arange(0., ndays*86400.+1, 10.)
+    tk_list = [UTC0 + timedelta(seconds=ti) for ti in tvec]
+    
+    
 
     # Loop over times to build truth dict and check visibility conditions
     vis_dict = {}
     for kk in range(len(tk_list)):
         
         tk = tk_list[kk]
+        
         
         if kk > 0:
             
@@ -701,14 +734,15 @@ def tracklet_visibility(vis_file):
             for obj_id in obj_id_list:
                 Xj = truth_dict[tk_prior][obj_id]
                 X = np.append(X, Xj)
+
             
             tin = [tk_prior, tk]
             tout, Xout = dyn.general_dynamics(X, tin, state_params, int_params)
             X = Xout[-1,:]
 
             ind = 0
-            for obj_id in obj_id_list:
-                truth_dict[tk] = {}
+            truth_dict[tk] = {}
+            for obj_id in obj_id_list:                
                 truth_dict[tk][obj_id] = X[ind:ind+6].reshape(6,1)
                 ind += 6
         
@@ -717,10 +751,11 @@ def tracklet_visibility(vis_file):
         
         for sensor_id in sensor_id_list:
             
-            sensor = sensor_params[sensor_id]
-            
             vis_obj_tk = []
             for obj_id in obj_id_list:
+                
+                # print(obj_id)
+                # print(truth_dict[tk])
         
                 Xj = truth_dict[tk][obj_id]          
                           
@@ -728,10 +763,10 @@ def tracklet_visibility(vis_file):
                                             sensor_id, tk, EOP_data, XYs_df):
                     
                     vis_obj_tk.append(obj_id)
-                    
-            vis_dict[tk] = vis_obj_tk
-                    
-                    
+            
+            if len(vis_obj_tk) > 0:
+                vis_dict[tk] = vis_obj_tk
+
                     
     # Generate visibility report
     vis_times = sorted(list(vis_dict.keys()))
@@ -743,7 +778,7 @@ def tracklet_visibility(vis_file):
         
     for tk in vis_times:
         for obj_id in obj_id_list:
-            if obj_id in vis_dict:
+            if obj_id in vis_dict[tk]:
                 output[obj_id].append(True)
             else:
                 output[obj_id].append(False)
@@ -752,6 +787,11 @@ def tracklet_visibility(vis_file):
     # Form dataframe and CSV output
     output_df = pd.DataFrame.from_dict(output)
     output_df.to_csv(vis_file)
+    
+    # Save truth and params
+    pklFile = open( truth_file, 'wb' )
+    pickle.dump( [truth_dict, state_params, int_params, sensor_params], pklFile, -1 )
+    pklFile.close()
 
 
     return
@@ -824,10 +864,69 @@ def generate_tracklets():
     return
 
 
+def check_truth():
+    
+    fdir = r'D:\documents\research_projects\iod\data\sim\test\aas2023_geo_6obj_7day'
+
+    
+    fname = 'geo_twobody_6obj_7day_truth_9.pkl'    
+    truth_file = os.path.join(fdir, fname)
+    
+    pklFile = open(truth_file, 'rb' )
+    data = pickle.load( pklFile )
+    truth_dict = data[0]
+    pklFile.close()
+    
+    tk_list = sorted(list(truth_dict.keys()))
+    t0 = tk_list[0]
+    tf = tk_list[-1]
+    
+    print(t0)
+    print(tf)
+    
+    print(len(tk_list))
+
+    
+    obj_id_list = list(truth_dict[t0].keys())
+    obj_id = obj_id_list[0]
+    
+    Xo = truth_dict[t0][obj_id]
+    tdays = []
+    Xerr = np.zeros((6,len(tk_list)))
+    for tk in tk_list:
+        dt_sec = (tk - t0).total_seconds()
+        tdays.append(dt_sec/86400.)
+        Xnum = truth_dict[tk][obj_id]
+        Xanal = astro.element_conversion(Xo, 1, 1, dt=dt_sec)
+        
+        kk = tk_list.index(tk)
+        Xerr[:,kk] = (Xanal - Xnum).flatten()
+        
+        
+    plt.figure()
+    plt.subplot(3,1,1)
+    plt.plot(tdays, Xerr[0,:], 'k.')
+    plt.ylabel('X [km]')
+    plt.subplot(3,1,2)
+    plt.plot(tdays, Xerr[1,:], 'k.')
+    plt.ylabel('Y [km]')
+    plt.subplot(3,1,3)
+    plt.plot(tdays, Xerr[2,:], 'k.')
+    plt.ylabel('Z [km]')
+    plt.xlabel('Time [days]')
+    
+    plt.show()
+    
+    
+    return
+
+
 
 
 
 if __name__ == '__main__':
+    
+    plt.close('all')
     
     
 #    leo_tracklets_marco()
@@ -837,9 +936,26 @@ if __name__ == '__main__':
     # test_tracklet_association()
     
     fdir = r'D:\documents\research_projects\iod\data\sim\test\aas2023_geo_6obj_7day'
-    fname = 'geo_twobody_6obj_day_visibility.csv'
+    
+    fname = 'geo_twobody_6obj_7day_setup.pkl'
+    setup_file = os.path.join(fdir, fname)  
+    
+    fname = 'geo_twobody_6obj_7day_truth_8.pkl'    
+    prev_file = os.path.join(fdir, fname)
+    
+    fname = 'geo_twobody_6obj_7day_visibility_9.csv'
     vis_file = os.path.join(fdir, fname)
-    tracklet_visibility(vis_file)
+    
+    fname = 'geo_twobody_6obj_7day_truth_9.pkl'    
+    truth_file = os.path.join(fdir, fname)
+    
+    # geo_twobody_setup(setup_file)
+    
+    
+    
+    # tracklet_visibility(vis_file, prev_file, truth_file)
+    
+    check_truth()
     
     
     
