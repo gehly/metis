@@ -1106,7 +1106,10 @@ def multitarget_analysis(results_file):
     truth_dict = data[3]
     pklFile.close()
     
-    analysis.multitarget_orbit_errors(filter_output, filter_output, truth_dict)
+    
+    analysis.compute_coordturn_errors(filter_output, filter_output, truth_dict)
+    
+    # analysis.multitarget_orbit_errors(filter_output, filter_output, truth_dict)
     
     return
 
@@ -1136,9 +1139,9 @@ if __name__ == '__main__':
     # gen_mat_file(setup_file, setup_file_mat)
     
     
-    run_multitarget_filter(setup_file, results_file)
+    # run_multitarget_filter(setup_file, results_file)
     
-    # multitarget_analysis(results_file)
+    multitarget_analysis(results_file)
     
     
     

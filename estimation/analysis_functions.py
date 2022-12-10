@@ -148,6 +148,151 @@ def compute_balldrop_errors(filter_output, truth_dict):
 
 
 ###############################################################################
+# Vo Coordinated Turn Test Case
+###############################################################################
+
+def compute_coordturn_errors(filter_output, full_state_output, truth_dict):
+    '''
+    
+    '''
+    
+    # True cardinality and states
+    tk_truth = sorted(list(truth_dict.keys()))
+    N_truth = []
+    plot_truth = {}
+    full_obj_list = []
+    for tk in tk_truth:
+        obj_list_truth = list(truth_dict[tk].keys())
+        N_truth.append(len(obj_list_truth))
+        
+        # Store object states and plot times
+        for obj_id in obj_list_truth:            
+            if obj_id not in plot_truth:
+                plot_truth[obj_id] = {}
+                plot_truth[obj_id]['tk_plot'] = []
+                plot_truth[obj_id]['x_plot'] = []
+                plot_truth[obj_id]['y_plot'] = []
+                full_obj_list.append(obj_id)
+            
+            plot_truth[obj_id]['tk_plot'].append(tk)
+            plot_truth[obj_id]['x_plot'].append(truth_dict[tk][obj_id][0])
+            plot_truth[obj_id]['y_plot'].append(truth_dict[tk][obj_id][2])
+            
+            
+    full_obj_list = sorted(list(set(full_obj_list)))        
+        
+    
+    # Estimated cardinality and states
+    tk_list = sorted(list(filter_output.keys()))
+    N_est = []
+    plot_est = {}
+    full_label_list = []
+    for tk in tk_list:
+        N_est.append(filter_output[tk]['N'])
+        LMB_k = filter_output[tk]['LMB_dict']
+        card_k = filter_output[tk]['card']
+        label_k = filter_output[tk]['label_list']
+        rk_list = filter_output[tk]['rk_list']
+        Xk_list = filter_output[tk]['Xk_list']
+        Pk_list = filter_output[tk]['Pk_list']
+        
+        
+        for jj in range(len(label_k)):
+            label = label_k[jj]
+            Xj = Xk_list[jj]
+            Pj = Pk_list[jj]
+            rj = rk_list[jj]
+            
+            if label not in plot_est:
+                plot_est[label] = {}
+                plot_est[label]['tk_plot'] = []
+                plot_est[label]['r_plot'] = []
+                plot_est[label]['x_plot'] = []
+                plot_est[label]['y_plot'] = []
+                plot_est[label]['x_sig'] = []
+                plot_est[label]['y_sig'] = []
+                full_label_list.append(label)
+                
+            plot_est[label]['tk_plot'].append(tk)
+            plot_est[label]['r_plot'].append(rj)
+            plot_est[label]['x_plot'].append(Xj[0])
+            plot_est[label]['y_plot'].append(Xj[2])
+            plot_est[label]['x_sig'].append(np.sqrt(Pj[0,0]))
+            plot_est[label]['y_sig'].append(np.sqrt(Pj[2,2]))
+    
+    
+    # Cardinality plot
+    plt.figure()
+    plt.plot(tk_truth, N_truth, 'k-')
+    plt.plot(tk_list, N_est, 'k.')
+    plt.ylabel('Cardinality')
+    plt.xlabel('Time [sec]')
+    plt.legend(['Truth', 'Est'])
+    
+    
+    # True/Est State plot
+    cm = plt.get_cmap('hsv')
+    num_colors = len(full_obj_list)
+    
+    fig1 = plt.figure()
+    fig2 = plt.figure()   
+    ii = 0
+    for obj_id in full_obj_list:
+        
+        color_ii = cm(ii/num_colors)
+        
+        tk_plot = plot_truth[obj_id]['tk_plot']
+        x_plot = plot_truth[obj_id]['x_plot']
+        y_plot = plot_truth[obj_id]['y_plot']
+        
+        plt.figure(fig1)
+        plt.subplot(2,1,1)
+        plt.plot(tk_plot, x_plot, '-', color=color_ii)
+        plt.ylabel('x [m]')
+        plt.subplot(2,1,2)
+        plt.plot(tk_plot, y_plot, '-', color=color_ii)
+        plt.ylabel('y [m]')
+        plt.xlabel('Time [sec]')
+        
+        plt.figure(fig2)
+        plt.plot(x_plot, y_plot, '-', color=color_ii)
+        plt.plot(x_plot[0], y_plot[0], 'o', color=color_ii)
+        plt.plot(x_plot[-1], y_plot[-1], 'x', color=color_ii)
+        plt.xlabel('x [m]')
+        plt.ylabel('y [m]')
+        plt.xlim([-2000., 2000.])
+        plt.ylim([0., 2000.])
+        
+        
+        ii += 1
+        
+    for label in full_label_list:
+        
+        tk_plot = plot_est[label]['tk_plot']
+        x_plot = plot_est[label]['x_plot']
+        y_plot = plot_est[label]['y_plot']
+        
+        plt.figure(fig1)
+        plt.subplot(2,1,1)
+        plt.plot(tk_plot, x_plot, 'ko', fillstyle='none', ms=3)
+        plt.subplot(2,1,2)
+        plt.plot(tk_plot, y_plot, 'ko', fillstyle='none', ms=3)
+        
+        plt.figure(fig2)
+        plt.plot(x_plot, y_plot, 'ko', fillstyle='none', ms=3)
+        
+    
+    
+    plt.show()
+    
+    
+    
+    
+    return
+
+
+
+###############################################################################
 # PDF Analysis
 ###############################################################################
 
