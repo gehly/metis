@@ -599,6 +599,88 @@ def compute_resids(Xo, UTC0, tracklet1, tracklet2, params_dict):
     return resids, ra_rms, dec_rms
 
 
+def geo_tracklet_visibility():
+    
+    # Object IDs
+    qzs1r_norad = 49336
+    qzs2_norad = 42738
+    qzs3_norad = 42917
+    qzs4_norad = 42965
+    
+    ses15_norad = 42709
+    amos5_norad = 37950
+    coms1_norad = 36744
+    
+    # Initial state vectors from TLE data
+    obj_id_list = [qzs1r_norad, qzs2_norad, qzs3_norad, qzs4_norad,
+                   ses15_norad, amos5_norad, coms1_norad]
+    UTC0 = datetime(2022, 11, 7, 11, 0, 0)
+    tle_dict = tle.propagate_TLE(obj_id_list, [UTC0])
+    
+    # Build truth dict
+    truth_dict = {}
+    truth_dict[UTC0] = {}
+    truth_dict[UTC0]['Xt_list'] = []
+    for obj_id in obj_id_list:
+    
+        r0 = tle_dict[obj_id]['r_GCRF'][0]
+        v0 = tle_dict[obj_id]['v_GCRF'][0]
+        Xt = np.concatenate((r0, v0), axis=0)
+        
+        truth_dict[UTC0]['Xt_list'].append(Xt)
+        
+        
+    # Retrieve latest EOP data from celestrak.com
+    eop_alldata = eop.get_celestrak_eop_alldata()
+        
+    # Retrieve polar motion data from file
+    XYs_df = eop.get_XYs2006_alldata()
+    
+    # Define state parameters
+    state_params = {}
+    state_params['GM'] = GME
+    state_params['radius_m'] = 1.
+    state_params['albedo'] = 0.1
+    state_params['bodies_to_create'] = ['Earth']
+    state_params['global_frame_origin'] = 'Earth'
+    state_params['global_frame_orientation'] = 'J2000'
+    state_params['central_bodies'] = ['Earth']
+    state_params['sph_deg'] = 0
+    state_params['sph_ord'] = 0
+    state_params['mass'] = 400.
+    state_params['Cd'] = 0.
+    state_params['Cr'] = 0.
+    state_params['drag_area_m2'] = 4.
+    state_params['srp_area_m2'] = 4.
+    
+    # Integration function and additional settings    
+    int_params = {}
+    int_params['integrator'] = 'tudat'
+    int_params['tudat_integrator'] = 'rkf78'
+    int_params['step'] = 10.
+    int_params['max_step'] = 1000.
+    int_params['min_step'] = 1.
+    int_params['rtol'] = 1e-12
+    int_params['atol'] = 1e-12
+    int_params['time_format'] = 'datetime'
+
+
+    # Time vector
+    tk_list = []
+    ndays = 7.
+    tvec = np.arange(0., ndays*86400.+1., 10.)
+    tk_list.append([UTC0 + timedelta(seconds=ti) for ti in tvec])
+    
+    
+        
+    
+    
+    return
+
+
+
+
+
 if __name__ == '__main__':
     
     

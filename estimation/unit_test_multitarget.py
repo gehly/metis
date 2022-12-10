@@ -28,7 +28,7 @@ sys.path.append(metis_dir)
 
 from estimation import analysis_functions as analysis
 from estimation import estimation_functions as est
-from estimation import multitarget_functions3 as mult
+from estimation import multitarget_functions as mult
 from dynamics import dynamics_functions as dyn
 from sensors import measurement_functions as mfunc
 from sensors import sensors as sens
