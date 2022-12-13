@@ -1016,7 +1016,16 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, sensor_id_list, meas_fcn, params_
             
             log_likelihood = -lam_clutter + np.log(hyp_weight)
             
-            for nn in range(nlabel):
+            for label in label_list:
+                
+                weights = GLMB_dict[hyp][label]['weights']
+                means = GLMB_dict[hyp][label]['means']
+                covars = GLMB_dict[hyp][label]['covars']
+                
+                p_det = compute_pd_statedep(p_det, weights, means, covars, center,
+                                            sensor_id, sensor_params, meas_fcn)
+                
+                
                 log_likelihood += np.log(1. - p_det)
             
             
@@ -1658,6 +1667,54 @@ def compute_hypothesis_dict(r_list, label_list, H_max=1000):
 ###############################################################################
 # Utility Functions
 ###############################################################################
+
+
+def compute_pd_statedep(tk, weights, means, covars, meas_fcn, sensor_id,
+                        fov_center, state_params, filter_params, 
+                        sensor_params):
+    
+    
+    # Break out inputs
+    pd_sensor = filter_params['p_det']
+    gam = filter_params['gam']
+    Wm = filter_params['Wm']
+    diagWc = filter_params['diagWc']  
+    
+    # Form GMM and merge components
+    GMM_dict = {}
+    GMM_dict['weights'] = weights
+    GMM_dict['means'] = means
+    GMM_dict['covars'] = covars
+    
+    params = {}
+    params['prune_T'] = 1e-5
+    params['merge_U'] = 1e6
+    GMM_dict = est.merge_GMM(GMM_dict, params)
+    
+    ind = GMM_dict['weights'].index(max(GMM_dict['weights']))
+    mj = GMM_dict['means'][ind]
+    Pj = GMM_dict['covars'][ind]
+    nstates = len(mj)
+    npoints = nstates*2 + 1
+    
+    # Compute sigma points
+    sqP = np.linalg.cholesky(Pj)
+    Xrep = np.tile(mj, (1, nstates))
+    chi = np.concatenate((mj, Xrep+(gam*sqP), Xrep-(gam*sqP)), axis=1)
+
+    # Computed measurement
+    gamma_til_k, Rk = meas_fcn(tk, chi, state_params, sensor_params, sensor_id)
+    zbar = np.dot(gamma_til_k, Wm.T)
+    zbar = np.reshape(zbar, (len(zbar), 1))
+    
+    # Compare zbar against FOV center and limits to get pd_fov
+    
+    
+    # Multiply to get full pd
+    pd = pd_sensor*pd_fov
+    
+    return pd
+
 
 
 def clutter_intensity(zi, sensor_id, sensor_params):
