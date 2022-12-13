@@ -1005,11 +1005,23 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, sensor_id_list, meas_fcn, params_
             hyp_weight = GLMB_dict[hyp]['hyp_weight']
             label_list = GLMB_dict[hyp]['label_list']
             nlabel = len(label_list)
-            GLMB_dict[hyp]['hyp_weight'] = hyp_weight*(1-p_det)**nlabel
             
-            for sensor_id in unique_sensors:
-                lam_clutter = sensor_params[sensor_id]['lam_clutter']
-                GLMB_dict[hyp]['hyp_weight'] *= np.exp(-lam_clutter)
+            
+            # TODO - Work out how to handle multisensor case where each
+            # could have a different clutter rate lam_clutter
+            
+            # Single sensor case
+            sensor_id = sensor_id_list[0]
+            lam_clutter = sensor_params[sensor_id]['lam_clutter']
+            
+            log_likelihood = -lam_clutter + np.log(hyp_weight)
+            
+            for nn in range(nlabel):
+                log_likelihood += np.log(1. - p_det)
+            
+            
+            GLMB_dict[hyp]['hyp_weight'] = np.exp(log_likelihood)
+            
             
             # No measurements to update tracks/state estimates
     else:
