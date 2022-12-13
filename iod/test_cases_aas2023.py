@@ -691,6 +691,96 @@ def geo_twobody_setup(setup_file):
     return
 
 
+def geo_perturbed_setup(setup_file):
+    
+    # Object IDs
+    qzs1r_norad = 49336
+    qzs2_norad = 42738
+    qzs3_norad = 42917
+    qzs4_norad = 42965
+    
+    amos5_norad = 37950
+    coms1_norad = 36744
+    
+    # Initial state vectors from TLE data
+    obj_id_list = [qzs1r_norad, qzs2_norad, qzs3_norad, qzs4_norad,
+                   amos5_norad, coms1_norad]
+    UTC0 = datetime(2022, 11, 7, 11, 0, 0)
+    tle_dict = tle.propagate_TLE(obj_id_list, [UTC0])
+    
+    # Build truth dict
+    truth_dict = {}
+    truth_dict[UTC0] = {}
+    for obj_id in obj_id_list:
+    
+        r0 = tle_dict[obj_id]['r_GCRF'][0]
+        v0 = tle_dict[obj_id]['v_GCRF'][0]
+        Xt = np.concatenate((r0, v0), axis=0)
+        
+        truth_dict[UTC0][obj_id] = Xt
+        
+        
+    # Retrieve latest EOP data from celestrak.com
+    eop_alldata = eop.get_celestrak_eop_alldata()
+        
+    # Retrieve polar motion data from file
+    XYs_df = eop.get_XYs2006_alldata()
+    
+    # Define state parameters
+    state_params = {}
+    state_params['GM'] = GME
+    state_params['radius_m'] = 1.
+    state_params['albedo'] = 0.1
+    state_params['bodies_to_create'] = ['Earth', 'Sun', 'Moon']
+    state_params['global_frame_origin'] = 'Earth'
+    state_params['global_frame_orientation'] = 'J2000'
+    state_params['central_bodies'] = ['Earth']
+    state_params['sph_deg'] = 8
+    state_params['sph_ord'] = 8
+    state_params['mass'] = 2000.
+    state_params['Cd'] = 0.
+    state_params['Cr'] = 1.2
+    state_params['drag_area_m2'] = 0.1
+    state_params['srp_area_m2'] = 40.
+    
+    # Integration function and additional settings    
+    int_params = {}
+    int_params['integrator'] = 'tudat'
+    int_params['tudat_integrator'] = 'rkf78'
+    int_params['step'] = 10.
+    int_params['max_step'] = 1000.
+    int_params['min_step'] = 1.
+    int_params['rtol'] = 1e-12
+    int_params['atol'] = 1e-12
+    int_params['time_format'] = 'datetime'
+    
+    # Sensor and measurement parameters
+    sensor_id_list = ['RMIT ROO']
+    sensor_params = sens.define_sensors(sensor_id_list)
+    sensor_params['eop_alldata'] = eop_alldata
+    sensor_params['XYs_df'] = XYs_df
+    
+    for sensor_id in sensor_id_list:
+        sensor_params[sensor_id]['meas_types'] = ['ra', 'dec']
+        sigma_dict = {}
+        sigma_dict['ra'] = 5.*arcsec2rad   # rad
+        sigma_dict['dec'] = 5.*arcsec2rad  # rad
+        sensor_params[sensor_id]['sigma_dict'] = sigma_dict
+        sensor_params[sensor_id]['lam_clutter'] = 5.
+        FOV_hlim = sensor_params[sensor_id]['FOV_hlim']
+        FOV_vlim = sensor_params[sensor_id]['FOV_vlim']        
+        sensor_params[sensor_id]['V_sensor'] = (FOV_hlim[1] - FOV_hlim[0])*(FOV_vlim[1] - FOV_vlim[0])
+        
+        
+    # Save truth and params
+    pklFile = open( setup_file, 'wb' )
+    pickle.dump( [truth_dict, state_params, int_params, sensor_params], pklFile, -1 )
+    pklFile.close()
+    
+    
+    return
+
+
 def tracklet_visibility(vis_file, prev_file, truth_file):
     
     
@@ -869,7 +959,7 @@ def check_truth():
     fdir = r'D:\documents\research_projects\iod\data\sim\test\aas2023_geo_6obj_7day'
 
     
-    fname = 'geo_twobody_6obj_7day_truth_9.pkl'    
+    fname = 'geo_perturbed_6obj_7day_truth.pkl'    
     truth_file = os.path.join(fdir, fname)
     
     pklFile = open(truth_file, 'rb' )
@@ -893,6 +983,12 @@ def check_truth():
     Xo = truth_dict[t0][obj_id]
     tdays = []
     Xerr = np.zeros((6,len(tk_list)))
+    a_plot = []
+    e_plot = []
+    i_plot = []
+    raan_plot = []
+    w_plot = []
+    ta_plot = []
     for tk in tk_list:
         dt_sec = (tk - t0).total_seconds()
         tdays.append(dt_sec/86400.)
@@ -901,6 +997,14 @@ def check_truth():
         
         kk = tk_list.index(tk)
         Xerr[:,kk] = (Xanal - Xnum).flatten()
+        
+        elem = astro.cart2kep(Xnum)
+        a_plot.append(elem[0])
+        e_plot.append(elem[1])
+        i_plot.append(elem[2])
+        raan_plot.append(elem[3])
+        w_plot.append(elem[4])
+        ta_plot.append(elem[5])
         
         
     plt.figure()
@@ -915,12 +1019,258 @@ def check_truth():
     plt.ylabel('Z [km]')
     plt.xlabel('Time [days]')
     
+    plt.figure()
+    plt.subplot(3,1,1)
+    plt.plot(tdays, a_plot, 'k.')
+    plt.ylabel('SMA [km]')
+    plt.subplot(3,1,2)
+    plt.plot(tdays, e_plot, 'k.')
+    plt.ylabel('ECC')
+    plt.subplot(3,1,3)
+    plt.plot(tdays, ta_plot, 'k.')
+    plt.ylabel('TA [deg]')
+    plt.xlabel('Time [days]')
+    
+    plt.figure()
+    plt.subplot(3,1,1)
+    plt.plot(tdays, i_plot, 'k.')
+    plt.ylabel('INC [deg]')
+    plt.subplot(3,1,2)
+    plt.plot(tdays, raan_plot, 'k.')
+    plt.ylabel('RAAN [deg]')
+    plt.subplot(3,1,3)
+    plt.plot(tdays, w_plot, 'k.')
+    plt.ylabel('AOP [deg]')
+    plt.xlabel('Time [days]')
+    
     plt.show()
     
     
     return
 
 
+def consolidate_visibility():
+    
+    fdir = r'D:\documents\research_projects\iod\data\sim\test\aas2023_geo_6obj_7day'
+
+    
+    df_list = []
+    for jj in range(1,15):
+        fname = 'geo_perturbed_6obj_7day_visibility_' + str(jj) + '.csv'
+        vis_file = os.path.join(fdir, fname)
+        
+        df = pd.read_csv(vis_file)
+        df.reset_index(drop=True, inplace=True)
+        df_list.append(df)
+        
+    vis_df = pd.concat(df_list, ignore_index=True, axis=0)
+    
+    
+    # Object IDs
+    qzs1r_norad = 49336
+    qzs2_norad = 42738
+    qzs3_norad = 42917
+    qzs4_norad = 42965
+    
+    # ses15_norad = 42709
+    amos5_norad = 37950
+    coms1_norad = 36744
+    
+    # Initial state vectors from TLE data
+    obj_id_list = [qzs1r_norad, qzs2_norad, qzs3_norad, qzs4_norad,
+                   amos5_norad, coms1_norad]
+    
+    vis_dict = {}
+    vis_dict['UTC'] = vis_df['Time [UTC]'].tolist()
+    for obj_id in obj_id_list:
+        vis_dict[obj_id] = vis_df[str(obj_id)].tolist()
+    
+    vis_df2 = pd.DataFrame.from_dict(vis_dict)
+    
+    print(vis_df2)
+    
+    vis_df2 = vis_df2.drop_duplicates()
+    
+    print(vis_df2)
+    
+    fname = 'geo_perturbed_6obj_7day_visibility.csv'
+    outfile = os.path.join(fdir, fname)
+    vis_df2.to_csv(outfile)
+    
+    
+    return
+
+
+def compute_obs_times(vis_file, pass_length, obs_time_file):
+    
+    vis_df = pd.read_csv(vis_file)
+    
+    # Object IDs
+    qzs1r_norad = 49336
+    qzs2_norad = 42738
+    qzs3_norad = 42917
+    qzs4_norad = 42965
+    
+    # ses15_norad = 42709
+    amos5_norad = 37950
+    coms1_norad = 36744
+    
+    # Initial state vectors from TLE data
+    obj_id_list = [qzs1r_norad, qzs2_norad, qzs3_norad, qzs4_norad,
+                   amos5_norad, coms1_norad]
+    
+    
+    # Initialize dict
+    obs_times = {}
+    for obj_id in obj_id_list:
+        obs_times[obj_id] = {}
+        obs_times[obj_id]['tk_list'] = []
+        
+        
+    # For each day, find visible times and build out dictionary
+    UTC_list = vis_df['UTC'].tolist()
+    vis_df['UTC'] = [datetime.strptime(dt_str, '%Y-%m-%d %H:%M:%S') for dt_str in UTC_list]
+    UTC0 = vis_df['UTC'].tolist()[0]
+
+    date = datetime(UTC0.year, UTC0.month, UTC0.day)
+    for ii in range(7):
+        
+        obs_times = single_day_obs_times(vis_df, date, obs_times, pass_length)
+        
+        print(obs_times)
+        
+        date = date + timedelta(days=1)
+        
+        
+    print('\n\n')
+    
+    for obj_id in obs_times:
+        
+        print('\n')
+        print('obj_id', obj_id)
+        print(obs_times[obj_id]['tk_list'])
+        
+        
+    # Save truth and params
+    pklFile = open( obs_time_file, 'wb' )
+    pickle.dump( [obs_times], pklFile, -1 )
+    pklFile.close()
+    
+    return
+
+
+def single_day_obs_times(vis_df, date, obs_times, pass_length):
+    
+    # Retrieve data from inputs
+    obj_id_list = sorted(list(obs_times.keys()))
+
+    # Reduce vis_df
+    vis_df2 = vis_df.loc[(vis_df['UTC'] > date) & (vis_df['UTC'] < date + timedelta(days=1.))]
+    UTC_list = vis_df2['UTC'].tolist()
+    
+    print(vis_df)
+    print(vis_df2)
+    
+    # Find number of visible times
+    obj_ind_dict = {}
+    ntimes_list = []
+    for obj_id in obj_id_list:
+        obj_ind_dict[obj_id] = [ind for ind, vis_flag in enumerate(vis_df2[str(obj_id)]) if vis_flag]
+        ntimes_list.append(len(obj_ind_dict[obj_id]))
+        
+    # Work backward from least to most visible object
+    ntimes_inds = sorted(range(len(ntimes_list)), key=lambda k: ntimes_list[k])
+    
+    print(ntimes_list)
+    print(ntimes_inds)
+    
+    sorted_obj = [obj_id_list[ii] for ii in ntimes_inds]
+    
+    print(obj_id_list)
+    print(sorted_obj)
+    
+    while len(sorted_obj) > 0:
+        
+        obj_id = sorted_obj[0]
+        
+        # Check there are at least enough entries
+        min_entries = int(pass_length/10) + 1
+        if len(obj_ind_dict[obj_id]) < min_entries:
+            del sorted_obj[0]
+            continue
+        
+        # Retrieve last obs time for this object
+        tk_list = obs_times[obj_id]['tk_list']
+        if len(tk_list) > 0:
+            tk_prior = tk_list[-1]
+        else:
+            tk_prior = datetime(2000, 1, 1)
+            
+            
+        # Select first available block with at least min_entries consecutive
+        ind = 0
+        test_block = [obj_ind_dict[obj_id][ind]]
+        while len(test_block) < min_entries:
+            
+            if ind >= len(obj_ind_dict[obj_id]):
+                break
+            
+            
+            # print('obj_id', obj_id)
+            # print('ind', ind)
+            # print('len obj_ind_dict[obj_id]', len(obj_ind_dict[obj_id]))
+            # print('obj_ind_dict[obj_id][ind]', obj_ind_dict[obj_id][ind])
+            # print('UTC list', len(UTC_list))
+            
+            # Check if time is too close to previous day pass
+            tk_new = UTC_list[obj_ind_dict[obj_id][ind]]
+            tdiff = (tk_new - tk_prior).total_seconds()/3600.
+            if tdiff > 21.5 and tdiff < 26:
+                ind += 1
+                continue
+ 
+            if obj_ind_dict[obj_id][ind+1] - obj_ind_dict[obj_id][ind] == 1:
+                test_block.append(obj_ind_dict[obj_id][ind+1])
+            else:
+                test_block = [obj_ind_dict[obj_id][ind+1]]
+                
+            ind += 1
+            
+            
+            
+        if len(test_block) < min_entries:
+            del sorted_obj[0]
+            continue
+            
+        print(obj_id)
+        print(test_block)
+        
+        # Store entries for this object and delete object from list
+        tk_list_new = [UTC_list[kk] for kk in test_block]
+        obs_times[obj_id]['tk_list'].extend(tk_list_new)
+        del sorted_obj[0]
+        
+        print(obs_times)
+        
+        # Delete these entries from other objects
+        for obj_id2 in sorted_obj:
+            for del_ind in test_block:
+                if del_ind in obj_ind_dict[obj_id2]:
+                    del obj_ind_dict[obj_id2][obj_ind_dict[obj_id2].index(del_ind)]
+            
+            
+        print(obj_ind_dict)
+        
+        
+        
+        
+    print('')
+    print(obs_times)
+    
+
+    
+    
+    return obs_times
 
 
 
@@ -937,25 +1287,35 @@ if __name__ == '__main__':
     
     fdir = r'D:\documents\research_projects\iod\data\sim\test\aas2023_geo_6obj_7day'
     
-    fname = 'geo_twobody_6obj_7day_setup.pkl'
-    setup_file = os.path.join(fdir, fname)  
+    # fname = 'geo_twobody_6obj_7day_setup.pkl'
+    # setup_file = os.path.join(fdir, fname)  
     
-    fname = 'geo_twobody_6obj_7day_truth_8.pkl'    
-    prev_file = os.path.join(fdir, fname)
+    # fname = 'geo_twobody_6obj_7day_truth_13.pkl'    
+    # prev_file = os.path.join(fdir, fname)
     
-    fname = 'geo_twobody_6obj_7day_visibility_9.csv'
+    fname = 'geo_perturbed_6obj_7day_visibility.csv'
     vis_file = os.path.join(fdir, fname)
     
-    fname = 'geo_twobody_6obj_7day_truth_9.pkl'    
-    truth_file = os.path.join(fdir, fname)
+    # fname = 'geo_twobody_6obj_7day_truth_14.pkl'    
+    # truth_file = os.path.join(fdir, fname)
     
-    # geo_twobody_setup(setup_file)
+    fname = 'geo_perturbed_6obj_7day_obstime_10min.pkl'
+    obs_time_file = os.path.join(fdir, fname)
+    
+    
+    
+    # geo_perturbed_setup(setup_file)
     
     
     
     # tracklet_visibility(vis_file, prev_file, truth_file)
     
-    check_truth()
+    # check_truth()
+    
+    # consolidate_visibility()
+    
+    pass_length = 600.
+    compute_obs_times(vis_file, pass_length, obs_time_file)
     
     
     
