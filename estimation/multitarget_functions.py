@@ -506,6 +506,7 @@ def lmb_filter(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):
     print(tk_list)
     print(N)
 
+
   
     # Loop over times
     for kk in range(N):
@@ -530,10 +531,11 @@ def lmb_filter(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):
         print('')
         print('tk', tk)
         print('predictor')
-        # print(LMB_birth)
-        # print(LMB_surv)
+        print(LMB_birth)
+        print(LMB_surv)
         print('birth tracks', len(LMB_birth))
         print('surv tracks', len(LMB_surv))
+        
 
         # Corrector Step
         Zk = meas_dict[tk]['Zk_list']
@@ -544,9 +546,9 @@ def lmb_filter(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):
         print('')
         print('tk', tk)
         print('corrector')
-        # print(LMB_dict)
+        print(LMB_dict)
         print('ntracks', len(LMB_dict))
-        
+
         # Prune/Merge Step
         LMB_dict = lmb_cleanup(LMB_dict, params_dict)
         
@@ -555,7 +557,7 @@ def lmb_filter(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):
         print('merge')
         print(LMB_dict)
         print('ntracks', len(LMB_dict))
-        
+
         
         # State extraction and residuals calculation
         pk, Nk, labelk_list, rk_list, Xk_list, Pk_list, resids_k = \
@@ -573,7 +575,7 @@ def lmb_filter(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):
         print('Xk_list', Xk_list)
         print('Pk_list', Pk_list)
         print('resids', resids_k)
-        
+
         
         # Store output
         filter_output[tk] = {}
@@ -641,7 +643,7 @@ def lmb_predictor(LMB_dict, tin, params_dict):
     elif time_format == 'datetime':
         delta_t = (tk - tk_prior).total_seconds()
         
-    # print('delta_t', delta_t)
+    print('delta_t', delta_t)
 
 
     # Birth Components
@@ -797,10 +799,10 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, sensor_id_list, meas_fcn, params_
     GLMB_birth = lmb2glmb(LMB_birth, H_max_birth)
     GLMB_surv = lmb2glmb(LMB_surv, H_max)
     
-    # print('GLMB_birth')
-    # print(GLMB_birth)
-    # print('GLMB_surv')
-    # print(GLMB_surv)
+    print('GLMB_birth')
+    print(GLMB_birth)
+    print('GLMB_surv')
+    print(GLMB_surv)
 
     
     # Combine and normalize weights
@@ -817,13 +819,14 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, sensor_id_list, meas_fcn, params_
     print('ntotal hyp', len(GLMB_dict))
         
     
-    # print('GLMB_dict', GLMB_dict)
-    # print('wsum', wsum)
+    print('GLMB_dict', GLMB_dict)
+    print('wsum', wsum)
     total_weight = 0.
     for hyp in GLMB_dict:
         total_weight += GLMB_dict[hyp]['hyp_weight']
         
     print('total hyp weight', total_weight)
+    
 
     # Get unique sensor id's
     unique_sensors = list(set(sensor_id_list))
@@ -1246,7 +1249,7 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, sensor_id_list, meas_fcn, params_
         
     print('')
     print('GLMB before normalize')
-    # print(GLMB_dict)
+    print(GLMB_dict)
         
     # Renormalize hypothesis weights
     hyp_list = list(GLMB_dict.keys())
@@ -1260,14 +1263,14 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, sensor_id_list, meas_fcn, params_
         
     print('')
     print('GLMB after normalize')
-    # print(GLMB_dict)
+    print(GLMB_dict)
         
     # Convert GLMB to LMB
     LMB_dict = glmb2lmb(GLMB_dict, full_label_list)
     
     print('')
     print('LMB posterior')
-    # print(LMB_dict)
+    print(LMB_dict)
 
     return LMB_dict
 
@@ -1403,7 +1406,8 @@ def combine_glmb(GLMB_birth, GLMB_surv, H_max=1000):
             # Increment hypothesis index
             hyp_ind += 1
             
-    # Reduce to H_max entries
+    # Reduce to H_max entries and/or avoid divide by zero for small 
+    # probability hypotheses
     if len(GLMB_dict) > H_max:
         
         weight_list = []
@@ -1412,18 +1416,22 @@ def combine_glmb(GLMB_birth, GLMB_surv, H_max=1000):
             
         sorted_weights = sorted(weight_list, reverse=True)
         wmin = sorted_weights[H_max-1]
+        wmin = max(wmin, 1e-10)
+    else:
+        wmin = 1e-10
         
-        wsum = 0.
-        hyp_list = list(GLMB_dict.keys())
-        for hyp in hyp_list:
-            if GLMB_dict[hyp]['hyp_weight'] < wmin:
-                del GLMB_dict[hyp]
-            else:
-                wsum += GLMB_dict[hyp]['hyp_weight']
-        
-        # Renormalize weights
-        for hyp in GLMB_dict:
-            GLMB_dict[hyp]['hyp_weight'] *= (1./wsum)
+    
+    wsum = 0.
+    hyp_list = list(GLMB_dict.keys())
+    for hyp in hyp_list:
+        if GLMB_dict[hyp]['hyp_weight'] < wmin:
+            del GLMB_dict[hyp]
+        else:
+            wsum += GLMB_dict[hyp]['hyp_weight']
+    
+    # Renormalize weights
+    for hyp in GLMB_dict:
+        GLMB_dict[hyp]['hyp_weight'] *= (1./wsum)
     
     return GLMB_dict
 
@@ -1552,23 +1560,24 @@ def lmb_state_extraction(LMB_dict, tk, Zk, sensor_id_list, meas_fcn,
     
     # Calculate residuals
     resids_out = []
-    # if len(rk_list) > 0:
-    #     for ii in range(len(Zk)):
-    #         zi = Zk[ii]
-    #         sensor_id = sensor_id_list[ii]
+    if len(rk_list) > 0:
+        
+        for ii in range(len(Zk)):
+            zi = Zk[ii]
+            sensor_id = sensor_id_list[ii]
             
-    #         resids_list = []
-    #         for jj in range(len(Xk_list)):
-    #             Xj = Xk_list[jj]            
-    #             zbar = mfunc.compute_measurement(Xj, state_params, sensor_params,
-    #                                              sensor_id, tk)
-    #             resids = zi - zbar
-    #             resids_list.append(resids)
-                
-    #         # Take smallest magnitude as residual for this measurement
-    #         min_list = [np.linalg.norm(resid) for resid in resids_list]
-    #         resids_k = resids_list[min_list.index(min(min_list))]
-    #         resids_out.append(resids_k)
+            resids_list = []
+            for jj in range(len(Xk_list)):
+                Xj = Xk_list[jj]            
+                zbar = mfunc.compute_measurement(Xj, state_params, sensor_params,
+                                                  sensor_id, tk)
+                resids = zi - zbar
+                resids_list.append(resids)
+
+            # Take smallest magnitude as residual for this measurement
+            min_list = [np.linalg.norm(resid) for resid in resids_list]
+            resids_k = resids_list[min_list.index(min(min_list))]
+            resids_out.append(resids_k)
     
     
     return pk, Nk, labelk_list, rk_list, Xk_list, Pk_list, resids_out

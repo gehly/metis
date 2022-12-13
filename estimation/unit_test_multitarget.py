@@ -823,17 +823,27 @@ def tudat_geo_2obj_setup(setup_file):
     state_params['Cr'] = 0.
     state_params['drag_area_m2'] = 4.
     state_params['srp_area_m2'] = 4.
+    state_params['nstates'] = 6
+    
+    # LMB Birth Model
+    birth_model = {}
     
     # Filter parameters
     filter_params = {}
     filter_params['Q'] = 1e-16 * np.diag([1, 1, 1])
+    filter_params['snc_flag'] = 'gamma'
     filter_params['gap_seconds'] = 900.
     filter_params['alpha'] = 1e-4
     filter_params['pnorm'] = 2.
     filter_params['prune_T'] = 1e-3
     filter_params['merge_U'] = 36.
+    filter_params['H_max'] = 1000
+    filter_params['H_max_birth'] = 5
+    filter_params['T_max'] = 100
+    filter_params['T_threshold'] = 1e-3
     filter_params['p_surv'] = 1.
-    filter_params['p_det'] = 0.9
+    filter_params['p_det'] = 0.99
+    filter_params['birth_model'] = birth_model
     
     # Integration function and additional settings    
     int_params = {}
@@ -868,11 +878,31 @@ def tudat_geo_2obj_setup(setup_file):
     X2_init = X2_true + np.reshape(pert_vect2, (6, 1))
     
     
+    # PHD Filter Setup
+    # state_dict = {}
+    # state_dict[tk_list[0]] = {}
+    # state_dict[tk_list[0]]['weights'] = [1., 1.]
+    # state_dict[tk_list[0]]['means'] = [X1_init, X2_init]
+    # state_dict[tk_list[0]]['covars'] = [P1, P2]
+    
+    # LMB Filter Setup
+    LMB_dict = {}
+    LMB_dict[(tk_list[0], 1)] = {}
+    LMB_dict[(tk_list[0], 1)]['r'] = 0.999
+    LMB_dict[(tk_list[0], 1)]['weights'] = [1.]
+    LMB_dict[(tk_list[0], 1)]['means'] = [X1_init]
+    LMB_dict[(tk_list[0], 1)]['covars'] = [P1]
+    
+    LMB_dict[(tk_list[0], 2)] = {}
+    LMB_dict[(tk_list[0], 2)]['r'] = 0.999
+    LMB_dict[(tk_list[0], 2)]['weights'] = [1.]
+    LMB_dict[(tk_list[0], 2)]['means'] = [X2_init]
+    LMB_dict[(tk_list[0], 2)]['covars'] = [P2]
+    
     state_dict = {}
     state_dict[tk_list[0]] = {}
-    state_dict[tk_list[0]]['weights'] = [1., 1.]
-    state_dict[tk_list[0]]['means'] = [X1_init, X2_init]
-    state_dict[tk_list[0]]['covars'] = [P1, P2]
+    state_dict[tk_list[0]]['LMB_dict'] = LMB_dict
+    
     
     
     # Sensor and measurement parameters
@@ -1077,7 +1107,7 @@ def run_multitarget_filter(setup_file, results_file):
     pklFile.close()
     
     # Update to use UKF propagator function
-    params_dict['int_params']['intfcn'] = dyn.ode_coordturn_ukf
+    # params_dict['int_params']['intfcn'] = dyn.ode_coordturn_ukf
     
     
     # filter_output, full_state_output = mult.phd_filter(state_dict, truth_dict, meas_dict, meas_fcn, params_dict)
@@ -1118,20 +1148,20 @@ if __name__ == '__main__':
     
     plt.close('all')
     
-    fdir = r'D:\documents\research_projects\multitarget\data\sim\test\2022_12_07_vo_coordturn_10obj'
+    fdir = r'D:\documents\research_projects\multitarget\data\sim\test\2022_12_13_lmb_geo_2obj'
     
     
-    # setup_file = os.path.join(fdir, 'tudat_geo_twobody_2obj_pd09_lam0_setup.pkl')
-    # results_file = os.path.join(fdir, 'tudat_geo_twobody_2obj_pd09_lam0_phd_results.pkl')
+    setup_file = os.path.join(fdir, 'tudat_geo_twobody_2obj_pd1_lam5_setup.pkl')
+    results_file = os.path.join(fdir, 'tudat_geo_twobody_2obj_pd1_lam5_lmb_results.pkl')
     
     
     # tudat_geo_2obj_setup(setup_file)    
     
     
     
-    setup_file = os.path.join(fdir, 'vo_coordturn_10obj_setup.pkl')
-    setup_file_mat = os.path.join(fdir, 'vo_coordturn_10obj_setup.mat')
-    results_file = os.path.join(fdir, 'vo_coordturn_10boj_lmb_results.pkl')
+    # setup_file = os.path.join(fdir, 'vo_coordturn_10obj_setup.pkl')
+    # setup_file_mat = os.path.join(fdir, 'vo_coordturn_10obj_setup.mat')
+    # results_file = os.path.join(fdir, 'vo_coordturn_10boj_lmb_results.pkl')
     
     
     # vo_2d_motion_setup(setup_file)
@@ -1139,9 +1169,9 @@ if __name__ == '__main__':
     # gen_mat_file(setup_file, setup_file_mat)
     
     
-    # run_multitarget_filter(setup_file, results_file)
+    run_multitarget_filter(setup_file, results_file)
     
-    multitarget_analysis(results_file)
+    # multitarget_analysis(results_file)
     
     
     
