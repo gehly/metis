@@ -8,6 +8,8 @@ import getpass
 import os
 import inspect
 import pandas as pd
+import scipy.stats as ss
+import random
 
 filename = inspect.getframeinfo(inspect.currentframe()).filename
 current_dir = os.path.dirname(os.path.abspath(filename))
@@ -1302,6 +1304,9 @@ def generate_meas_file(noise, lam_c, orbit_regime, truth_file, obs_time_file, me
     obs_times = data[0]
     pklFile.close()
     
+    eop_alldata = sensor_params['eop_alldata']
+    XYs_df = sensor_params['XYs_df']
+    
     # Retrieve sensors
     sensor_id_list = list(sensor_params.keys())
     del sensor_id_list[sensor_id_list.index('eop_alldata')]
@@ -1317,13 +1322,17 @@ def generate_meas_file(noise, lam_c, orbit_regime, truth_file, obs_time_file, me
     obj_id_list = sorted(list(obs_times.keys()))    
     
     
-    print(obs_times)
-    
-    mistake
     
     # Loop over objects
-    tracklet_ind = 0
-    for obj_id in obj_id_list:        
+    meas_dict = {}
+    tracklet_dict = {}
+    tracklet_id = 0
+    for obj_id in obj_id_list:  
+        
+        
+        # Form object sublist for later checks if in FOV
+        obj_id_sublist = list(set(obj_id_list) - set([obj_id]))
+        
         
         # Retrieve tk_list and form tracklet time sublists
         tk_list = obs_times[obj_id]['tk_list']
@@ -1347,61 +1356,169 @@ def generate_meas_file(noise, lam_c, orbit_regime, truth_file, obs_time_file, me
                 
                 
         print(obj_id)
-        print(tracklet_sublists)
+        
+        for tk_tracklet in tracklet_sublists:
+            print('')
+            print(tk_tracklet)
                 
-        mistake
-        
-        
         
         # Loop over sensors
-        # for sensor_id in sensor_id_list:    
+        for sensor_id in sensor_id_list:    
+            
+            # Sensor data
+            p_det = sensor_params[sensor_id]['p_det']
+            lam_clutter = sensor_params[sensor_id]['lam_clutter']
+            FOV_hlim = sensor_params[sensor_id]['FOV_hlim']
+            FOV_vlim = sensor_params[sensor_id]['FOV_vlim']
+            
+            # Loop over tracklet times
+            for tk_tracklet in tracklet_sublists:
+                
+                # Initialize tracklet data
+                tracklet_dict[tracklet_id] = {}
+                tracklet_dict[tracklet_id]['orbit_regime'] = orbit_regime
+                tracklet_dict[tracklet_id]['obj_id'] = obj_id
+                tracklet_dict[tracklet_id]['tk_list'] = []
+                tracklet_dict[tracklet_id]['Zk_list'] = []
+                tracklet_dict[tracklet_id]['sensor_id_list'] = []
+                
+                for tk in tk_tracklet:
+                    
+                    # Initialize meas_dict entry
+                    if tk in meas_dict:
+                        print('meas_dict', meas_dict)
+                        print(tk)
+                        mistake
+                        
+                    meas_Zk = []
+                    meas_sensor_id = []
+                    meas_center = []
+                    
+                    # Retrieve true state
+                    Xj = truth_dict[tk][obj_id]
+            
+                    # Check/confirm visibility
+                    EOP_data = eop.get_eop_data(eop_alldata, tk)
+                    if not visfunc.check_visibility(Xj, state_params, sensor_params,
+                                                    sensor_id, tk, EOP_data, XYs_df):
+                        
+                        print('error not visible')
+                        print('obj_id', obj_id)
+                        print('tk', tk)
+                        print('sensor_id', sensor_id)
+                        
+                        mistake
+                
+                    # Compute measurements
+                    zj = mfunc.compute_measurement(Xj, state_params, sensor_params,
+                                                   sensor_id, tk, EOP_data, XYs_df)
+                    
+                    # Save as center for this observation
+                    center = zj.copy()
+                    
+                    # Add noise
+                    zj[0] += np.random.rand()*noise*arcsec2rad
+                    zj[1] += np.random.rand()*noise*arcsec2rad
+                    
+                    # Incorporate p_det for main object
+                    if np.randon.rand() <= p_det:
+                        
+                        # Store tracklet data
+                        tracklet_dict[tracklet_id]['tk_list'].append(tk)
+                        tracklet_dict[tracklet_id]['Zk_list'].append(zj)
+                        tracklet_dict[tracklet_id]['sensor_id_list'].append(sensor_id)
+                        
+                        
+                        # First and last entries in trackelts will be used for
+                        # Gooding IOD solution. Skip these entries for the 
+                        # meas_dict supplied to the filter to avoid double
+                        # counting measurements
+                        if tk_tracklet.index(tk) == 0 or tk_tracklet.index(tk) == (len(tk_tracklet) - 1):
+                            continue
+                        
+                        # Store meas data
+                        meas_Zk.append(zj)
+                        meas_sensor_id.append(sensor_id)
+                        meas_center.append(center)
+                        
+
+                    # Check all other objects if visible and generate measurements
+                    for obj_id2 in obj_id_sublist:
+                        
+                        # True object state
+                        X2 = truth_dict[tk][obj_id]
+                    
+                        # If object visible, apply p_det and noise and store meas_dict
+                        if not visfunc.check_visibility(X2, state_params, sensor_params,
+                                                        sensor_id, tk, EOP_data, XYs_df):
+                            continue
+                        
+                        z2 = mfunc.compute_measurement(X2, state_params, sensor_params,
+                                                       sensor_id, tk, EOP_data, XYs_df)
+                        # Angle rollover in RA
+                        z2_test = z2 - center
+                        if z2_test[0] > np.pi:
+                            z2_test[0] -= 2.*np.pi
+                        if z2_test[0] < -np.pi:
+                            z2_test[0] += 2.*np.pi                        
+                        
+                        if (z2_test[0] < FOV_hlim[0] or z2_test[0] > FOV_hlim[1] 
+                            or z2_test[1] < FOV_vlim[0] or z2_test[1] > FOV_vlim[1]):
+                            
+                            continue
+                        
+                        if np.random.rand() > p_det:
+                            continue
+                        
+                        # Add noise and store
+                        z2[0] += np.random.rand()*noise*arcsec2rad
+                        z2[1] += np.random.rand()*noise*arcsec2rad
+                        
+                        meas_Zk.append(z2)
+                        meas_sensor_id.append(sensor_id)
+                        meas_center.append(center)
+                    
+                    
+                    # Generate clutter and store
+                    n_clutter = ss.poisson.rvs(lam_clutter)
+
+                    # Compute clutter meas in RA/DEC, uniform over FOV
+                    for c_ind in range(n_clutter):
+                        ra  = center[0] + (FOV_hlim[1]-FOV_hlim[0])*(np.random.rand() - 0.5)
+                        dec = center[1] + (FOV_vlim[1]-FOV_vlim[0])*(np.random.rand() - 0.5)
+                        
+                        # Angle rollover in RA
+                        if ra > np.pi:
+                            ra -= 2.*np.pi
+                        if ra < -np.pi:
+                            ra += 2.*np.pi
+
+                        zclutter = np.reshape([ra, dec], (2,1))
+                        meas_Zk.append(zclutter)
+                        meas_sensor_id.append(sensor_id)
+                        meas_center.append(center)
+                        
+                    
+                    # If measurements were collected, randomize order and store
+                    if len(meas_Zk) > 0:
+                        
+                        inds = list(range(len(meas_Zk)))
+                        random.shuffle(inds)
+                        
+                        meas_dict[tk] = {}
+                        meas_dict[tk]['Zk_list'] = [meas_Zk[ii] for ii in inds]
+                        meas_dict[tk]['sensor_id_list'] = [meas_sensor_id[ii] for ii in inds]
+                        meas_dict[tk]['center_list'] = [meas_center[ii] for ii in inds]
+                    
+            
+                # Increment tracklet index
+                tracklet_id += 1
     
-            
-        
-        
-        
-        # Find end of tracklet and create tk_sublist
-        
-        
-        
-        
-            # Loop over times in tk_sublist
-            
-            
-                # Check/confirm visibility
-                
-                
-                # Compute meas
-                
-                
-                # Incorporate p_det for main object
-                
-                
-                # If detected, store as center
-                
-                
-                # Add noise
-                
-                
-                # Store tracklet data
-                
-                
-                # Check all other objects if visible
-                
-                
-                # If object visible, apply p_det and noise and store meas_dict
-                
-                
-                # Generate clutter and store in meas_dict
-                
-            
-            # Store tracklet and meas_dict data
-            
-            # Increment counters
-            # tracklet_ind += 1
     
-    
-    
+    # Save data
+    pklFile = open( meas_file, 'wb' )
+    pickle.dump( [tracklet_dict, meas_dict, sensor_params], pklFile, -1 )
+    pklFile.close()
     
     
     return
@@ -1449,14 +1566,14 @@ if __name__ == '__main__':
     
     # consolidate_visibility()
     
-    pass_length = 600.
-    compute_obs_times(vis_file, pass_length, obs_time_file)
+    # pass_length = 600.
+    # compute_obs_times(vis_file, pass_length, obs_time_file)
     
     
     noise = 0.
     lam_c = 5.
     orbit_regime = 'GEO'
-    # generate_meas_file(noise, lam_c, orbit_regime, truth_file, obs_time_file, meas_file)
+    generate_meas_file(noise, lam_c, orbit_regime, truth_file, obs_time_file, meas_file)
     
     
     
