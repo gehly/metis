@@ -1151,6 +1151,7 @@ def compute_obs_times(vis_file, pass_length, obs_time_file):
         print(obs_times[obj_id]['tk_list'])
         
         
+        
     # Save truth and params
     pklFile = open( obs_time_file, 'wb' )
     pickle.dump( [obs_times], pklFile, -1 )
@@ -1178,6 +1179,12 @@ def single_day_obs_times(vis_df, date, obs_times, pass_length):
         obj_ind_dict[obj_id] = [ind for ind, vis_flag in enumerate(vis_df2[str(obj_id)]) if vis_flag]
         ntimes_list.append(len(obj_ind_dict[obj_id]))
         
+        
+        # if obj_id == 36744 and date == datetime(2022,11,10):
+        #     print(obj_ind_dict[obj_id])
+        #     print(ntimes_list)
+        #     mistake
+        
     # Work backward from least to most visible object
     ntimes_inds = sorted(range(len(ntimes_list)), key=lambda k: ntimes_list[k])
     
@@ -1188,6 +1195,9 @@ def single_day_obs_times(vis_df, date, obs_times, pass_length):
     
     print(obj_id_list)
     print(sorted_obj)
+    
+    # if date == datetime(2022,11,10):
+    #     mistake
     
     while len(sorted_obj) > 0:
         
@@ -1227,6 +1237,7 @@ def single_day_obs_times(vis_df, date, obs_times, pass_length):
             tdiff = (tk_new - tk_prior).total_seconds()/3600.
             if tdiff > 21.5 and tdiff < 26:
                 ind += 1
+                test_block = [obj_ind_dict[obj_id][ind]]
                 continue
  
             if obj_ind_dict[obj_id][ind+1] - obj_ind_dict[obj_id][ind] == 1:
@@ -1273,6 +1284,129 @@ def single_day_obs_times(vis_df, date, obs_times, pass_length):
     return obs_times
 
 
+def generate_meas_file(noise, lam_c, orbit_regime, truth_file, obs_time_file, meas_file):
+    
+    gap_length = 100.  # seconds
+    
+    # Load truth and observation time data
+    pklFile = open(truth_file, 'rb' )
+    data = pickle.load( pklFile )
+    truth_dict = data[0]
+    state_params = data[1]
+    int_params = data[2]
+    sensor_params = data[3]
+    pklFile.close()
+    
+    pklFile = open(obs_time_file, 'rb' )
+    data = pickle.load( pklFile )
+    obs_times = data[0]
+    pklFile.close()
+    
+    # Retrieve sensors
+    sensor_id_list = list(sensor_params.keys())
+    del sensor_id_list[sensor_id_list.index('eop_alldata')]
+    del sensor_id_list[sensor_id_list.index('XYs_df')]
+    
+    # Update sensor params noise and lam_clutter
+    for sensor_id in sensor_id_list:
+        sensor_params[sensor_id]['sigma_dict']['ra'] = max(noise,1.)*arcsec2rad
+        sensor_params[sensor_id]['sigma_dict']['dec'] = max(noise,1.)*arcsec2rad
+        sensor_params[sensor_id]['lam_clutter'] = lam_c
+    
+    # Form obj_id_list from obs_times
+    obj_id_list = sorted(list(obs_times.keys()))    
+    
+    
+    print(obs_times)
+    
+    mistake
+    
+    # Loop over objects
+    tracklet_ind = 0
+    for obj_id in obj_id_list:        
+        
+        # Retrieve tk_list and form tracklet time sublists
+        tk_list = obs_times[obj_id]['tk_list']
+        tracklet_sublists = []
+        for kk in range(len(tk_list)):
+            
+            if kk == 0:
+                tk_tracklet = [tk_list[kk]]
+                continue
+            
+            tdiff = (tk_list[kk] - tk_list[kk-1]).total_seconds()
+            
+            # Still part of same tracklet
+            if tdiff < gap_length:
+                tk_tracklet.append(tk_list[kk])
+                
+            # Tracklet has ended, start over
+            else:
+                tracklet_sublists.append(tk_tracklet)
+                tk_tracklet = [tk_list[kk]]
+                
+                
+        print(obj_id)
+        print(tracklet_sublists)
+                
+        mistake
+        
+        
+        
+        # Loop over sensors
+        # for sensor_id in sensor_id_list:    
+    
+            
+        
+        
+        
+        # Find end of tracklet and create tk_sublist
+        
+        
+        
+        
+            # Loop over times in tk_sublist
+            
+            
+                # Check/confirm visibility
+                
+                
+                # Compute meas
+                
+                
+                # Incorporate p_det for main object
+                
+                
+                # If detected, store as center
+                
+                
+                # Add noise
+                
+                
+                # Store tracklet data
+                
+                
+                # Check all other objects if visible
+                
+                
+                # If object visible, apply p_det and noise and store meas_dict
+                
+                
+                # Generate clutter and store in meas_dict
+                
+            
+            # Store tracklet and meas_dict data
+            
+            # Increment counters
+            # tracklet_ind += 1
+    
+    
+    
+    
+    
+    return
+
+
 
 if __name__ == '__main__':
     
@@ -1293,16 +1427,17 @@ if __name__ == '__main__':
     # fname = 'geo_twobody_6obj_7day_truth_13.pkl'    
     # prev_file = os.path.join(fdir, fname)
     
-    fname = 'geo_perturbed_6obj_7day_visibility.csv'
+    fname = 'geo_twobody_6obj_7day_visibility.csv'
     vis_file = os.path.join(fdir, fname)
     
-    # fname = 'geo_twobody_6obj_7day_truth_14.pkl'    
-    # truth_file = os.path.join(fdir, fname)
+    fname = 'geo_twobody_6obj_7day_truth.pkl'    
+    truth_file = os.path.join(fdir, fname)
     
-    fname = 'geo_perturbed_6obj_7day_obstime_10min.pkl'
+    fname = 'geo_twobody_6obj_7day_obstime_10min.pkl'
     obs_time_file = os.path.join(fdir, fname)
     
-    
+    fname = r'2022_12_14_meas_and_tracklet_tests\geo_twobody_6obj_7day_meas_10min_noise0_lam5.pkl'
+    meas_file = os.path.join(fdir, fname)
     
     # geo_perturbed_setup(setup_file)
     
@@ -1316,6 +1451,14 @@ if __name__ == '__main__':
     
     pass_length = 600.
     compute_obs_times(vis_file, pass_length, obs_time_file)
+    
+    
+    noise = 0.
+    lam_c = 5.
+    orbit_regime = 'GEO'
+    # generate_meas_file(noise, lam_c, orbit_regime, truth_file, obs_time_file, meas_file)
+    
+    
     
     
     
