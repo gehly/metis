@@ -842,7 +842,6 @@ def tudat_geo_2obj_setup(setup_file):
     filter_params['T_max'] = 100
     filter_params['T_threshold'] = 1e-3
     filter_params['p_surv'] = 1.
-    filter_params['p_det'] = 0.99
     filter_params['birth_model'] = birth_model
     
     # Integration function and additional settings    
@@ -918,8 +917,11 @@ def tudat_geo_2obj_setup(setup_file):
         sigma_dict['dec'] = 5.*arcsec2rad  # rad
         sensor_params[sensor_id]['sigma_dict'] = sigma_dict
         sensor_params[sensor_id]['lam_clutter'] = 5.
-        FOV_hlim = sensor_params[sensor_id]['FOV_hlim']
-        FOV_vlim = sensor_params[sensor_id]['FOV_vlim']        
+        sensor_params[sensor_id]['p_det'] = 0.99
+        FOV_hlim = [-5*np.pi/180., 5*np.pi/180.]  # sensor_params[sensor_id]['FOV_hlim']
+        FOV_vlim = [-5*np.pi/180., 5*np.pi/180.]  # sensor_params[sensor_id]['FOV_vlim']
+        sensor_params[sensor_id]['FOV_hlim'] = FOV_hlim
+        sensor_params[sensor_id]['FOV_vlim'] = FOV_vlim
         sensor_params[sensor_id]['V_sensor'] = (FOV_hlim[1] - FOV_hlim[0])*(FOV_vlim[1] - FOV_vlim[0])
 
         
@@ -956,20 +958,17 @@ def tudat_geo_2obj_setup(setup_file):
         EOP_data = eop.get_eop_data(eop_alldata, UTC)
         Zk_list = []
         sensor_kk_list = []
+        center_list = []
         for sensor_id in sensor_id_list:
             
             sensor = sensor_params[sensor_id]
-            p_det = filter_params['p_det']
+            p_det = sensor['p_det']
             center_flag = True            
             for Xj in truth_dict[tk_list[kk]]['Xt_list']:            
                           
                 if visfunc.check_visibility(Xj, state_params, sensor_params,
                                             sensor_id, UTC, EOP_data, XYs_df):
-                    
-                    # Incorporate missed detection
-                    if np.random.rand() > p_det:
-                        continue
-                    
+                                        
                     # Compute measurements
                     zj = mfunc.compute_measurement(Xj, state_params, sensor_params,
                                                    sensor_id, UTC, EOP_data, XYs_df,
@@ -979,6 +978,25 @@ def tudat_geo_2obj_setup(setup_file):
                     if center_flag:
                         center = zj.copy()
                         center_flag = False
+                        
+                    # Check if measurement is in FOV
+                    else:
+                        
+                        # Angle rollover in RA
+                        zj_test = zj - center
+                        if zj_test[0] > np.pi:
+                            zj_test[0] -= 2.*np.pi
+                        if zj_test[0] < -np.pi:
+                            zj_test[0] += 2.*np.pi                        
+                        
+                        if (zj_test[0] < FOV_hlim[0] or zj_test[0] > FOV_hlim[1] 
+                            or zj_test[1] < FOV_vlim[0] or zj_test[1] > FOV_vlim[1]):
+                            
+                            continue
+
+                    # Incorporate missed detection
+                    if np.random.rand() > p_det:
+                        continue
                     
                     # Add noise and store measurement data
                     zj[0] += np.random.randn()*sigma_dict['ra']
@@ -986,6 +1004,7 @@ def tudat_geo_2obj_setup(setup_file):
                     
                     Zk_list.append(zj)
                     sensor_kk_list.append(sensor_id)
+                    center_list.append(center)
             
             # Incorporate clutter measurements
             n_clutter = ss.poisson.rvs(sensor['lam_clutter'])
@@ -996,6 +1015,12 @@ def tudat_geo_2obj_setup(setup_file):
                 FOV_vlim = sensor['FOV_vlim']
                 ra  = center[0] + (FOV_hlim[1]-FOV_hlim[0])*(np.random.rand() - 0.5)
                 dec = center[1] + (FOV_vlim[1]-FOV_vlim[0])*(np.random.rand() - 0.5)
+                
+                # Angle rollover in RA
+                if ra > np.pi:
+                    ra -= 2.*np.pi
+                if ra < -np.pi:
+                    ra += 2.*np.pi
 
                 zclutter = np.reshape([ra, dec], (2,1))
                 Zk_list.append(zclutter)
@@ -1010,6 +1035,7 @@ def tudat_geo_2obj_setup(setup_file):
             meas_dict[UTC] = {}
             meas_dict[UTC]['Zk_list'] = [Zk_list[ii] for ii in inds]
             meas_dict[UTC]['sensor_id_list'] = [sensor_kk_list[ii] for ii in inds]
+            meas_dict[UTC]['center_list'] = [center_list[ii] for ii in inds]
                 
 
     # Plot data

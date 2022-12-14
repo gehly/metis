@@ -539,9 +539,10 @@ def lmb_filter(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):
 
         # Corrector Step
         Zk = meas_dict[tk]['Zk_list']
+        center_list = meas_dict[tk]['center_list']
         sensor_id_list = meas_dict[tk]['sensor_id_list']
-        LMB_dict = lmb_corrector(LMB_birth, LMB_surv, tk, Zk, sensor_id_list,
-                                 meas_fcn, params_dict)
+        LMB_dict = lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list,
+                                 sensor_id_list, meas_fcn, params_dict)
         
         print('')
         print('tk', tk)
@@ -768,7 +769,7 @@ def lmb_predictor(LMB_dict, tin, params_dict):
 
 
 
-def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, sensor_id_list, meas_fcn, params_dict):
+def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list, sensor_id_list, meas_fcn, params_dict):
     '''
     
     
@@ -790,7 +791,6 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, sensor_id_list, meas_fcn, params_
     gam = filter_params['gam']
     Wm = filter_params['Wm']
     diagWc = filter_params['diagWc']
-    p_det = filter_params['p_det']
     nstates = state_params['nstates']
     npoints = 2*nstates + 1
     nmeas = len(Zk)
@@ -855,6 +855,7 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, sensor_id_list, meas_fcn, params_
         # Retrieve measurement
         zi = Zk[ii]
         sensor_id = sensor_id_list[ii]
+        center = center_list[ii]
     
         # Loop over tracks
         for tt in range(len(full_label_list)):
@@ -929,6 +930,7 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, sensor_id_list, meas_fcn, params_
             
             # Normalize updated weights (this will always sum to 1?)
             # Vo, Vo, Phung 2014 Eq 27-28
+            p_det = compute_pd_statedep()
             factor = p_det/clutter_intensity(zi, sensor_id, sensor_params)            
             
             # print('factor', factor)
@@ -1012,6 +1014,7 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, sensor_id_list, meas_fcn, params_
             
             # Single sensor case
             sensor_id = sensor_id_list[0]
+            center = center_list[0]
             lam_clutter = sensor_params[sensor_id]['lam_clutter']
             
             log_likelihood = -lam_clutter + np.log(hyp_weight)
@@ -1022,7 +1025,7 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, sensor_id_list, meas_fcn, params_
                 means = GLMB_dict[hyp][label]['means']
                 covars = GLMB_dict[hyp][label]['covars']
                 
-                p_det = compute_pd_statedep(p_det, weights, means, covars, center,
+                p_det = compute_pd_statedep(weights, means, covars, center,
                                             sensor_id, sensor_params, meas_fcn)
                 
                 
@@ -1155,7 +1158,15 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, sensor_id_list, meas_fcn, params_
                         sensor_id = sensor_id_list[ii]
                         log_likelihood += np.log(clutter_intensity(zi, sensor_id, sensor_params))
                         
+                        
+                    # TODO - work out how to handle multisensor case where
+                    # each could have different pointing/p_det
                     for nn in range(nlabel):
+                        
+                        # Single sensor, 1 center value for all meas at this time
+                        center = center_list[0]
+                        p_det = compute_pd_statedep()
+                        
                         log_likelihood += np.log(1. - p_det)
                     
                     
@@ -1164,6 +1175,14 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, sensor_id_list, meas_fcn, params_
                         
                         label = label_list[jj]
                         meas_ind = alist[jj]
+                        
+                        
+                        # TODO - work out how to handle multisensor case where
+                        # each could have different pointing/p_det
+                        
+                        # Single sensor, 1 center value for all meas at this time
+                        center = center_list[0]
+                        p_det = compute_pd_statedep()
                         
                         
                         # print('alist', alist)
@@ -1675,10 +1694,13 @@ def compute_pd_statedep(tk, weights, means, covars, meas_fcn, sensor_id,
     
     
     # Break out inputs
-    pd_sensor = filter_params['p_det']
     gam = filter_params['gam']
     Wm = filter_params['Wm']
     diagWc = filter_params['diagWc']  
+    sensor = sensor_params[sensor_id]
+    pd_sensor = sensor['p_det']
+    FOV_hlim = sensor['FOV_hlim']
+    FOV_vlim = sensor['FOV_vlim']
     
     # Form GMM and merge components
     GMM_dict = {}
@@ -1708,7 +1730,20 @@ def compute_pd_statedep(tk, weights, means, covars, meas_fcn, sensor_id,
     zbar = np.reshape(zbar, (len(zbar), 1))
     
     # Compare zbar against FOV center and limits to get pd_fov
+    pd_fov = 1.
+    zbar_test = zbar - fov_center
     
+    # Angle rollover in RA
+    if zbar_test[0] > np.pi:
+        zbar_test[0] -= 2.*np.pi
+    if zbar_test[0] < -np.pi:
+        zbar_test[0] += 2.*np.pi                        
+    
+    if (zbar_test[0] < FOV_hlim[0] or zbar_test[0] > FOV_hlim[1] 
+        or zbar_test[1] < FOV_vlim[0] or zbar_test[1] > FOV_vlim[1]):
+        
+        pd_fov = 0.
+        
     
     # Multiply to get full pd
     pd = pd_sensor*pd_fov
