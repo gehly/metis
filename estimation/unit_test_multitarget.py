@@ -1214,7 +1214,7 @@ if __name__ == '__main__':
     # gen_mat_file(setup_file, setup_file_mat)
     
     
-    run_multitarget_filter(setup_file, results_file)
+    # run_multitarget_filter(setup_file, results_file)
     
     # multitarget_analysis(results_file)
     
