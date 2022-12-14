@@ -871,6 +871,7 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list, sensor_id_list, meas
             covars = []
             for jj in range(ncomp):        
                 
+                wj = weights0[jj]
                 mj = means0[jj]
                 Pj = covars0[jj]
                 
@@ -930,7 +931,9 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list, sensor_id_list, meas
             
             # Normalize updated weights (this will always sum to 1?)
             # Vo, Vo, Phung 2014 Eq 27-28
-            p_det = compute_pd_statedep()
+            p_det = compute_pd_statedep(tk, [wj], [mj], [Pj], meas_fcn, sensor_id,
+                                        center, state_params, filter_params, 
+                                        sensor_params)
             factor = p_det/clutter_intensity(zi, sensor_id, sensor_params)            
             
             # print('factor', factor)
@@ -1025,8 +1028,9 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list, sensor_id_list, meas
                 means = GLMB_dict[hyp][label]['means']
                 covars = GLMB_dict[hyp][label]['covars']
                 
-                p_det = compute_pd_statedep(weights, means, covars, center,
-                                            sensor_id, sensor_params, meas_fcn)
+                p_det = compute_pd_statedep(tk, weights, means, covars, meas_fcn,
+                                            sensor_id, center, state_params,
+                                            filter_params, sensor_params)
                 
                 
                 log_likelihood += np.log(1. - p_det)
@@ -1165,7 +1169,17 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list, sensor_id_list, meas
                         
                         # Single sensor, 1 center value for all meas at this time
                         center = center_list[0]
-                        p_det = compute_pd_statedep()
+                        
+                        # Retrieve state information for this track
+                        label = label_list[nn]
+                        weights = GLMB_dict[hyp][label]['weights']
+                        means = GLMB_dict[hyp][label]['means']
+                        covars = GLMB_dict[hyp][label]['covars']                        
+                        
+                        # Compute state dependent p_det for this track
+                        p_det = compute_pd_statedep(tk, weights, means, covars, meas_fcn,
+                                                    sensor_id, center, state_params,
+                                                    filter_params, sensor_params)
                         
                         log_likelihood += np.log(1. - p_det)
                     
@@ -1182,7 +1196,16 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list, sensor_id_list, meas
                         
                         # Single sensor, 1 center value for all meas at this time
                         center = center_list[0]
-                        p_det = compute_pd_statedep()
+                        
+                        # Retrieve state information for this track
+                        weights = GLMB_dict[hyp][label]['weights']
+                        means = GLMB_dict[hyp][label]['means']
+                        covars = GLMB_dict[hyp][label]['covars']
+                        
+                        # Compute state dependent p_det for this track
+                        p_det = compute_pd_statedep(tk, weights, means, covars, meas_fcn,
+                                                    sensor_id, center, state_params,
+                                                    filter_params, sensor_params)
                         
                         
                         # print('alist', alist)
@@ -1244,7 +1267,7 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list, sensor_id_list, meas
                             # print('label', track_update[tind]['label'])
                             # print('meas_ind', track_update[tind]['meas_ind'])
                             
-                            # Incorporate likelihood
+                            # Incorporate likelihood (includes p_det from before)
                             eta = sum(weights)
                             # likelihood *= eta
                             
@@ -1696,7 +1719,6 @@ def compute_pd_statedep(tk, weights, means, covars, meas_fcn, sensor_id,
     # Break out inputs
     gam = filter_params['gam']
     Wm = filter_params['Wm']
-    diagWc = filter_params['diagWc']  
     sensor = sensor_params[sensor_id]
     pd_sensor = sensor['p_det']
     FOV_hlim = sensor['FOV_hlim']
@@ -1717,7 +1739,6 @@ def compute_pd_statedep(tk, weights, means, covars, meas_fcn, sensor_id,
     mj = GMM_dict['means'][ind]
     Pj = GMM_dict['covars'][ind]
     nstates = len(mj)
-    npoints = nstates*2 + 1
     
     # Compute sigma points
     sqP = np.linalg.cholesky(Pj)

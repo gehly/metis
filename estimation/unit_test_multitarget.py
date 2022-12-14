@@ -918,8 +918,8 @@ def tudat_geo_2obj_setup(setup_file):
         sensor_params[sensor_id]['sigma_dict'] = sigma_dict
         sensor_params[sensor_id]['lam_clutter'] = 5.
         sensor_params[sensor_id]['p_det'] = 0.99
-        FOV_hlim = [-5*np.pi/180., 5*np.pi/180.]  # sensor_params[sensor_id]['FOV_hlim']
-        FOV_vlim = [-5*np.pi/180., 5*np.pi/180.]  # sensor_params[sensor_id]['FOV_vlim']
+        FOV_hlim = [-0.5*np.pi/180., 0.5*np.pi/180.]  # sensor_params[sensor_id]['FOV_hlim']
+        FOV_vlim = [-0.5*np.pi/180., 0.5*np.pi/180.]  # sensor_params[sensor_id]['FOV_vlim']
         sensor_params[sensor_id]['FOV_hlim'] = FOV_hlim
         sensor_params[sensor_id]['FOV_vlim'] = FOV_vlim
         sensor_params[sensor_id]['V_sensor'] = (FOV_hlim[1] - FOV_hlim[0])*(FOV_vlim[1] - FOV_vlim[0])
@@ -992,7 +992,23 @@ def tudat_geo_2obj_setup(setup_file):
                         if (zj_test[0] < FOV_hlim[0] or zj_test[0] > FOV_hlim[1] 
                             or zj_test[1] < FOV_vlim[0] or zj_test[1] > FOV_vlim[1]):
                             
+                            print('missed det')
+                            print('center', center)
+                            print('zj', zj)
+                            print('zj_test', zj_test)
+                            print('FOV_hlim', FOV_hlim)
+                            print('FOV_vlim', FOV_vlim)
+                            
                             continue
+                        
+                        print('detection')
+                        print('center', center)
+                        print('zj', zj)
+                        print('zj_test', zj_test)
+                        print('FOV_hlim', FOV_hlim)
+                        print('FOV_vlim', FOV_vlim)
+                        
+                        
 
                     # Incorporate missed detection
                     if np.random.rand() > p_det:
@@ -1025,6 +1041,7 @@ def tudat_geo_2obj_setup(setup_file):
                 zclutter = np.reshape([ra, dec], (2,1))
                 Zk_list.append(zclutter)
                 sensor_kk_list.append(sensor_id)
+                center_list.append(center)
 
         # If measurements were collected, randomize order and store
         if len(Zk_list) > 0:
@@ -1176,11 +1193,11 @@ if __name__ == '__main__':
     
     plt.close('all')
     
-    fdir = r'D:\documents\research_projects\multitarget\data\sim\test\2022_12_13_lmb_geo_2obj'
+    fdir = r'D:\documents\research_projects\multitarget\data\sim\test\2022_12_14_lmb_geo_2obj'
     
     
-    setup_file = os.path.join(fdir, 'tudat_geo_twobody_2obj_pd1_lam5_setup.pkl')
-    results_file = os.path.join(fdir, 'tudat_geo_twobody_2obj_pd1_lam5_lmb_results.pkl')
+    setup_file = os.path.join(fdir, 'tudat_geo_twobody_2obj_pd099_lam5_fov05_setup.pkl')
+    results_file = os.path.join(fdir, 'tudat_geo_twobody_2obj_pd099_lam5_fov05_lmb_results.pkl')
     
     
     # tudat_geo_2obj_setup(setup_file)    
@@ -1197,9 +1214,9 @@ if __name__ == '__main__':
     # gen_mat_file(setup_file, setup_file_mat)
     
     
-    # run_multitarget_filter(setup_file, results_file)
+    run_multitarget_filter(setup_file, results_file)
     
-    multitarget_analysis(results_file)
+    # multitarget_analysis(results_file)
     
     
     
