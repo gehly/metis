@@ -1286,7 +1286,7 @@ def single_day_obs_times(vis_df, date, obs_times, pass_length):
     return obs_times
 
 
-def generate_meas_file(noise, lam_c, orbit_regime, truth_file, obs_time_file, meas_file):
+def generate_meas_file(noise, lam_c, p_det, orbit_regime, truth_file, obs_time_file, meas_file):
     
     gap_length = 100.  # seconds
     
@@ -1317,6 +1317,7 @@ def generate_meas_file(noise, lam_c, orbit_regime, truth_file, obs_time_file, me
         sensor_params[sensor_id]['sigma_dict']['ra'] = max(noise,1.)*arcsec2rad
         sensor_params[sensor_id]['sigma_dict']['dec'] = max(noise,1.)*arcsec2rad
         sensor_params[sensor_id]['lam_clutter'] = lam_c
+        sensor_params[sensor_id]['p_det'] = p_det
     
     # Form obj_id_list from obs_times
     obj_id_list = sorted(list(obs_times.keys()))    
@@ -1336,6 +1337,12 @@ def generate_meas_file(noise, lam_c, orbit_regime, truth_file, obs_time_file, me
         
         # Retrieve tk_list and form tracklet time sublists
         tk_list = obs_times[obj_id]['tk_list']
+        
+        print(obj_id)
+        print(tk_list)
+        # mistake
+
+        
         tracklet_sublists = []
         for kk in range(len(tk_list)):
             
@@ -1354,22 +1361,30 @@ def generate_meas_file(noise, lam_c, orbit_regime, truth_file, obs_time_file, me
                 tracklet_sublists.append(tk_tracklet)
                 tk_tracklet = [tk_list[kk]]
                 
+            # If reached the end, store tracklet
+            if kk == (len(tk_list) - 1):
+                tracklet_sublists.append(tk_tracklet)
+                
                 
         print(obj_id)
         
         for tk_tracklet in tracklet_sublists:
             print('')
             print(tk_tracklet)
-                
+
         
         # Loop over sensors
-        for sensor_id in sensor_id_list:    
+        for sensor_id in sensor_id_list:  
+            
             
             # Sensor data
             p_det = sensor_params[sensor_id]['p_det']
             lam_clutter = sensor_params[sensor_id]['lam_clutter']
             FOV_hlim = sensor_params[sensor_id]['FOV_hlim']
             FOV_vlim = sensor_params[sensor_id]['FOV_vlim']
+            
+            # print(sensor_params[sensor_id])
+            # mistake
             
             # Loop over tracklet times
             for tk_tracklet in tracklet_sublists:
@@ -1383,6 +1398,9 @@ def generate_meas_file(noise, lam_c, orbit_regime, truth_file, obs_time_file, me
                 tracklet_dict[tracklet_id]['sensor_id_list'] = []
                 
                 for tk in tk_tracklet:
+                    
+                    print('')
+                    print(tk)
                     
                     # Initialize meas_dict entry
                     if tk in meas_dict:
@@ -1421,7 +1439,7 @@ def generate_meas_file(noise, lam_c, orbit_regime, truth_file, obs_time_file, me
                     zj[1] += np.random.rand()*noise*arcsec2rad
                     
                     # Incorporate p_det for main object
-                    if np.randon.rand() <= p_det:
+                    if np.random.rand() <= p_det:
                         
                         # Store tracklet data
                         tracklet_dict[tracklet_id]['tk_list'].append(tk)
@@ -1433,8 +1451,10 @@ def generate_meas_file(noise, lam_c, orbit_regime, truth_file, obs_time_file, me
                         # Gooding IOD solution. Skip these entries for the 
                         # meas_dict supplied to the filter to avoid double
                         # counting measurements
-                        if tk_tracklet.index(tk) == 0 or tk_tracklet.index(tk) == (len(tk_tracklet) - 1):
-                            continue
+                        # if tk_tracklet.index(tk) == 0 or tk_tracklet.index(tk) == (len(tk_tracklet) - 1):
+                        #     continue
+                        
+                        # print('add to meas dict')
                         
                         # Store meas data
                         meas_Zk.append(zj)
@@ -1445,13 +1465,19 @@ def generate_meas_file(noise, lam_c, orbit_regime, truth_file, obs_time_file, me
                     # Check all other objects if visible and generate measurements
                     for obj_id2 in obj_id_sublist:
                         
+                        print('check other obj visible')
+                        print('obj_id2', obj_id2)
+                        
                         # True object state
-                        X2 = truth_dict[tk][obj_id]
+                        X2 = truth_dict[tk][obj_id2]
                     
                         # If object visible, apply p_det and noise and store meas_dict
                         if not visfunc.check_visibility(X2, state_params, sensor_params,
                                                         sensor_id, tk, EOP_data, XYs_df):
                             continue
+                        
+                        
+                        print('object pass visibility check')
                         
                         z2 = mfunc.compute_measurement(X2, state_params, sensor_params,
                                                        sensor_id, tk, EOP_data, XYs_df)
@@ -1467,8 +1493,13 @@ def generate_meas_file(noise, lam_c, orbit_regime, truth_file, obs_time_file, me
                             
                             continue
                         
+                        print('object is in FOV')
+                        
+                        
                         if np.random.rand() > p_det:
                             continue
+                        
+                        print('object detected!')
                         
                         # Add noise and store
                         z2[0] += np.random.rand()*noise*arcsec2rad
@@ -1509,8 +1540,33 @@ def generate_meas_file(noise, lam_c, orbit_regime, truth_file, obs_time_file, me
                         meas_dict[tk]['Zk_list'] = [meas_Zk[ii] for ii in inds]
                         meas_dict[tk]['sensor_id_list'] = [meas_sensor_id[ii] for ii in inds]
                         meas_dict[tk]['center_list'] = [meas_center[ii] for ii in inds]
+                        
+                        print('tk', tk)
+                        print('meas dict tk')
+                        print(meas_dict[tk])
+                        print('')
                     
             
+                # Summary and cleanup
+                print('tracklet_dict entry')
+                print(tracklet_dict[tracklet_id])
+                
+                # print(meas_dict.keys())
+                
+                # First and last entries in trackelts will be used for
+                # Gooding IOD solution. Skip these entries for the 
+                # meas_dict supplied to the filter to avoid double
+                # counting measurements
+                t0 = tracklet_dict[tracklet_id]['tk_list'][0]
+                tf = tracklet_dict[tracklet_id]['tk_list'][-1]
+                del meas_dict[t0]
+                del meas_dict[tf]
+                
+                # print(meas_dict.keys())
+                
+                # mistake
+                
+                
                 # Increment tracklet index
                 tracklet_id += 1
     
@@ -1519,6 +1575,33 @@ def generate_meas_file(noise, lam_c, orbit_regime, truth_file, obs_time_file, me
     pklFile = open( meas_file, 'wb' )
     pickle.dump( [tracklet_dict, meas_dict, sensor_params], pklFile, -1 )
     pklFile.close()
+    
+    
+    return
+
+
+def check_meas_file(meas_file):
+    
+    # Load data
+    pklFile = open(meas_file, 'rb' )
+    data = pickle.load( pklFile )
+    tracklet_dict = data[0]
+    meas_dict = data[1]
+    sensor_params = data[2]
+    pklFile.close()
+    
+    
+    for tracklet_id in tracklet_dict:
+        
+        tracklet = tracklet_dict[tracklet_id]
+        
+        print('')
+        print('tracklet_id', tracklet_id)
+        print('obj_id', tracklet['obj_id'])
+        print('orbit_regime', tracklet['orbit_regime'])
+        print('nmeas', len(tracklet['Zk_list']))
+        print('t0', tracklet['tk_list'][0])
+        print('tf', tracklet['tk_list'][-1])
     
     
     return
@@ -1572,10 +1655,11 @@ if __name__ == '__main__':
     
     noise = 0.
     lam_c = 5.
+    p_det = 0.99
     orbit_regime = 'GEO'
-    generate_meas_file(noise, lam_c, orbit_regime, truth_file, obs_time_file, meas_file)
+    # generate_meas_file(noise, lam_c, p_det, orbit_regime, truth_file, obs_time_file, meas_file)
     
-    
+    check_meas_file(meas_file)
     
     
     
