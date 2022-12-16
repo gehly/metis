@@ -1436,8 +1436,8 @@ def generate_meas_file(noise, lam_c, p_det, orbit_regime, truth_file, obs_time_f
                     center = zj.copy()
                     
                     # Add noise
-                    zj[0] += np.random.rand()*noise*arcsec2rad
-                    zj[1] += np.random.rand()*noise*arcsec2rad
+                    zj[0] += np.random.randn()*noise*arcsec2rad
+                    zj[1] += np.random.randn()*noise*arcsec2rad
                     
                     # Incorporate p_det for main object
                     if np.random.rand() <= p_det:
@@ -1503,8 +1503,8 @@ def generate_meas_file(noise, lam_c, p_det, orbit_regime, truth_file, obs_time_f
                         print('object detected!')
                         
                         # Add noise and store
-                        z2[0] += np.random.rand()*noise*arcsec2rad
-                        z2[1] += np.random.rand()*noise*arcsec2rad
+                        z2[0] += np.random.randn()*noise*arcsec2rad
+                        z2[1] += np.random.randn()*noise*arcsec2rad
                         
                         meas_Zk.append(z2)
                         meas_sensor_id.append(sensor_id)
@@ -1810,6 +1810,19 @@ def run_multitarget_filter(setup_file, results_file):
     params_dict = data[3]
     truth_dict = data[4]
     pklFile.close()
+    
+    # Reduce meas dict to times of interest
+    t0 = datetime(2022, 11, 7, 0, 0, 0)
+    tf = datetime(2022, 11, 8, 0, 0, 0)
+    tk_list = sorted(list(meas_dict.keys()))
+    
+    for tk in tk_list:
+        if tk < t0 or tk > tf:
+            del meas_dict[tk]
+            
+    print(meas_dict.keys())
+    print(len(meas_dict.keys()))
+    
 
 
     filter_output, full_state_output = mult.lmb_filter(state_dict, truth_dict, meas_dict, meas_fcn, params_dict)
@@ -1852,7 +1865,7 @@ if __name__ == '__main__':
     # test_tracklet_association()
     
     fdir = r'D:\documents\research_projects\iod\data\sim\test\aas2023_geo_6obj_7day'
-    fdir2 = os.path.join(fdir, '2022_12_14_meas_and_tracklet_tests')
+    fdir2 = os.path.join(fdir, '2022_12_16_geo_twobody_6obj_7day')
     
     
     
@@ -1865,16 +1878,16 @@ if __name__ == '__main__':
     fname = 'geo_twobody_6obj_7day_truth.pkl'    
     truth_file = os.path.join(fdir2, fname)
     
-    # fname = 'geo_twobody_6obj_7day_obstime_10min.pkl'
-    # obs_time_file = os.path.join(fdir, fname)
+    fname = 'geo_twobody_6obj_7day_obstime_10min.pkl'
+    obs_time_file = os.path.join(fdir, fname)
     
-    fname = r'geo_twobody_6obj_7day_meas_10min_noise0_lam5.pkl'
+    fname = r'geo_twobody_6obj_7day_meas_10min_noise1_lam5.pkl'
     meas_file = os.path.join(fdir2, fname)
     
-    fname = 'geo_twobody_6obj_7day_setup_10min_noise0_lam5.pkl'
+    fname = 'geo_twobody_6obj_7day_setup_10min_noise1_lam5.pkl'
     setup_file = os.path.join(fdir2, fname)  
     
-    fname = 'geo_twobody_6obj_7day_10min_noise0_lam5_results.pkl'
+    fname = 'geo_twobody_6obj_7day_10min_noise1_lam5_results_1.pkl'
     results_file = os.path.join(fdir2, fname)
     
     
@@ -1894,7 +1907,7 @@ if __name__ == '__main__':
     # compute_obs_times(vis_file, pass_length, obs_time_file)
     
     
-    noise = 0.
+    noise = 1.
     lam_c = 5.
     p_det = 0.99
     orbit_regime = 'GEO'
@@ -1908,7 +1921,9 @@ if __name__ == '__main__':
     
     
     # Run Filter
-    run_multitarget_filter(setup_file, results_file)
+    # run_multitarget_filter(setup_file, results_file)
+    
+    multitarget_analysis(results_file)
     
     
     

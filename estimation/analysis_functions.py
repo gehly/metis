@@ -1810,6 +1810,12 @@ def lmb_orbit_errors(filter_output, full_state_output, truth_dict):
     tk_list = list(full_state_output.keys())
     t0 = sorted(truth_dict.keys())[0]
     
+    obj_id_list = sorted(truth_dict[tk_list[0]].keys())
+    if 42709 in obj_id_list:
+        del obj_id_list[obj_id_list.index(42709)]
+    
+    print(obj_id_list)
+    
     # print(t0)
     # print(tk_list[0])
     thrs = [(tk - t0).total_seconds()/3600. for tk in tk_list]
@@ -1819,7 +1825,8 @@ def lmb_orbit_errors(filter_output, full_state_output, truth_dict):
     thrs_meas = [(tk - t0).total_seconds()/3600. for tk in meas_tk_list]
     
     # Number of states and measurements
-    Xo = truth_dict[meas_t0]['Xt_list'][0]
+    obj_id = list(truth_dict[meas_t0].keys())[0]
+    Xo = truth_dict[meas_t0][obj_id]
     resids0 = filter_output[meas_t0]['resids'][0]
     n = len(Xo)
     p = len(resids0)
@@ -1876,7 +1883,10 @@ def lmb_orbit_errors(filter_output, full_state_output, truth_dict):
         rksum_array[kk] = sum(rk_list)
         
         # Compute OSPA errors
-        Xt_list = truth_dict[tk]['Xt_list']
+        # Xt_list = truth_dict[tk]['Xt_list']
+        Xt_list = []
+        for obj_id in obj_id_list:
+            Xt_list.append(truth_dict[tk][obj_id])
         N_true[kk] = len(Xt_list)
         
         OSPA, OSPA_pos, OSPA_vel, OSPA_card, row_indices = \
@@ -1888,12 +1898,13 @@ def lmb_orbit_errors(filter_output, full_state_output, truth_dict):
         ospa_card[kk] = OSPA_card
         
         # Choose 1 object as representative case for error/covariance plots
-        label_plot = label_list[0]
+        ii = 0
+        label_plot = label_list[ii]
         
-        if len(Xt_list) >= len(Xk_list):            
-            ii = row_indices[0]
-        else:
-            ii = row_indices.index(0)
+        # if len(Xt_list) >= len(Xk_list):            
+        #     ii = row_indices[0]
+        # else:
+        #     ii = row_indices.index(0)
 
         print(row_indices)
         print(ii)
@@ -1903,6 +1914,13 @@ def lmb_orbit_errors(filter_output, full_state_output, truth_dict):
         Xt = Xt_list[ii]
         Xk = Xk_list[0]
         Pk = Pk_list[0]
+        
+        print(label_list[0])
+        print(obj_id_list[0])
+        print('Xt', Xt)
+        print('Xk', Xk)
+        
+        mistake
         
         X_err[:,kk] = (Xk - Xt).flatten()
         sig_x[kk] = np.sqrt(Pk[0,0])

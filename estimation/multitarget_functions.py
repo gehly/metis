@@ -890,6 +890,7 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list, sensor_id_list, meas
                 Pxy = np.dot(chi_diff,  np.dot(diagWc, z_diff.T))
                 
                 print('')
+                print(tk)
                 print('ii', ii)
                 print('zi', zi)
                 print('label', label)
