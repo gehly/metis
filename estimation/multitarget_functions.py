@@ -1526,7 +1526,7 @@ def lmb_cleanup(LMB_in, params_dict):
     # Compute minimum existence probability to keep
     if len(r_list) > T_max:
         sorted_r = sorted(r_list)
-        rmin = min([T_threshold, sorted_r[T_max]])
+        rmin = max([T_threshold, sorted_r[T_max]])
     else:
         rmin = T_threshold
         

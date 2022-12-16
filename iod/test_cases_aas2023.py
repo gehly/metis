@@ -21,6 +21,7 @@ sys.path.append(metis_dir)
 from iod import iod_functions as iod
 import estimation.analysis_functions as analysis
 import estimation.estimation_functions as est
+from estimation import multitarget_functions as mult
 import dynamics.dynamics_functions as dyn
 import sensors.measurement_functions as mfunc
 import sensors.sensors as sens
@@ -1591,9 +1592,26 @@ def check_meas_file(meas_file):
     pklFile.close()
     
     
+    t0 = datetime(2022, 11, 7, 11, 0, 0)
+    
+    sensor_id_list = list(sensor_params.keys())
+    del sensor_id_list[sensor_id_list.index('eop_alldata')]
+    del sensor_id_list[sensor_id_list.index('XYs_df')]
+    
+    # Tracklet data
+    obj_id_list = []
+    for tracklet_id in tracklet_dict:
+        obj_id_list.append(tracklet_dict[tracklet_id]['obj_id'])
+        
+    obj_id_list = sorted(list(set(obj_id_list)))
+    
+    plot_dict = {}
     for tracklet_id in tracklet_dict:
         
         tracklet = tracklet_dict[tracklet_id]
+        obj_id = tracklet['obj_id']
+        tk_list = tracklet['tk_list']
+        tracklet_sensor_id = tracklet['sensor_id_list']
         
         print('')
         print('tracklet_id', tracklet_id)
@@ -1602,7 +1620,221 @@ def check_meas_file(meas_file):
         print('nmeas', len(tracklet['Zk_list']))
         print('t0', tracklet['tk_list'][0])
         print('tf', tracklet['tk_list'][-1])
+        
+        if obj_id not in plot_dict:
+            plot_dict[obj_id] = {}
+            plot_dict[obj_id]['thrs'] = []
+            plot_dict[obj_id]['sensor_index'] = []
+            
+        for kk in range(len(tk_list)):
+            tk = tk_list[kk]
+            ind = sensor_id_list.index(tracklet_sensor_id[kk])
+            plot_dict[obj_id]['thrs'].append((tk-t0).total_seconds()/3600.)
+            plot_dict[obj_id]['sensor_index'].append(ind)
+            
+            
+        
+        
+        
+    # Measurement and pre-fit residuals data
+    meas_tk = sorted(meas_dict.keys())
+    meas_tplot = [(tk - t0).total_seconds()/3600. for tk in meas_tk]
+    nmeas_plot = []
+    ra_plot = []
+    dec_plot = []
+    resids_tplot = []
+    for tk in meas_tk:
+            
+        Zk_list = meas_dict[tk]['Zk_list']
+        center_list = meas_dict[tk]['center_list']
+        
+        # sensor_id_list = meas_dict[tk]['sensor_id_list']
+        # meas_sensor_id = meas_dict[tk]['sensor_id_list']
+        # meas_sensor_index = [sensor_id_list.index(sensor_id) for sensor_id in meas_sensor_id]
+        
+        nmeas_plot.append(len(Zk_list))
+        
+        for ii in range(len(Zk_list)):
+            zi = Zk_list[ii]
+            center = center_list[ii]
+            resid = (zi - center)*(1./arcsec2rad)
+            ra_plot.append(resid[0])
+            dec_plot.append(resid[1])
+            resids_tplot.append((tk - t0).total_seconds()/3600.)
+            
     
+    
+    fig = plt.figure()
+    ax1 = fig.add_axes([0.1, 0.1, 0.8, 0.8])
+    clist = ['r', 'g', 'b', 'c', 'k', 'y', 'm', 'c']
+    for ii in range(len(obj_id_list)):
+        obj_id = obj_id_list[ii]
+        color = clist[ii]
+        
+        ax1.plot(plot_dict[obj_id]['thrs'], plot_dict[obj_id]['sensor_index'], '.', color=color)
+        
+    plt.xlabel('Time [hours]')
+    ax1.set_yticks([0])
+    ax1.set_yticklabels(sensor_id_list, rotation=90, verticalalignment='center')
+    plt.legend(obj_id_list)
+    plt.title('Tracklets')
+    
+    
+    plt.figure()
+    plt.plot(meas_tplot, nmeas_plot, 'k.')
+    plt.ylabel('Number of Meas')
+    plt.xlabel('Time [hours]')
+    
+    plt.figure()
+    plt.subplot(2,1,1)
+    plt.plot(resids_tplot, ra_plot, 'k.')
+    plt.ylabel('RA [arcsec]')
+    plt.title('Prefit Residuals')
+    plt.subplot(2,1,2)
+    plt.plot(resids_tplot, dec_plot, 'k.')
+    plt.ylabel('DEC [arcsec]')
+    plt.xlabel('Time [hours]')
+    
+                
+    plt.show() 
+    
+    
+    return
+
+
+def tudat_geo_lmb_setup_no_birth(truth_file, meas_file, setup_file):
+    
+    
+    # Don't use sensor_params from truth file it has been updated for meas
+    pklFile = open(truth_file, 'rb' )
+    data = pickle.load( pklFile )
+    truth_dict = data[0]
+    state_params = data[1]
+    int_params = data[2]
+    pklFile.close()
+        
+    # Load measurement data and sensor params
+    pklFile = open(meas_file, 'rb' )
+    data = pickle.load( pklFile )
+    tracklet_dict = data[0]
+    meas_dict = data[1]
+    sensor_params = data[2]
+    pklFile.close()
+    
+    # Setup filter params
+    # LMB Birth Model
+    birth_model = {}
+    
+    # Filter parameters
+    filter_params = {}
+    filter_params['Q'] = 1e-16 * np.diag([1, 1, 1])
+    filter_params['snc_flag'] = 'gamma'
+    filter_params['gap_seconds'] = 900.
+    filter_params['alpha'] = 1e-4
+    filter_params['pnorm'] = 2.
+    filter_params['prune_T'] = 1e-3
+    filter_params['merge_U'] = 36.
+    filter_params['H_max'] = 1000
+    filter_params['H_max_birth'] = 5
+    filter_params['T_max'] = 100
+    filter_params['T_threshold'] = 1e-3
+    filter_params['p_surv'] = 1.
+    filter_params['birth_model'] = birth_model
+    
+    # Additions to other parameter dictionaries
+    state_params['nstates'] = 6
+    
+    
+    
+    # Initial state LMB for filter
+    tk_list = sorted(truth_dict.keys())
+    obj_id_list = sorted(truth_dict[tk_list[0]].keys())
+    if 42709 in obj_id_list:
+        del obj_id_list[obj_id_list.index(42709)]
+    
+    print(obj_id_list)
+
+    
+    LMB_dict = {}
+    P = np.diag([1., 1., 1., 1e-6, 1e-6, 1e-6])
+    ii = 1
+    for obj_id in obj_id_list:
+        
+        X_true = truth_dict[tk_list[0]][obj_id]
+        pert_vect = np.multiply(np.sqrt(np.diag(P)), np.random.randn(6))
+        X_init = X_true + np.reshape(pert_vect, (6, 1))
+        
+        LMB_dict[(tk_list[0], ii)] = {}
+        LMB_dict[(tk_list[0], ii)]['r'] = 0.999
+        LMB_dict[(tk_list[0], ii)]['weights'] = [1.]
+        LMB_dict[(tk_list[0], ii)]['means'] = [X_init]
+        LMB_dict[(tk_list[0], ii)]['covars'] = [P]
+        
+        ii += 1
+        
+        
+    print(LMB_dict)
+
+        
+    state_dict = {}
+    state_dict[tk_list[0]] = {}
+    state_dict[tk_list[0]]['LMB_dict'] = LMB_dict
+    
+    
+    
+    # Save final setup file
+    params_dict = {}
+    params_dict['state_params'] = state_params
+    params_dict['filter_params'] = filter_params
+    params_dict['int_params'] = int_params
+    params_dict['sensor_params'] = sensor_params
+    
+    meas_fcn = mfunc.unscented_radec
+                
+    pklFile = open( setup_file, 'wb' )
+    pickle.dump( [state_dict, meas_fcn, meas_dict, params_dict, truth_dict], pklFile, -1 )
+    pklFile.close()
+    
+    
+    return
+
+
+def run_multitarget_filter(setup_file, results_file):
+    
+    
+    pklFile = open(setup_file, 'rb' )
+    data = pickle.load( pklFile )
+    state_dict = data[0]
+    meas_fcn = data[1]
+    meas_dict = data[2]
+    params_dict = data[3]
+    truth_dict = data[4]
+    pklFile.close()
+
+
+    filter_output, full_state_output = mult.lmb_filter(state_dict, truth_dict, meas_dict, meas_fcn, params_dict)
+    
+    
+    pklFile = open( results_file, 'wb' )
+    pickle.dump( [filter_output, full_state_output, params_dict, truth_dict], pklFile, -1 )
+    pklFile.close()
+
+    
+    return
+
+
+def multitarget_analysis(results_file):
+    
+    pklFile = open(results_file, 'rb' )
+    data = pickle.load( pklFile )
+    filter_output = data[0]
+    full_state_output = data[1]
+    params_dict = data[2]
+    truth_dict = data[3]
+    pklFile.close()
+    
+    
+    analysis.lmb_orbit_errors(filter_output, filter_output, truth_dict)
     
     return
 
@@ -1620,24 +1852,33 @@ if __name__ == '__main__':
     # test_tracklet_association()
     
     fdir = r'D:\documents\research_projects\iod\data\sim\test\aas2023_geo_6obj_7day'
+    fdir2 = os.path.join(fdir, '2022_12_14_meas_and_tracklet_tests')
     
-    # fname = 'geo_twobody_6obj_7day_setup.pkl'
-    # setup_file = os.path.join(fdir, fname)  
+    
     
     # fname = 'geo_twobody_6obj_7day_truth_13.pkl'    
     # prev_file = os.path.join(fdir, fname)
     
-    fname = 'geo_twobody_6obj_7day_visibility.csv'
-    vis_file = os.path.join(fdir, fname)
+    # fname = 'geo_twobody_6obj_7day_visibility.csv'
+    # vis_file = os.path.join(fdir, fname)
     
     fname = 'geo_twobody_6obj_7day_truth.pkl'    
-    truth_file = os.path.join(fdir, fname)
+    truth_file = os.path.join(fdir2, fname)
     
-    fname = 'geo_twobody_6obj_7day_obstime_10min.pkl'
-    obs_time_file = os.path.join(fdir, fname)
+    # fname = 'geo_twobody_6obj_7day_obstime_10min.pkl'
+    # obs_time_file = os.path.join(fdir, fname)
     
-    fname = r'2022_12_14_meas_and_tracklet_tests\geo_twobody_6obj_7day_meas_10min_noise0_lam5.pkl'
-    meas_file = os.path.join(fdir, fname)
+    fname = r'geo_twobody_6obj_7day_meas_10min_noise0_lam5.pkl'
+    meas_file = os.path.join(fdir2, fname)
+    
+    fname = 'geo_twobody_6obj_7day_setup_10min_noise0_lam5.pkl'
+    setup_file = os.path.join(fdir2, fname)  
+    
+    fname = 'geo_twobody_6obj_7day_10min_noise0_lam5_results.pkl'
+    results_file = os.path.join(fdir2, fname)
+    
+    
+    
     
     # geo_perturbed_setup(setup_file)
     
@@ -1659,8 +1900,15 @@ if __name__ == '__main__':
     orbit_regime = 'GEO'
     # generate_meas_file(noise, lam_c, p_det, orbit_regime, truth_file, obs_time_file, meas_file)
     
-    check_meas_file(meas_file)
+    # check_meas_file(meas_file)
     
+    
+    # tudat_geo_lmb_setup_no_birth(truth_file, meas_file, setup_file)
+    
+    
+    
+    # Run Filter
+    run_multitarget_filter(setup_file, results_file)
     
     
     
