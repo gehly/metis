@@ -1876,6 +1876,7 @@ def lmb_orbit_errors(filter_output, full_state_output, truth_dict):
         Xk_list = full_state_output[tk]['Xk_list']
         Pk_list = full_state_output[tk]['Pk_list']
         resids_k = full_state_output[tk]['resids']
+        sorted_labels = sorted(label_list)
 
         # Cardinality related terms
         nlabel_array[kk] = len(label_list)
@@ -1898,8 +1899,10 @@ def lmb_orbit_errors(filter_output, full_state_output, truth_dict):
         ospa_card[kk] = OSPA_card
         
         # Choose 1 object as representative case for error/covariance plots
-        ii = 0
-        label_plot = label_list[ii]
+        ii = 1
+        # label_plot = label_list[ii]
+        label_ii = sorted_labels[ii]
+        label_ind = label_list.index(label_ii)
         
         # if len(Xt_list) >= len(Xk_list):            
         #     ii = row_indices[0]
@@ -1907,20 +1910,21 @@ def lmb_orbit_errors(filter_output, full_state_output, truth_dict):
         #     ii = row_indices.index(0)
 
         print(row_indices)
-        print(ii)
+        print('ii', ii)
+        print('label_ii', label_ii)
+        print('label_ind', label_ind)
         print(Xt_list)
         print(Xk_list)        
 
         Xt = Xt_list[ii]
-        Xk = Xk_list[0]
-        Pk = Pk_list[0]
+        Xk = Xk_list[label_ind]
+        Pk = Pk_list[label_ind]
         
-        print(label_list[0])
-        print(obj_id_list[0])
+        
+        print(obj_id_list[ii])
         print('Xt', Xt)
         print('Xk', Xk)
         
-        mistake
         
         X_err[:,kk] = (Xk - Xt).flatten()
         sig_x[kk] = np.sqrt(Pk[0,0])

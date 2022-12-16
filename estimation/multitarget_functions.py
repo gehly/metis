@@ -471,7 +471,10 @@ def lmb_filter(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):
     # State information
     state_tk = sorted(state_dict.keys())[-1]
     LMB_dict = state_dict[state_tk]['LMB_dict']
-
+    
+    print(state_tk)
+    print(LMB_dict)
+    
     # Prior information about the distribution
     pnorm = 2.
     kurt = math.gamma(5./pnorm)*math.gamma(1./pnorm)/(math.gamma(3./pnorm)**2.)
@@ -1568,6 +1571,9 @@ def lmb_cleanup(LMB_in, params_dict):
 def lmb_state_extraction(LMB_dict, tk, Zk, sensor_id_list, meas_fcn,
                          params_dict):
     
+    print('')
+    print('state_extraction')
+    
     # Break out inputs
     state_params = params_dict['state_params']
     sensor_params = params_dict['sensor_params']
@@ -1642,6 +1648,16 @@ def lmb_state_extraction(LMB_dict, tk, Zk, sensor_id_list, meas_fcn,
             min_list = [np.linalg.norm(resid) for resid in resids_list]
             resids_k = resids_list[min_list.index(min(min_list))]
             resids_out.append(resids_k)
+            
+            print(resids_list)
+            print(min_list)
+            print(resids_k)
+            
+            
+    print(resids_out)
+    print('')
+    
+
     
     
     return pk, Nk, labelk_list, rk_list, Xk_list, Pk_list, resids_out

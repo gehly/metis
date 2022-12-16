@@ -1799,21 +1799,33 @@ def tudat_geo_lmb_setup_no_birth(truth_file, meas_file, setup_file):
     return
 
 
-def run_multitarget_filter(setup_file, results_file):
+def run_multitarget_filter(setup_file, prev_results, results_file):
     
-    
+    # Load setup
     pklFile = open(setup_file, 'rb' )
     data = pickle.load( pklFile )
-    state_dict = data[0]
+    # state_dict = data[0]
     meas_fcn = data[1]
     meas_dict = data[2]
     params_dict = data[3]
     truth_dict = data[4]
     pklFile.close()
     
+    # Load previous results and reset state_dict
+    pklFile = open(prev_results, 'rb' )
+    data = pickle.load( pklFile )
+    state_dict = data[0]
+    pklFile.close()
+    
+    # tk_filter = sorted(list(filter_output.keys()))
+    # tf_filter = tk_filter[-1]
+    # LMB_dict = filter_output[tf_filter]['LMB_dict']
+    
+    
+    
     # Reduce meas dict to times of interest
-    t0 = datetime(2022, 11, 7, 0, 0, 0)
-    tf = datetime(2022, 11, 8, 0, 0, 0)
+    t0 = datetime(2022, 11, 8, 0, 0, 0)
+    tf = datetime(2022, 11, 9, 0, 0, 0)
     tk_list = sorted(list(meas_dict.keys()))
     
     for tk in tk_list:
@@ -1855,7 +1867,7 @@ def multitarget_analysis(results_file):
 
 if __name__ == '__main__':
     
-    plt.close('all')
+    # plt.close('all')
     
     
 #    leo_tracklets_marco()
@@ -1887,7 +1899,11 @@ if __name__ == '__main__':
     fname = 'geo_twobody_6obj_7day_setup_10min_noise1_lam5.pkl'
     setup_file = os.path.join(fdir2, fname)  
     
+    
     fname = 'geo_twobody_6obj_7day_10min_noise1_lam5_results_1.pkl'
+    prev_results = os.path.join(fdir2, fname)
+    
+    fname = 'geo_twobody_6obj_7day_10min_noise1_lam5_results_2.pkl'
     results_file = os.path.join(fdir2, fname)
     
     
@@ -1921,9 +1937,9 @@ if __name__ == '__main__':
     
     
     # Run Filter
-    # run_multitarget_filter(setup_file, results_file)
+    run_multitarget_filter(setup_file, prev_results, results_file)
     
-    multitarget_analysis(results_file)
+    # multitarget_analysis(results_file)
     
     
     
