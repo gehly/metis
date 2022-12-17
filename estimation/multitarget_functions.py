@@ -4,6 +4,7 @@ import sys
 import os
 import inspect
 import copy
+import time
 
 
 filename = inspect.getframeinfo(inspect.currentframe()).filename
@@ -16,6 +17,8 @@ sys.path.append(metis_dir)
 from dynamics import dynamics_functions as dyn
 from estimation import estimation_functions as est
 from sensors import measurement_functions as mfunc
+from utilities import coordinate_systems as coord
+from utilities import eop_functions as eop
 from utilities import time_systems as timesys
 
 
@@ -798,6 +801,11 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list, sensor_id_list, meas
     npoints = 2*nstates + 1
     nmeas = len(Zk)
     
+    # EOP data
+    eop_alldata = sensor_params['eop_alldata']
+    XYs_df = sensor_params['XYs_df']
+    EOP_data = eop.get_eop_data(eop_alldata, tk) 
+    
     # Form GLMB from input LMB
     GLMB_birth = lmb2glmb(LMB_birth, H_max_birth)
     GLMB_surv = lmb2glmb(LMB_surv, H_max)
@@ -836,7 +844,7 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list, sensor_id_list, meas
     
     # Components for missed detection case
     LMB_bar = combine_lmb(LMB_birth, LMB_surv)
-    full_label_list = list(LMB_bar.keys())
+    full_label_list = sorted(list(LMB_bar.keys()))
     track_update = {}
     tind = 0
     for label in full_label_list:
@@ -848,6 +856,67 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list, sensor_id_list, meas
         track_update[tind]['covars'] = LMB_bar[label]['covars']
         track_update[tind]['meas_ind'] = 'missed'
         tind += 1
+        
+        
+    pd_start = time.time()
+    # Generate state dependent pd_table
+    merge_all_params = {}
+    merge_all_params['prune_T'] = 1e-5
+    merge_all_params['merge_U'] = 1e6
+    pd_table = np.zeros((len(sensor_id_list), len(full_label_list)))
+    for ii in range(len(sensor_id_list)):
+        
+        sensor_id = sensor_id_list[ii]
+        fov_center = center_list[ii]
+        sensor = sensor_params[sensor_id]
+        sensor_itrf = sensor['site_ecef']
+        pd_sensor = sensor['p_det']
+        FOV_hlim = sensor['FOV_hlim']
+        FOV_vlim = sensor['FOV_vlim']
+        sensor_gcrf, dum = coord.itrf2gcrf(sensor_itrf, np.zeros((3,1)), tk,
+                                           EOP_data, XYs_df)
+        
+        for jj in range(len(full_label_list)):
+            
+            label = full_label_list[jj]
+            GMM_dict = {}
+            GMM_dict['weights'] = LMB_bar[label]['weights']
+            GMM_dict['means'] = LMB_bar[label]['means']
+            GMM_dict['covars'] = LMB_bar[label]['covars']
+            GMM_dict = est.merge_GMM(GMM_dict, merge_all_params)
+            ind = GMM_dict['weights'].index(max(GMM_dict['weights']))
+            r_gcrf = GMM_dict['means'][ind][0:3].reshape(3,1)
+            
+            rg = np.linalg.norm(r_gcrf - sensor_gcrf)
+            rho_hat_gcrf = (r_gcrf - sensor_gcrf)/rg
+            
+            ra = math.atan2(rho_hat_gcrf[1], rho_hat_gcrf[0])
+            dec = math.asin(rho_hat_gcrf[2])
+            
+            zbar = np.array([[ra], [dec]])
+            
+            pd_fov = 1.
+            zbar_test = zbar - fov_center
+            
+            # Angle rollover in RA
+            if zbar_test[0] > np.pi:
+                zbar_test[0] -= 2.*np.pi
+            if zbar_test[0] < -np.pi:
+                zbar_test[0] += 2.*np.pi                        
+            
+            if (zbar_test[0] < FOV_hlim[0] or zbar_test[0] > FOV_hlim[1] 
+                or zbar_test[1] < FOV_vlim[0] or zbar_test[1] > FOV_vlim[1]):
+                
+                pd_fov = 0.
+            
+            # Multiply to get full pd
+            pd_table[ii,jj] = pd_sensor*pd_fov
+    
+    
+    
+    print(pd_table)
+    print('pd_time', time.time() - pd_start)
+
         
     # print(track_update)
 
@@ -866,6 +935,8 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list, sensor_id_list, meas
             weights0 = LMB_bar[label]['weights']
             means0 = LMB_bar[label]['means']
             covars0 = LMB_bar[label]['covars']
+            
+            p_det = pd_table[ii,tt]
             
             # Loop over components
             ncomp = len(weights0)
@@ -935,9 +1006,9 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list, sensor_id_list, meas
             
             # Normalize updated weights (this will always sum to 1?)
             # Vo, Vo, Phung 2014 Eq 27-28
-            p_det = compute_pd_statedep(tk, [wj], [mj], [Pj], meas_fcn, sensor_id,
-                                        center, state_params, filter_params, 
-                                        sensor_params)
+            # p_det = compute_pd_statedep(tk, [wj], [mj], [Pj], meas_fcn, sensor_id,
+            #                             center, state_params, filter_params, 
+            #                             sensor_params)
             factor = p_det/clutter_intensity(zi, sensor_id, sensor_params)            
             
             # print('factor', factor)
@@ -1001,6 +1072,7 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list, sensor_id_list, meas
     # Reference Mahler (2014) Eq 15.191 for labeled RFS measurement likelihood
     # function. Using Vo Matlab code log likelihood formulation.
 
+    start_update = time.time()
             
     # Measurement update
     # All missed detections
@@ -1032,9 +1104,12 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list, sensor_id_list, meas
                 means = GLMB_dict[hyp][label]['means']
                 covars = GLMB_dict[hyp][label]['covars']
                 
-                p_det = compute_pd_statedep(tk, weights, means, covars, meas_fcn,
-                                            sensor_id, center, state_params,
-                                            filter_params, sensor_params)
+                # p_det = compute_pd_statedep(tk, weights, means, covars, meas_fcn,
+                #                             sensor_id, center, state_params,
+                #                             filter_params, sensor_params)
+                
+                label_ind = full_label_list.index(label)
+                p_det = pd_table[0,label_ind]
                 
                 
                 log_likelihood += np.log(1. - p_det)
@@ -1054,9 +1129,16 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list, sensor_id_list, meas
             nlabel = len(label_list)
             
             print('')
+            print(tk)
             print('hyp', hyp)
             print('hyp_weight', hyp_weight)
             print('label_list', label_list)
+            
+            assign_time = 0.
+            pd_time = 0.
+            clutter_time = 0.
+            missed_time = 0.
+            det_time = 0.
             
             # No tracks means all measurements are clutter
             if nlabel == 0:
@@ -1107,6 +1189,9 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list, sensor_id_list, meas
             # Compute measurement to track associations
             else:
                 
+                # print('assign')
+                # print(time.time() - start_update)
+                
                 # Need to replace the current hypothesis with new ones spawned
                 # by it
                 hyp_del_list.append(hyp)
@@ -1126,9 +1211,13 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list, sensor_id_list, meas
                 # print('label_list', label_list)
                 # print('cost_mat', cost_mat)
                 
+                start_assign = time.time()
+                
                 # Compute measurement to track assignments
                 kbest = int(np.ceil(np.sqrt(H_max*hyp_weight)))
                 assign_lists = glmb_kbest_assignments(neglog_mat, kbest)
+                
+                assign_time += time.time() - start_assign
                 
                 # print('kbest', kbest)
                 # print('assign_lists', assign_lists)
@@ -1139,6 +1228,9 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list, sensor_id_list, meas
                 likelihood_list = []
                 new_hyp_list = []
                 for alist in assign_lists:
+                    
+                    # print('alist', alist)
+                    # print(time.time() - start_update)
                     
                     # Create a new hypothesis for each new assignment
                     GLMB_dict[new_hyp_ind] = {}
@@ -1160,13 +1252,18 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list, sensor_id_list, meas
                     # # TODO - incorporate state and label dependent p_det
                     # likelihood *= (1-p_det)**nlabel
                     
+                    start_clutter = time.time()
                     log_likelihood = -lam_clutter + np.log(hyp_weight)
                     for ii in range(nmeas):
                         zi = Zk[ii]
                         sensor_id = sensor_id_list[ii]
                         log_likelihood += np.log(clutter_intensity(zi, sensor_id, sensor_params))
                         
+                    clutter_time += time.time() - start_clutter
                         
+                    # print('external setup')
+                    # print(time.time() - start_update)
+                    
                     # TODO - work out how to handle multisensor case where
                     # each could have different pointing/p_det
                     for nn in range(nlabel):
@@ -1176,16 +1273,25 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list, sensor_id_list, meas
                         
                         # Retrieve state information for this track
                         label = label_list[nn]
-                        weights = GLMB_dict[hyp][label]['weights']
-                        means = GLMB_dict[hyp][label]['means']
-                        covars = GLMB_dict[hyp][label]['covars']                        
+                        # weights = GLMB_dict[hyp][label]['weights']
+                        # means = GLMB_dict[hyp][label]['means']
+                        # covars = GLMB_dict[hyp][label]['covars']                        
                         
-                        # Compute state dependent p_det for this track
-                        p_det = compute_pd_statedep(tk, weights, means, covars, meas_fcn,
-                                                    sensor_id, center, state_params,
-                                                    filter_params, sensor_params)
+                        # # Compute state dependent p_det for this track
+                        start_pd = time.time()
+                        # p_det = compute_pd_statedep(tk, weights, means, covars, meas_fcn,
+                        #                             sensor_id, center, state_params,
+                        #                             filter_params, sensor_params)
+                        
+                        p_det = pd_table[0,full_label_list.index(label)]
+                        
+                        pd_time += time.time() - start_pd
                         
                         log_likelihood += np.log(1. - p_det)
+                    
+                    # print('actual assign')
+                    # print(time.time() - start_update)
+                    
                     
                     
                     # Loop over tracks
@@ -1202,14 +1308,19 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list, sensor_id_list, meas
                         center = center_list[0]
                         
                         # Retrieve state information for this track
-                        weights = GLMB_dict[hyp][label]['weights']
-                        means = GLMB_dict[hyp][label]['means']
-                        covars = GLMB_dict[hyp][label]['covars']
+                        # weights = GLMB_dict[hyp][label]['weights']
+                        # means = GLMB_dict[hyp][label]['means']
+                        # covars = GLMB_dict[hyp][label]['covars']
                         
                         # Compute state dependent p_det for this track
-                        p_det = compute_pd_statedep(tk, weights, means, covars, meas_fcn,
-                                                    sensor_id, center, state_params,
-                                                    filter_params, sensor_params)
+                        start_pd = time.time()
+                        # p_det = compute_pd_statedep(tk, weights, means, covars, meas_fcn,
+                        #                             sensor_id, center, state_params,
+                        #                             filter_params, sensor_params)
+                        
+                        p_det = pd_table[0,full_label_list.index(label)]
+                        
+                        pd_time += time.time() - start_pd
                         
                         
                         # print('alist', alist)
@@ -1218,8 +1329,12 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list, sensor_id_list, meas
                         # print('label', label)
                         # print('meas_ind', meas_ind)
                         
+                        
+                        
                         # Missed detection                        
                         if meas_ind >= nmeas:
+                            
+                            start_missed = time.time()
                             
                             # Compute update to track GMM
                             tind = full_label_list.index(label)
@@ -1251,9 +1366,13 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list, sensor_id_list, meas
                             GLMB_dict[new_hyp_ind][label]['weights'] = weights
                             GLMB_dict[new_hyp_ind][label]['means'] = means
                             GLMB_dict[new_hyp_ind][label]['covars'] = covars
+                            
+                            missed_time += time.time() - start_missed
 
                         # Detection
                         else:
+                            
+                            start_det = time.time()
                             
                             zi = Zk[meas_ind]
                             sensor_id = sensor_id_list[meas_ind]
@@ -1287,6 +1406,8 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list, sensor_id_list, meas
                             GLMB_dict[new_hyp_ind][label]['means'] = means
                             GLMB_dict[new_hyp_ind][label]['covars'] = covars
                             
+                            det_time += time.time() - start_det
+                            
                     # Compute likelihood
                     likelihood = np.exp(log_likelihood)
                     
@@ -1309,7 +1430,17 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list, sensor_id_list, meas
                     likelihood = float(likelihood_list[hh])
                     GLMB_dict[new_hyp_ind2]['hyp_weight'] = likelihood
                     
-                
+    
+    print('update time', time.time() - start_update)
+    # print('assign_time', assign_time)
+    # print('pd_time', pd_time)
+    # print('clutter_time', clutter_time)
+    # print('missed_time', missed_time)
+    # print('det_time', det_time)
+    
+    # mistake
+    
+    
     # Delete old hypotheses
     for hyp in hyp_del_list:
         del GLMB_dict[hyp]
@@ -1734,8 +1865,8 @@ def compute_pd_statedep(tk, weights, means, covars, meas_fcn, sensor_id,
     
     
     # Break out inputs
-    gam = filter_params['gam']
-    Wm = filter_params['Wm']
+    # gam = filter_params['gam']
+    # Wm = filter_params['Wm']
     sensor = sensor_params[sensor_id]
     pd_sensor = sensor['p_det']
     FOV_hlim = sensor['FOV_hlim']
@@ -1754,18 +1885,43 @@ def compute_pd_statedep(tk, weights, means, covars, meas_fcn, sensor_id,
     
     ind = GMM_dict['weights'].index(max(GMM_dict['weights']))
     mj = GMM_dict['means'][ind]
-    Pj = GMM_dict['covars'][ind]
-    nstates = len(mj)
+    # Pj = GMM_dict['covars'][ind]
+    # nstates = len(mj)
     
-    # Compute sigma points
-    sqP = np.linalg.cholesky(Pj)
-    Xrep = np.tile(mj, (1, nstates))
-    chi = np.concatenate((mj, Xrep+(gam*sqP), Xrep-(gam*sqP)), axis=1)
+    eop_alldata = sensor_params['eop_alldata']
+    EOP_data = eop.get_eop_data(eop_alldata, tk)  
+    XYs_df = sensor_params['XYs_df']  
+    
+    sensor_itrf = sensor['site_ecef']
+    sensor_gcrf, dum = coord.itrf2gcrf(sensor_itrf, np.zeros((3,1)), tk, EOP_data,
+                                       XYs_df)
+    
+    # Object location in GCRF
+    r_gcrf = mj[0:3].reshape(3,1)
+    
+    # Compute range and line of sight vector
+    rg = np.linalg.norm(r_gcrf - sensor_gcrf)
+    rho_hat_gcrf = (r_gcrf - sensor_gcrf)/rg
+    
+    ra = math.atan2(rho_hat_gcrf[1], rho_hat_gcrf[0])
+    dec = math.asin(rho_hat_gcrf[2])
+    
+    zbar = np.array([[ra], [dec]])
+    
+    
+    
+    # zbar = mfunc.compute_measurement(mj, state_params, sensor_params, sensor_id, 
+    #                                  tk, meas_types=['ra', 'dec'])
+    
+    # # Compute sigma points
+    # sqP = np.linalg.cholesky(Pj)
+    # Xrep = np.tile(mj, (1, nstates))
+    # chi = np.concatenate((mj, Xrep+(gam*sqP), Xrep-(gam*sqP)), axis=1)
 
-    # Computed measurement
-    gamma_til_k, Rk = meas_fcn(tk, chi, state_params, sensor_params, sensor_id)
-    zbar = np.dot(gamma_til_k, Wm.T)
-    zbar = np.reshape(zbar, (len(zbar), 1))
+    # # Computed measurement
+    # gamma_til_k, Rk = meas_fcn(tk, chi, state_params, sensor_params, sensor_id)
+    # zbar = np.dot(gamma_til_k, Wm.T)
+    # zbar = np.reshape(zbar, (len(zbar), 1))
     
     # Compare zbar against FOV center and limits to get pd_fov
     pd_fov = 1.

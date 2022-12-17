@@ -1753,10 +1753,19 @@ def tudat_geo_lmb_setup_no_birth(truth_file, meas_file, setup_file):
         del obj_id_list[obj_id_list.index(42709)]
     
     print(obj_id_list)
+    
+    # Initial covariance, compute by unscented transform
+    P_elem = np.diag([1., 1e-8, 0.0001, 0.0001, 0.0001, 0.0001])
+    m_elem = np.reshape([42164.1, 1e-3, 1., 10., 10., 10.], (6,1))
+    transform_fcn = est.unscented_kep2cart
+    dum, P, dum2 = est.unscented_transform(m_elem, P_elem, transform_fcn, 
+                                           {}, alpha=1e-4, pnorm=2.)
+    
+    print(P)
+    print(np.sqrt(np.diag(P)))
 
     
     LMB_dict = {}
-    P = np.diag([1., 1., 1., 1e-6, 1e-6, 1e-6])
     ii = 1
     for obj_id in obj_id_list:
         
@@ -1804,18 +1813,18 @@ def run_multitarget_filter(setup_file, prev_results, results_file):
     # Load setup
     pklFile = open(setup_file, 'rb' )
     data = pickle.load( pklFile )
-    # state_dict = data[0]
+    state_dict = data[0]
     meas_fcn = data[1]
     meas_dict = data[2]
     params_dict = data[3]
     truth_dict = data[4]
     pklFile.close()
     
-    # Load previous results and reset state_dict
-    pklFile = open(prev_results, 'rb' )
-    data = pickle.load( pklFile )
-    state_dict = data[0]
-    pklFile.close()
+    # # Load previous results and reset state_dict
+    # pklFile = open(prev_results, 'rb' )
+    # data = pickle.load( pklFile )
+    # state_dict = data[0]
+    # pklFile.close()
     
     # tk_filter = sorted(list(filter_output.keys()))
     # tf_filter = tk_filter[-1]
@@ -1824,7 +1833,7 @@ def run_multitarget_filter(setup_file, prev_results, results_file):
     
     
     # Reduce meas dict to times of interest
-    t0 = datetime(2022, 11, 8, 0, 0, 0)
+    t0 = datetime(2022, 11, 7, 0, 0, 0)
     tf = datetime(2022, 11, 9, 0, 0, 0)
     tk_list = sorted(list(meas_dict.keys()))
     
@@ -1834,7 +1843,6 @@ def run_multitarget_filter(setup_file, prev_results, results_file):
             
     print(meas_dict.keys())
     print(len(meas_dict.keys()))
-    
 
 
     filter_output, full_state_output = mult.lmb_filter(state_dict, truth_dict, meas_dict, meas_fcn, params_dict)
@@ -1848,7 +1856,7 @@ def run_multitarget_filter(setup_file, prev_results, results_file):
     return
 
 
-def multitarget_analysis(results_file):
+def multitarget_analysis(results_file, setup_file):
     
     pklFile = open(results_file, 'rb' )
     data = pickle.load( pklFile )
@@ -1858,8 +1866,14 @@ def multitarget_analysis(results_file):
     truth_dict = data[3]
     pklFile.close()
     
+    # Load setup
+    pklFile = open(setup_file, 'rb' )
+    data = pickle.load( pklFile )
+    meas_dict = data[2]
+    pklFile.close()
     
-    analysis.lmb_orbit_errors(filter_output, filter_output, truth_dict)
+    
+    analysis.lmb_orbit_errors(filter_output, filter_output, truth_dict, meas_dict)
     
     return
 
@@ -1867,7 +1881,7 @@ def multitarget_analysis(results_file):
 
 if __name__ == '__main__':
     
-    # plt.close('all')
+    plt.close('all')
     
     
 #    leo_tracklets_marco()
@@ -1877,7 +1891,7 @@ if __name__ == '__main__':
     # test_tracklet_association()
     
     fdir = r'D:\documents\research_projects\iod\data\sim\test\aas2023_geo_6obj_7day'
-    fdir2 = os.path.join(fdir, '2022_12_16_geo_twobody_6obj_7day')
+    fdir2 = os.path.join(fdir, '2022_12_17_geo_twobody_6obj_7day_newPo')
     
     
     
@@ -1903,7 +1917,7 @@ if __name__ == '__main__':
     fname = 'geo_twobody_6obj_7day_10min_noise1_lam5_results_1.pkl'
     prev_results = os.path.join(fdir2, fname)
     
-    fname = 'geo_twobody_6obj_7day_10min_noise1_lam5_results_2.pkl'
+    fname = 'geo_twobody_6obj_7day_10min_noise1_lam5_results_12.pkl'
     results_file = os.path.join(fdir2, fname)
     
     
@@ -1939,7 +1953,7 @@ if __name__ == '__main__':
     # Run Filter
     run_multitarget_filter(setup_file, prev_results, results_file)
     
-    # multitarget_analysis(results_file)
+    # multitarget_analysis(results_file, setup_file)
     
     
     

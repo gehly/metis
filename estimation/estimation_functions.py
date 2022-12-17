@@ -18,6 +18,7 @@ sys.path.append(metis_dir)
 from dynamics import dynamics_functions as dyn
 from sensors import measurement_functions as mfunc
 from utilities.constants import arcsec2rad
+from utilities import astrodynamics as astro
 
 
 
@@ -2197,7 +2198,109 @@ def gmm_samples(GMM_dict, N):
     return mc_points
 
 
+def unscented_transform(m1, P1, transform_fcn, inputs, alpha=1., pnorm=2.):
+    '''
+    This function computes the unscented transform for a p-norm
+    distribution and user defined transform function.
 
+    Parameters
+    ------
+    m1 : nx1 numpy array
+      mean state vector
+    P1 : nxn numpy array
+      covariance matrix
+    transform_fcn : function handle
+      name of transform function
+    inputs : dictionary
+      input parameters for transform function
+    alpha : float, optional
+      sigma point distribution parameter (default=1)
+    pnorm : float, optional
+      value of p-norm distribution (default=2)
+
+    Returns
+    ------
+    m2 : mx1 numpy array
+      transformed mean state vector
+    P2 : mxm numpy array
+      transformed covariance matrix
+    Pcross : nxm numpy array
+      cross correlation covariance matrix
+    '''
+
+    # Number of States
+    L = len(m1)
+
+    # Prior information about the distribution
+    kurt = math.gamma(5./pnorm)*math.gamma(1./pnorm)/(math.gamma(3./pnorm)**2.)
+    beta = kurt - 1.
+    kappa = kurt - float(L)
+
+    # Compute sigma point weights
+    lam = alpha**2.*(L + kappa) - L
+    gam = np.sqrt(L + lam)
+    Wm = 1./(2.*(L + lam)) * np.ones((1, 2*L))
+    Wm = list(Wm.flatten())
+    Wc = copy.copy(Wm)
+    Wm.insert(0, lam/(L + lam))
+    Wc.insert(0, lam/(L + lam) + (1 - alpha**2 + beta))
+    Wm = np.asarray(Wm)
+    diagWc = np.diag(Wc)
+
+    # Compute chi - baseline sigma points
+    sqP = np.linalg.cholesky(P1)
+    Xrep = np.tile(m1, (1, L))
+    chi = np.concatenate((m1, Xrep+(gam*sqP), Xrep-(gam*sqP)), axis=1)
+    chi_diff = chi - np.dot(m1, np.ones((1, (2*L+1))))
+    
+    # Compute transformed sigma points
+    Y = transform_fcn(chi, inputs)
+    row2 = int(Y.shape[0])
+    col2 = int(Y.shape[1])
+
+    # Compute mean and covar
+    m2 = np.dot(Y, Wm.T)
+    m2 = np.reshape(m2, (row2, 1))
+    Y_diff = Y - np.dot(m2, np.ones((1, col2)))
+    P2 = np.dot(Y_diff, np.dot(diagWc, Y_diff.T))
+    Pcross = np.dot(chi_diff,  np.dot(diagWc, Y_diff.T))
+
+    return m2, P2, Pcross
+
+
+def unscented_kep2cart(chi, inputs):
+    '''
+    Function for use with unscented_transform.
+    Converts sigma point matrix from keplerian elements to inertial cartesian
+    coordinates.
+
+    Parameters
+    ------
+    chi : L x (2L+1) numpy array
+      sigma point matrix
+    inputs : dictionary
+      input parameters
+
+    Returns
+    ------
+    Y : m x (2L+1) numpy array
+      transformed sigma point matrix
+    '''
+
+    # Size of input/output
+    L = int(chi.shape[1])
+    Y = np.zeros((6, L))
+
+    for jj in range(L):
+
+        # Pull out column of chi
+        elem = chi[:,jj]
+
+        # Convert to ECI
+        Xeci = astro.kep2cart(elem)
+        Y[:,jj] = Xeci.flatten()
+
+    return Y
 
 
 
