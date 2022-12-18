@@ -1118,7 +1118,7 @@ def compute_obs_times(vis_file, pass_length, obs_time_file):
     amos5_norad = 37950
     coms1_norad = 36744
     
-    # Initial state vectors from TLE data
+    
     obj_id_list = [qzs1r_norad, qzs2_norad, qzs3_norad, qzs4_norad,
                    amos5_norad, coms1_norad]
     
@@ -1140,7 +1140,12 @@ def compute_obs_times(vis_file, pass_length, obs_time_file):
         
         obs_times = single_day_obs_times(vis_df, date, obs_times, pass_length)
         
+        
+        obs_times = single_day_obs_times(vis_df, date, obs_times, pass_length)
+        
+        print('')
         print(obs_times)
+        
         
         date = date + timedelta(days=1)
         
@@ -1175,6 +1180,29 @@ def single_day_obs_times(vis_df, date, obs_times, pass_length):
     print(vis_df)
     print(vis_df2)
     
+    # Delete previously used times
+    del_list = []
+    for obj_id in obs_times:
+        tk_list = obs_times[obj_id]['tk_list']
+        for tk in tk_list:
+            
+            if tk in UTC_list:
+                # del_list.append(UTC_list.index(tk))
+                del_list.append(int(vis_df2.index[vis_df2['UTC'] == tk][0]))
+            
+    if len(del_list) > 0:
+        del_list = sorted(del_list)
+        print(del_list)
+        print(vis_df2)
+        
+        vis_df2 = vis_df2.drop(del_list)
+        UTC_list = vis_df2['UTC'].tolist()
+        
+        print(vis_df2)
+        
+        print('')
+
+    
     # Find number of visible times
     obj_ind_dict = {}
     ntimes_list = []
@@ -1205,6 +1233,7 @@ def single_day_obs_times(vis_df, date, obs_times, pass_length):
     while len(sorted_obj) > 0:
         
         obj_id = sorted_obj[0]
+        print(obj_id)
         
         # Check there are at least enough entries
         min_entries = int(pass_length/10) + 1
@@ -1235,15 +1264,20 @@ def single_day_obs_times(vis_df, date, obs_times, pass_length):
             # print('obj_ind_dict[obj_id][ind]', obj_ind_dict[obj_id][ind])
             # print('UTC list', len(UTC_list))
             
-            # Check if time is too close to previous day pass
+            # Check if time is too close to previous pass
             tk_new = UTC_list[obj_ind_dict[obj_id][ind]]
             tdiff = (tk_new - tk_prior).total_seconds()/3600.
-            if tdiff > 21.5 and tdiff < 26:
+            # if tdiff > 3.5 and tdiff < 26:
+            if tdiff < 3.5:
                 ind += 1
                 test_block = [obj_ind_dict[obj_id][ind]]
                 continue
- 
-            if obj_ind_dict[obj_id][ind+1] - obj_ind_dict[obj_id][ind] == 1:
+
+            
+            print(tk_new)
+            print(ind)
+            
+            if (UTC_list[obj_ind_dict[obj_id][ind+1]] - UTC_list[obj_ind_dict[obj_id][ind]]).total_seconds() < 11.:
                 test_block.append(obj_ind_dict[obj_id][ind+1])
             else:
                 test_block = [obj_ind_dict[obj_id][ind+1]]
@@ -1317,8 +1351,8 @@ def generate_meas_file(noise, lam_c, p_det, orbit_regime, truth_file, obs_time_f
     for sensor_id in sensor_id_list:
         sensor_params[sensor_id]['sigma_dict']['ra'] = max(noise,1.)*arcsec2rad
         sensor_params[sensor_id]['sigma_dict']['dec'] = max(noise,1.)*arcsec2rad
-        sensor_params[sensor_id]['lam_clutter'] = lam_c
-        sensor_params[sensor_id]['p_det'] = p_det
+        sensor_params[sensor_id]['lam_clutter'] = max(lam_c, 1)
+        sensor_params[sensor_id]['p_det'] = min(p_det, 0.99)
     
     # Form obj_id_list from obs_times
     obj_id_list = sorted(list(obs_times.keys()))    
@@ -1379,8 +1413,8 @@ def generate_meas_file(noise, lam_c, p_det, orbit_regime, truth_file, obs_time_f
             
             
             # Sensor data
-            p_det = sensor_params[sensor_id]['p_det']
-            lam_clutter = sensor_params[sensor_id]['lam_clutter']
+            # p_det = sensor_params[sensor_id]['p_det']
+            # lam_clutter = sensor_params[sensor_id]['lam_clutter']
             FOV_hlim = sensor_params[sensor_id]['FOV_hlim']
             FOV_vlim = sensor_params[sensor_id]['FOV_vlim']
             
@@ -1512,7 +1546,7 @@ def generate_meas_file(noise, lam_c, p_det, orbit_regime, truth_file, obs_time_f
                     
                     
                     # Generate clutter and store
-                    n_clutter = ss.poisson.rvs(lam_clutter)
+                    n_clutter = ss.poisson.rvs(lam_c)
 
                     # Compute clutter meas in RA/DEC, uniform over FOV
                     for c_ind in range(n_clutter):
@@ -1727,7 +1761,7 @@ def tudat_geo_lmb_setup_no_birth(truth_file, meas_file, setup_file):
     
     # Filter parameters
     filter_params = {}
-    filter_params['Q'] = 1e-16 * np.diag([1, 1, 1])
+    filter_params['Q'] = 1e-15 * np.diag([1, 1, 1])
     filter_params['snc_flag'] = 'gamma'
     filter_params['gap_seconds'] = 900.
     filter_params['alpha'] = 1e-4
@@ -1755,14 +1789,17 @@ def tudat_geo_lmb_setup_no_birth(truth_file, meas_file, setup_file):
     print(obj_id_list)
     
     # Initial covariance, compute by unscented transform
-    P_elem = np.diag([1., 1e-8, 0.0001, 0.0001, 0.0001, 0.0001])
-    m_elem = np.reshape([42164.1, 1e-3, 1., 10., 10., 10.], (6,1))
-    transform_fcn = est.unscented_kep2cart
-    dum, P, dum2 = est.unscented_transform(m_elem, P_elem, transform_fcn, 
-                                           {}, alpha=1e-4, pnorm=2.)
+    # P_elem = np.diag([1., 1e-8, 0.0001, 0.0001, 0.0001, 0.0001])
+    # m_elem = np.reshape([42164.1, 1e-3, 1., 10., 10., 10.], (6,1))
+    # transform_fcn = est.unscented_kep2cart
+    # dum, P, dum2 = est.unscented_transform(m_elem, P_elem, transform_fcn, 
+    #                                        {}, alpha=1e-4, pnorm=2.)
     
-    print(P)
-    print(np.sqrt(np.diag(P)))
+    # print(P)
+    # print(np.sqrt(np.diag(P)))
+    
+    P = np.diag([1., 1., 1., 1e-6, 1e-6, 1e-6])
+    
 
     
     LMB_dict = {}
@@ -1808,9 +1845,113 @@ def tudat_geo_lmb_setup_no_birth(truth_file, meas_file, setup_file):
     return
 
 
-def run_multitarget_filter(setup_file, prev_results, results_file):
+def tudat_geo_setup_singletarget(mult_setup_file, obs_time_file, single_setup_file):
     
-    # Load setup
+    
+    # Don't use sensor_params from truth file it has been updated for meas
+    pklFile = open(mult_setup_file, 'rb' )
+    data = pickle.load( pklFile )
+    state_dict = data[0]
+    meas_fcn = data[1]
+    meas_dict = data[2]
+    params_dict = data[3]
+    truth_dict = data[4]
+    pklFile.close()
+    
+    pklFile = open(obs_time_file, 'rb' )
+    data = pickle.load( pklFile )
+    obs_times = data[0]
+    pklFile.close()
+        
+    
+    # Reformulate to fit single target
+    obj_id = 37950
+    
+    # Date range
+    t0 = datetime(2022, 11, 7, 0, 0, 0)
+    tf = datetime(2022, 11, 12, 0, 0, 0)
+    
+    tk_truth = sorted(list(truth_dict.keys()))
+    truth_dict2 = {}
+    for tk in tk_truth:
+        
+        if tk > t0 and tk < tf:
+            
+            X = truth_dict[tk][obj_id]
+            truth_dict2[tk] = X.copy()
+    
+    
+    print(truth_dict2.keys())
+    
+    tk_meas = sorted(list(meas_dict.keys()))
+    meas_dict2 = {}
+    meas_dict2['tk_list'] = []
+    meas_dict2['Yk_list'] = []
+    meas_dict2['sensor_id_list'] = []
+    for tk in tk_meas:
+        
+        if tk > t0 and tk < tf:
+            
+            if tk in obs_times[obj_id]['tk_list']:
+                
+                Zk_list = meas_dict[tk]['Zk_list']
+                sensor_id_list = meas_dict[tk]['sensor_id_list']
+                
+                if len(Zk_list) == 1:
+                    Yk = Zk_list[0]
+                    sensor_id = sensor_id_list[0]
+                    meas_dict2['tk_list'].append(tk)
+                    meas_dict2['Yk_list'].append(Yk)
+                    meas_dict2['sensor_id_list'].append(sensor_id)
+                    
+                    
+                else:
+                    mistake
+                
+                
+    print(meas_dict2)
+    
+    
+    
+    
+    # Initial state dict
+    # LMB_dict = state_dict[tk_truth[0]]['LMB_dict']
+    # weights = LMB_dict[(tk_truth[0], 2)]['weights']
+    # means = LMB_dict[(tk_truth[0], 2)]['means']
+    # covars = LMB_dict[(tk_truth[0], 2)]['covars']
+
+    P = np.diag([1., 1., 1., 1e-6, 1e-6, 1e-6])
+    Xo_true = truth_dict2[tk_truth[0]]
+    pert_vect = np.multiply(np.sqrt(np.diag(P)), np.random.randn(6))
+    X_init = Xo_true + np.reshape(pert_vect, (6, 1))
+        
+    state_dict2 = {}
+    state_dict2[tk_truth[0]] = {}
+    state_dict2[tk_truth[0]]['X'] = X_init
+    state_dict2[tk_truth[0]]['P'] = P
+    
+    
+    
+    # # Save final setup file
+    # params_dict = {}
+    # params_dict['state_params'] = state_params
+    # params_dict['filter_params'] = filter_params
+    # params_dict['int_params'] = int_params
+    # params_dict['sensor_params'] = sensor_params
+    
+    # meas_fcn = mfunc.unscented_radec
+                
+    pklFile = open( single_setup_file, 'wb' )
+    pickle.dump( [state_dict2, meas_fcn, meas_dict2, params_dict, truth_dict2], pklFile, -1 )
+    pklFile.close()
+    
+    
+    return
+
+
+def run_singletarget_filter(setup_file):
+    
+        
     pklFile = open(setup_file, 'rb' )
     data = pickle.load( pklFile )
     state_dict = data[0]
@@ -1820,11 +1961,57 @@ def run_multitarget_filter(setup_file, prev_results, results_file):
     truth_dict = data[4]
     pklFile.close()
     
-    # # Load previous results and reset state_dict
-    # pklFile = open(prev_results, 'rb' )
-    # data = pickle.load( pklFile )
+    
+    # meas_fcn = mfunc.unscented_radec
+    params_dict['filter_params']['alpha'] = 1e-4
+    params_dict['filter_params']['Q'] = 1e-15 * np.diag([1, 1, 1])
+    # params_dict['int_params']['tudat_integrator'] = 'rkf78'
+    
+    
+    
+    
+    # # Reduced dynamics model
+    # state_params = params_dict['state_params']
+    # state_params['bodies_to_create'] = ['Earth', 'Sun', 'Moon']
+    # state_params['sph_deg'] = 2
+    # state_params['sph_ord'] = 0
+    # state_params['mass'] = 400.
+    # state_params['Cd'] = 2.2
+    # state_params['Cr'] = 1.5
+    # state_params['drag_area_m2'] = 4.
+    # state_params['srp_area_m2'] = 4.
+    
+    # params_dict['state_params'] = state_params
+    
+    # print(params_dict['state_params'])
+    
+    # mistake
+    
+    # UKF Test
+    filter_output, full_state_output = est.ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, params_dict)
+    analysis.compute_orbit_errors(filter_output, filter_output, truth_dict)
+        
+    
+    return
+
+
+def run_multitarget_filter(setup_file, prev_results, results_file):
+    
+    # Load setup
+    pklFile = open(setup_file, 'rb' )
+    data = pickle.load( pklFile )
     # state_dict = data[0]
-    # pklFile.close()
+    meas_fcn = data[1]
+    meas_dict = data[2]
+    params_dict = data[3]
+    truth_dict = data[4]
+    pklFile.close()
+    
+    # Load previous results and reset state_dict
+    pklFile = open(prev_results, 'rb' )
+    data = pickle.load( pklFile )
+    state_dict = data[0]
+    pklFile.close()
     
     # tk_filter = sorted(list(filter_output.keys()))
     # tf_filter = tk_filter[-1]
@@ -1833,8 +2020,8 @@ def run_multitarget_filter(setup_file, prev_results, results_file):
     
     
     # Reduce meas dict to times of interest
-    t0 = datetime(2022, 11, 7, 0, 0, 0)
-    tf = datetime(2022, 11, 9, 0, 0, 0)
+    t0 = datetime(2022, 11, 13, 0, 0, 0)
+    tf = datetime(2022, 11, 14, 0, 0, 0)
     tk_list = sorted(list(meas_dict.keys()))
     
     for tk in tk_list:
@@ -1852,6 +2039,42 @@ def run_multitarget_filter(setup_file, prev_results, results_file):
     pickle.dump( [filter_output, full_state_output, params_dict, truth_dict], pklFile, -1 )
     pklFile.close()
 
+    
+    return
+
+
+def combine_results():
+    
+    
+    fdir = r'D:\documents\research_projects\iod\data\sim\test\aas2023_geo_6obj_7day'
+    fdir2 = os.path.join(fdir, '2022_12_18_geo_twobody_6obj_2perday_redo')
+
+    filter_output_full = {}
+    
+    for ii in range(1,8):
+    
+        fname = 'geo_twobody_6obj_7day_10min_2perday_results_' + str(ii) + '.pkl'
+        results_file = os.path.join(fdir2, fname)
+        
+        pklFile = open(results_file, 'rb' )
+        data = pickle.load( pklFile )
+        filter_output = data[0]
+        full_state_output = data[1]
+        params_dict = data[2]
+        truth_dict = data[3]
+        pklFile.close()
+        
+        filter_output_full.update(filter_output)
+        
+    full_state_output = filter_output_full
+        
+    fname = 'geo_twobody_6obj_7day_10min_2perday_results_full.pkl'
+    full_results_file = os.path.join(fdir2, fname)
+    
+    pklFile = open( full_results_file, 'wb' )
+    pickle.dump( [filter_output_full, full_state_output, params_dict, truth_dict], pklFile, -1 )
+    pklFile.close()
+    
     
     return
 
@@ -1891,33 +2114,33 @@ if __name__ == '__main__':
     # test_tracklet_association()
     
     fdir = r'D:\documents\research_projects\iod\data\sim\test\aas2023_geo_6obj_7day'
-    fdir2 = os.path.join(fdir, '2022_12_17_geo_twobody_6obj_7day_newPo')
+    fdir2 = os.path.join(fdir, '2022_12_18_geo_twobody_6obj_2perday_redo')
     
     
     
     # fname = 'geo_twobody_6obj_7day_truth_13.pkl'    
     # prev_file = os.path.join(fdir, fname)
     
-    # fname = 'geo_twobody_6obj_7day_visibility.csv'
-    # vis_file = os.path.join(fdir, fname)
+    fname = 'geo_twobody_6obj_7day_visibility.csv'
+    vis_file = os.path.join(fdir2, fname)
     
     fname = 'geo_twobody_6obj_7day_truth.pkl'    
     truth_file = os.path.join(fdir2, fname)
     
-    fname = 'geo_twobody_6obj_7day_obstime_10min.pkl'
-    obs_time_file = os.path.join(fdir, fname)
+    fname = 'geo_twobody_6obj_7day_obstime_10min_2perday.pkl'
+    obs_time_file = os.path.join(fdir2, fname)
     
-    fname = r'geo_twobody_6obj_7day_meas_10min_noise1_lam5.pkl'
+    fname = r'geo_twobody_6obj_7day_meas_10min_2perday_noise1_lam0_pd1.pkl'
     meas_file = os.path.join(fdir2, fname)
     
-    fname = 'geo_twobody_6obj_7day_setup_10min_noise1_lam5.pkl'
+    fname = 'geo_twobody_6obj_7day_setup_10min_2perday_noise1_lam0_pd1.pkl'
     setup_file = os.path.join(fdir2, fname)  
     
     
-    fname = 'geo_twobody_6obj_7day_10min_noise1_lam5_results_1.pkl'
+    fname = 'geo_twobody_6obj_7day_10min_2perday_results_6.pkl'
     prev_results = os.path.join(fdir2, fname)
     
-    fname = 'geo_twobody_6obj_7day_10min_noise1_lam5_results_12.pkl'
+    fname = 'geo_twobody_6obj_7day_10min_2perday_results_full.pkl'
     results_file = os.path.join(fdir2, fname)
     
     
@@ -1933,13 +2156,13 @@ if __name__ == '__main__':
     
     # consolidate_visibility()
     
-    # pass_length = 600.
+    pass_length = 600.
     # compute_obs_times(vis_file, pass_length, obs_time_file)
     
     
     noise = 1.
-    lam_c = 5.
-    p_det = 0.99
+    lam_c = 0.
+    p_det = 1.
     orbit_regime = 'GEO'
     # generate_meas_file(noise, lam_c, p_det, orbit_regime, truth_file, obs_time_file, meas_file)
     
@@ -1949,11 +2172,23 @@ if __name__ == '__main__':
     # tudat_geo_lmb_setup_no_birth(truth_file, meas_file, setup_file)
     
     
+    # fname = 'geo_twobody_singletarget_setup.pkl'
+    # single_setup_file = os.path.join(fdir2, fname)
+    
+    # tudat_geo_setup_singletarget(setup_file, obs_time_file, single_setup_file)
+    
+    # run_singletarget_filter(single_setup_file)
+    
+    
     
     # Run Filter
-    run_multitarget_filter(setup_file, prev_results, results_file)
+    # run_multitarget_filter(setup_file, prev_results, results_file)
     
-    # multitarget_analysis(results_file, setup_file)
+    # combine_results()
+    
+    
+    
+    multitarget_analysis(results_file, setup_file)
     
     
     
