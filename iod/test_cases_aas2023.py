@@ -1321,6 +1321,230 @@ def single_day_obs_times(vis_df, date, obs_times, pass_length):
     return obs_times
 
 
+def compute_obs_times2(vis_file, pass_length, obs_time_file):
+    
+    vis_df = pd.read_csv(vis_file)
+    UTC_list = vis_df['UTC'].tolist()
+    vis_df['UTC'] = [datetime.strptime(dt_str, '%Y-%m-%d %H:%M:%S') for dt_str in UTC_list]
+    
+    # Object IDs
+    qzs1r_norad = 49336
+    qzs2_norad = 42738
+    qzs3_norad = 42917
+    qzs4_norad = 42965
+    
+    # ses15_norad = 42709
+    amos5_norad = 37950
+    coms1_norad = 36744
+    
+    
+    obj_id_list = [qzs1r_norad, qzs2_norad, qzs3_norad, qzs4_norad,
+                   amos5_norad, coms1_norad]
+    
+    
+    # Initialize dict
+    obs_times = {}
+    for obj_id in obj_id_list:
+        obs_times[obj_id] = {}
+        obs_times[obj_id]['tk_list'] = []
+        
+    # Choose obs times
+    obj_id = qzs4_norad
+    tk_list =      [datetime(2022,11,7,11,0,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)]
+    tk_list.extend([datetime(2022,11,7,15,9,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,8,9,55,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,8,14,0,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,9,12,0,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,9,13,30,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,10,10,0,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,10,14,30,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,11,11,0,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,11,13,0,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,12,10,30,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,12,12,30,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,13,11,10,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,13,14,40,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    
+    # Check visibility
+    vis_df2 = vis_df.loc[(vis_df[str(obj_id)])]
+    vis_times = vis_df2['UTC'].tolist()
+    print(vis_df2)
+
+    for tk in tk_list:
+        if tk not in vis_times:
+            print(tk)
+
+    print(len(tk_list))
+    
+    obs_times[obj_id]['tk_list'] = tk_list
+    
+    
+    obj_id = qzs1r_norad
+    tk_list =      [datetime(2022,11,7,11,10,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)]
+    tk_list.extend([datetime(2022,11,7,18,0,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,8,10,5,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,8,14,10,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,9,12,10,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,9,17,0,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,10,10,30,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,10,14,40,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,11,11,10,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,11,17,10,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,12,12,40,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,12,16,30,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,13,10,50,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,13,17,40,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    
+    # Check visibility
+    vis_df2 = vis_df.loc[(vis_df[str(obj_id)])]
+    vis_times = vis_df2['UTC'].tolist()
+    print(vis_df2)
+
+    for tk in tk_list:
+        if tk not in vis_times:
+            print(tk)
+
+    print(len(tk_list))
+    
+    obs_times[obj_id]['tk_list'] = tk_list
+    
+    
+    obj_id = qzs2_norad
+    tk_list =      [datetime(2022,11,7,13,40,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)]
+    tk_list.extend([datetime(2022,11,7,17,50,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,8,14,20,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,8,16,30,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,9,14,0,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,9,17,10,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,10,14,50,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,10,18,0,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,11,13,25,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,11,17,0,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,12,14,20,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,12,16,40,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,13,13,50,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,13,17,50,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    
+    # Check visibility
+    vis_df2 = vis_df.loc[(vis_df[str(obj_id)])]
+    vis_times = vis_df2['UTC'].tolist()
+    print(vis_df2)
+
+    for tk in tk_list:
+        if tk not in vis_times:
+            print(tk)
+
+    print(len(tk_list))
+    
+    obs_times[obj_id]['tk_list'] = tk_list
+    
+    
+    
+    obj_id = qzs3_norad
+    tk_list =      [datetime(2022,11,7,11,20,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)]
+    tk_list.extend([datetime(2022,11,7,18,10,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,8,10,15,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,8,14,30,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,9,12,20,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,9,17,20,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,10,10,40,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,10,15,0,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,11,11,20,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,11,17,20,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,12,12,50,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,12,16,50,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,13,11,0,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,13,18,0,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    
+    
+    # Check visibility
+    vis_df2 = vis_df.loc[(vis_df[str(obj_id)])]
+    vis_times = vis_df2['UTC'].tolist()
+    print(vis_df2)
+
+    for tk in tk_list:
+        if tk not in vis_times:
+            print(tk)
+
+    print(len(tk_list))
+    
+    obs_times[obj_id]['tk_list'] = tk_list
+    
+    
+    obj_id = amos5_norad
+    tk_list =      [datetime(2022,11,7,11,30,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)]
+    tk_list.extend([datetime(2022,11,7,17,40,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,8,10,25,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,8,14,40,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,9,12,30,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,9,17,30,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,10,10,50,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,10,15,10,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,11,10,30,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,11,14,30,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,12,13,0,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,12,17,0,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,13,11,20,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,13,16,0,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    
+    
+    # Check visibility
+    vis_df2 = vis_df.loc[(vis_df[str(obj_id)])]
+    vis_times = vis_df2['UTC'].tolist()
+    print(vis_df2)
+
+    for tk in tk_list:
+        if tk not in vis_times:
+            print(tk)
+
+    print(len(tk_list))
+    
+    obs_times[obj_id]['tk_list'] = tk_list
+    
+    
+    
+    obj_id = coms1_norad
+    tk_list =      [datetime(2022,11,7,11,40,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)]
+    tk_list.extend([datetime(2022,11,7,17,30,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,8,10,35,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,8,16,20,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,9,12,40,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,9,15,0,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,10,10,10,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,10,17,50,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,11,12,0,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,11,14,20,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,12,13,10,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,12,17,10,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,13,11,30,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    tk_list.extend([datetime(2022,11,13,15,30,0) + timedelta(seconds=ii) for ii in np.arange(0,pass_length+1,10)])
+    
+    
+    # Check visibility
+    vis_df2 = vis_df.loc[(vis_df[str(obj_id)])]
+    vis_times = vis_df2['UTC'].tolist()
+    print(vis_df2)
+
+    for tk in tk_list:
+        if tk not in vis_times:
+            print(tk)
+
+    print(len(tk_list))
+    
+    obs_times[obj_id]['tk_list'] = tk_list
+    
+        
+     
+        
+        
+    # Save truth and params
+    pklFile = open( obs_time_file, 'wb' )
+    pickle.dump( [obs_times], pklFile, -1 )
+    pklFile.close()
+    
+    return
+
+
 def generate_meas_file(noise, lam_c, p_det, orbit_regime, truth_file, obs_time_file, meas_file):
     
     gap_length = 100.  # seconds
@@ -2114,7 +2338,7 @@ if __name__ == '__main__':
     # test_tracklet_association()
     
     fdir = r'D:\documents\research_projects\iod\data\sim\test\aas2023_geo_6obj_7day'
-    fdir2 = os.path.join(fdir, '2022_12_18_geo_twobody_6obj_2perday_redo')
+    fdir2 = os.path.join(fdir, '2022_12_18_geo_twobody_tracklet_corr')
     
     
     
@@ -2127,10 +2351,10 @@ if __name__ == '__main__':
     fname = 'geo_twobody_6obj_7day_truth.pkl'    
     truth_file = os.path.join(fdir2, fname)
     
-    fname = 'geo_twobody_6obj_7day_obstime_10min_2perday.pkl'
+    fname = 'geo_twobody_6obj_7day_obstime.pkl'
     obs_time_file = os.path.join(fdir2, fname)
     
-    fname = r'geo_twobody_6obj_7day_meas_10min_2perday_noise1_lam0_pd1.pkl'
+    fname = r'geo_twobody_6obj_7day_meas_noise1_lam0_pd1.pkl'
     meas_file = os.path.join(fdir2, fname)
     
     fname = 'geo_twobody_6obj_7day_setup_10min_2perday_noise1_lam0_pd1.pkl'
@@ -2156,8 +2380,8 @@ if __name__ == '__main__':
     
     # consolidate_visibility()
     
-    pass_length = 600.
-    # compute_obs_times(vis_file, pass_length, obs_time_file)
+    pass_length = 300.
+    # compute_obs_times2(vis_file, pass_length, obs_time_file)
     
     
     noise = 1.
@@ -2166,7 +2390,7 @@ if __name__ == '__main__':
     orbit_regime = 'GEO'
     # generate_meas_file(noise, lam_c, p_det, orbit_regime, truth_file, obs_time_file, meas_file)
     
-    # check_meas_file(meas_file)
+    check_meas_file(meas_file)
     
     
     # tudat_geo_lmb_setup_no_birth(truth_file, meas_file, setup_file)
@@ -2188,7 +2412,7 @@ if __name__ == '__main__':
     
     
     
-    multitarget_analysis(results_file, setup_file)
+    # multitarget_analysis(results_file, setup_file)
     
     
     
