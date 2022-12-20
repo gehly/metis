@@ -1800,7 +1800,7 @@ def multitarget_orbit_errors(filter_output, full_state_output, truth_dict):
 
 
 
-def lmb_orbit_errors(filter_output, full_state_output, truth_dict, meas_dict):
+def lmb_orbit_errors(filter_output, full_state_output, truth_dict, meas_dict, label_truth_dict):
     
     # OSPA parameters
     pnorm = 2.
@@ -1820,7 +1820,7 @@ def lmb_orbit_errors(filter_output, full_state_output, truth_dict, meas_dict):
     # print(tk_list[0])
     thrs = [(tk - t0).total_seconds()/3600. for tk in tk_list]
     
-    meas_tk_list = list(filter_output.keys())
+    meas_tk_list = list(meas_dict.keys())
     meas_t0 = sorted(meas_tk_list)[0]
     thrs_meas = [(tk - t0).total_seconds()/3600. for tk in meas_tk_list]
     
@@ -2202,6 +2202,303 @@ def lmb_orbit_errors(filter_output, full_state_output, truth_dict, meas_dict):
     plt.plot(thrs, rksum_array, 'k.')
     plt.ylabel('sum(rk)')
     plt.xlabel('Time [hours]')
+    
+    
+    
+    
+        
+    
+    plt.show()
+    
+    
+    
+    
+    return
+
+
+
+def lmb_orbit_errors2(filter_output, full_state_output, truth_dict, meas_dict, label_truth_dict):
+    
+    # OSPA parameters
+    pnorm = 2.
+    c = 100.    # km, penalty for cardinality errors
+    
+    # Times
+    tk_list = list(full_state_output.keys())
+    t0 = sorted(truth_dict.keys())[0]
+    
+    obj_id_list = sorted(truth_dict[tk_list[0]].keys())
+    if 42709 in obj_id_list:
+        del obj_id_list[obj_id_list.index(42709)]
+    
+    print(obj_id_list)
+    
+    # print(t0)
+    # print(tk_list[0])
+    thrs = [(tk - t0).total_seconds()/3600. for tk in tk_list]
+    
+
+    
+    meas_tk_list = sorted(list(meas_dict.keys()))
+    meas_t0 = sorted(meas_tk_list)[0]
+    
+    # Number of states and measurements
+    obj_id = list(truth_dict[meas_t0].keys())[0]
+    Xo = truth_dict[meas_t0][obj_id]
+    resids0 = filter_output[meas_t0]['resids'][0]
+    n = len(Xo)
+    p = len(resids0)
+    
+    
+    # Compute OSPA Errors
+    ospa = np.zeros(len(full_state_output),)
+    ospa_pos = np.zeros(len(full_state_output),)
+    ospa_vel = np.zeros(len(full_state_output),)
+    ospa_card = np.zeros(len(full_state_output),)
+    nlabel_array = np.zeros(len(full_state_output),)
+    N_est = np.zeros(len(full_state_output),)
+    N_true = np.zeros(len(full_state_output),)
+    rksum_array = np.zeros(len(full_state_output),)
+    for kk in range(len(full_state_output)):
+        tk = tk_list[kk]
+
+        # Retrieve GMM and extracted state estimate
+        LMB_dict = full_state_output[tk]['LMB_dict']
+        card = full_state_output[tk]['card']
+        Nk = full_state_output[tk]['N']
+        label_list = full_state_output[tk]['label_list']
+        rk_list = full_state_output[tk]['rk_list']
+        Xk_list = full_state_output[tk]['Xk_list']
+        Pk_list = full_state_output[tk]['Pk_list']
+        resids_k = full_state_output[tk]['resids']
+        sorted_labels = sorted(label_list)
+
+        # Cardinality related terms
+        nlabel_array[kk] = len(label_list)
+        N_est[kk] = Nk        
+        rksum_array[kk] = sum(rk_list)
+        
+        # Compute OSPA errors
+        Xt_list = []
+        for obj_id in obj_id_list:
+            Xt_list.append(truth_dict[tk][obj_id])
+        N_true[kk] = len(Xt_list)
+        
+        OSPA, OSPA_pos, OSPA_vel, OSPA_card, row_indices = \
+            compute_ospa(Xt_list, Xk_list, pnorm, c)
+            
+        ospa[kk] = OSPA
+        ospa_pos[kk] = OSPA_pos
+        ospa_vel[kk] = OSPA_vel
+        ospa_card[kk] = OSPA_card
+    
+    # ospa *= 1000.
+    # ospa_pos *= 1000.
+    # ospa_vel *= 1000.
+    
+    
+    for ii in range(len(obj_id_list)):
+        
+        obj_id_plot = obj_id_list[ii]
+        
+
+    
+        # Compute state errors
+        thrs_ric = []
+        r_err = []
+        i_err = []
+        c_err = []
+        r_sig = []
+        i_sig = []
+        c_sig = []
+        
+        
+        meas_ind = 0 
+        for kk in range(len(full_state_output)):
+            tk = tk_list[kk]
+            
+            # Choose 1 object as representative case for error/covariance plots
+
+            # label_plot = label_list[ii]
+            label_list = full_state_output[tk]['label_list']
+            obj_in_filter = False
+            for label in label_list:
+                if label_truth_dict[label] == obj_id_plot:
+                    label_ind = label_list.index(label)
+                    label_ii = label
+                    obj_in_filter = True
+                    break
+                
+            if not obj_in_filter:
+                continue
+            
+            print('')
+            print(tk)
+            print(label_list)
+            print('label_ii', label_ii)
+            print('label_ind', label_ind)
+            print('obj_id_plot', obj_id_plot)
+            
+            # Retrieve entry for this time
+            rk_list = full_state_output[tk]['rk_list']
+            Xk_list = full_state_output[tk]['Xk_list']
+            Pk_list = full_state_output[tk]['Pk_list']
+            resids_k = full_state_output[tk]['resids']
+    
+            Xt = truth_dict[tk][obj_id_plot]
+            Xk = Xk_list[label_ind]
+            Pk = Pk_list[label_ind]
+            
+            
+            # print(obj_id_list[ii])
+            print('Xt', Xt)
+            print('Xk', Xk)
+            
+            
+            X_err = (Xk - Xt).flatten()
+    
+            # RIC Errors and Covariance
+            rc_vect = Xt[0:3].reshape(3,1)
+            vc_vect = Xt[3:6].reshape(3,1)
+            err_eci = X_err[0:3].reshape(3,1)
+            P_eci = Pk[0:3,0:3]
+            
+            err_ric = coord.eci2ric(rc_vect, vc_vect, err_eci)
+            P_ric = coord.eci2ric(rc_vect, vc_vect, P_eci)
+            X_err_ric = err_ric.flatten()
+            
+            # Store for plot
+            thrs_ric.append((tk-t0).total_seconds()/3600.)
+            r_err.append(float(X_err_ric[0]))
+            i_err.append(float(X_err_ric[1]))
+            c_err.append(float(X_err_ric[2]))
+            
+            r_sig.append(np.sqrt(P_ric[0,0]))
+            i_sig.append(np.sqrt(P_ric[1,1]))
+            c_sig.append(np.sqrt(P_ric[2,2]))
+            
+            
+        
+        r_err = np.asarray(r_err)
+        i_err = np.asarray(i_err)
+        c_err = np.asarray(c_err)
+        r_sig = np.asarray(r_sig)
+        i_sig = np.asarray(i_sig)
+        c_sig = np.asarray(c_sig)
+        
+        
+    
+        # Compute and print statistics
+        conv_ind = int(len(full_state_output)/2)
+        print('\n\nState Error and Residuals Analysis')
+        print('Object ', obj_id, ' Label ', label_ii)
+        print('\n\t\t\t\t  Mean\t\tSTD')
+        # print('----------------------------------------')
+        # print('X ECI [km]\t\t', '{0:0.2E}'.format(np.mean(X_err[0,conv_ind:])), '\t{0:0.2E}'.format(np.std(X_err[0,conv_ind:])))
+        # print('Y ECI [km]\t\t', '{0:0.2E}'.format(np.mean(X_err[1,conv_ind:])), '\t{0:0.2E}'.format(np.std(X_err[1,conv_ind:])))
+        # print('Z ECI [km]\t\t', '{0:0.2E}'.format(np.mean(X_err[2,conv_ind:])), '\t{0:0.2E}'.format(np.std(X_err[2,conv_ind:])))
+        # print('dX ECI [km/s]\t', '{0:0.2E}'.format(np.mean(X_err[3,conv_ind:])), '\t{0:0.2E}'.format(np.std(X_err[3,conv_ind:])))
+        # print('dY ECI [km/s]\t', '{0:0.2E}'.format(np.mean(X_err[4,conv_ind:])), '\t{0:0.2E}'.format(np.std(X_err[4,conv_ind:])))
+        # print('dZ ECI [km/s]\t', '{0:0.2E}'.format(np.mean(X_err[5,conv_ind:])), '\t{0:0.2E}'.format(np.std(X_err[5,conv_ind:])))
+        print('')
+        print('Radial [km]\t\t', '{0:0.2E}'.format(np.mean(r_err[conv_ind:])), '\t{0:0.2E}'.format(np.std(r_err[conv_ind:])))
+        print('In-Track [km]\t', '{0:0.2E}'.format(np.mean(i_err[conv_ind:])), '\t{0:0.2E}'.format(np.std(i_err[conv_ind:])))
+        print('Cross-Track [km]\t', '{0:0.2E}'.format(np.mean(c_err[conv_ind:])), '\t{0:0.2E}'.format(np.std(c_err[conv_ind:])))
+        print('')
+        
+    
+        
+        
+        
+        plt.figure()
+        plt.subplot(3,1,1)
+        plt.plot(thrs_ric, r_err, 'k.')
+        plt.plot(thrs_ric, 3*r_sig, 'k--')
+        plt.plot(thrs_ric, -3*r_sig, 'k--')
+        plt.ylabel('Radial [km]')
+        plt.title('NORAD ' + str(obj_id_plot) + ' (' + label_ii[0].strftime('%Y-%m-%d %H:%M:%S') + ', ' + str(label_ii[1]) + ')')
+        
+        plt.subplot(3,1,2)
+        plt.plot(thrs_ric, i_err, 'k.')
+        plt.plot(thrs_ric, 3*i_sig, 'k--')
+        plt.plot(thrs_ric, -3*i_sig, 'k--')
+        plt.ylabel('In-Track [km]')
+        
+        plt.subplot(3,1,3)
+        plt.plot(thrs_ric, c_err, 'k.')
+        plt.plot(thrs_ric, 3*c_sig, 'k--')
+        plt.plot(thrs_ric, -3*c_sig, 'k--')
+        plt.ylabel('Cross-Track [km]')
+    
+        plt.xlabel('Time [hours]')
+
+        
+        
+        
+    # OSPA
+    plt.figure()
+    plt.subplot(4,1,1)
+    plt.plot(thrs, ospa, 'k.')
+    plt.ylabel('OSPA')
+    plt.subplot(4,1,2)
+    plt.plot(thrs, ospa_pos, 'k.')
+    plt.ylabel('OSPA Pos [km]')
+    plt.subplot(4,1,3)
+    plt.plot(thrs, ospa_vel, 'k.')
+    plt.ylabel('OSPA Vel [km/s]')
+    plt.subplot(4,1,4)
+    plt.plot(thrs, ospa_card, 'k.')
+    plt.ylabel('OSPA Card')
+    plt.xlabel('Time [hours]')
+    
+    
+    # Cardinaltiy/Number plots
+    plt.figure()
+    plt.subplot(3,1,1)
+    plt.plot(thrs, N_true, 'k--')
+    plt.plot(thrs, N_est, 'k.')
+    plt.legend(['True', 'Est'])
+    plt.ylabel('Cardinality')
+    plt.subplot(3,1,2)
+    plt.plot(thrs, nlabel_array, 'k.')
+    plt.ylabel('Num Labels')
+    plt.subplot(3,1,3)
+    plt.plot(thrs, rksum_array, 'k.')
+    plt.ylabel('sum(rk)')
+    plt.xlabel('Time [hours]')
+    
+        
+    # Resids
+    plt.figure()
+    clist = ['r', 'g', 'b', 'c', 'k', 'y', 'm', 'c']
+    for tk in tk_list:
+        
+        if tk not in meas_tk_list:
+            continue
+        
+        tk_hrs = (tk - t0).total_seconds()/3600.
+        resids_k = filter_output[tk]['resids']
+        
+        for ii in range(len(resids_k)):
+            
+            ind = int(ii % len(clist))
+            color_ii = clist[ind]
+            ra_arcsec = resids_k[ii][0]*(1./arcsec2rad)
+            dec_arcsec = resids_k[ii][1]*(1./arcsec2rad)
+            
+            plt.subplot(2,1,1)
+            plt.plot(tk_hrs, ra_arcsec, '.', c=color_ii)
+            plt.subplot(2,1,2)
+            plt.plot(tk_hrs, dec_arcsec, '.', c=color_ii)
+            
+    plt.subplot(2,1,1)
+    plt.ylabel('RA [arcsec]')
+    plt.subplot(2,1,2)
+    plt.ylabel('DEC [arcsec]')
+    plt.xlabel('Time [hours]')
+    
+    
+    
     
     
     

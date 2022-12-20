@@ -550,11 +550,19 @@ def lmb_filter(state_dict, truth_dict, meas_dict, birth_time_dict, meas_fcn, par
         print('birth tracks', len(LMB_birth))
         print('surv tracks', len(LMB_surv))
         
+        
+        
 
         # Corrector Step
-        Zk = meas_dict[tk]['Zk_list']
-        center_list = meas_dict[tk]['center_list']
-        sensor_id_list = meas_dict[tk]['sensor_id_list']
+        if tk in meas_dict:
+            Zk = meas_dict[tk]['Zk_list']
+            center_list = meas_dict[tk]['center_list']
+            sensor_id_list = meas_dict[tk]['sensor_id_list']
+        else:
+            Zk = []
+            center_list = []
+            sensor_id_list = []
+            
         LMB_dict = lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list,
                                  sensor_id_list, meas_fcn, params_dict)
         
@@ -563,6 +571,7 @@ def lmb_filter(state_dict, truth_dict, meas_dict, birth_time_dict, meas_fcn, par
         print('corrector')
         print(LMB_dict)
         print('ntracks', len(LMB_dict))
+        
 
         # Prune/Merge Step
         LMB_dict = lmb_cleanup(LMB_dict, params_dict)
@@ -676,6 +685,7 @@ def lmb_predictor(LMB_dict, tin, birth_model, params_dict):
     print('')
     print('LMB Birth')
     print(LMB_birth)
+
 
     # Check if propagation is needed
     if delta_t == 0.:
@@ -1100,8 +1110,9 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list, sensor_id_list, meas
             # could have a different clutter rate lam_clutter
             
             # Single sensor case
-            sensor_id = sensor_id_list[0]
-            center = center_list[0]
+            # sensor_id = sensor_id_list[0]
+            # center = center_list[0]
+            sensor_id = 'RMIT ROO'
             lam_clutter = sensor_params[sensor_id]['lam_clutter']
             
             log_likelihood = -lam_clutter + np.log(hyp_weight)
@@ -1116,8 +1127,16 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list, sensor_id_list, meas
                 #                             sensor_id, center, state_params,
                 #                             filter_params, sensor_params)
                 
-                label_ind = full_label_list.index(label)
-                p_det = pd_table[0,label_ind]
+                # if len(sensor_id_list)
+                
+                # label_ind = full_label_list.index(label)
+                # p_det = pd_table[0,label_ind]
+                
+                # TODO - fix this to handle missed detections properly, need
+                # sensor pointing information even when no meas recorded
+                # For now, assume nmeas=0 corresponds to a birth time when
+                # no measurements were attempted, so pd = 0
+                p_det = 0.
                 
                 
                 log_likelihood += np.log(1. - p_det)
@@ -1477,6 +1496,8 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list, sensor_id_list, meas
     print('')
     print('LMB posterior')
     print(LMB_dict)
+    
+
 
     return LMB_dict
 
