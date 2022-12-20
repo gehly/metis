@@ -464,7 +464,7 @@ def phd_state_extraction(GMM_dict, tk, Zk, sensor_id_list, meas_fcn,
 ###############################################################################
 
 
-def lmb_filter(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):
+def lmb_filter(state_dict, truth_dict, meas_dict, birth_time_dict, meas_fcn, params_dict):
     
     # Break out inputs
     state_params = params_dict['state_params']
@@ -500,8 +500,11 @@ def lmb_filter(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):
     # Initialize output
     filter_output = {}
 
-    # Measurement times
-    tk_list = sorted(meas_dict.keys())
+    # Measurement/Birth times
+    tk_list = list(meas_dict.keys())
+    tk_list2 = list(birth_time_dict.keys())
+    tk_list.extend(tk_list2)
+    tk_list = sorted(tk_list)
     # tk_list = tk_list[0:15]
     
     # Number of epochs
@@ -531,8 +534,13 @@ def lmb_filter(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):
         print('ntracks', len(LMB_dict))
 
         # Predictor Step
-        tin = [tk_prior, tk]
-        LMB_birth, LMB_surv = lmb_predictor(LMB_dict, tin, params_dict)
+        if tk in birth_time_dict:
+            birth_model = birth_time_dict[tk]
+        else:
+            birth_model = {}
+        
+        tin = [tk_prior, tk]        
+        LMB_birth, LMB_surv = lmb_predictor(LMB_dict, tin, birth_model, params_dict)
         
         print('')
         print('tk', tk)
@@ -606,7 +614,7 @@ def lmb_filter(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):
 
 
 
-def lmb_predictor(LMB_dict, tin, params_dict):
+def lmb_predictor(LMB_dict, tin, birth_model, params_dict):
     '''
     
     
@@ -654,7 +662,7 @@ def lmb_predictor(LMB_dict, tin, params_dict):
 
 
     # Birth Components
-    birth_model = filter_params['birth_model']
+    # birth_model = filter_params['birth_model']
     LMB_birth = {}
     for ii in birth_model.keys():
         label = (tk, ii)
@@ -667,7 +675,7 @@ def lmb_predictor(LMB_dict, tin, params_dict):
     
     print('')
     print('LMB Birth')
-    # print(LMB_birth)
+    print(LMB_birth)
 
     # Check if propagation is needed
     if delta_t == 0.:

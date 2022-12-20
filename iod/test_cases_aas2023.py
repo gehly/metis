@@ -2370,7 +2370,7 @@ def tracklets_to_birth_model(correlation_file, ra_lim, dec_lim):
     # print(sorted(list(birth_time_dict.keys())))
     # print(len(birth_time_dict.keys()))
     
-    return
+    return birth_time_dict
 
 
 def tudat_geo_lmb_setup_no_birth(truth_file, meas_file, setup_file):
@@ -2504,7 +2504,7 @@ def tudat_geo_lmb_setup_birth(truth_file, meas_file, correlation_file,
     
     # Setup filter params
     # LMB Birth Model
-    birth_model = {}
+    birth_time_dict = tracklets_to_birth_model(correlation_file, ra_lim, dec_lim)
     
     # Filter parameters
     filter_params = {}
@@ -2520,7 +2520,7 @@ def tudat_geo_lmb_setup_birth(truth_file, meas_file, correlation_file,
     filter_params['T_max'] = 100
     filter_params['T_threshold'] = 1e-3
     filter_params['p_surv'] = 1.
-    filter_params['birth_model'] = birth_model
+    # filter_params['birth_model'] = birth_model
     
     # Additions to other parameter dictionaries
     state_params['nstates'] = 6
@@ -2545,33 +2545,33 @@ def tudat_geo_lmb_setup_birth(truth_file, meas_file, correlation_file,
     # print(P)
     # print(np.sqrt(np.diag(P)))
     
-    P = np.diag([1., 1., 1., 1e-6, 1e-6, 1e-6])
+    # P = np.diag([1., 1., 1., 1e-6, 1e-6, 1e-6])
     
 
     
-    LMB_dict = {}
-    ii = 1
-    for obj_id in obj_id_list:
+    # LMB_dict = {}
+    # ii = 1
+    # for obj_id in obj_id_list:
         
-        X_true = truth_dict[tk_list[0]][obj_id]
-        pert_vect = np.multiply(np.sqrt(np.diag(P)), np.random.randn(6))
-        X_init = X_true + np.reshape(pert_vect, (6, 1))
+    #     X_true = truth_dict[tk_list[0]][obj_id]
+    #     pert_vect = np.multiply(np.sqrt(np.diag(P)), np.random.randn(6))
+    #     X_init = X_true + np.reshape(pert_vect, (6, 1))
         
-        LMB_dict[(tk_list[0], ii)] = {}
-        LMB_dict[(tk_list[0], ii)]['r'] = 0.999
-        LMB_dict[(tk_list[0], ii)]['weights'] = [1.]
-        LMB_dict[(tk_list[0], ii)]['means'] = [X_init]
-        LMB_dict[(tk_list[0], ii)]['covars'] = [P]
+    #     LMB_dict[(tk_list[0], ii)] = {}
+    #     LMB_dict[(tk_list[0], ii)]['r'] = 0.999
+    #     LMB_dict[(tk_list[0], ii)]['weights'] = [1.]
+    #     LMB_dict[(tk_list[0], ii)]['means'] = [X_init]
+    #     LMB_dict[(tk_list[0], ii)]['covars'] = [P]
         
-        ii += 1
+    #     ii += 1
         
         
-    print(LMB_dict)
+    # print(LMB_dict)
 
-        
+    # Initialize empty
     state_dict = {}
     state_dict[tk_list[0]] = {}
-    state_dict[tk_list[0]]['LMB_dict'] = LMB_dict
+    state_dict[tk_list[0]]['LMB_dict'] = {}
     
     
     
@@ -2585,7 +2585,7 @@ def tudat_geo_lmb_setup_birth(truth_file, meas_file, correlation_file,
     meas_fcn = mfunc.unscented_radec
                 
     pklFile = open( setup_file, 'wb' )
-    pickle.dump( [state_dict, meas_fcn, meas_dict, params_dict, truth_dict], pklFile, -1 )
+    pickle.dump( [state_dict, meas_fcn, meas_dict, params_dict, truth_dict, birth_time_dict], pklFile, -1 )
     pklFile.close()
     
     
@@ -2752,6 +2752,7 @@ def run_multitarget_filter(setup_file, prev_results, results_file):
     meas_dict = data[2]
     params_dict = data[3]
     truth_dict = data[4]
+    birth_time_dict = data[5]
     pklFile.close()
     
     # Load previous results and reset state_dict
@@ -2766,20 +2767,26 @@ def run_multitarget_filter(setup_file, prev_results, results_file):
     
     
     
-    # Reduce meas dict to times of interest
-    t0 = datetime(2022, 11, 13, 0, 0, 0)
-    tf = datetime(2022, 11, 14, 0, 0, 0)
+    # Reduce meas and birth dict to times of interest
+    t0 = datetime(2022, 11, 7, 0, 0, 0)
+    tf = datetime(2022, 11, 8, 0, 0, 0)
     tk_list = sorted(list(meas_dict.keys()))
+    tk_list2 = sorted(list(birth_time_dict.keys()))
+
     
     for tk in tk_list:
         if tk < t0 or tk > tf:
             del meas_dict[tk]
             
-    print(meas_dict.keys())
-    print(len(meas_dict.keys()))
+    for tk in tk_list2:
+        if tk < t0 or tk > tf:
+            del birth_time_dict[tk]
+            
+    # print(meas_dict.keys())
+    # print(len(meas_dict.keys()))
 
 
-    filter_output, full_state_output = mult.lmb_filter(state_dict, truth_dict, meas_dict, meas_fcn, params_dict)
+    filter_output, full_state_output = mult.lmb_filter(state_dict, truth_dict, meas_dict, birth_time_dict, meas_fcn, params_dict)
     
     
     pklFile = open( results_file, 'wb' )
