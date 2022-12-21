@@ -2325,7 +2325,7 @@ def compute_resids(Xo, UTC0, tk_list1, Zk_list1, Rmat1, params_dict):
     return resids, ra_rms, dec_rms
 
 
-def tracklets_to_birth_model(correlation_file, ra_lim, dec_lim):
+def tracklets_to_birth_model(correlation_file, ra_lim, dec_lim, birth_type='simple'):
     
     # Load correlation data
     pklFile = open(correlation_file, 'rb' )
@@ -2336,39 +2336,86 @@ def tracklets_to_birth_model(correlation_file, ra_lim, dec_lim):
     truth_dict = data[3]
     pklFile.close()
     
-    
-    # Simple model - just initialize near truth
+    # Initialize
     birth_time_dict = {}
     label_truth_dict = {}
-    tracklet_id_list = sorted(list(tracklet_dict.keys()))
-    P_birth = np.diag([1., 1., 1., 1e-6, 1e-6, 1e-6])
-    for tracklet_id in tracklet_id_list:
+    P_birth = 100.*np.diag([1., 1., 1., 1e-6, 1e-6, 1e-6])
+    
+    # Simple model - just initialize near truth
+    if birth_type == 'simple':
         
-        # Retrieve tracklet data
-        tracklet = tracklet_dict[tracklet_id]
-        obj_id = tracklet['obj_id']
-        tk_list = tracklet['tk_list']
+        tracklet_id_list = sorted(list(tracklet_dict.keys()))
         
-        # Retrieve truth data for initial tracklet time
-        tk = tk_list[0]
-        X_true = truth_dict[tk][obj_id]
+        for tracklet_id in tracklet_id_list:
+            
+            # Retrieve tracklet data
+            tracklet = tracklet_dict[tracklet_id]
+            obj_id = tracklet['obj_id']
+            tk_list = tracklet['tk_list']
+            
+            # Retrieve truth data for initial tracklet time
+            tk = tk_list[0]
+            X_true = truth_dict[tk][obj_id]
+            
+            # Perturbed initial filter state
+            pert_vect = np.multiply(np.sqrt(np.diag(P_birth)), np.random.randn(6))
+            X_init = X_true + np.reshape(pert_vect, (6, 1))
+            
+            # Generate and store birth component for this time
+            birth_model = {}
+            birth_model[1] = {}
+            birth_model[1]['r_birth'] = 0.05
+            birth_model[1]['weights'] = [1.]
+            birth_model[1]['means'] = [X_init]
+            birth_model[1]['covars'] = [P_birth]
+            
+            birth_time_dict[tk] = birth_model
+            
+            label = (tk, 1)
+            label_truth_dict[label] = obj_id
+            
+            
+    # GMM model using mean state from Gooding IOD
+    if birth_type == 'gooding_gmm':
         
-        # Perturbed initial filter state
-        pert_vect = np.multiply(np.sqrt(np.diag(P_birth)), np.random.randn(6))
-        X_init = X_true + np.reshape(pert_vect, (6, 1))
-        
-        # Generate and store birth component for this time
-        birth_model = {}
-        birth_model[1] = {}
-        birth_model[1]['r_birth'] = 0.05
-        birth_model[1]['weights'] = [1.]
-        birth_model[1]['means'] = [X_init]
-        birth_model[1]['covars'] = [P_birth]
-        
-        birth_time_dict[tk] = birth_model
-        
-        label = (tk, 1)
-        label_truth_dict[label] = obj_id
+        for case_id in correlation_dict:
+            
+            # If no IOD solution fit, correlation is estimated to be false
+            if len(correlation_dict[case_id]['M_list']) == 0:
+                continue
+            
+            # Otherwise, estimate correlation status based on residuals
+            else:            
+                ra_rms_list = correlation_dict[case_id]['ra_rms_list']
+                dec_rms_list = correlation_dict[case_id]['dec_rms_list']
+                Xo_list = correlation_dict[case_id]['Xo_list']
+                means = []
+                covars = []
+                for ii in range(len(ra_rms_list)):
+                    ra_rms = ra_rms_list[ii]
+                    dec_rms = dec_rms_list[ii]
+                    Xo = Xo_list[ii]
+                    
+                    if ra_rms < ra_lim and dec_rms < dec_lim:
+                        means.append(Xo)
+                        covars.append(P_birth)
+                        
+                if len(means) > 0:
+                    tracklet1_id = correlation_dict[case_id]['tracklet1_id']
+                    tk = tracklet_dict[tracklet1_id]['tk_list'][0]
+                    weights = [1./len(means)]*len(means)
+                    
+                    birth_model = {}
+                    birth_model[birth_id] = {}
+                    birth_model[birth_id]['r_birth'] = 0.05
+                    birth_model[birth_id]['weights'] = weights
+                    birth_model[birth_id]['means'] = means
+                    birth_model[birth_id]['covars'] = covars
+                    
+                    birth_time_dict[tk] = birth_model
+                    
+                        
+                        
         
         
     # print(sorted(list(birth_time_dict.keys())))
@@ -2753,7 +2800,7 @@ def run_multitarget_filter(setup_file, prev_results, results_file):
     # Load setup
     pklFile = open(setup_file, 'rb' )
     data = pickle.load( pklFile )
-    state_dict = data[0]
+    # state_dict = data[0]
     meas_fcn = data[1]
     meas_dict = data[2]
     params_dict = data[3]
@@ -2762,21 +2809,16 @@ def run_multitarget_filter(setup_file, prev_results, results_file):
     label_truth_dict = data[6]
     pklFile.close()
     
-    # # Load previous results and reset state_dict
-    # pklFile = open(prev_results, 'rb' )
-    # data = pickle.load( pklFile )
-    # state_dict = data[0]
-    # pklFile.close()
-    
-    # tk_filter = sorted(list(filter_output.keys()))
-    # tf_filter = tk_filter[-1]
-    # LMB_dict = filter_output[tf_filter]['LMB_dict']
-    
+    # Load previous results and reset state_dict
+    pklFile = open(prev_results, 'rb' )
+    data = pickle.load( pklFile )
+    state_dict = data[0]
+    pklFile.close()
     
     
     # Reduce meas and birth dict to times of interest
-    t0 = datetime(2022, 11, 7, 0, 0, 0)
-    tf = datetime(2022, 11, 9, 0, 0, 0)
+    t0 = datetime(2022, 11, 12, 0, 0, 0)
+    tf = datetime(2022, 11, 13, 0, 0, 0)
     tk_list = sorted(list(meas_dict.keys()))
     tk_list2 = sorted(list(birth_time_dict.keys()))
 
@@ -2811,13 +2853,13 @@ def combine_results():
     
     
     fdir = r'D:\documents\research_projects\iod\data\sim\test\aas2023_geo_6obj_7day'
-    fdir2 = os.path.join(fdir, '2022_12_18_geo_twobody_6obj_2perday_redo')
+    fdir2 = os.path.join(fdir, '2022_12_18_geo_twobody_tracklet_corr')
 
     filter_output_full = {}
     
-    for ii in range(1,8):
+    for ii in range(1,6):
     
-        fname = 'geo_twobody_6obj_7day_10min_2perday_results_' + str(ii) + '.pkl'
+        fname = 'geo_twobody_6obj_7day_truebirth_results_' + str(ii) + '.pkl'
         results_file = os.path.join(fdir2, fname)
         
         pklFile = open(results_file, 'rb' )
@@ -2826,17 +2868,18 @@ def combine_results():
         full_state_output = data[1]
         params_dict = data[2]
         truth_dict = data[3]
+        label_truth_dict = data[4]
         pklFile.close()
         
         filter_output_full.update(filter_output)
         
     full_state_output = filter_output_full
         
-    fname = 'geo_twobody_6obj_7day_10min_2perday_results_full.pkl'
+    fname = 'geo_twobody_6obj_7day_truebirth_results_full.pkl'
     full_results_file = os.path.join(fdir2, fname)
     
     pklFile = open( full_results_file, 'wb' )
-    pickle.dump( [filter_output_full, full_state_output, params_dict, truth_dict], pklFile, -1 )
+    pickle.dump( [filter_output_full, full_state_output, params_dict, truth_dict, label_truth_dict], pklFile, -1 )
     pklFile.close()
     
     
@@ -2904,10 +2947,10 @@ if __name__ == '__main__':
     setup_file = os.path.join(fdir2, fname)  
     
     
-    fname = 'geo_twobody_6obj_7day_truebirth_results_1.pkl'
+    fname = 'geo_twobody_6obj_7day_truebirth_results_5.pkl'
     prev_results = os.path.join(fdir2, fname)
     
-    fname = 'geo_twobody_6obj_7day_truebirth_results_1.pkl'
+    fname = 'geo_twobody_6obj_7day_truebirth_results_full.pkl'
     results_file = os.path.join(fdir2, fname)
     
     
@@ -2966,13 +3009,13 @@ if __name__ == '__main__':
     
     
     # Run Filter
-    run_multitarget_filter(setup_file, prev_results, results_file)
+    # run_multitarget_filter(setup_file, prev_results, results_file)
     
     # combine_results()
     
     
     
-    # multitarget_analysis(results_file, setup_file)
+    multitarget_analysis(results_file, setup_file)
     
     
     
