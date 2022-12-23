@@ -2786,7 +2786,7 @@ def run_multitarget_filter(setup_file, prev_results, results_file):
     # Load setup
     pklFile = open(setup_file, 'rb' )
     data = pickle.load( pklFile )
-    # state_dict = data[0]
+    state_dict = data[0]
     meas_fcn = data[1]
     meas_dict = data[2]
     params_dict = data[3]
@@ -2795,16 +2795,16 @@ def run_multitarget_filter(setup_file, prev_results, results_file):
     label_truth_dict = data[6]
     pklFile.close()
     
-    # Load previous results and reset state_dict
-    pklFile = open(prev_results, 'rb' )
-    data = pickle.load( pklFile )
-    state_dict = data[0]
-    pklFile.close()
+    # # Load previous results and reset state_dict
+    # pklFile = open(prev_results, 'rb' )
+    # data = pickle.load( pklFile )
+    # state_dict = data[0]
+    # pklFile.close()
     
     
     # Reduce meas and birth dict to times of interest
-    t0 = datetime(2022, 11, 12, 0, 0, 0)
-    tf = datetime(2022, 11, 13, 0, 0, 0)
+    t0 = datetime(2022, 11, 7, 0, 0, 0)
+    tf = datetime(2022, 11, 8, 0, 0, 0)
     tk_list = sorted(list(meas_dict.keys()))
     tk_list2 = sorted(list(birth_time_dict.keys()))
 
@@ -2986,8 +2986,8 @@ if __name__ == '__main__':
     
     # tudat_geo_lmb_setup_no_birth(truth_file, meas_file, setup_file)
     
-    tudat_geo_lmb_setup_birth(truth_file, meas_file, corr_pkl,
-                              ra_lim, dec_lim, birth_type, setup_file)
+    # tudat_geo_lmb_setup_birth(truth_file, meas_file, corr_pkl,
+    #                           ra_lim, dec_lim, birth_type, setup_file)
     
     
     # fname = 'geo_twobody_singletarget_setup.pkl'
@@ -3006,7 +3006,7 @@ if __name__ == '__main__':
     
     
     
-    # multitarget_analysis(results_file, setup_file)
+    multitarget_analysis(results_file, setup_file)
     
     
     
