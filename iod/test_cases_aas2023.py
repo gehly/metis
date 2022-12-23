@@ -2378,44 +2378,29 @@ def tracklets_to_birth_model(correlation_file, ra_lim, dec_lim, birth_type='simp
     # GMM model using mean state from Gooding IOD
     if birth_type == 'gooding_gmm':
         
-        for case_id in correlation_dict:
-            
-            # If no IOD solution fit, correlation is estimated to be false
-            if len(correlation_dict[case_id]['M_list']) == 0:
-                continue
-            
-            # Otherwise, estimate correlation status based on residuals
-            else:            
-                ra_rms_list = correlation_dict[case_id]['ra_rms_list']
-                dec_rms_list = correlation_dict[case_id]['dec_rms_list']
-                Xo_list = correlation_dict[case_id]['Xo_list']
-                means = []
-                covars = []
-                for ii in range(len(ra_rms_list)):
-                    ra_rms = ra_rms_list[ii]
-                    dec_rms = dec_rms_list[ii]
-                    Xo = Xo_list[ii]
-                    
-                    if ra_rms < ra_lim and dec_rms < dec_lim:
-                        means.append(Xo)
-                        covars.append(P_birth)
-                        
-                if len(means) > 0:
-                    tracklet1_id = correlation_dict[case_id]['tracklet1_id']
-                    tk = tracklet_dict[tracklet1_id]['tk_list'][0]
-                    weights = [1./len(means)]*len(means)
-                    
-                    birth_model = {}
-                    birth_model[birth_id] = {}
-                    birth_model[birth_id]['r_birth'] = 0.05
-                    birth_model[birth_id]['weights'] = weights
-                    birth_model[birth_id]['means'] = means
-                    birth_model[birth_id]['covars'] = covars
-                    
-                    birth_time_dict[tk] = birth_model
-                    
-                        
-                        
+        # Get estimated correlation status
+        corr_est_dict = analysis.evaluate_tracklet_correlation(correlation_file, ra_lim, dec_lim)
+        
+        # Build birth model
+        for tracklet_id in corr_est_dict:
+            tk = tracklet_dict[tracklet_id]['tk_list'][0]
+            means = corr_est_dict[tracklet_id]['means']
+            ncomp = len(means)
+            if tk in birth_time_dict:
+                birth_id_list = sorted(list(birth_time_dict[tk].keys()))
+                birth_id = birth_id_list[-1] + 1
+            else:
+                birth_id = 1                
+                birth_time_dict[tk] = {}
+        
+            birth_time_dict[tk][birth_id] = {}
+            birth_time_dict[tk][birth_id]['r_birth'] = 0.05
+            birth_time_dict[tk][birth_id]['weights'] = [1./ncomp]*ncomp
+            birth_time_dict[tk][birth_id]['means'] = means
+            birth_time_dict[tk][birth_id]['covars'] = [P_birth]*ncomp
+
+            label = (tk, birth_id)
+            label_truth_dict[label] = tracklet_dict[tracklet_id]['obj_id']
         
         
     # print(sorted(list(birth_time_dict.keys())))
@@ -2989,7 +2974,7 @@ if __name__ == '__main__':
     
     ra_lim = 500.
     dec_lim = 500.
-    # analysis.evaluate_tracklet_correlation(corr_pkl, ra_lim, dec_lim)
+    # corr_est_dict = analysis.evaluate_tracklet_correlation(corr_pkl, ra_lim, dec_lim)
     
     # tracklets_to_birth_model(corr_pkl, ra_lim, dec_lim)
     

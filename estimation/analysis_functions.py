@@ -2692,6 +2692,7 @@ def evaluate_tracklet_correlation(correlation_file, ra_lim, dec_lim):
     N_trueneg = 0
     N_falsepos = 0
     N_falseneg = 0
+    corr_est_dict = {}
     for case_id in correlation_dict:
         corr_truth_list = correlation_dict[case_id]['corr_truth_list']
         
@@ -2722,6 +2723,20 @@ def evaluate_tracklet_correlation(correlation_file, ra_lim, dec_lim):
                 resids_rms = np.sqrt(np.mean(np.sum(np.multiply(resids_ii, resids_ii), axis=0)))
                 rms_list.append(resids_rms)
                 
+                # Check for individual instances within the case that pass and
+                # store for output
+                ra_rms = ra_rms_list[ii]
+                dec_rms = dec_rms_list[ii]                
+                if ra_rms < ra_lim and dec_rms < dec_lim:
+                    Xo = correlation_dict[case_id]['Xo_list'][ii]
+                    tracklet1_id = correlation_dict[case_id]['tracklet1_id']
+                    if tracklet1_id not in corr_est_dict:
+                        corr_est_dict[tracklet1_id] = {}
+                        corr_est_dict[tracklet1_id]['means'] = []
+                        
+                    corr_est_dict[tracklet1_id]['means'].append(Xo)
+                    
+            # General TP/FP calculations for the case id
             min_ind = rms_list.index(min(rms_list))
             ra_min = ra_rms_list[min_ind]
             dec_min = dec_rms_list[min_ind]
@@ -2764,15 +2779,9 @@ def evaluate_tracklet_correlation(correlation_file, ra_lim, dec_lim):
     print('False Pos: %5.2f%% (%3d/%3d)' % ((N_falsepos/N_false)*100., N_falsepos, N_false))
     print('False Neg: %5.2f%% (%3d/%3d)' % ((N_falseneg/N_true)*100., N_falseneg, N_true))
     
+
     
-    
-    
-    
-    
-    
-    
-    
-    return
+    return corr_est_dict
 
 
 
