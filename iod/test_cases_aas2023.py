@@ -2403,11 +2403,11 @@ def tracklets_to_birth_model(correlation_file, ra_lim, dec_lim, birth_type='simp
             label_truth_dict[label] = tracklet_dict[tracklet_id]['obj_id']
         
         
-    # print(sorted(list(birth_time_dict.keys())))
-    # print(len(birth_time_dict.keys()))
+    print(sorted(list(birth_time_dict.keys())))
+    print(len(birth_time_dict.keys()))
     
     print(label_truth_dict)
-    
+
     return birth_time_dict, label_truth_dict
 
 
@@ -2521,7 +2521,7 @@ def tudat_geo_lmb_setup_no_birth(truth_file, meas_file, setup_file):
 
 
 def tudat_geo_lmb_setup_birth(truth_file, meas_file, correlation_file,
-                              ra_lim, dec_lim, setup_file):
+                              ra_lim, dec_lim, birth_type, setup_file):
     
     
     # Don't use sensor_params from truth file it has been updated for meas
@@ -2542,7 +2542,8 @@ def tudat_geo_lmb_setup_birth(truth_file, meas_file, correlation_file,
     
     # Setup filter params
     # LMB Birth Model
-    birth_time_dict, label_truth_dict = tracklets_to_birth_model(correlation_file, ra_lim, dec_lim)
+    birth_time_dict, label_truth_dict = \
+        tracklets_to_birth_model(correlation_file, ra_lim, dec_lim, birth_type)
     
     # Filter parameters
     filter_params = {}
@@ -2909,7 +2910,7 @@ if __name__ == '__main__':
     # test_tracklet_association()
     
     fdir = r'D:\documents\research_projects\iod\data\sim\test\aas2023_geo_6obj_7day'
-    fdir2 = os.path.join(fdir, '2022_12_18_geo_twobody_tracklet_corr')
+    fdir2 = os.path.join(fdir, '2022_12_23_geo_twobody_gooding_birth')
     
     
     
@@ -2928,14 +2929,14 @@ if __name__ == '__main__':
     fname = r'geo_twobody_6obj_7day_meas_noise1_lam0_pd1.pkl'
     meas_file = os.path.join(fdir2, fname)
     
-    fname = 'geo_twobody_6obj_7day_setup_noise1_lam0_pd1_truebirth.pkl'
+    fname = 'geo_twobody_6obj_7day_setup_noise1_lam0_pd1_goodingbirth.pkl'
     setup_file = os.path.join(fdir2, fname)  
     
     
-    fname = 'geo_twobody_6obj_7day_truebirth_results_5.pkl'
+    fname = 'geo_twobody_6obj_7day_goodingbirth_results_1.pkl'
     prev_results = os.path.join(fdir2, fname)
     
-    fname = 'geo_twobody_6obj_7day_truebirth_results_full.pkl'
+    fname = 'geo_twobody_6obj_7day_goodingbirth_results_1.pkl'
     results_file = os.path.join(fdir2, fname)
     
     
@@ -2974,14 +2975,19 @@ if __name__ == '__main__':
     
     ra_lim = 500.
     dec_lim = 500.
+    birth_type = 'gooding_gmm'
+    
     # corr_est_dict = analysis.evaluate_tracklet_correlation(corr_pkl, ra_lim, dec_lim)
     
-    # tracklets_to_birth_model(corr_pkl, ra_lim, dec_lim)
+    # birth_time_dict, label_truth_dict = tracklets_to_birth_model(corr_pkl, ra_lim, dec_lim, birth_type)
+    
+    # print(birth_time_dict)
+    
     
     # tudat_geo_lmb_setup_no_birth(truth_file, meas_file, setup_file)
     
-    # tudat_geo_lmb_setup_birth(truth_file, meas_file, corr_pkl,
-    #                           ra_lim, dec_lim, setup_file)
+    tudat_geo_lmb_setup_birth(truth_file, meas_file, corr_pkl,
+                              ra_lim, dec_lim, birth_type, setup_file)
     
     
     # fname = 'geo_twobody_singletarget_setup.pkl'
@@ -3000,7 +3006,7 @@ if __name__ == '__main__':
     
     
     
-    multitarget_analysis(results_file, setup_file)
+    # multitarget_analysis(results_file, setup_file)
     
     
     
