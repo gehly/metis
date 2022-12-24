@@ -2339,7 +2339,7 @@ def tracklets_to_birth_model(correlation_file, ra_lim, dec_lim, birth_type='simp
     # Initialize
     birth_time_dict = {}
     label_truth_dict = {}
-    P_birth = 100.*np.diag([1., 1., 1., 1e-6, 1e-6, 1e-6])
+    P_birth = 1.*np.diag([1., 1., 1., 1e-6, 1e-6, 1e-6])
     
     # Simple model - just initialize near truth
     if birth_type == 'simple':
@@ -2394,7 +2394,7 @@ def tracklets_to_birth_model(correlation_file, ra_lim, dec_lim, birth_type='simp
                 birth_time_dict[tk] = {}
         
             birth_time_dict[tk][birth_id] = {}
-            birth_time_dict[tk][birth_id]['r_birth'] = 0.05
+            birth_time_dict[tk][birth_id]['r_birth'] = 0.01
             birth_time_dict[tk][birth_id]['weights'] = [1./ncomp]*ncomp
             birth_time_dict[tk][birth_id]['means'] = means
             birth_time_dict[tk][birth_id]['covars'] = [P_birth]*ncomp
@@ -2558,7 +2558,7 @@ def tudat_geo_lmb_setup_birth(truth_file, meas_file, correlation_file,
     filter_params['H_max_birth'] = 5
     filter_params['T_max'] = 100
     filter_params['T_threshold'] = 1e-3
-    filter_params['p_surv'] = 1.
+    filter_params['p_surv'] = 0.99
     # filter_params['birth_model'] = birth_model
     
     # Additions to other parameter dictionaries
@@ -2804,7 +2804,7 @@ def run_multitarget_filter(setup_file, prev_results, results_file):
     
     # Reduce meas and birth dict to times of interest
     t0 = datetime(2022, 11, 7, 0, 0, 0)
-    tf = datetime(2022, 11, 8, 0, 0, 0)
+    tf = datetime(2022, 11, 7, 17, 45, 0)
     tk_list = sorted(list(meas_dict.keys()))
     tk_list2 = sorted(list(birth_time_dict.keys()))
 
@@ -2929,14 +2929,14 @@ if __name__ == '__main__':
     fname = r'geo_twobody_6obj_7day_meas_noise1_lam0_pd1.pkl'
     meas_file = os.path.join(fdir2, fname)
     
-    fname = 'geo_twobody_6obj_7day_setup_noise1_lam0_pd1_goodingbirth.pkl'
+    fname = 'geo_twobody_6obj_7day_setup_noise1_lam0_pd1_goodingbirth2.pkl'
     setup_file = os.path.join(fdir2, fname)  
     
     
-    fname = 'geo_twobody_6obj_7day_goodingbirth_results_1.pkl'
+    fname = 'geo_twobody_6obj_7day_goodingbirth2_results_1.pkl'
     prev_results = os.path.join(fdir2, fname)
     
-    fname = 'geo_twobody_6obj_7day_goodingbirth_results_1.pkl'
+    fname = 'geo_twobody_6obj_7day_goodingbirth2_results_1.pkl'
     results_file = os.path.join(fdir2, fname)
     
     
