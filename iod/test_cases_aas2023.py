@@ -2336,10 +2336,15 @@ def tracklets_to_birth_model(correlation_file, ra_lim, dec_lim, birth_type='simp
     truth_dict = data[3]
     pklFile.close()
     
+    # Params
+    state_params = params_dict['state_params']
+    int_params = params_dict['int_params']
+    
+    
     # Initialize
     birth_time_dict = {}
     label_truth_dict = {}
-    P_birth = 1.*np.diag([1., 1., 1., 1e-6, 1e-6, 1e-6])
+    P_birth = 100.*np.diag([1., 1., 1., 1e-6, 1e-6, 1e-6])
     
     # Simple model - just initialize near truth
     if birth_type == 'simple':
@@ -2383,16 +2388,28 @@ def tracklets_to_birth_model(correlation_file, ra_lim, dec_lim, birth_type='simp
         
         # Build birth model
         for tracklet_id in corr_est_dict:
-            tk = tracklet_dict[tracklet_id]['tk_list'][0]
-            means = corr_est_dict[tracklet_id]['means']
-            ncomp = len(means)
+            t0 = tracklet_dict[tracklet_id]['tk_list'][0]
+            tk = tracklet_dict[tracklet_id]['tk_list'][1]
+            tin = [t0, tk]
+            means0 = corr_est_dict[tracklet_id]['means']
+            ncomp = len(means0)
+            means = []
+            
+            # Propagate Gooding IOD states to second tracklet time for birth model
+            for jj in range(ncomp):
+                Xo = means0[jj]
+                tout, intout = dyn.general_dynamics(Xo, tin, state_params, int_params)
+                Xk = intout[-1,:].reshape(6,1)
+                means.append(Xk)
+
             if tk in birth_time_dict:
                 birth_id_list = sorted(list(birth_time_dict[tk].keys()))
                 birth_id = birth_id_list[-1] + 1
             else:
                 birth_id = 1                
                 birth_time_dict[tk] = {}
-        
+                
+
             birth_time_dict[tk][birth_id] = {}
             birth_time_dict[tk][birth_id]['r_birth'] = 0.01
             birth_time_dict[tk][birth_id]['weights'] = [1./ncomp]*ncomp
@@ -2558,7 +2575,7 @@ def tudat_geo_lmb_setup_birth(truth_file, meas_file, correlation_file,
     filter_params['H_max_birth'] = 5
     filter_params['T_max'] = 100
     filter_params['T_threshold'] = 1e-3
-    filter_params['p_surv'] = 0.99
+    filter_params['p_surv'] = 1.0
     # filter_params['birth_model'] = birth_model
     
     # Additions to other parameter dictionaries
@@ -2929,14 +2946,14 @@ if __name__ == '__main__':
     fname = r'geo_twobody_6obj_7day_meas_noise1_lam0_pd1.pkl'
     meas_file = os.path.join(fdir2, fname)
     
-    fname = 'geo_twobody_6obj_7day_setup_noise1_lam0_pd1_goodingbirth2.pkl'
+    fname = 'geo_twobody_6obj_7day_setup_noise1_lam0_pd1_goodingbirth3.pkl'
     setup_file = os.path.join(fdir2, fname)  
     
     
-    fname = 'geo_twobody_6obj_7day_goodingbirth2_results_1.pkl'
+    fname = 'geo_twobody_6obj_7day_goodingbirth3_results_1.pkl'
     prev_results = os.path.join(fdir2, fname)
     
-    fname = 'geo_twobody_6obj_7day_goodingbirth2_results_1.pkl'
+    fname = 'geo_twobody_6obj_7day_goodingbirth3_results_1.pkl'
     results_file = os.path.join(fdir2, fname)
     
     
@@ -2986,8 +3003,8 @@ if __name__ == '__main__':
     
     # tudat_geo_lmb_setup_no_birth(truth_file, meas_file, setup_file)
     
-    # tudat_geo_lmb_setup_birth(truth_file, meas_file, corr_pkl,
-    #                           ra_lim, dec_lim, birth_type, setup_file)
+    tudat_geo_lmb_setup_birth(truth_file, meas_file, corr_pkl,
+                              ra_lim, dec_lim, birth_type, setup_file)
     
     
     # fname = 'geo_twobody_singletarget_setup.pkl'
@@ -3006,7 +3023,7 @@ if __name__ == '__main__':
     
     
     
-    multitarget_analysis(results_file, setup_file)
+    # multitarget_analysis(results_file, setup_file)
     
     
     
