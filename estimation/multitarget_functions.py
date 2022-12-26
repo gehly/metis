@@ -503,7 +503,11 @@ def lmb_filter(state_dict, truth_dict, meas_dict, birth_time_dict, meas_fcn, par
     # Measurement/Birth times
     tk_list = list(meas_dict.keys())
     tk_list2 = list(birth_time_dict.keys())
-    tk_list.extend(tk_list2)
+    
+    for tk2 in tk_list2:
+        if tk2 not in tk_list:
+            tk_list.append(tk2)
+    
     tk_list = sorted(tk_list)
     # tk_list = tk_list[0:15]
     
@@ -1765,17 +1769,22 @@ def lmb_state_extraction(LMB_dict, tk, Zk, sensor_id_list, meas_fcn,
         ri = r_list[ii]
         label_i = label_list[ii]
         
-        # Merge GMM to get single component output
-        GMM_dict = {}
-        GMM_dict['weights'] = LMB_dict[label_i]['weights']
-        GMM_dict['means'] = LMB_dict[label_i]['means']
-        GMM_dict['covars'] = LMB_dict[label_i]['covars']
+        # # Merge GMM to get single component output
+        # GMM_dict = {}
+        # GMM_dict['weights'] = LMB_dict[label_i]['weights']
+        # GMM_dict['means'] = LMB_dict[label_i]['means']
+        # GMM_dict['covars'] = LMB_dict[label_i]['covars']
         
-        GMM_dict = est.merge_GMM(GMM_dict, params)
+        # GMM_dict = est.merge_GMM(GMM_dict, params)
         
-        weights = GMM_dict['weights']
-        means = GMM_dict['means']
-        covars = GMM_dict['covars']
+        # weights = GMM_dict['weights']
+        # means = GMM_dict['means']
+        # covars = GMM_dict['covars']
+        
+        # Select highest weighted component for output
+        weights = LMB_dict[label_i]['weights']
+        means = LMB_dict[label_i]['means']
+        covars = LMB_dict[label_i]['covars']
         
         ind = np.argmax(weights)
         Xk = means[ind]

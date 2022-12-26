@@ -2340,6 +2340,10 @@ def tracklets_to_birth_model(correlation_file, ra_lim, dec_lim, birth_type='simp
     state_params = params_dict['state_params']
     int_params = params_dict['int_params']
     
+    gmm_params = {}
+    gmm_params['prune_T'] = 1e-3
+    gmm_params['merge_U'] = 36.
+    
     
     # Initialize
     birth_time_dict = {}
@@ -2388,14 +2392,29 @@ def tracklets_to_birth_model(correlation_file, ra_lim, dec_lim, birth_type='simp
         
         # Build birth model
         for tracklet_id in corr_est_dict:
+            
+            # Set up propagation to second tracklet time
             t0 = tracklet_dict[tracklet_id]['tk_list'][0]
             tk = tracklet_dict[tracklet_id]['tk_list'][1]
             tin = [t0, tk]
+            
+            # Retrieve and merge GMM components
             means0 = corr_est_dict[tracklet_id]['means']
             ncomp = len(means0)
-            means = []
+            # weights0 = [1./ncomp]*ncomp
+            # covars0 = [P_birth]*ncomp
+            # GMM_dict = {}
+            # GMM_dict['weights'] = weights0
+            # GMM_dict['means'] = means0
+            # GMM_dict['covars'] = covars0
+            # GMM_dict = est.merge_GMM(GMM_dict, gmm_params)
+            
+            # means1 = GMM_dict['means']
+            
             
             # Propagate Gooding IOD states to second tracklet time for birth model
+            means = []
+            
             for jj in range(ncomp):
                 Xo = means0[jj]
                 tout, intout = dyn.general_dynamics(Xo, tin, state_params, int_params)
@@ -2803,7 +2822,7 @@ def run_multitarget_filter(setup_file, prev_results, results_file):
     # Load setup
     pklFile = open(setup_file, 'rb' )
     data = pickle.load( pklFile )
-    state_dict = data[0]
+    # state_dict = data[0]
     meas_fcn = data[1]
     meas_dict = data[2]
     params_dict = data[3]
@@ -2812,16 +2831,16 @@ def run_multitarget_filter(setup_file, prev_results, results_file):
     label_truth_dict = data[6]
     pklFile.close()
     
-    # # Load previous results and reset state_dict
-    # pklFile = open(prev_results, 'rb' )
-    # data = pickle.load( pklFile )
-    # state_dict = data[0]
-    # pklFile.close()
+    # Load previous results and reset state_dict
+    pklFile = open(prev_results, 'rb' )
+    data = pickle.load( pklFile )
+    state_dict = data[0]
+    pklFile.close()
     
     
     # Reduce meas and birth dict to times of interest
-    t0 = datetime(2022, 11, 7, 0, 0, 0)
-    tf = datetime(2022, 11, 7, 17, 45, 0)
+    t0 = datetime(2022, 11, 7, 14, 0, 0)
+    tf = datetime(2022, 11, 7, 17, 35, 0)
     tk_list = sorted(list(meas_dict.keys()))
     tk_list2 = sorted(list(birth_time_dict.keys()))
 
@@ -2946,14 +2965,14 @@ if __name__ == '__main__':
     fname = r'geo_twobody_6obj_7day_meas_noise1_lam0_pd1.pkl'
     meas_file = os.path.join(fdir2, fname)
     
-    fname = 'geo_twobody_6obj_7day_setup_noise1_lam0_pd1_goodingbirth3.pkl'
+    fname = 'geo_twobody_6obj_7day_setup_noise1_lam0_pd1_goodingbirth4.pkl'
     setup_file = os.path.join(fdir2, fname)  
     
     
-    fname = 'geo_twobody_6obj_7day_goodingbirth3_results_1.pkl'
+    fname = 'geo_twobody_6obj_7day_goodingbirth4_results_1.pkl'
     prev_results = os.path.join(fdir2, fname)
     
-    fname = 'geo_twobody_6obj_7day_goodingbirth3_results_1.pkl'
+    fname = 'geo_twobody_6obj_7day_goodingbirth4_results_2.pkl'
     results_file = os.path.join(fdir2, fname)
     
     
@@ -3003,8 +3022,8 @@ if __name__ == '__main__':
     
     # tudat_geo_lmb_setup_no_birth(truth_file, meas_file, setup_file)
     
-    tudat_geo_lmb_setup_birth(truth_file, meas_file, corr_pkl,
-                              ra_lim, dec_lim, birth_type, setup_file)
+    # tudat_geo_lmb_setup_birth(truth_file, meas_file, corr_pkl,
+    #                           ra_lim, dec_lim, birth_type, setup_file)
     
     
     # fname = 'geo_twobody_singletarget_setup.pkl'
@@ -3017,7 +3036,7 @@ if __name__ == '__main__':
     
     
     # Run Filter
-    # run_multitarget_filter(setup_file, prev_results, results_file)
+    run_multitarget_filter(setup_file, prev_results, results_file)
     
     # combine_results()
     
