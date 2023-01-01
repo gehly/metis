@@ -1374,7 +1374,7 @@ def compute_obs_times2(vis_file, pass_length, obs_time_file):
 
     for tk in tk_list:
         if tk not in vis_times:
-            print(tk)
+            print(obj_id, ' not visible at time ', tk)
 
     print(len(tk_list))
     
@@ -1404,7 +1404,7 @@ def compute_obs_times2(vis_file, pass_length, obs_time_file):
 
     for tk in tk_list:
         if tk not in vis_times:
-            print(tk)
+            print(obj_id, ' not visible at time ', tk)
 
     print(len(tk_list))
     
@@ -1434,7 +1434,7 @@ def compute_obs_times2(vis_file, pass_length, obs_time_file):
 
     for tk in tk_list:
         if tk not in vis_times:
-            print(tk)
+            print(obj_id, ' not visible at time ', tk)
 
     print(len(tk_list))
     
@@ -1466,7 +1466,7 @@ def compute_obs_times2(vis_file, pass_length, obs_time_file):
 
     for tk in tk_list:
         if tk not in vis_times:
-            print(tk)
+            print(obj_id, ' not visible at time ', tk)
 
     print(len(tk_list))
     
@@ -1497,7 +1497,7 @@ def compute_obs_times2(vis_file, pass_length, obs_time_file):
 
     for tk in tk_list:
         if tk not in vis_times:
-            print(tk)
+            print(obj_id, ' not visible at time ', tk)
 
     print(len(tk_list))
     
@@ -1529,7 +1529,7 @@ def compute_obs_times2(vis_file, pass_length, obs_time_file):
 
     for tk in tk_list:
         if tk not in vis_times:
-            print(tk)
+            print(obj_id, ' not visible at time ', tk)
 
     print(len(tk_list))
     
@@ -2001,7 +2001,7 @@ def process_tracklets_full(meas_file, truth_file, csv_file, correlation_file):
     resids_time = 0.
     
     # Exclusion times
-    exclude_short = 12*3600.
+    exclude_short = 0.*3600.
     exclude_long = 3.*86400.
     
 
@@ -2206,7 +2206,8 @@ def process_tracklets_full(meas_file, truth_file, csv_file, correlation_file):
     
     
     pklFile = open( correlation_file, 'wb' )
-    pickle.dump( [correlation_dict, tracklet_dict, params_dict, truth_dict], pklFile, -1 )
+    pickle.dump( [correlation_dict, tracklet_dict, params_dict, truth_dict,
+                  gooding_time, resids_time], pklFile, -1 )
     pklFile.close()
     
     
@@ -2945,35 +2946,43 @@ if __name__ == '__main__':
     
     # test_tracklet_association()
     
-    fdir = r'D:\documents\research_projects\iod\data\sim\test\aas2023_geo_6obj_7day'
-    fdir2 = os.path.join(fdir, '2022_12_23_geo_twobody_gooding_birth')
-    
+    fdir = r'D:\documents\research_projects\iod\data\aas2023_preprint'
+    truthdir = os.path.join(fdir, 'truth')
+    visdir = os.path.join(fdir, 'visibility')
+    measdir = os.path.join(fdir, 'meas')
+    trackdir = os.path.join(fdir, 'tracklet_corr')
     
     
     # fname = 'geo_twobody_6obj_7day_truth_13.pkl'    
     # prev_file = os.path.join(fdir, fname)
     
     fname = 'geo_twobody_6obj_7day_visibility.csv'
-    vis_file = os.path.join(fdir2, fname)
+    vis_file = os.path.join(visdir, fname)
     
     fname = 'geo_twobody_6obj_7day_truth.pkl'    
-    truth_file = os.path.join(fdir2, fname)
+    truth_file = os.path.join(truthdir, fname)
     
-    fname = 'geo_twobody_6obj_7day_obstime.pkl'
-    obs_time_file = os.path.join(fdir2, fname)
+    fname = 'geo_twobody_6obj_7day_obstime_2pass_300sec.pkl'
+    obs_time_file = os.path.join(visdir, fname)
     
-    fname = r'geo_twobody_6obj_7day_meas_noise1_lam0_pd1.pkl'
-    meas_file = os.path.join(fdir2, fname)
+    fname = 'geo_twobody_6obj_7day_meas_2pass_300sec_noise1_lam0_pd1.pkl'
+    meas_file = os.path.join(measdir, fname)
     
-    fname = 'geo_twobody_6obj_7day_setup_noise1_lam0_pd1_goodingbirth4.pkl'
-    setup_file = os.path.join(fdir2, fname)  
+    fname = 'geo_twobody_6obj_7day_corr_2pass_300sec_noise1_lam0_pd1_summary.csv'
+    corr_csv = os.path.join(trackdir, fname)
+    
+    fname = 'geo_twobody_6obj_7day_corr_2pass_300sec_noise1_lam0_pd1.pkl'
+    corr_pkl = os.path.join(trackdir, fname)
+    
+    # fname = 'geo_twobody_6obj_7day_setup_noise1_lam0_pd1_goodingbirth4.pkl'
+    # setup_file = os.path.join(fdir2, fname)  
     
     
-    fname = 'geo_twobody_6obj_7day_goodingbirth4_results_1.pkl'
-    prev_results = os.path.join(fdir2, fname)
+    # fname = 'geo_twobody_6obj_7day_goodingbirth4_results_1.pkl'
+    # prev_results = os.path.join(fdir2, fname)
     
-    fname = 'geo_twobody_6obj_7day_goodingbirth4_results_2.pkl'
-    results_file = os.path.join(fdir2, fname)
+    # fname = 'geo_twobody_6obj_7day_goodingbirth4_results_2.pkl'
+    # results_file = os.path.join(fdir2, fname)
     
     
     
@@ -2991,8 +3000,16 @@ if __name__ == '__main__':
     pass_length = 300.
     # compute_obs_times2(vis_file, pass_length, obs_time_file)
     
+    # pklFile = open(obs_time_file, 'rb' )
+    # data = pickle.load( pklFile )
+    # obs_times = data[0]
+    # pklFile.close()
     
-    noise = 1.
+    
+    # print(obs_times)
+    
+    
+    noise = 10.
     lam_c = 0.
     p_det = 1.
     orbit_regime = 'GEO'
@@ -3000,20 +3017,23 @@ if __name__ == '__main__':
     
     # check_meas_file(meas_file)
     
-    fname = 'geo_twobody_6obj_7day_corr_summary.csv'
-    corr_csv = os.path.join(fdir2, fname)
     
-    fname = 'geo_twobody_6obj_7day_corr.pkl'
-    corr_pkl = os.path.join(fdir2, fname)
     
     
     # process_tracklets_full(meas_file, truth_file, corr_csv, corr_pkl)
     
-    ra_lim = 500.
-    dec_lim = 500.
+    ra_lim = 50.
+    dec_lim = 50.
     birth_type = 'gooding_gmm'
+    plot_flag = True
     
-    # corr_est_dict = analysis.evaluate_tracklet_correlation(corr_pkl, ra_lim, dec_lim)
+    corr_est_dict = analysis.evaluate_tracklet_correlation(corr_pkl, ra_lim, dec_lim, plot_flag)
+    
+    
+    
+    
+    
+    
     
     # birth_time_dict, label_truth_dict = tracklets_to_birth_model(corr_pkl, ra_lim, dec_lim, birth_type)
     
@@ -3036,7 +3056,7 @@ if __name__ == '__main__':
     
     
     # Run Filter
-    run_multitarget_filter(setup_file, prev_results, results_file)
+    # run_multitarget_filter(setup_file, prev_results, results_file)
     
     # combine_results()
     

@@ -2637,7 +2637,7 @@ def ospa_auction(A) :
 # Tracklet Correlation and IOD
 ###############################################################################
 
-def evaluate_tracklet_correlation(correlation_file, ra_lim, dec_lim):
+def evaluate_tracklet_correlation(correlation_file, ra_lim, dec_lim, plot_flag=False):
     
     # Load correlation data
     pklFile = open(correlation_file, 'rb' )
@@ -2685,7 +2685,8 @@ def evaluate_tracklet_correlation(correlation_file, ra_lim, dec_lim):
 
     # Compute number of true positives, true negatives and correlation 
     # performance
-    N_cases = len(correlation_dict.keys())
+    # N_cases = len(correlation_dict.keys())
+    N_cases = 0
     N_true = 0
     N_false = 0
     N_truepos = 0
@@ -2695,6 +2696,21 @@ def evaluate_tracklet_correlation(correlation_file, ra_lim, dec_lim):
     corr_est_dict = {}
     for case_id in correlation_dict:
         corr_truth_list = correlation_dict[case_id]['corr_truth_list']
+        
+        
+        # Exclude cases near 24 hour time difference
+        tracklet1_id = correlation_dict[case_id]['tracklet1_id']
+        tracklet2_id = correlation_dict[case_id]['tracklet2_id']
+        tracklet1_t0 = tracklet_dict[tracklet1_id]['tk_list'][0]
+        tracklet2_t0 = tracklet_dict[tracklet2_id]['tk_list'][0]
+        
+        tdiff_hrs = (tracklet2_t0 - tracklet1_t0).total_seconds()/3600.
+        
+        if tdiff_hrs % 24. < 1. or tdiff_hrs % 24 > 23.:
+            continue
+        
+        
+        N_cases += 1
         
         # True correlation status determined by object id
         obj1_id = correlation_dict[case_id]['obj1_id']
@@ -2729,12 +2745,16 @@ def evaluate_tracklet_correlation(correlation_file, ra_lim, dec_lim):
                 dec_rms = dec_rms_list[ii]                
                 if ra_rms < ra_lim and dec_rms < dec_lim:
                     Xo = correlation_dict[case_id]['Xo_list'][ii]
+                    Xo_true = correlation_dict[case_id]['Xo_true']
+                    Xo_err = Xo - Xo_true
                     tracklet1_id = correlation_dict[case_id]['tracklet1_id']
                     if tracklet1_id not in corr_est_dict:
                         corr_est_dict[tracklet1_id] = {}
                         corr_est_dict[tracklet1_id]['means'] = []
+                        corr_est_dict[tracklet1_id]['Xo_err'] = []
                         
                     corr_est_dict[tracklet1_id]['means'].append(Xo)
+                    corr_est_dict[tracklet1_id]['Xo_err'].append(Xo_err)
                     
             # General TP/FP calculations for the case id
             min_ind = rms_list.index(min(rms_list))
@@ -2779,6 +2799,54 @@ def evaluate_tracklet_correlation(correlation_file, ra_lim, dec_lim):
     print('False Pos: %5.2f%% (%3d/%3d)' % ((N_falsepos/N_false)*100., N_falsepos, N_false))
     print('False Neg: %5.2f%% (%3d/%3d)' % ((N_falseneg/N_true)*100., N_falseneg, N_true))
     
+
+    if plot_flag:
+        
+        # Build distribution of errors
+        x_err = []
+        y_err = []
+        z_err = []
+        dx_err = []
+        dy_err = []
+        dz_err = []
+        pos3d_err = []
+        vel3d_err = []
+        
+        tracklet_id_list = list(corr_est_dict.keys())
+        for tracklet_id in tracklet_id_list:
+            Xo_err_list = corr_est_dict[tracklet_id]['Xo_err']
+            
+            for Xo_err in Xo_err_list:
+                
+                
+                # print(tracklet_id)
+                # print(Xo_err)
+                
+                
+                x_err.append(abs(float(Xo_err[0])))
+                y_err.append(abs(float(Xo_err[1])))
+                z_err.append(abs(float(Xo_err[2])))
+                dx_err.append(abs(float(Xo_err[3])))
+                dy_err.append(abs(float(Xo_err[4])))
+                dz_err.append(abs(float(Xo_err[5])))
+                
+                pos3d_err.append(np.linalg.norm(Xo_err[0:3]))
+                vel3d_err.append(np.linalg.norm(Xo_err[3:6]))
+        
+     
+        print('')
+        print('Correlated Case Initial Error Results')
+        print('Mean/Median X err [km]', np.mean(x_err), np.median(x_err))
+        print('Mean/Median Y err [km]', np.mean(y_err), np.median(y_err))
+        print('Mean/Median Z err [km]', np.mean(z_err), np.median(z_err))
+        print('Mean/Median 3D Pos err [km]', np.mean(pos3d_err), np.median(pos3d_err))
+        
+        
+        plt.figure()
+        
+        plt.boxplot(pos3d_err)
+        
+        plt.show()
 
     
     return corr_est_dict

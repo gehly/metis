@@ -1636,6 +1636,8 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, lr_star, orbit_type,
         if debug:
             print('fc', fc)
 
+        #TODO Should this increment iters or not???
+
         # Exception Handling
         # If previous step has produced a much larger penalty value, update
         # range values and restart loop (Gooding 1997 Eq. 8)
@@ -1658,6 +1660,8 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, lr_star, orbit_type,
         
         # Use central finite difference to compute numerical derivatives of f
         # and g with respect to small changes in rho0 and rhof
+        
+        #TODO Does this actually exit/break the loop correctly???
         
         # Exception Handling
         # If any of the finite difference steps does not return
