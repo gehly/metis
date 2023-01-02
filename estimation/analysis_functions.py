@@ -2773,8 +2773,8 @@ def evaluate_tracklet_correlation(correlation_file, ra_lim, dec_lim, plot_flag=F
                 N_truepos += 1
             else:
                 N_falseneg += 1
-                print('')
-                print('False negative case id', case_id)
+                # print('')
+                # print('False negative case id', case_id)
                 
         else:
             if corr_est:
@@ -2850,6 +2850,71 @@ def evaluate_tracklet_correlation(correlation_file, ra_lim, dec_lim, plot_flag=F
 
     
     return corr_est_dict
+
+
+
+def boxplot_corr_errors(correlation_file, lim_list):
+    
+    
+    ra_lim = lim_list[0]
+    dec_lim = lim_list[0]  
+    plot_flag = False    
+    corr_est_dict = evaluate_tracklet_correlation(correlation_file, ra_lim, dec_lim, plot_flag)
+    
+    pos3d_err1 = []
+    tracklet_id_list = list(corr_est_dict.keys())
+    for tracklet_id in tracklet_id_list:
+        Xo_err_list = corr_est_dict[tracklet_id]['Xo_err']
+        
+        for Xo_err in Xo_err_list:
+            
+            pos3d_err1.append(np.linalg.norm(Xo_err[0:3]))
+            
+            
+    ra_lim = lim_list[1]
+    dec_lim = lim_list[1]
+    corr_est_dict = evaluate_tracklet_correlation(correlation_file, ra_lim, dec_lim, plot_flag)
+    
+    pos3d_err2 = []
+    tracklet_id_list = list(corr_est_dict.keys())
+    for tracklet_id in tracklet_id_list:
+        Xo_err_list = corr_est_dict[tracklet_id]['Xo_err']
+        
+        for Xo_err in Xo_err_list:
+            
+            pos3d_err2.append(np.linalg.norm(Xo_err[0:3]))
+            
+            
+    ra_lim = lim_list[2]
+    dec_lim = lim_list[2]
+    corr_est_dict = evaluate_tracklet_correlation(correlation_file, ra_lim, dec_lim, plot_flag)
+    
+    pos3d_err3 = []
+    tracklet_id_list = list(corr_est_dict.keys())
+    for tracklet_id in tracklet_id_list:
+        Xo_err_list = corr_est_dict[tracklet_id]['Xo_err']
+        
+        for Xo_err in Xo_err_list:
+            
+            pos3d_err3.append(np.linalg.norm(Xo_err[0:3]))
+            
+            
+    data = [pos3d_err1, pos3d_err2, pos3d_err3]
+    
+    
+    plt.figure()
+    plt.boxplot(data, vert=False)
+    plt.yticks([1,2,3], [str(lim) for lim in lim_list])
+    plt.ylabel('RMS Resids Limit [arcsec]')
+    plt.xlabel('Initial 3D Position Error [km]')
+    plt.xlim([-10, 7000])
+    
+    
+    plt.show()
+    
+    
+    
+    return
 
 
 
