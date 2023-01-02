@@ -1228,6 +1228,14 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
             print(r0_final)
             print(v0_final)
             print(elem0)
+            
+        # Prune solutions that don't fit orbit regime
+        if orbit_regime == 'GEO':
+            sma = float(elem0[0])
+            if sma < 41664. or sma > 42664.:
+                                
+                continue
+            
 
 #        # There should only be one solution with everything specified
 #        if len(M_final) > 1:

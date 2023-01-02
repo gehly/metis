@@ -2956,22 +2956,22 @@ if __name__ == '__main__':
     # fname = 'geo_twobody_6obj_7day_truth_13.pkl'    
     # prev_file = os.path.join(fdir, fname)
     
-    fname = 'geo_perturbed_6obj_7day_visibility.csv'
+    fname = 'geo_twobody_6obj_7day_visibility.csv'
     vis_file = os.path.join(visdir, fname)
     
-    fname = 'geo_perturbed_6obj_7day_truth.pkl'    
+    fname = 'geo_twobody_6obj_7day_truth.pkl'    
     truth_file = os.path.join(truthdir, fname)
     
-    fname = 'geo_perturbed_6obj_7day_obstime_2pass_300sec.pkl'
+    fname = 'geo_twobody_6obj_7day_obstime_2pass_300sec.pkl'
     obs_time_file = os.path.join(visdir, fname)
     
-    fname = 'geo_perturbed_6obj_7day_meas_2pass_300sec_noise10_lam0_pd1.pkl'
+    fname = 'geo_twobody_6obj_7day_meas_2pass_300sec_noise10_lam0_pd1.pkl'
     meas_file = os.path.join(measdir, fname)
     
-    fname = 'geo_perturbed_6obj_7day_corr_2pass_300sec_noise10_lam0_pd1_summary.csv'
+    fname = 'geo_twobody_6obj_7day_corr_2pass_300sec_noise10_lam0_pd1_summary.csv'
     corr_csv = os.path.join(trackdir, fname)
     
-    fname = 'geo_perturbed_6obj_7day_corr_2pass_300sec_noise10_lam0_pd1.pkl'
+    fname = 'geo_twobody_6obj_7day_corr_2pass_300sec_noise10_lam0_pd1.pkl'
     corr_pkl = os.path.join(trackdir, fname)
     
     # fname = 'geo_twobody_6obj_7day_setup_noise1_lam0_pd1_goodingbirth4.pkl'
@@ -3030,7 +3030,7 @@ if __name__ == '__main__':
     # corr_est_dict = analysis.evaluate_tracklet_correlation(corr_pkl, ra_lim, dec_lim, plot_flag)
     
     lim_list = [50., 200., 500.]
-    analysis.boxplot_corr_errors(corr_pkl, lim_list)
+    analysis.boxplot_corr_errors(corr_pkl, lim_list, True)
     
     
     

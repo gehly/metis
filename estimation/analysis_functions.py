@@ -2646,6 +2646,8 @@ def evaluate_tracklet_correlation(correlation_file, ra_lim, dec_lim, plot_flag=F
     tracklet_dict = data[1]
     params_dict = data[2]
     truth_dict = data[3]
+    gooding_time = data[4]
+    resids_time = data[5]
     pklFile.close()
         
     # # Reformulate correlation dict according to cases
@@ -2794,10 +2796,19 @@ def evaluate_tracklet_correlation(correlation_file, ra_lim, dec_lim, plot_flag=F
     print('Number of False Correlations: ', N_false)
     
     print('')
+    print('Total Time', gooding_time + resids_time)
+    print('Gooding Time', gooding_time)
+    print('Resids Time', resids_time)
+    print('Average Time', (gooding_time + resids_time)/len(correlation_dict))
+    
+    print('')
     print('True Pos:  %5.2f%% (%3d/%3d)' % ((N_truepos/N_true)*100., N_truepos, N_true))
     print('True Neg:  %5.2f%% (%3d/%3d)' % ((N_trueneg/N_false)*100., N_trueneg, N_false))
     print('False Pos: %5.2f%% (%3d/%3d)' % ((N_falsepos/N_false)*100., N_falsepos, N_false))
     print('False Neg: %5.2f%% (%3d/%3d)' % ((N_falseneg/N_true)*100., N_falseneg, N_true))
+    
+    
+    
     
 
     if plot_flag:
@@ -2853,12 +2864,11 @@ def evaluate_tracklet_correlation(correlation_file, ra_lim, dec_lim, plot_flag=F
 
 
 
-def boxplot_corr_errors(correlation_file, lim_list):
+def boxplot_corr_errors(correlation_file, lim_list, plot_flag=False):
     
     
     ra_lim = lim_list[0]
     dec_lim = lim_list[0]  
-    plot_flag = False    
     corr_est_dict = evaluate_tracklet_correlation(correlation_file, ra_lim, dec_lim, plot_flag)
     
     pos3d_err1 = []
@@ -2907,7 +2917,7 @@ def boxplot_corr_errors(correlation_file, lim_list):
     plt.yticks([1,2,3], [str(lim) for lim in lim_list])
     plt.ylabel('RMS Resids Limit [arcsec]')
     plt.xlabel('Initial 3D Position Error [km]')
-    plt.xlim([-10, 7000])
+    # plt.xlim([-10, 7000])
     
     
     plt.show()
