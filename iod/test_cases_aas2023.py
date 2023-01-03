@@ -20,6 +20,8 @@ ind = current_dir.find('metis')
 metis_dir = current_dir[0:ind+5]
 sys.path.append(metis_dir)
 
+from data_processing import measurement_analysis as ma
+from data_processing import data_processing as proc
 from iod import iod_functions_jit as iod
 import estimation.analysis_functions as analysis
 import estimation.estimation_functions as est
@@ -786,6 +788,306 @@ def geo_perturbed_setup(setup_file):
     return
 
 
+def choose_ids(obj):    
+    
+    # QZSS Satellite IDs
+    qzs1_norad = 37158
+    qzs2_norad = 42738
+    qzs3_norad = 42917
+    qzs4_norad = 42965
+    qzs1r_norad = 49336
+    
+    qzs1_sp3_id = 'PJ01'
+    qzs1r_sp3_id = 'PJ04'
+    qzs2_sp3_id = 'PJ02'    
+    qzs3_sp3_id = 'PJ07'    
+    qzs4_sp3_id = 'PJ03'   
+    
+    if obj == 'qzs1':
+        norad_id = qzs1_norad
+        sp3_id = qzs1_sp3_id
+    elif obj == 'qzs1r':
+        norad_id = qzs1r_norad
+        sp3_id = qzs1r_sp3_id
+    elif obj == 'qzs2':
+        norad_id = qzs2_norad
+        sp3_id = qzs2_sp3_id
+    elif obj == 'qzs3':
+        norad_id = qzs3_norad
+        sp3_id = qzs3_sp3_id
+    elif obj == 'qzs4':
+        norad_id = qzs4_norad
+        sp3_id = qzs4_sp3_id
+    
+    return norad_id, sp3_id
+
+
+def geo_real_tracklets(truth_file, meas_file):
+    
+    # Retrieve latest EOP data from celestrak.com
+    eop_alldata = eop.get_celestrak_eop_alldata()
+        
+    # Retrieve polar motion data from file
+    XYs_df = eop.get_XYs2006_alldata()
+    
+    # Define state parameters
+    state_params = {}
+    state_params['GM'] = GME
+    state_params['radius_m'] = 1.
+    state_params['albedo'] = 0.1
+    state_params['bodies_to_create'] = ['Earth', 'Sun', 'Moon']
+    state_params['global_frame_origin'] = 'Earth'
+    state_params['global_frame_orientation'] = 'J2000'
+    state_params['central_bodies'] = ['Earth']
+    state_params['sph_deg'] = 4
+    state_params['sph_ord'] = 4
+    state_params['mass'] = 2000.
+    state_params['Cd'] = 0.
+    state_params['Cr'] = 1.2
+    state_params['drag_area_m2'] = 0.1
+    state_params['srp_area_m2'] = 40.
+    
+    # Integration function and additional settings    
+    int_params = {}
+    int_params['integrator'] = 'tudat'
+    int_params['tudat_integrator'] = 'rkf78'
+    int_params['step'] = 10.
+    int_params['max_step'] = 1000.
+    int_params['min_step'] = 1.
+    int_params['rtol'] = 1e-12
+    int_params['atol'] = 1e-12
+    int_params['time_format'] = 'datetime'
+    
+    # Sensor and measurement parameters
+    sensor_id = 'RMIT ROO'
+    sensor_id_list = ['RMIT ROO']
+    sensor_params = sens.define_sensors(sensor_id_list)
+    sensor_params['eop_alldata'] = eop_alldata
+    sensor_params['XYs_df'] = XYs_df
+    
+    for sensor_id in sensor_id_list:
+        sensor_params[sensor_id]['meas_types'] = ['ra', 'dec']
+        sigma_dict = {}
+        sigma_dict['ra'] = 10.*arcsec2rad   # rad
+        sigma_dict['dec'] = 10.*arcsec2rad  # rad
+        sensor_params[sensor_id]['sigma_dict'] = sigma_dict
+        sensor_params[sensor_id]['lam_clutter'] = 1.
+        sensor_params[sensor_id]['p_det'] = 0.99
+        FOV_hlim = sensor_params[sensor_id]['FOV_hlim']
+        FOV_vlim = sensor_params[sensor_id]['FOV_vlim']        
+        sensor_params[sensor_id]['V_sensor'] = (FOV_hlim[1] - FOV_hlim[0])*(FOV_vlim[1] - FOV_vlim[0])
+
+    
+    
+    # Files and directories
+    fdir = r'D:\documents\research_projects\iod\data\real\2022_11_GEO'
+    
+    csv_list = []
+    sp3_list = []
+    obj_id_list = []
+    sp3_id_list = []
+    
+    date = '2022_11_07'
+    obj = 'qzs1r'
+    obj_id, sp3_id = choose_ids(obj)
+    fname = os.path.join(fdir, date, obj, 'PNGs_angles.csv')
+    csv_list.append(fname)
+    fname = os.path.join(fdir, date, 'truth', 'qzf22351.sp3')
+    sp3_list.append(fname)
+    obj_id_list.append(obj_id)
+    sp3_id_list.append(sp3_id)
+    
+    date = '2022_11_07'
+    obj = 'qzs3'
+    obj_id, sp3_id = choose_ids(obj)
+    fname = os.path.join(fdir, date, obj, 'PNGs_angles.csv')
+    csv_list.append(fname)
+    fname = os.path.join(fdir, date, 'truth', 'qzf22351.sp3')
+    sp3_list.append(fname)
+    obj_id_list.append(obj_id)
+    sp3_id_list.append(sp3_id)
+    
+    date = '2022_11_07'
+    obj = 'qzs4'
+    obj_id, sp3_id = choose_ids(obj)
+    fname = os.path.join(fdir, date, obj, 'PNGs_angles.csv')
+    csv_list.append(fname)
+    fname = os.path.join(fdir, date, 'truth', 'qzf22351.sp3')
+    sp3_list.append(fname)
+    obj_id_list.append(obj_id)
+    sp3_id_list.append(sp3_id)
+    
+    date = '2022_11_08'
+    obj = 'qzs1r'
+    obj_id, sp3_id = choose_ids(obj)
+    fname = os.path.join(fdir, date, obj, 'PNGs_angles1.csv')
+    csv_list.append(fname)
+    fname = os.path.join(fdir, date, 'truth', 'qzf22352.sp3')
+    sp3_list.append(fname)
+    obj_id_list.append(obj_id)
+    sp3_id_list.append(sp3_id)
+    
+    date = '2022_11_08'
+    obj = 'qzs1r'
+    obj_id, sp3_id = choose_ids(obj)
+    fname = os.path.join(fdir, date, obj, 'PNGs_angles2.csv')
+    csv_list.append(fname)
+    fname = os.path.join(fdir, date, 'truth', 'qzf22352.sp3')
+    sp3_list.append(fname)
+    obj_id_list.append(obj_id)
+    sp3_id_list.append(sp3_id)
+    
+    date = '2022_11_08'
+    obj = 'qzs3'
+    obj_id, sp3_id = choose_ids(obj)
+    fname = os.path.join(fdir, date, obj, 'PNGs_angles1.csv')
+    csv_list.append(fname)
+    fname = os.path.join(fdir, date, 'truth', 'qzf22352.sp3')
+    sp3_list.append(fname)
+    obj_id_list.append(obj_id)
+    sp3_id_list.append(sp3_id)
+    
+    date = '2022_11_08'
+    obj = 'qzs3'
+    obj_id, sp3_id = choose_ids(obj)
+    fname = os.path.join(fdir, date, obj, 'PNGs_angles2.csv')
+    csv_list.append(fname)
+    fname = os.path.join(fdir, date, 'truth', 'qzf22352.sp3')
+    sp3_list.append(fname)
+    obj_id_list.append(obj_id)
+    sp3_id_list.append(sp3_id)
+    
+    date = '2022_11_08'
+    obj = 'qzs4'
+    obj_id, sp3_id = choose_ids(obj)
+    fname = os.path.join(fdir, date, obj, 'PNGs_angles1.csv')
+    csv_list.append(fname)
+    fname = os.path.join(fdir, date, 'truth', 'qzf22352.sp3')
+    sp3_list.append(fname)
+    obj_id_list.append(obj_id)
+    sp3_id_list.append(sp3_id)
+    
+    date = '2022_11_08'
+    obj = 'qzs4'
+    obj_id, sp3_id = choose_ids(obj)
+    fname = os.path.join(fdir, date, obj, 'PNGs_angles2.csv')
+    csv_list.append(fname)
+    fname = os.path.join(fdir, date, 'truth', 'qzf22352.sp3')
+    sp3_list.append(fname)
+    obj_id_list.append(obj_id)
+    sp3_id_list.append(sp3_id)
+        
+    date = '2022_11_09'
+    obj = 'qzs1r'
+    obj_id, sp3_id = choose_ids(obj)
+    fname = os.path.join(fdir, date, obj, 'PNGs_angles1.csv')
+    csv_list.append(fname)
+    fname = os.path.join(fdir, date, 'truth', 'qzf22353.sp3')
+    sp3_list.append(fname)
+    obj_id_list.append(obj_id)
+    sp3_id_list.append(sp3_id)
+    
+    date = '2022_11_09'
+    obj = 'qzs1r'
+    obj_id, sp3_id = choose_ids(obj)
+    fname = os.path.join(fdir, date, obj, 'PNGs_angles2.csv')
+    csv_list.append(fname)
+    fname = os.path.join(fdir, date, 'truth', 'qzf22353.sp3')
+    sp3_list.append(fname)
+    obj_id_list.append(obj_id)
+    sp3_id_list.append(sp3_id)
+
+    date = '2022_11_09'
+    obj = 'qzs3'
+    obj_id, sp3_id = choose_ids(obj)
+    fname = os.path.join(fdir, date, obj, 'PNGs_angles.csv')
+    csv_list.append(fname)
+    fname = os.path.join(fdir, date, 'truth', 'qzf22353.sp3')
+    sp3_list.append(fname)
+    obj_id_list.append(obj_id)
+    sp3_id_list.append(sp3_id)
+    
+    date = '2022_11_09'
+    obj = 'qzs4'
+    obj_id, sp3_id = choose_ids(obj)
+    fname = os.path.join(fdir, date, obj, 'PNGs_angles.csv')
+    csv_list.append(fname)
+    fname = os.path.join(fdir, date, 'truth', 'qzf22353.sp3')
+    sp3_list.append(fname)
+    obj_id_list.append(obj_id)
+    sp3_id_list.append(sp3_id)
+
+    
+    truth_dict = {}
+    meas_dict = {}
+    tracklet_dict = {}
+    tracklet_id = 0
+    for ind in range(len(csv_list)):
+        
+        csv_fname = csv_list[ind]
+        sp3_fname = sp3_list[ind]
+        obj_id = obj_id_list[ind]
+        sp3_id = sp3_id_list[ind]
+
+        meas_time_offset = 0.
+        ra_bias = 0.
+        dec_bias = 0.
+        
+        # Retrieve times and measurements
+        UTC_list, ra_list, dec_list = ma.read_roo_csv_data(csv_fname, meas_time_offset, ra_bias, dec_bias)
+        Zk_list = [np.reshape([ra_list[ii], dec_list[ii]], (2,1)) for ii in range(len(ra_list))]
+        
+        tracklet_dict[tracklet_id] = {}
+        tracklet_dict[tracklet_id]['orbit_regime'] = 'GEO'
+        tracklet_dict[tracklet_id]['obj_id'] = obj_id
+        tracklet_dict[tracklet_id]['tk_list'] = UTC_list
+        tracklet_dict[tracklet_id]['Zk_list'] = Zk_list
+        tracklet_dict[tracklet_id]['sensor_id_list'] = [sensor_id]*len(UTC_list)
+        
+        tracklet_id += 1
+        
+        # Generate truth data
+        r_eci_list = proc.interpolate_sp3_truth(UTC_list, sp3_fname, sp3_id,
+                                                eop_alldata, XYs_df)
+        
+        for kk in range(len(UTC_list)):
+            tk = UTC_list[kk]
+            r_eci = r_eci_list[kk]
+            Zk = Zk_list[kk]
+            
+            center = mfunc.compute_measurement(r_eci, state_params,
+                                               sensor_params, sensor_id, tk,
+                                               meas_types=['ra', 'dec'])
+            
+
+            
+            if tk not in truth_dict:
+                truth_dict[tk] = {}
+            
+            truth_dict[tk][obj_id] = np.reshape(r_eci, (3,1))
+            
+            if kk > 0 and kk < (len(UTC_list) -1):
+                meas_dict[tk] = {}
+                meas_dict[tk]['Zk_list'] = [Zk]
+                meas_dict[tk]['sensor_id_list'] = [sensor_id]
+                meas_dict[tk]['center_list'] = [center]
+    
+    print(tracklet_dict)
+    
+    
+    # Save truth file and meas file
+    pklFile = open( truth_file, 'wb' )
+    pickle.dump( [truth_dict, state_params, int_params, sensor_params], pklFile, -1 )
+    pklFile.close()
+    
+    pklFile = open( meas_file, 'wb' )
+    pickle.dump( [tracklet_dict, meas_dict, sensor_params], pklFile, -1 )
+    pklFile.close()
+    
+    
+    return
+
+
 def tracklet_visibility(vis_file, prev_file, truth_file):
     
     
@@ -959,13 +1261,8 @@ def generate_tracklets():
     return
 
 
-def check_truth():
+def check_truth(truth_file):
     
-    fdir = r'D:\documents\research_projects\iod\data\sim\test\aas2023_geo_6obj_7day'
-
-    
-    fname = 'geo_perturbed_6obj_7day_truth.pkl'    
-    truth_file = os.path.join(fdir, fname)
     
     pklFile = open(truth_file, 'rb' )
     data = pickle.load( pklFile )
@@ -987,7 +1284,7 @@ def check_truth():
     
     Xo = truth_dict[t0][obj_id]
     tdays = []
-    Xerr = np.zeros((6,len(tk_list)))
+    Xerr = np.zeros((len(Xo),len(tk_list)))
     a_plot = []
     e_plot = []
     i_plot = []
@@ -2066,17 +2363,19 @@ def process_tracklets_full(meas_file, truth_file, csv_file, correlation_file):
             # Compute true association details
             obj_id = tracklet1['obj_id']
             Xo_true = truth_dict[tk_list[0]][obj_id]
-            elem_true = astro.cart2kep(Xo_true)
-            sma = elem_true[0]
-            period = astro.sma2period(sma)
-            M_true = int(np.floor((tk_list[-1]-tk_list[0]).total_seconds()/period))
             
-            print('Tracklet1 Elem Truth: ', elem_true)
-            print('Xo_true', Xo_true)
-            print('sma', sma)
-            print('period', period/3600.)
-            print('M_frac', (tk_list[-1]-tk_list[0]).total_seconds()/period)
-            print('M_true', M_true)
+            if len(Xo_true) == 6:
+                elem_true = astro.cart2kep(Xo_true)
+                sma = elem_true[0]
+                period = astro.sma2period(sma)
+                M_true = int(np.floor((tk_list[-1]-tk_list[0]).total_seconds()/period))
+                
+                print('Tracklet1 Elem Truth: ', elem_true)
+                print('Xo_true', Xo_true)
+                print('sma', sma)
+                print('period', period/3600.)
+                print('M_frac', (tk_list[-1]-tk_list[0]).total_seconds()/period)
+                print('M_true', M_true)
             
 
                 
@@ -2146,11 +2445,13 @@ def process_tracklets_full(meas_file, truth_file, csv_file, correlation_file):
                     
                 resids_time += time.time() - start
                                     
-                
-                Xo_err = np.linalg.norm(X_list[ind] - Xo_true)
+                if len(Xo_true) == 3:
+                    Xo_err = np.linalg.norm(X_list[ind][0:3] - Xo_true)
+                else:
+                    Xo_err = np.linalg.norm(X_list[ind] - Xo_true)
                 
                 # True correlation status
-                if (tracklet1['obj_id'] == tracklet2['obj_id']) and (M_list[ind] == M_true):
+                if (tracklet1['obj_id'] == tracklet2['obj_id']): # and (M_list[ind] == M_true):
                     corr_truth = True
                 else:
                     corr_truth = False
@@ -2351,6 +2652,18 @@ def tracklets_to_birth_model(correlation_file, ra_lim, dec_lim, birth_type='simp
     label_truth_dict = {}
     P_birth = 100.*np.diag([1., 1., 1., 1e-6, 1e-6, 1e-6])
     
+    
+    # # Initial covariance, compute by unscented transform
+    # P_elem = np.diag([1., 1e-8, 0.0001, 0.0001, 0.0001, 0.0001])
+    # m_elem = np.reshape([42164.1, 1e-3, 1., 10., 10., 10.], (6,1))
+    # transform_fcn = est.unscented_kep2cart
+    # dum, P_birth, dum2 = est.unscented_transform(m_elem, P_elem, transform_fcn, 
+    #                                              {}, alpha=1e-4, pnorm=2.)
+    
+    # print(P_birth)
+    # mistake
+    
+    
     # Simple model - just initialize near truth
     if birth_type == 'simple':
         
@@ -2398,6 +2711,9 @@ def tracklets_to_birth_model(correlation_file, ra_lim, dec_lim, birth_type='simp
             t0 = tracklet_dict[tracklet_id]['tk_list'][0]
             tk = tracklet_dict[tracklet_id]['tk_list'][1]
             tin = [t0, tk]
+            
+            if t0 > datetime(2022, 11, 7, 14, 0, 0):
+                continue
             
             # Retrieve and merge GMM components
             means0 = corr_est_dict[tracklet_id]['means']
@@ -2584,7 +2900,7 @@ def tudat_geo_lmb_setup_birth(truth_file, meas_file, correlation_file,
     
     # Filter parameters
     filter_params = {}
-    filter_params['Q'] = 1e-15 * np.diag([1, 1, 1])
+    filter_params['Q'] = 1e-12 * np.diag([1, 1, 1])
     filter_params['snc_flag'] = 'gamma'
     filter_params['gap_seconds'] = 900.
     filter_params['alpha'] = 1e-4
@@ -2823,7 +3139,7 @@ def run_multitarget_filter(setup_file, prev_results, results_file):
     # Load setup
     pklFile = open(setup_file, 'rb' )
     data = pickle.load( pklFile )
-    # state_dict = data[0]
+    state_dict = data[0]
     meas_fcn = data[1]
     meas_dict = data[2]
     params_dict = data[3]
@@ -2832,16 +3148,16 @@ def run_multitarget_filter(setup_file, prev_results, results_file):
     label_truth_dict = data[6]
     pklFile.close()
     
-    # Load previous results and reset state_dict
-    pklFile = open(prev_results, 'rb' )
-    data = pickle.load( pklFile )
-    state_dict = data[0]
-    pklFile.close()
+    # # Load previous results and reset state_dict
+    # pklFile = open(prev_results, 'rb' )
+    # data = pickle.load( pklFile )
+    # state_dict = data[0]
+    # pklFile.close()
     
     
     # Reduce meas and birth dict to times of interest
-    t0 = datetime(2022, 11, 7, 14, 0, 0)
-    tf = datetime(2022, 11, 7, 17, 35, 0)
+    t0 = datetime(2022, 11, 7, 0, 0, 0)
+    tf = datetime(2022, 11, 8, 0, 0, 0)
     tk_list = sorted(list(meas_dict.keys()))
     tk_list2 = sorted(list(birth_time_dict.keys()))
 
@@ -2875,15 +3191,15 @@ def run_multitarget_filter(setup_file, prev_results, results_file):
 def combine_results():
     
     
-    fdir = r'D:\documents\research_projects\iod\data\sim\test\aas2023_geo_6obj_7day'
-    fdir2 = os.path.join(fdir, '2022_12_18_geo_twobody_tracklet_corr')
+    fdir = r'D:\documents\research_projects\iod\data\sim\test\aas2023_geo_6obj_7day\2023_01_02_geo_twobody_fixed_corr'
+    
 
     filter_output_full = {}
     
-    for ii in range(1,6):
+    for ii in range(1,3):
     
-        fname = 'geo_twobody_6obj_7day_truebirth_results_' + str(ii) + '.pkl'
-        results_file = os.path.join(fdir2, fname)
+        fname = 'geo_twobody_6obj_7day_goodingbirth_results_' + str(ii) + '.pkl'
+        results_file = os.path.join(fdir, fname)
         
         pklFile = open(results_file, 'rb' )
         data = pickle.load( pklFile )
@@ -2898,8 +3214,8 @@ def combine_results():
         
     full_state_output = filter_output_full
         
-    fname = 'geo_twobody_6obj_7day_truebirth_results_full.pkl'
-    full_results_file = os.path.join(fdir2, fname)
+    fname = 'geo_twobody_6obj_7day_goodingbirth_results_full.pkl'
+    full_results_file = os.path.join(fdir, fname)
     
     pklFile = open( full_results_file, 'wb' )
     pickle.dump( [filter_output_full, full_state_output, params_dict, truth_dict, label_truth_dict], pklFile, -1 )
@@ -2951,38 +3267,39 @@ if __name__ == '__main__':
     visdir = os.path.join(fdir, 'visibility')
     measdir = os.path.join(fdir, 'meas')
     trackdir = os.path.join(fdir, 'tracklet_corr')
+    filterdir = r'D:\documents\research_projects\iod\data\sim\test\aas2023_geo_6obj_7day\2023_01_02_geo_twobody_Po_trials'
     
     
     # fname = 'geo_twobody_6obj_7day_truth_13.pkl'    
     # prev_file = os.path.join(fdir, fname)
     
-    fname = 'geo_twobody_6obj_7day_visibility.csv'
-    vis_file = os.path.join(visdir, fname)
+    # fname = 'geo_twobody_6obj_7day_visibility.csv'
+    # vis_file = os.path.join(visdir, fname)
     
-    fname = 'geo_twobody_6obj_7day_truth.pkl'    
+    fname = 'geo_real_3obj_3day_truth.pkl'    
     truth_file = os.path.join(truthdir, fname)
     
-    fname = 'geo_twobody_6obj_7day_obstime_2pass_300sec.pkl'
-    obs_time_file = os.path.join(visdir, fname)
+    # fname = 'geo_twobody_6obj_7day_obstime_2pass_300sec.pkl'
+    # obs_time_file = os.path.join(visdir, fname)
     
-    fname = 'geo_twobody_6obj_7day_meas_2pass_300sec_noise10_lam0_pd1.pkl'
+    fname = 'geo_real_3obj_3day_meas.pkl'
     meas_file = os.path.join(measdir, fname)
     
-    fname = 'geo_twobody_6obj_7day_corr_2pass_300sec_noise10_lam0_pd1_summary.csv'
+    fname = 'geo_real_3obj_3day_corr_summary.csv'
     corr_csv = os.path.join(trackdir, fname)
     
-    fname = 'geo_twobody_6obj_7day_corr_2pass_300sec_noise10_lam0_pd1.pkl'
+    fname = 'geo_real_3obj_3day_corr.pkl'
     corr_pkl = os.path.join(trackdir, fname)
     
-    # fname = 'geo_twobody_6obj_7day_setup_noise1_lam0_pd1_goodingbirth4.pkl'
-    # setup_file = os.path.join(fdir2, fname)  
+    # fname = 'geo_twobody_6obj_7day_setup_noise1_lam0_pd1_goodingbirth2.pkl'
+    # setup_file = os.path.join(filterdir, fname)  
     
     
-    # fname = 'geo_twobody_6obj_7day_goodingbirth4_results_1.pkl'
-    # prev_results = os.path.join(fdir2, fname)
+    # fname = 'geo_twobody_6obj_7day_goodingbirth2_results_1.pkl'
+    # prev_results = os.path.join(filterdir, fname)
     
-    # fname = 'geo_twobody_6obj_7day_goodingbirth4_results_2.pkl'
-    # results_file = os.path.join(fdir2, fname)
+    # fname = 'geo_twobody_6obj_7day_goodingbirth2_results_1.pkl'
+    # results_file = os.path.join(filterdir, fname)
     
     
     
@@ -2993,7 +3310,7 @@ if __name__ == '__main__':
     
     # tracklet_visibility(vis_file, prev_file, truth_file)
     
-    # check_truth()
+    # check_truth(truth_file)
     
     # consolidate_visibility()
     
@@ -3008,6 +3325,12 @@ if __name__ == '__main__':
     
     # print(obs_times)
     
+    ###########################################################################
+    # Tracklets and Measurements
+    ###########################################################################
+    
+    # geo_real_tracklets(truth_file, meas_file)
+    
     
     noise = 1.
     lam_c = 0.
@@ -3018,6 +3341,10 @@ if __name__ == '__main__':
     # check_meas_file(meas_file)
     
     
+    
+    ###########################################################################
+    # Tracklet Correlation
+    ###########################################################################
     
     
     # process_tracklets_full(meas_file, truth_file, corr_csv, corr_pkl)
@@ -3034,7 +3361,12 @@ if __name__ == '__main__':
     
     
     
-    birth_type = 'gooding_gmm'
+    
+    ###########################################################################
+    # Filter Setup
+    ###########################################################################
+    
+    # birth_type = 'gooding_gmm'
     
     # birth_time_dict, label_truth_dict = tracklets_to_birth_model(corr_pkl, ra_lim, dec_lim, birth_type)
     
@@ -3043,6 +3375,11 @@ if __name__ == '__main__':
     
     # tudat_geo_lmb_setup_no_birth(truth_file, meas_file, setup_file)
     
+    
+    
+    ra_lim = 50.
+    dec_lim = 50.
+    birth_type = 'gooding_gmm'
     # tudat_geo_lmb_setup_birth(truth_file, meas_file, corr_pkl,
     #                           ra_lim, dec_lim, birth_type, setup_file)
     
@@ -3051,6 +3388,14 @@ if __name__ == '__main__':
     # single_setup_file = os.path.join(fdir2, fname)
     
     # tudat_geo_setup_singletarget(setup_file, obs_time_file, single_setup_file)
+    
+    
+    
+    ###########################################################################
+    # Run Filter
+    ###########################################################################
+    
+    
     
     # run_singletarget_filter(single_setup_file)
     

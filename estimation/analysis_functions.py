@@ -2708,8 +2708,8 @@ def evaluate_tracklet_correlation(correlation_file, ra_lim, dec_lim, plot_flag=F
         
         tdiff_hrs = (tracklet2_t0 - tracklet1_t0).total_seconds()/3600.
         
-        if tdiff_hrs % 24. < 1. or tdiff_hrs % 24 > 23.:
-            continue
+        # if tdiff_hrs % 24. < 1. or tdiff_hrs % 24 > 23.:
+        #     continue
         
         
         N_cases += 1
@@ -2748,7 +2748,12 @@ def evaluate_tracklet_correlation(correlation_file, ra_lim, dec_lim, plot_flag=F
                 if ra_rms < ra_lim and dec_rms < dec_lim:
                     Xo = correlation_dict[case_id]['Xo_list'][ii]
                     Xo_true = correlation_dict[case_id]['Xo_true']
-                    Xo_err = Xo - Xo_true
+                    
+                    if len(Xo_true) == 3:                    
+                        Xo_err = Xo[0:3] - Xo_true[0:3]                        
+                    else:
+                        Xo_err = Xo - Xo_true
+                        
                     tracklet1_id = correlation_dict[case_id]['tracklet1_id']
                     if tracklet1_id not in corr_est_dict:
                         corr_est_dict[tracklet1_id] = {}
@@ -2837,12 +2842,16 @@ def evaluate_tracklet_correlation(correlation_file, ra_lim, dec_lim, plot_flag=F
                 x_err.append(abs(float(Xo_err[0])))
                 y_err.append(abs(float(Xo_err[1])))
                 z_err.append(abs(float(Xo_err[2])))
-                dx_err.append(abs(float(Xo_err[3])))
-                dy_err.append(abs(float(Xo_err[4])))
-                dz_err.append(abs(float(Xo_err[5])))
+                
+                if len(Xo_err) == 6:
+                    dx_err.append(abs(float(Xo_err[3])))
+                    dy_err.append(abs(float(Xo_err[4])))
+                    dz_err.append(abs(float(Xo_err[5])))
                 
                 pos3d_err.append(np.linalg.norm(Xo_err[0:3]))
-                vel3d_err.append(np.linalg.norm(Xo_err[3:6]))
+                
+                if len(Xo_err) == 6:
+                    vel3d_err.append(np.linalg.norm(Xo_err[3:6]))
         
      
         print('')
@@ -2917,7 +2926,7 @@ def boxplot_corr_errors(correlation_file, lim_list, plot_flag=False):
     plt.yticks([1,2,3], [str(lim) for lim in lim_list])
     plt.ylabel('RMS Resids Limit [arcsec]')
     plt.xlabel('Initial 3D Position Error [km]')
-    # plt.xlim([-10, 7000])
+    plt.xlim([-10, 1000])
     
     
     plt.show()

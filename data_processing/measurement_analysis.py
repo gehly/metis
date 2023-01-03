@@ -38,8 +38,18 @@ def read_roo_csv_data(fname, meas_time_offset=0., ra_bias=0., dec_bias=0.):
     ra_list = [ra*math.pi/180. - ra_bias for ra in ra_deg_list]
     dec_list = [dec*math.pi/180. - dec_bias for dec in dec_deg_list]
     
-    
+    for ii in range(len(ra_list)):
+        
+        if ra_list[ii] > math.pi:
+            ra_list[ii] -= 2.*math.pi
+        if ra_list[ii] < -math.pi:
+            ra_list[ii] += 2.*math.pi
+            
+
     return UTC_list, ra_list, dec_list
+
+
+
 
 
 def compute_radec_errors(meas_file, truth_file, norad_id, sp3_id, sensor_id, meas_time_offset=0.):
@@ -223,10 +233,10 @@ def convert_radec_to_deg(meas_file):
         ra_deg = (float(ra[ii][0:2]) + float(ra[ii][3:5])/60. + float(ra[ii][6:])/3600.)*15.
         dec_deg = float(dec[ii][0:2]) + float(dec[ii][3:5])/60. + float(dec[ii][6:])/3600.
                        
-        ra_rad = ra_deg*pi/180.
-        if ra_rad > pi:
-            ra_rad -= 2*pi
-        dec_rad = dec_deg*pi/180.
+        ra_rad = ra_deg*math.pi/180.
+        if ra_rad > math.pi:
+            ra_rad -= 2*math.pi
+        dec_rad = dec_deg*math.pi/180.
         
         output[0,ii] = ti_sec
         output[1,ii] = ra_rad
