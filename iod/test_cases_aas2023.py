@@ -3088,6 +3088,59 @@ def tudat_geo_setup_singletarget(mult_setup_file, obs_time_file, single_setup_fi
     return
 
 
+def tudat_geo_setup_singletarget2(truth_file, meas_file, obj_id, truth_file2, meas_file2):
+    
+    # Don't use sensor_params from truth file it has been updated for meas
+    pklFile = open(truth_file, 'rb' )
+    data = pickle.load( pklFile )
+    truth_dict = data[0]
+    state_params = data[1]
+    int_params = data[2]
+    pklFile.close()
+        
+    # Load measurement data and sensor params
+    pklFile = open(meas_file, 'rb' )
+    data = pickle.load( pklFile )
+    tracklet_dict = data[0]
+    meas_dict = data[1]
+    sensor_params = data[2]
+    pklFile.close()
+    
+    
+    
+    # Reduce truth, tracklet, meas dictionaries to single object
+    tracklet_id_list = list(tracklet_dict.keys())
+    tk_tracklet_full = []
+    for tracklet_id in tracklet_id_list:
+        if tracklet_dict[tracklet_id]['obj_id'] != obj_id:
+            del tracklet_dict[tracklet_id]
+        else:
+            tk_tracklet_full.extend(tracklet_dict[tracklet_id]['tk_list'])
+            
+            
+    print('tk tracklet full', tk_tracklet_full)
+            
+    tk_truth = sorted(list(truth_dict.keys()))  
+    for tk in tk_truth:
+        obj_id_list = list(truth_dict[tk].keys())
+        
+        for obj_jj in obj_id_list:
+            if obj_jj != obj_id:
+                del truth_dict[tk][obj_jj]
+                
+        if tk in meas_dict and tk not in tk_tracklet_full:
+            del meas_dict[tk]
+            
+    
+    print(meas_dict)
+    print(tracklet_dict)
+        
+        
+    
+    
+    return
+
+
 def run_singletarget_filter(setup_file):
     
         
@@ -3267,7 +3320,7 @@ if __name__ == '__main__':
     visdir = os.path.join(fdir, 'visibility')
     measdir = os.path.join(fdir, 'meas')
     trackdir = os.path.join(fdir, 'tracklet_corr')
-    filterdir = r'D:\documents\research_projects\iod\data\sim\test\aas2023_geo_6obj_7day\2023_01_02_geo_twobody_Po_trials'
+    filterdir = r'D:\documents\research_projects\iod\data\sim\test\aas2023_geo_6obj_7day\2023_01_03_geo_twobody_singletarget'
     
     
     # fname = 'geo_twobody_6obj_7day_truth_13.pkl'    
@@ -3276,20 +3329,29 @@ if __name__ == '__main__':
     # fname = 'geo_twobody_6obj_7day_visibility.csv'
     # vis_file = os.path.join(visdir, fname)
     
-    fname = 'geo_real_3obj_3day_truth.pkl'    
+    fname = 'geo_twobody_6obj_7day_truth.pkl'    
     truth_file = os.path.join(truthdir, fname)
+    
+    fname = 'geo_twobody_1obj_7day_truth.pkl'    
+    truth_file2 = os.path.join(filterdir, fname)
+    
     
     # fname = 'geo_twobody_6obj_7day_obstime_2pass_300sec.pkl'
     # obs_time_file = os.path.join(visdir, fname)
     
-    fname = 'geo_real_3obj_3day_meas.pkl'
+    fname = 'geo_twobody_6obj_7day_meas_2pass_300sec_noise1_lam0_pd1.pkl'
     meas_file = os.path.join(measdir, fname)
     
-    fname = 'geo_real_3obj_3day_corr_summary.csv'
-    corr_csv = os.path.join(trackdir, fname)
+    fname = 'geo_twobody_1obj_7day_meas_2pass_300sec_noise1_lam0_pd1.pkl'
+    meas_file2 = os.path.join(filterdir, fname)
     
-    fname = 'geo_real_3obj_3day_corr.pkl'
-    corr_pkl = os.path.join(trackdir, fname)
+    
+    
+    # fname = 'geo_real_3obj_3day_corr_summary.csv'
+    # corr_csv = os.path.join(trackdir, fname)
+    
+    # fname = 'geo_real_3obj_3day_corr.pkl'
+    # corr_pkl = os.path.join(trackdir, fname)
     
     # fname = 'geo_twobody_6obj_7day_setup_noise1_lam0_pd1_goodingbirth2.pkl'
     # setup_file = os.path.join(filterdir, fname)  
@@ -3331,6 +3393,9 @@ if __name__ == '__main__':
     
     # geo_real_tracklets(truth_file, meas_file)
     
+    obj_id = 49336
+    tudat_geo_setup_singletarget2(truth_file, meas_file, obj_id, truth_file2, meas_file2)
+    
     
     noise = 1.
     lam_c = 0.
@@ -3357,7 +3422,7 @@ if __name__ == '__main__':
     # corr_est_dict = analysis.evaluate_tracklet_correlation(corr_pkl, ra_lim, dec_lim, plot_flag)
     
     lim_list = [50., 200., 500.]
-    analysis.boxplot_corr_errors(corr_pkl, lim_list, True)
+    # analysis.boxplot_corr_errors(corr_pkl, lim_list, True)
     
     
     
