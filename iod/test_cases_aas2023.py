@@ -2279,6 +2279,8 @@ def process_tracklets_full(meas_file, truth_file, csv_file, correlation_file):
     sensor_params = data[2]
     pklFile.close()
     
+
+    
     params_dict = {}
     params_dict['sensor_params'] = sensor_params
     params_dict['state_params'] = state_params
@@ -2305,10 +2307,14 @@ def process_tracklets_full(meas_file, truth_file, csv_file, correlation_file):
     # Loop through tracklets and compute association
     tracklet_id_list = list(tracklet_dict.keys())
     case_id = 0
-    for ii in tracklet_id_list:
+    for ind in range(len(tracklet_id_list)):
+        ii = tracklet_id_list[ind]
         tracklet_ii = tracklet_dict[ii]
         
-        for jj in tracklet_id_list[ii+1:]:
+        for ind2 in range(ind+1, len(tracklet_id_list)):            
+        # for jj in tracklet_id_list[ii+1:]:
+            
+            jj = tracklet_id_list[ind2]
             tracklet_jj = tracklet_dict[jj]
             
             # Check times and switch if needed
@@ -2829,7 +2835,7 @@ def tudat_geo_lmb_setup_no_birth(truth_file, meas_file, setup_file):
     P = np.diag([1., 1., 1., 1e-6, 1e-6, 1e-6])
     
 
-    
+    label_truth_dict = {}
     LMB_dict = {}
     ii = 1
     for obj_id in obj_id_list:
@@ -2844,6 +2850,9 @@ def tudat_geo_lmb_setup_no_birth(truth_file, meas_file, setup_file):
         LMB_dict[(tk_list[0], ii)]['means'] = [X_init]
         LMB_dict[(tk_list[0], ii)]['covars'] = [P]
         
+        label = (tk_list[0], ii)
+        label_truth_dict[label] = obj_id
+        
         ii += 1
         
         
@@ -2855,7 +2864,9 @@ def tudat_geo_lmb_setup_no_birth(truth_file, meas_file, setup_file):
     state_dict[tk_list[0]]['LMB_dict'] = LMB_dict
     
     
+    birth_time_dict = {}
     
+
     # Save final setup file
     params_dict = {}
     params_dict['state_params'] = state_params
@@ -2865,8 +2876,12 @@ def tudat_geo_lmb_setup_no_birth(truth_file, meas_file, setup_file):
     
     meas_fcn = mfunc.unscented_radec
                 
+    # pklFile = open( setup_file, 'wb' )
+    # pickle.dump( [state_dict, meas_fcn, meas_dict, params_dict, truth_dict], pklFile, -1 )
+    # pklFile.close()
+    
     pklFile = open( setup_file, 'wb' )
-    pickle.dump( [state_dict, meas_fcn, meas_dict, params_dict, truth_dict], pklFile, -1 )
+    pickle.dump( [state_dict, meas_fcn, meas_dict, params_dict, truth_dict, birth_time_dict, label_truth_dict], pklFile, -1 )
     pklFile.close()
     
     
@@ -2900,7 +2915,7 @@ def tudat_geo_lmb_setup_birth(truth_file, meas_file, correlation_file,
     
     # Filter parameters
     filter_params = {}
-    filter_params['Q'] = 1e-12 * np.diag([1, 1, 1])
+    filter_params['Q'] = 1e-15 * np.diag([1, 1, 1])
     filter_params['snc_flag'] = 'gamma'
     filter_params['gap_seconds'] = 900.
     filter_params['alpha'] = 1e-4
@@ -3135,7 +3150,17 @@ def tudat_geo_setup_singletarget2(truth_file, meas_file, obj_id, truth_file2, me
     print(meas_dict)
     print(tracklet_dict)
         
+      
         
+    # Save truth and params
+    pklFile = open( truth_file2, 'wb' )
+    pickle.dump( [truth_dict, state_params, int_params, sensor_params], pklFile, -1 )
+    pklFile.close()
+    
+    # Save data
+    pklFile = open( meas_file2, 'wb' )
+    pickle.dump( [tracklet_dict, meas_dict, sensor_params], pklFile, -1 )
+    pklFile.close()
     
     
     return
@@ -3210,7 +3235,7 @@ def run_multitarget_filter(setup_file, prev_results, results_file):
     
     # Reduce meas and birth dict to times of interest
     t0 = datetime(2022, 11, 7, 0, 0, 0)
-    tf = datetime(2022, 11, 8, 0, 0, 0)
+    tf = datetime(2022, 11, 10, 0, 0, 0)
     tk_list = sorted(list(meas_dict.keys()))
     tk_list2 = sorted(list(birth_time_dict.keys()))
 
@@ -3223,8 +3248,8 @@ def run_multitarget_filter(setup_file, prev_results, results_file):
         if tk < t0 or tk > tf:
             del birth_time_dict[tk]
             
-    # print(meas_dict.keys())
-    # print(len(meas_dict.keys()))
+    print(meas_dict.keys())
+    print(len(meas_dict.keys()))
     
     print(meas_dict.keys())
     print(birth_time_dict.keys())
@@ -3347,21 +3372,21 @@ if __name__ == '__main__':
     
     
     
-    # fname = 'geo_real_3obj_3day_corr_summary.csv'
-    # corr_csv = os.path.join(trackdir, fname)
+    fname = 'geo_twobody_1obj_7day_corr_summary_2pass_300sec_noise1_lam0_pd1.csv'
+    corr_csv = os.path.join(filterdir, fname)
     
-    # fname = 'geo_real_3obj_3day_corr.pkl'
-    # corr_pkl = os.path.join(trackdir, fname)
+    fname = 'geo_twobody_1obj_7day_corr_2pass_300sec_noise1_lam0_pd1.pkl'
+    corr_pkl = os.path.join(filterdir, fname)
     
-    # fname = 'geo_twobody_6obj_7day_setup_noise1_lam0_pd1_goodingbirth2.pkl'
-    # setup_file = os.path.join(filterdir, fname)  
+    fname = 'geo_twobody_1obj_7day_setup_noise1_lam0_pd1_nobirth.pkl'
+    setup_file = os.path.join(filterdir, fname)  
     
     
-    # fname = 'geo_twobody_6obj_7day_goodingbirth2_results_1.pkl'
-    # prev_results = os.path.join(filterdir, fname)
+    fname = 'geo_twobody_1obj_7day_nobirth_results_1.pkl'
+    prev_results = os.path.join(filterdir, fname)
     
-    # fname = 'geo_twobody_6obj_7day_goodingbirth2_results_1.pkl'
-    # results_file = os.path.join(filterdir, fname)
+    fname = 'geo_twobody_1obj_7day_nobirth_results_1.pkl'
+    results_file = os.path.join(filterdir, fname)
     
     
     
@@ -3394,7 +3419,7 @@ if __name__ == '__main__':
     # geo_real_tracklets(truth_file, meas_file)
     
     obj_id = 49336
-    tudat_geo_setup_singletarget2(truth_file, meas_file, obj_id, truth_file2, meas_file2)
+    # tudat_geo_setup_singletarget2(truth_file, meas_file, obj_id, truth_file2, meas_file2)
     
     
     noise = 1.
@@ -3403,7 +3428,7 @@ if __name__ == '__main__':
     orbit_regime = 'GEO'
     # generate_meas_file(noise, lam_c, p_det, orbit_regime, truth_file, obs_time_file, meas_file)
     
-    # check_meas_file(meas_file)
+    # check_meas_file(meas_file2)
     
     
     
@@ -3412,7 +3437,7 @@ if __name__ == '__main__':
     ###########################################################################
     
     
-    # process_tracklets_full(meas_file, truth_file, corr_csv, corr_pkl)
+    # process_tracklets_full(meas_file2, truth_file2, corr_csv, corr_pkl)
     
     ra_lim = 50.
     dec_lim = 50.
@@ -3421,7 +3446,7 @@ if __name__ == '__main__':
     
     # corr_est_dict = analysis.evaluate_tracklet_correlation(corr_pkl, ra_lim, dec_lim, plot_flag)
     
-    lim_list = [50., 200., 500.]
+    lim_list = [10., 50., 200.]
     # analysis.boxplot_corr_errors(corr_pkl, lim_list, True)
     
     
@@ -3438,7 +3463,7 @@ if __name__ == '__main__':
     # print(birth_time_dict)
     
     
-    # tudat_geo_lmb_setup_no_birth(truth_file, meas_file, setup_file)
+    # tudat_geo_lmb_setup_no_birth(truth_file2, meas_file2, setup_file)
     
     
     

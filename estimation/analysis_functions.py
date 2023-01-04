@@ -2792,8 +2792,7 @@ def evaluate_tracklet_correlation(correlation_file, ra_lim, dec_lim, plot_flag=F
         # Check for fail conditions, if Gooding IOD didn't produce a solution
         # with the correct rev number M
         
-    
-    
+
     
     print('')
     print('Total Number of Correlations: ', N_cases)
@@ -2807,10 +2806,10 @@ def evaluate_tracklet_correlation(correlation_file, ra_lim, dec_lim, plot_flag=F
     print('Average Time', (gooding_time + resids_time)/len(correlation_dict))
     
     print('')
-    print('True Pos:  %5.2f%% (%3d/%3d)' % ((N_truepos/N_true)*100., N_truepos, N_true))
-    print('True Neg:  %5.2f%% (%3d/%3d)' % ((N_trueneg/N_false)*100., N_trueneg, N_false))
-    print('False Pos: %5.2f%% (%3d/%3d)' % ((N_falsepos/N_false)*100., N_falsepos, N_false))
-    print('False Neg: %5.2f%% (%3d/%3d)' % ((N_falseneg/N_true)*100., N_falseneg, N_true))
+    print('True Pos:  %5.2f%% (%3d/%3d)' % ((N_truepos/max(N_true, 1e-14))*100., N_truepos, N_true))
+    print('True Neg:  %5.2f%% (%3d/%3d)' % ((N_trueneg/max(N_false, 1e-14))*100., N_trueneg, N_false))
+    print('False Pos: %5.2f%% (%3d/%3d)' % ((N_falsepos/max(N_false, 1e-14))*100., N_falsepos, N_false))
+    print('False Neg: %5.2f%% (%3d/%3d)' % ((N_falseneg/max(N_true, 1e-14))*100., N_falseneg, N_true))
     
     
     
