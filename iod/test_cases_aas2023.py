@@ -2656,6 +2656,7 @@ def tracklets_to_birth_model(correlation_file, ra_lim, dec_lim, birth_type='simp
     # Initialize
     birth_time_dict = {}
     label_truth_dict = {}
+    tk_meas_del = []
     # P_birth = np.diag([1., 1., 1., 1e-6, 1e-6, 1e-6])
     
     # From Batch Fit
@@ -2785,14 +2786,57 @@ def tracklets_to_birth_model(correlation_file, ra_lim, dec_lim, birth_type='simp
 
             label = (tk, birth_id)
             label_truth_dict[label] = tracklet_dict[tracklet_id]['obj_id']
+            
+            
+    if birth_type == 'gooding_batch':
         
+        # Get estimated correlation status
+        corr_est_dict = analysis.evaluate_tracklet_correlation(correlation_file, ra_lim, dec_lim)
         
+        # Build birth model
+        for tracklet_id in corr_est_dict:
+            
+            # Set up propagation to second tracklet time
+            t0 = tracklet_dict[tracklet_id]['tk_list'][0]
+            tk = tracklet_dict[tracklet_id]['tk_list'][1]
+            tin = [t0, tk]
+            
+            if t0 > datetime(2022, 11, 7, 14, 0, 0):
+                continue
+            
+            # Retrieve initial state
+            means0 = corr_est_dict[tracklet_id]['means']
+            ncomp = len(means0)
+            
+            print(corr_est_dict[tracklet_id])
+            
+            
+            # Setup and run batch estimator
+            Xo = means0[0]
+            X_birth, P_birth, tk_meas_del = run_batch(Xo, tracklet_dict, params_dict, truth_dict)
+            tk_birth = tk_meas_del[0]
+        
+            birth_model = {}
+            birth_model[1] = {}
+            birth_model[1]['r_birth'] = 0.01
+            birth_model[1]['weights'] = [1.]
+            birth_model[1]['means'] = [X_birth]
+            birth_model[1]['covars'] = [P_birth]
+            
+            birth_time_dict[tk_birth] = birth_model
+            
+            label = (tk_birth, 1)
+            label_truth_dict[label] = tracklet_dict[tracklet_id]['obj_id']
+        
+    
+    print(birth_time_dict)
     print(sorted(list(birth_time_dict.keys())))
     print(len(birth_time_dict.keys()))
     
     print(label_truth_dict)
+    
 
-    return birth_time_dict, label_truth_dict
+    return birth_time_dict, label_truth_dict, tk_meas_del
 
 
 def tudat_geo_lmb_setup_no_birth(truth_file, meas_file, setup_file):
@@ -2935,7 +2979,7 @@ def tudat_geo_lmb_setup_birth(truth_file, meas_file, correlation_file,
     
     # Setup filter params
     # LMB Birth Model
-    birth_time_dict, label_truth_dict = \
+    birth_time_dict, label_truth_dict, tk_meas_del = \
         tracklets_to_birth_model(correlation_file, ra_lim, dec_lim, birth_type)
     
     # Filter parameters
@@ -2956,6 +3000,11 @@ def tudat_geo_lmb_setup_birth(truth_file, meas_file, correlation_file,
     
     # Additions to other parameter dictionaries
     state_params['nstates'] = 6
+    
+    # Reduce measurement dictionary, remove entries used for IOD
+    for tk in tk_meas_del:
+        if tk in meas_dict:
+            del meas_dict[tk]
     
     
     
@@ -3189,6 +3238,97 @@ def tudat_geo_setup_singletarget2(truth_file, meas_file, obj_id, truth_file2, me
     
     
     return
+
+
+def run_batch(Xo, tracklet_dict, params_dict, truth_dict):
+    
+    
+    t0 = datetime(2022, 11, 7, 0, 0, 0)
+    tf = datetime(2022, 11, 8, 0, 0, 0)
+    
+    
+    # Reformat truth data for single target filter
+    tk_truth = sorted(list(truth_dict.keys()))
+    truth_dict2 = {}
+    for tk in tk_truth:
+        
+        if tk > t0 and tk < tf:
+            
+            X = truth_dict[tk][obj_id]
+            truth_dict2[tk] = X.copy()
+        
+        
+    # Form measurement dict from tracklet dict    
+    meas_dict = {}
+    meas_dict['tk_list'] = []
+    meas_dict['Yk_list'] = []
+    meas_dict['sensor_id_list'] = []
+    tracklet_id_list = sorted(list(tracklet_dict.keys()))
+    for tracklet_id in tracklet_id_list:
+        
+        tk_list = tracklet_dict[tracklet_id]['tk_list']
+        
+        if tk_list[0] > t0 and tk_list[-1] < tf:
+            
+            Zk_list = tracklet_dict[tracklet_id]['Zk_list']
+            sensor_id_list = tracklet_dict[tracklet_id]['sensor_id_list']
+            
+            ind_list = list(np.arange(0,len(tk_list), 2))
+            last_ind = len(tk_list)-1
+            if last_ind not in ind_list:
+                ind_list.append(last_ind)
+            
+            meas_dict['tk_list'].extend([tk_list[ii] for ii in ind_list])
+            meas_dict['Yk_list'].extend([Zk_list[ii] for ii in ind_list])
+            meas_dict['sensor_id_list'].extend([sensor_id_list[ii] for ii in ind_list])
+            
+    
+    t0_state = sorted(meas_dict['tk_list'])[0]
+    
+    
+    # Setup state dict    
+    state_dict = {}
+    state_dict[t0_state] = {}
+    state_dict[t0_state]['X'] = Xo
+    state_dict[t0_state]['P'] = 100.*np.diag([1., 1., 1., 1e-6, 1e-6, 1e-6])
+    
+    
+    # Update params
+    int_params = {}
+    int_params['integrator'] = 'solve_ivp'
+    int_params['ode_integrator'] = 'DOP853'
+    int_params['intfcn'] = dyn.ode_twobody_stm
+    int_params['rtol'] = 1e-12
+    int_params['atol'] = 1e-12
+    int_params['time_format'] = 'datetime'
+    
+    
+    meas_fcn = mfunc.H_radec
+    # params_dict['filter_params']['alpha'] = 1e-4
+    # params_dict['filter_params']['Q'] = 1e-15 * np.diag([1, 1, 1])
+    # params_dict['int_params']['tudat_integrator'] = 'rkf78'
+    
+    params_dict['int_params'] = int_params
+    
+    
+    filter_output, full_state_output = est.ls_batch(state_dict, truth_dict2, meas_dict, meas_fcn, params_dict)    
+    analysis.compute_orbit_errors(filter_output, full_state_output, truth_dict2)
+    
+    t0_truth = sorted(truth_dict2.keys())[0]
+    
+    print('')
+    print('t0_truth', t0_truth)
+    print(full_state_output[t0_truth])
+    
+    print('')
+    print('t0_state', t0_state)
+    print(full_state_output[t0_state])
+    
+    X_birth = filter_output[t0_state]['X']
+    P_birth = 100.*filter_output[t0_state]['P']
+    tk_meas_del = meas_dict['tk_list']
+    
+    return X_birth, P_birth, tk_meas_del
 
 
 def run_singletarget_filter(setup_file):
@@ -3502,14 +3642,14 @@ if __name__ == '__main__':
     fname = 'geo_twobody_1obj_7day_corr_2pass_300sec_noise1_lam0_pd1.pkl'
     corr_pkl = os.path.join(filterdir, fname)
     
-    fname = 'geo_twobody_1obj_7day_setup_noise1_lam0_pd1_truebirth3.pkl'
+    fname = 'geo_twobody_1obj_7day_setup_noise1_lam0_pd1_batchbirth.pkl'
     setup_file = os.path.join(filterdir, fname)  
     
     
-    fname = 'geo_twobody_1obj_7day_truebirth3_results_1.pkl'
+    fname = 'geo_twobody_1obj_7day_batchbirth_results_1.pkl'
     prev_results = os.path.join(filterdir, fname)
     
-    fname = 'geo_twobody_1obj_7day_truebirth3_results_1.pkl'
+    fname = 'geo_twobody_1obj_7day_batchbirth_results_1.pkl'
     results_file = os.path.join(filterdir, fname)
     
     
@@ -3593,7 +3733,7 @@ if __name__ == '__main__':
     
     ra_lim = 50.
     dec_lim = 50.
-    birth_type = 'simple'
+    birth_type = 'gooding_batch'
     # tudat_geo_lmb_setup_birth(truth_file2, meas_file2, corr_pkl,
     #                           ra_lim, dec_lim, birth_type, setup_file)
     

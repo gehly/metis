@@ -2710,6 +2710,9 @@ def evaluate_tracklet_correlation(correlation_file, ra_lim, dec_lim, plot_flag=F
         
         # if tdiff_hrs % 24. < 1. or tdiff_hrs % 24 > 23.:
         #     continue
+    
+        if tdiff_hrs > 12.:
+            continue
         
         
         N_cases += 1
