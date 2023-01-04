@@ -5,6 +5,7 @@ import os
 import inspect
 import copy
 import time
+from datetime import datetime
 
 
 filename = inspect.getframeinfo(inspect.currentframe()).filename
@@ -603,6 +604,9 @@ def lmb_filter(state_dict, truth_dict, meas_dict, birth_time_dict, meas_fcn, par
         print('Xk_list', Xk_list)
         print('Pk_list', Pk_list)
         print('resids', resids_k)
+        
+        # if tk == datetime(2022, 11, 8, 10, 5, 10):
+        #     mistake
 
         
         # Store output
@@ -1236,11 +1240,11 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list, sensor_id_list, meas
                 cost_mat = allcost_mat[label_inds,:]
                 neglog_mat = -np.log(cost_mat)
                 
-                # print('')
-                # print('hyp', hyp)
-                # print('hyp_weight', hyp_weight)
-                # print('label_list', label_list)
-                # print('cost_mat', cost_mat)
+                print('')
+                print('hyp', hyp)
+                print('hyp_weight', hyp_weight)
+                print('label_list', label_list)
+                print('cost_mat', cost_mat)
                 
                 start_assign = time.time()
                 
@@ -1250,9 +1254,9 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list, sensor_id_list, meas
                 
                 assign_time += time.time() - start_assign
                 
-                # print('kbest', kbest)
-                # print('assign_lists', assign_lists)
-                # print('nmeas', nmeas)
+                print('kbest', kbest)
+                print('assign_lists', assign_lists)
+                print('nmeas', nmeas)
                 
 
                 
@@ -1354,11 +1358,11 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list, sensor_id_list, meas
                         pd_time += time.time() - start_pd
                         
                         
-                        # print('alist', alist)
-                        # print('label_list', label_list)
-                        # print('jj', jj)
-                        # print('label', label)
-                        # print('meas_ind', meas_ind)
+                        print('alist', alist)
+                        print('label_list', label_list)
+                        print('jj', jj)
+                        print('label', label)
+                        print('meas_ind', meas_ind)
                         
                         
                         
@@ -1374,10 +1378,10 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list, sensor_id_list, meas
                             means = track_update[tind]['means']
                             covars = track_update[tind]['covars']
                             
-                            # print('missed det')
-                            # print('tind', tind)
-                            # print('label', track_update[tind]['label'])
-                            # print('meas_ind', track_update[tind]['meas_ind'])
+                            print('missed det')
+                            print('tind', tind)
+                            print('label', track_update[tind]['label'])
+                            print('meas_ind', track_update[tind]['meas_ind'])
                             
                             weights = [(1. - p_det)*wi for wi in weights]
                             
@@ -1416,10 +1420,10 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list, sensor_id_list, meas
                             covars = track_update[tind]['covars']
                             qk_list = track_update[tind]['qk_list']
                             
-                            # print('det')
-                            # print('tind', tind)
-                            # print('label', track_update[tind]['label'])
-                            # print('meas_ind', track_update[tind]['meas_ind'])
+                            print('det')
+                            print('tind', tind)
+                            print('label', track_update[tind]['label'])
+                            print('meas_ind', track_update[tind]['meas_ind'])
                             
                             # Incorporate likelihood (includes p_det from before)
                             eta = sum(weights)
@@ -1496,6 +1500,7 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list, sensor_id_list, meas
         
     # Convert GLMB to LMB
     LMB_dict = glmb2lmb(GLMB_dict, full_label_list)
+    # LMB_dict = glmb2lmb(GLMB_dict)
     
     print('')
     print('LMB posterior')
@@ -2140,6 +2145,8 @@ def BFMSpathwrap(ncm, source, destination):
 def glmb_kbest_assignments(C, kbest=1):
     
     
+    machine_eps = np.finfo(float).eps
+    
     # Assume input C has tracks on rows and measurements on columns
     
     # Need to minimize cost
@@ -2152,17 +2159,18 @@ def glmb_kbest_assignments(C, kbest=1):
     dum = -np.log(np.ones((n1,n1)))
     C1 = np.concatenate((C, dum), axis=1)
     
-    # print('C', C)
-    # print('C1', C1)
+    print('C', C)
+    print('C1', C1)
     
     # Transpose and reformulate as maximization problem
     A = C1.T
     
-    # print('A', A)
+    print('A', A)
     
     A = np.max(A) - A
+    A += machine_eps
     
-    # print('A', A)
+    print('A', A)
     
     # Run Murty to get kbest solutions
     final_list = murty(A, kbest)
@@ -2430,10 +2438,12 @@ def murty(A0, kbest=1):
                 if j1 != j:
                     A1[i,j1] = 0.
 
-#            print(row_indices)
-#            print(score)
-#            print('A1',A1)
+            print(row_indices)
+            print(score)
+            print('A1',A1)
                                
+
+    print(solution_list)
 
     #Remove duplicate solutions
     final_list = []    

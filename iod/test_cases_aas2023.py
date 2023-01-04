@@ -2799,9 +2799,9 @@ def tracklets_to_birth_model(correlation_file, ra_lim, dec_lim, birth_type='simp
             # Set up propagation to second tracklet time
             t0 = tracklet_dict[tracklet_id]['tk_list'][0]
             tk = tracklet_dict[tracklet_id]['tk_list'][1]
-            tin = [t0, tk]
+            # tin = [t0, tk]
             
-            if t0 > datetime(2022, 11, 7, 14, 0, 0):
+            if t0 > datetime(2022, 11, 10, 0, 0, 0):
                 continue
             
             # Retrieve initial state
@@ -2813,8 +2813,12 @@ def tracklets_to_birth_model(correlation_file, ra_lim, dec_lim, birth_type='simp
             
             # Setup and run batch estimator
             Xo = means0[0]
-            X_birth, P_birth, tk_meas_del = run_batch(Xo, tracklet_dict, params_dict, truth_dict)
-            tk_birth = tk_meas_del[0]
+            t0_batch = datetime(t0.year, t0.month, t0.day)
+            tf_batch = t0_batch + timedelta(days=1.)
+            X_birth, P_birth, tk_meas_del_ii = run_batch(Xo, tracklet_dict, params_dict, truth_dict,
+                                                         t0_batch, tf_batch)
+            tk_birth = tk_meas_del_ii[0]
+            tk_meas_del.extend(tk_meas_del_ii)
         
             birth_model = {}
             birth_model[1] = {}
@@ -3240,11 +3244,11 @@ def tudat_geo_setup_singletarget2(truth_file, meas_file, obj_id, truth_file2, me
     return
 
 
-def run_batch(Xo, tracklet_dict, params_dict, truth_dict):
+def run_batch(Xo, tracklet_dict, params_dict, truth_dict, t0, tf):
     
     
-    t0 = datetime(2022, 11, 7, 0, 0, 0)
-    tf = datetime(2022, 11, 8, 0, 0, 0)
+    # t0 = datetime(2022, 11, 7, 0, 0, 0)
+    # tf = datetime(2022, 11, 8, 0, 0, 0)
     
     
     # Reformat truth data for single target filter
@@ -3609,7 +3613,7 @@ if __name__ == '__main__':
     visdir = os.path.join(fdir, 'visibility')
     measdir = os.path.join(fdir, 'meas')
     trackdir = os.path.join(fdir, 'tracklet_corr')
-    filterdir = r'D:\documents\research_projects\iod\data\sim\test\aas2023_geo_6obj_7day\2023_01_03_geo_twobody_singletarget'
+    filterdir = r'D:\documents\research_projects\iod\data\sim\test\aas2023_geo_6obj_7day\2023_01_04_geo_twobody_singletarget'
     
     
     # fname = 'geo_twobody_6obj_7day_truth_13.pkl'    
@@ -3642,14 +3646,14 @@ if __name__ == '__main__':
     fname = 'geo_twobody_1obj_7day_corr_2pass_300sec_noise1_lam0_pd1.pkl'
     corr_pkl = os.path.join(filterdir, fname)
     
-    fname = 'geo_twobody_1obj_7day_setup_noise1_lam0_pd1_batchbirth.pkl'
+    fname = 'geo_twobody_1obj_7day_setup_noise1_lam0_pd1_batchbirth3.pkl'
     setup_file = os.path.join(filterdir, fname)  
     
     
-    fname = 'geo_twobody_1obj_7day_batchbirth_results_1.pkl'
+    fname = 'geo_twobody_1obj_7day_batchbirth3_results_1.pkl'
     prev_results = os.path.join(filterdir, fname)
     
-    fname = 'geo_twobody_1obj_7day_batchbirth_results_1.pkl'
+    fname = 'geo_twobody_1obj_7day_batchbirth3_results_1.pkl'
     results_file = os.path.join(filterdir, fname)
     
     
