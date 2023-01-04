@@ -2656,7 +2656,30 @@ def tracklets_to_birth_model(correlation_file, ra_lim, dec_lim, birth_type='simp
     # Initialize
     birth_time_dict = {}
     label_truth_dict = {}
-    P_birth = 100.*np.diag([1., 1., 1., 1e-6, 1e-6, 1e-6])
+    # P_birth = np.diag([1., 1., 1., 1e-6, 1e-6, 1e-6])
+    
+    # From Batch Fit
+    
+    X_birth = np.array([[ 3.17140426e+04],
+                       [-1.04196373e+04],
+                       [-2.06293835e+04],
+                       [ 4.84449965e-01],
+                       [ 3.18679816e+00],
+                       [-6.87770665e-01]])
+    
+    
+    P_birth = 100.*np.array([[ 5.10084093e-01, -1.87085288e-01, -3.21505063e-01,
+                              -5.18406494e-05,  3.40826466e-06,  3.85866423e-05],
+                            [-1.87085288e-01,  6.96794260e-02,  1.18108035e-01,
+                              1.99392669e-05, -3.81221250e-06, -1.50122083e-05],
+                            [-3.21505063e-01,  1.18108035e-01,  2.03867746e-01,
+                              3.28755384e-05, -2.47623187e-06, -2.44474851e-05],
+                            [-5.18406494e-05,  1.99392669e-05,  3.28755384e-05,
+                              8.01900884e-09, -7.94260286e-09, -6.48798448e-09],
+                            [ 3.40826466e-06, -3.81221250e-06, -2.47623187e-06,
+                              -7.94260286e-09,  2.10729027e-08,  7.37667284e-09],
+                            [ 3.85866423e-05, -1.50122083e-05, -2.44474851e-05,
+                              -6.48798448e-09,  7.37667284e-09,  5.33221536e-09]])
     
     
     # # Initial covariance, compute by unscented transform
@@ -2683,25 +2706,27 @@ def tracklets_to_birth_model(correlation_file, ra_lim, dec_lim, birth_type='simp
             tk_list = tracklet['tk_list']
             
             # Retrieve truth data for initial tracklet time
-            tk = tk_list[0]
+            tk = tk_list[1]
             X_true = truth_dict[tk][obj_id]
             
             # Perturbed initial filter state
-            pert_vect = np.multiply(np.sqrt(np.diag(P_birth)), np.random.randn(6))
-            X_init = X_true + np.reshape(pert_vect, (6, 1))
+            # pert_vect = np.multiply(np.sqrt(np.diag(P_birth)), np.random.randn(6))
+            # X_init = X_true + np.reshape(pert_vect, (6, 1))
             
             # Generate and store birth component for this time
             birth_model = {}
             birth_model[1] = {}
             birth_model[1]['r_birth'] = 0.05
             birth_model[1]['weights'] = [1.]
-            birth_model[1]['means'] = [X_init]
+            birth_model[1]['means'] = [X_birth]
             birth_model[1]['covars'] = [P_birth]
             
             birth_time_dict[tk] = birth_model
             
             label = (tk, 1)
             label_truth_dict[label] = obj_id
+            
+            break
             
             
     # GMM model using mean state from Gooding IOD
@@ -3178,13 +3203,95 @@ def run_singletarget_filter(setup_file):
     truth_dict = data[4]
     pklFile.close()
     
+
     
-    # meas_fcn = mfunc.unscented_radec
-    params_dict['filter_params']['alpha'] = 1e-4
-    params_dict['filter_params']['Q'] = 1e-15 * np.diag([1, 1, 1])
+    # # Don't use sensor_params from truth file it has been updated for meas
+    # pklFile = open(truth_file, 'rb' )
+    # data = pickle.load( pklFile )
+    # truth_dict = data[0]
+    # state_params = data[1]
+    # int_params = data[2]
+    # pklFile.close()
+        
+    # # Load measurement data and sensor params
+    # pklFile = open(meas_file, 'rb' )
+    # data = pickle.load( pklFile )
+    # tracklet_dict = data[0]
+    # meas_dict = data[1]
+    # sensor_params = data[2]
+    # pklFile.close()
+    
+    t0 = datetime(2022, 11, 7, 0, 0, 0)
+    tf = datetime(2022, 11, 8, 0, 0, 0)
+    
+    
+    # Reformat truth data for single target filter
+    tk_truth = sorted(list(truth_dict.keys()))
+    truth_dict2 = {}
+    for tk in tk_truth:
+        
+        if tk > t0 and tk < tf:
+            
+            X = truth_dict[tk][obj_id]
+            truth_dict2[tk] = X.copy()
+        
+        
+    # Reformat meas_dict for single target filter
+    
+    
+    tk_meas = sorted(list(meas_dict.keys()))
+    meas_dict2 = {}
+    meas_dict2['tk_list'] = []
+    meas_dict2['Yk_list'] = []
+    meas_dict2['sensor_id_list'] = []
+    for tk in tk_meas:
+        
+        if tk > t0 and tk < tf:
+            
+            Zk_list = meas_dict[tk]['Zk_list']
+            sensor_id_list = meas_dict[tk]['sensor_id_list']
+            
+            if len(Zk_list) == 1:
+                Yk = Zk_list[0]
+                sensor_id = sensor_id_list[0]
+                meas_dict2['tk_list'].append(tk)
+                meas_dict2['Yk_list'].append(Yk)
+                meas_dict2['sensor_id_list'].append(sensor_id)
+                
+                
+            else:
+                mistake
+    
+    
+    # Reformat state dict
+    t0_state = sorted(state_dict.keys())[0]    
+    LMB_dict = state_dict[t0_state]['LMB_dict']
+    label = list(LMB_dict.keys())[0]
+    X_init = LMB_dict[label]['means'][0]
+    P = LMB_dict[label]['covars'][0]
+    
+    state_dict2 = {}
+    state_dict2[t0_state] = {}
+    state_dict2[t0_state]['X'] = X_init
+    state_dict2[t0_state]['P'] = P
+    
+    
+    # Update params
+    int_params = {}
+    int_params['integrator'] = 'solve_ivp'
+    int_params['ode_integrator'] = 'DOP853'
+    int_params['intfcn'] = dyn.ode_twobody_stm
+    int_params['rtol'] = 1e-12
+    int_params['atol'] = 1e-12
+    int_params['time_format'] = 'datetime'
+    
+    
+    meas_fcn = mfunc.H_radec
+    # params_dict['filter_params']['alpha'] = 1e-4
+    # params_dict['filter_params']['Q'] = 1e-15 * np.diag([1, 1, 1])
     # params_dict['int_params']['tudat_integrator'] = 'rkf78'
     
-    
+    params_dict['int_params'] = int_params
     
     
     # # Reduced dynamics model
@@ -3204,9 +3311,26 @@ def run_singletarget_filter(setup_file):
     
     # mistake
     
+    filter_output, full_state_output = est.ls_batch(state_dict2, truth_dict2, meas_dict2, meas_fcn, params_dict)    
+    analysis.compute_orbit_errors(filter_output, full_state_output, truth_dict2)
+    
+    t0_truth = sorted(truth_dict2.keys())[0]
+    
+    print('')
+    print('t0_truth', t0_truth)
+    print(full_state_output[t0_truth])
+    
+    print('')
+    print('t0_meas', tk_meas[0])
+    print(full_state_output[tk_meas[0]])
+    
     # UKF Test
-    filter_output, full_state_output = est.ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, params_dict)
-    analysis.compute_orbit_errors(filter_output, filter_output, truth_dict)
+    # filter_output, full_state_output = est.ls_ukf(state_dict2, truth_dict2, meas_dict2, meas_fcn, params_dict)
+    # analysis.compute_orbit_errors(filter_output, filter_output, truth_dict2)
+    
+    # Unscented Batch Test
+    # filter_output, full_state_output = est.unscented_batch(state_dict2, truth_dict2, meas_dict2, meas_fcn, params_dict)
+    # analysis.compute_orbit_errors(filter_output, full_state_output, truth_dict2)
         
     
     return
@@ -3378,14 +3502,14 @@ if __name__ == '__main__':
     fname = 'geo_twobody_1obj_7day_corr_2pass_300sec_noise1_lam0_pd1.pkl'
     corr_pkl = os.path.join(filterdir, fname)
     
-    fname = 'geo_twobody_1obj_7day_setup_noise1_lam0_pd1_nobirth.pkl'
+    fname = 'geo_twobody_1obj_7day_setup_noise1_lam0_pd1_truebirth3.pkl'
     setup_file = os.path.join(filterdir, fname)  
     
     
-    fname = 'geo_twobody_1obj_7day_nobirth_results_1.pkl'
+    fname = 'geo_twobody_1obj_7day_truebirth3_results_1.pkl'
     prev_results = os.path.join(filterdir, fname)
     
-    fname = 'geo_twobody_1obj_7day_nobirth_results_1.pkl'
+    fname = 'geo_twobody_1obj_7day_truebirth3_results_1.pkl'
     results_file = os.path.join(filterdir, fname)
     
     
@@ -3469,8 +3593,8 @@ if __name__ == '__main__':
     
     ra_lim = 50.
     dec_lim = 50.
-    birth_type = 'gooding_gmm'
-    # tudat_geo_lmb_setup_birth(truth_file, meas_file, corr_pkl,
+    birth_type = 'simple'
+    # tudat_geo_lmb_setup_birth(truth_file2, meas_file2, corr_pkl,
     #                           ra_lim, dec_lim, birth_type, setup_file)
     
     
@@ -3487,7 +3611,7 @@ if __name__ == '__main__':
     
     
     
-    # run_singletarget_filter(single_setup_file)
+    # run_singletarget_filter(setup_file)
     
     
     
@@ -3498,7 +3622,7 @@ if __name__ == '__main__':
     
     
     
-    # multitarget_analysis(results_file, setup_file)
+    multitarget_analysis(results_file, setup_file)
     
     
     
