@@ -684,10 +684,49 @@ def lmb_predictor(LMB_dict, tin, birth_model, params_dict):
     for ii in birth_model.keys():
         label = (tk, ii)
         LMB_birth[label] = {}        
-        LMB_birth[label]['r'] = birth_model[ii]['r_birth']
+        
         LMB_birth[label]['weights'] = birth_model[ii]['weights']
         LMB_birth[label]['means'] = birth_model[ii]['means']
         LMB_birth[label]['covars'] = birth_model[ii]['covars']
+        
+        LMB_birth[label]['r'] = birth_model[ii]['r_birth']
+        
+        # Compute Mahalanobis distance against existing components
+        for label_jj in LMB_dict:
+            GMM_dict = copy.deepcopy(LMB_dict[label_jj])
+            GMM_birth = copy.deepcopy(LMB_birth[label])
+            
+            print('GMM_dict', GMM_dict)
+            print('GMM_birth', GMM_birth)
+            
+            merge_params = {}
+            merge_params['prune_T'] = 1e-3
+            merge_params['merge_U'] = 1e6
+            
+            GMM_dict = est.merge_GMM(GMM_dict, merge_params)
+            GMM_birth = est.merge_GMM(GMM_birth, merge_params)
+            x1 = GMM_dict['means'][0]
+            P1 = GMM_dict['covars'][0]
+            x2 = GMM_birth['means'][0]
+            P2 = GMM_birth['covars'][0]
+            
+            mahalanobis = np.dot((x1 - x2).T, np.dot(np.linalg.inv(P1 + P2), (x1 - x2)))
+            
+            print('x1', x1)
+            print('x2', x2)
+            print('P1', P1)
+            print('P2', P2)
+            
+            print('diff', x1-x2)
+            print(mahalanobis)
+            
+            # mistake
+            
+            LMB_birth[label]['r'] = 1e-6
+        
+        
+        
+        
 
     
     print('')

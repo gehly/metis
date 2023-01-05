@@ -2182,12 +2182,14 @@ def check_meas_file(meas_file):
             plot_dict[obj_id] = {}
             plot_dict[obj_id]['thrs'] = []
             plot_dict[obj_id]['sensor_index'] = []
+            plot_dict[obj_id]['object_index'] = []
             
         for kk in range(len(tk_list)):
             tk = tk_list[kk]
             ind = sensor_id_list.index(tracklet_sensor_id[kk])
             plot_dict[obj_id]['thrs'].append((tk-t0).total_seconds()/3600.)
             plot_dict[obj_id]['sensor_index'].append(ind)
+            plot_dict[obj_id]['object_index'].append(obj_id_list.index(obj_id))
             
             
         
@@ -2228,13 +2230,17 @@ def check_meas_file(meas_file):
         obj_id = obj_id_list[ii]
         color = clist[ii]
         
-        ax1.plot(plot_dict[obj_id]['thrs'], plot_dict[obj_id]['sensor_index'], '.', color=color)
+        ax1.plot(plot_dict[obj_id]['thrs'], plot_dict[obj_id]['object_index'], '.', color=color)
         
-    plt.xlabel('Time [hours]')
-    ax1.set_yticks([0])
-    ax1.set_yticklabels(sensor_id_list, rotation=90, verticalalignment='center')
-    plt.legend(obj_id_list)
-    plt.title('Tracklets')
+    plt.xlabel('Time [hours] since ' + t0.strftime('%Y-%m-%d %H:%M:%S') + ' UTC')
+    # ax1.set_yticks([0])
+    # ax1.set_yticklabels(sensor_id_list, rotation=90, verticalalignment='center')
+    ax1.set_yticks(list(range(len(obj_id_list))))
+    ax1.set_yticklabels([str(obj_id) for obj_id in obj_id_list], rotation=0, verticalalignment='center')
+    ax1.set_ylim([-1, len(obj_id_list) ])
+    
+    # plt.legend(obj_id_list)
+    # plt.title('Tracklets')
     
     
     plt.figure()
@@ -2246,11 +2252,11 @@ def check_meas_file(meas_file):
     plt.subplot(2,1,1)
     plt.plot(resids_tplot, ra_plot, 'k.')
     plt.ylabel('RA [arcsec]')
-    plt.title('Prefit Residuals')
+    # plt.title('Prefit Residuals')
     plt.subplot(2,1,2)
     plt.plot(resids_tplot, dec_plot, 'k.')
     plt.ylabel('DEC [arcsec]')
-    plt.xlabel('Time [hours]')
+    plt.xlabel('Time [hours] since ' + t0.strftime('%Y-%m-%d %H:%M:%S') + ' UTC')
     
                 
     plt.show() 
@@ -2831,6 +2837,13 @@ def tracklets_to_birth_model(correlation_file, ra_lim, dec_lim, birth_type='simp
             
             label = (tk_birth, 1)
             label_truth_dict[label] = tracklet_dict[tracklet_id]['obj_id']
+            
+            obj_id = tracklet_dict[tracklet_id]['obj_id']
+            X_true = truth_dict[tk_birth][obj_id]
+            
+            
+            print('X_birth', X_birth)
+            print('X_true', X_true)
         
     
     print(birth_time_dict)
@@ -3613,7 +3626,7 @@ if __name__ == '__main__':
     visdir = os.path.join(fdir, 'visibility')
     measdir = os.path.join(fdir, 'meas')
     trackdir = os.path.join(fdir, 'tracklet_corr')
-    filterdir = r'D:\documents\research_projects\iod\data\sim\test\aas2023_geo_6obj_7day\2023_01_04_geo_twobody_singletarget'
+    filterdir = r'D:\documents\research_projects\iod\data\aas2023_preprint\geo_twobody_1obj_3day'
     
     
     # fname = 'geo_twobody_6obj_7day_truth_13.pkl'    
@@ -3633,6 +3646,7 @@ if __name__ == '__main__':
     # obs_time_file = os.path.join(visdir, fname)
     
     fname = 'geo_twobody_6obj_7day_meas_2pass_300sec_noise1_lam0_pd1.pkl'
+    # fname = 'geo_real_3obj_3day_meas.pkl'
     meas_file = os.path.join(measdir, fname)
     
     fname = 'geo_twobody_1obj_7day_meas_2pass_300sec_noise1_lam0_pd1.pkl'
@@ -3640,21 +3654,21 @@ if __name__ == '__main__':
     
     
     
-    fname = 'geo_twobody_1obj_7day_corr_summary_2pass_300sec_noise1_lam0_pd1.csv'
-    corr_csv = os.path.join(filterdir, fname)
+    fname = 'geo_real_3obj_3day_corr_summary.csv'
+    corr_csv = os.path.join(trackdir, fname)
     
-    fname = 'geo_twobody_1obj_7day_corr_2pass_300sec_noise1_lam0_pd1.pkl'
-    corr_pkl = os.path.join(filterdir, fname)
+    fname = 'geo_real_3obj_3day_corr.pkl'
+    corr_pkl = os.path.join(trackdir, fname)
     
-    fname = 'geo_twobody_1obj_7day_setup_noise1_lam0_pd1_batchbirth3.pkl'
-    setup_file = os.path.join(filterdir, fname)  
+    # fname = 'geo_twobody_1obj_7day_setup_noise1_lam0_pd1_batchbirth.pkl'
+    # setup_file = os.path.join(filterdir, fname)  
     
     
-    fname = 'geo_twobody_1obj_7day_batchbirth3_results_1.pkl'
-    prev_results = os.path.join(filterdir, fname)
+    # fname = 'geo_twobody_1obj_7day_batchbirth3_results_1.pkl'
+    # prev_results = os.path.join(filterdir, fname)
     
-    fname = 'geo_twobody_1obj_7day_batchbirth3_results_1.pkl'
-    results_file = os.path.join(filterdir, fname)
+    # fname = 'geo_twobody_1obj_7day_batchbirth_results_1.pkl'
+    # results_file = os.path.join(filterdir, fname)
     
     
     
@@ -3696,7 +3710,7 @@ if __name__ == '__main__':
     orbit_regime = 'GEO'
     # generate_meas_file(noise, lam_c, p_det, orbit_regime, truth_file, obs_time_file, meas_file)
     
-    # check_meas_file(meas_file2)
+    check_meas_file(meas_file)
     
     
     
@@ -3714,7 +3728,7 @@ if __name__ == '__main__':
     
     # corr_est_dict = analysis.evaluate_tracklet_correlation(corr_pkl, ra_lim, dec_lim, plot_flag)
     
-    lim_list = [10., 50., 200.]
+    lim_list = [50., 200., 500.]
     # analysis.boxplot_corr_errors(corr_pkl, lim_list, True)
     
     
@@ -3766,7 +3780,7 @@ if __name__ == '__main__':
     
     
     
-    multitarget_analysis(results_file, setup_file)
+    # multitarget_analysis(results_file, setup_file)
     
     
     
