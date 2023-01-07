@@ -4,7 +4,9 @@ import math
 import sys
 import os
 import inspect
+import copy
 import matplotlib.pyplot as plt
+from datetime import datetime, timedelta
 
 filename = inspect.getframeinfo(inspect.currentframe()).filename
 current_dir = os.path.dirname(os.path.abspath(filename))
@@ -13,9 +15,10 @@ ind = current_dir.find('metis')
 metis_dir = current_dir[0:ind+5]
 sys.path.append(metis_dir)
 
-import dynamics.dynamics_functions as dyn
-
+from dynamics import dynamics_functions as dyn
+from sensors import measurement_functions as mfunc
 from utilities.constants import arcsec2rad
+from utilities import astrodynamics as astro
 
 
 
@@ -23,8 +26,7 @@ from utilities.constants import arcsec2rad
 # Batch Estimation
 ###############################################################################
 
-def ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
-             sensor_params, int_params):
+def ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):
     '''
     This function implements the linearized batch estimator for the least
     squares cost function.
@@ -54,6 +56,11 @@ def ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         output state and covariance at all truth times
         
     '''
+    
+    # Break out params
+    state_params = params_dict['state_params']
+    int_params = params_dict['int_params']
+    sensor_params = params_dict['sensor_params']
 
     # State information
     state_tk = sorted(state_dict.keys())[-1]
@@ -302,8 +309,7 @@ def ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
     return filter_output, full_state_output
 
 
-def lp_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
-             sensor_params, int_params):
+def lp_batch(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):
     '''
     This function implements the linearized batch estimator for the minimum
     Lp-norm cost function, not including L1-norm (Least Absolute Deviations).
@@ -340,6 +346,12 @@ def lp_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         output state and covariance at all truth times
         
     '''
+    
+    # Break out params
+    state_params = params_dict['state_params']
+    int_params = params_dict['int_params']
+    sensor_params = params_dict['sensor_params']
+    filter_params = params_dict['filter_params']
 
     # State information
     state_tk = sorted(state_dict.keys())[-1]
@@ -347,7 +359,7 @@ def lp_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
     Po_bar = state_dict[state_tk]['P']
     
     # Cost function parameter
-    pnorm = state_params['pnorm']
+    pnorm = filter_params['pnorm']
     
     # Rescale noise for pnorm distribution
     scale = (math.gamma(3./pnorm)/math.gamma(1./pnorm)) * pnorm**(2./pnorm)
@@ -659,8 +671,7 @@ def lp_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
     return filter_output, full_state_output
 
 
-def unscented_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
-                    sensor_params, int_params):
+def unscented_batch(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):
     '''
     This function implements the unscented batch estimator for the least
     squares cost function.
@@ -690,6 +701,12 @@ def unscented_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         output state and covariance at all truth times
         
     '''
+    
+    # Break out params
+    state_params = params_dict['state_params']
+    int_params = params_dict['int_params']
+    sensor_params = params_dict['sensor_params']
+    filter_params = params_dict['filter_params']
 
     # State information
     state_tk = sorted(state_dict.keys())[-1]
@@ -706,7 +723,7 @@ def unscented_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
     kappa = kurt - float(n)
     
     # Compute sigma point weights
-    alpha = state_params['alpha']
+    alpha = filter_params['alpha']
     lam = alpha**2.*(n + kappa) - n
     gam = np.sqrt(n + lam)
     Wm = 1./(2.*(n + lam)) * np.ones(2*n,)
@@ -714,10 +731,6 @@ def unscented_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
     Wm = np.insert(Wm, 0, lam/(n + lam))
     Wc = np.insert(Wc, 0, lam/(n + lam) + (1 - alpha**2 + beta))
     diagWc = np.diag(Wc)
-    unscented_params = {}
-    unscented_params['gam'] = gam
-    unscented_params['Wm'] = Wm
-    unscented_params['diagWc'] = diagWc
 
     # Initialize output
     filter_output = {}
@@ -809,7 +822,17 @@ def unscented_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
             
             # Compute measurement for each sigma point
             gamma_til_k, Rk = meas_fcn(tk, chi, state_params, sensor_params, sensor_id)
-            ybar = np.dot(gamma_til_k, Wm.T)
+            
+            # Standard implementation computes ybar as the mean of the sigma
+            # point, but using Po_bar each iteration can cause these to have
+            # large spread and produce poor ybar calculation
+            # ybar = np.dot(gamma_til_k, Wm.T)
+            
+            # Instead, use only the first column of gamma_til_k, corresponding
+            # to the mean state calculated with the best updated value of X(t0)
+            ybar = gamma_til_k[:,0]
+            
+            # Reshape and continue
             ybar = np.reshape(ybar, (p, 1))
             resids = Yk - ybar
             cholRk = np.linalg.inv(np.linalg.cholesky(Rk))
@@ -1008,8 +1031,7 @@ def unscented_batch(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
 # Sequential Estimation
 ###############################################################################
 
-def ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
-           sensor_params, int_params):    
+def ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):    
     '''
     This function implements the linearized Extended Kalman Filter for the 
     least squares cost function.
@@ -1040,12 +1062,18 @@ def ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         
     '''
     
+    # Break out params
+    state_params = params_dict['state_params']
+    int_params = params_dict['int_params']
+    sensor_params = params_dict['sensor_params']
+    filter_params = params_dict['filter_params']
+    
     # State information
     state_tk = sorted(state_dict.keys())[-1]
     Xo_ref = state_dict[state_tk]['X']
     Po_bar = state_dict[state_tk]['P']
-    Q = state_params['Q']
-    gap_seconds = state_params['gap_seconds']
+    Q = filter_params['Q']
+    gap_seconds = filter_params['gap_seconds']
     time_format = int_params['time_format']
 
     # Setup
@@ -1275,8 +1303,7 @@ def ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
     return filter_output, full_state_output
 
 
-def ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
-           sensor_params, int_params):    
+def ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):    
     '''
     This function implements the Unscented Kalman Filter for the least
     squares cost function.
@@ -1307,12 +1334,18 @@ def ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         
     '''
     
+    # Break out params
+    state_params = params_dict['state_params']
+    int_params = params_dict['int_params']
+    sensor_params = params_dict['sensor_params']
+    filter_params = params_dict['filter_params']
+    
     # State information
     state_tk = sorted(state_dict.keys())[-1]
     Xk = state_dict[state_tk]['X']
     P = state_dict[state_tk]['P']
-    Q = state_params['Q']
-    gap_seconds = state_params['gap_seconds']
+    Q = filter_params['Q']
+    gap_seconds = filter_params['gap_seconds']
     time_format = int_params['time_format']
 
     n = len(Xk)
@@ -1325,7 +1358,7 @@ def ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
     kappa = kurt - float(n)
     
     # Compute sigma point weights
-    alpha = state_params['alpha']
+    alpha = filter_params['alpha']
     lam = alpha**2.*(n + kappa) - n
     gam = np.sqrt(n + lam)
     Wm = 1./(2.*(n + lam)) * np.ones(2*n,)
@@ -1333,10 +1366,6 @@ def ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
     Wm = np.insert(Wm, 0, lam/(n + lam))
     Wc = np.insert(Wc, 0, lam/(n + lam) + (1 - alpha**2 + beta))
     diagWc = np.diag(Wc)
-    unscented_params = {}
-    unscented_params['gam'] = gam
-    unscented_params['Wm'] = Wm
-    unscented_params['diagWc'] = diagWc
 
     # Initialize output
     filter_output = {}
@@ -1400,6 +1429,12 @@ def ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         Xbar = np.reshape(Xbar, (n, 1))
         chi_diff = chi - np.dot(Xbar, np.ones((1, (2*n+1))))
         Pbar = np.dot(chi_diff, np.dot(diagWc, chi_diff.T)) + np.dot(Gamma, np.dot(Q, Gamma.T))
+        
+        print('')
+        print('kk', kk)
+        print('Pbar', Pbar)
+        print('eig', np.linalg.eig(Pbar))
+        print('det', np.linalg.det(Pbar))
 
         # Recompute sigma points to incorporate process noise
         sqP = np.linalg.cholesky(Pbar)
@@ -1419,6 +1454,9 @@ def ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
         Y_diff = gamma_til_k - np.dot(ybar, np.ones((1, (2*n+1))))
         Pyy = np.dot(Y_diff, np.dot(diagWc, Y_diff.T)) + Rk
         Pxy = np.dot(chi_diff,  np.dot(diagWc, Y_diff.T))
+        
+        print('Yk', Yk)
+        print('ybar', ybar)
         
         # Kalman gain and measurement update
         Kk = np.dot(Pxy, np.linalg.inv(Pyy))
@@ -1480,7 +1518,789 @@ def ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, state_params,
     return filter_output, full_state_output
 
 
+###############################################################################
+# Non-Gaussian Estimation
+###############################################################################
 
+def aegis_ukf(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):    
+    '''
+    This function implements the Adaptive Entropy-based Gaussian Information
+    Syntheis (AEGIS) Unscented Kalman Filter for the least
+    squares cost function.
+
+    Parameters
+    ------
+    state_dict : dictionary
+        initial state and covariance for filter execution
+    truth_dict : dictionary
+        true state at all times
+    meas_dict : dictionary
+        measurement data over time for the filter and parameters (noise, etc)
+    meas_fcn : function handle
+        function for measurements
+    state_params : dictionary
+        physical parameters and constants
+    sensor_params : dictionary
+        location, constraint, noise parameters of sensors
+    int_params : dictionary
+        numerical integration parameters
+
+    Returns
+    ------
+    filter_output : dictionary
+        output state, covariance, and post-fit residuals at measurement times
+    full_state_output : dictionary
+        output state and covariance at all truth times
+        
+        
+    References
+    ------
+    [1] DeMars, K.J., "Entropy-based Approach for Uncertainty Propagation of
+        Nonlinear Dynamical Systems," JGCD 2013.
+        
+    '''
+    
+    # Break out inputs
+    state_params = params_dict['state_params']
+    filter_params = params_dict['filter_params']
+    
+    # State information
+    state_tk = sorted(state_dict.keys())[-1]
+    weights = state_dict[state_tk]['weights']
+    means = state_dict[state_tk]['means']
+    covars = state_dict[state_tk]['covars']
+    GMM_dict = {}
+    GMM_dict['weights'] = weights
+    GMM_dict['means'] = means
+    GMM_dict['covars'] = covars
+    nstates = len(means[0])    
+    
+    # Prior information about the distribution
+    pnorm = 2.
+    kurt = math.gamma(5./pnorm)*math.gamma(1./pnorm)/(math.gamma(3./pnorm)**2.)
+    beta = kurt - 1.
+    kappa = kurt - float(nstates)
+
+    # Compute sigma point weights
+    alpha = filter_params['alpha']
+    lam = alpha**2.*(nstates + kappa) - nstates
+    gam = np.sqrt(nstates + lam)
+    Wm = 1./(2.*(nstates + lam)) * np.ones(2*nstates,)
+    Wc = Wm.copy()
+    Wm = np.insert(Wm, 0, lam/(nstates + lam))
+    Wc = np.insert(Wc, 0, lam/(nstates + lam) + (1 - alpha**2 + beta))
+    diagWc = np.diag(Wc)
+    filter_params['gam'] = gam
+    filter_params['Wm'] = Wm
+    filter_params['diagWc'] = diagWc
+
+    # Initialize output
+    filter_output = {}
+
+    # Measurement times
+    tk_list = meas_dict['tk_list']
+    Yk_list = meas_dict['Yk_list']
+    sensor_id_list = meas_dict['sensor_id_list']
+    
+    # Number of epochs
+    N = len(tk_list)
+  
+    # Loop over times
+    for kk in range(N):
+    
+        # Current and previous time
+        if kk == 0:
+            tk_prior = state_tk
+        else:
+            tk_prior = tk_list[kk-1]
+
+        tk = tk_list[kk]
+
+        # Predictor Step
+        tin = [tk_prior, tk]
+        GMM_bar = aegis_predictor(GMM_dict, tin, params_dict)
+        
+        # Corrector Step
+        Yk = Yk_list[kk]
+        sensor_id = sensor_id_list[kk]
+        GMM_dict, resids_k = aegis_corrector(GMM_bar, tk, Yk, sensor_id,
+                                             meas_fcn, params_dict)
+        
+        # Store output
+        filter_output[tk] = {}
+        filter_output[tk]['weights'] = GMM_dict['weights']
+        filter_output[tk]['means'] = GMM_dict['means']
+        filter_output[tk]['covars'] = GMM_dict['covars']
+        filter_output[tk]['resids'] = resids_k
+        
+        
+    # TODO Generation of full_state_output not working correctly
+    # Use filter_output for error analysis
+    full_state_output = {}
+    
+    return filter_output, full_state_output
+
+
+def aegis_predictor(GMM_dict, tin, params_dict):
+    '''
+    
+    
+    '''
+    
+    # Break out inputs
+    filter_params = params_dict['filter_params']
+    state_params = params_dict['state_params']
+    int_params = params_dict['int_params']
+    
+    # Copy input to ensure pass by value
+    GMM_dict = copy.deepcopy(GMM_dict)
+    filter_params = copy.deepcopy(filter_params)
+    state_params = copy.deepcopy(state_params)
+    int_params = copy.deepcopy(int_params)
+    
+    # Retrieve parameters
+    Q = filter_params['Q']
+    gam = filter_params['gam']
+    Wm = filter_params['Wm']
+    diagWc = filter_params['diagWc']    
+    gap_seconds = filter_params['gap_seconds']        
+    time_format = int_params['time_format']     
+    
+    # Fudge to work with general_dynamics
+    state_params['split_T'] = filter_params['split_T']
+    state_params['alpha'] = filter_params['alpha']
+    
+    q = int(Q.shape[0])
+    
+    tk_prior = tin[0]
+    tk = tin[1]
+    
+    if time_format == 'seconds':
+        delta_t = tk - tk_prior
+    elif time_format == 'JD':
+        delta_t = (tk - tk_prior)*86400.
+    elif time_format == 'datetime':
+        delta_t = (tk - tk_prior).total_seconds()
+    
+    # Check if propagation is needed
+    if delta_t == 0.:
+        return GMM_dict
+    
+    # Initialize for integrator
+    # Retrieve current GMM
+    weights = GMM_dict['weights']
+    means = GMM_dict['means']
+    covars = GMM_dict['covars']
+    t0_list = [tk_prior]*len(weights)
+    
+    # For each GMM component, there should be 1 entropy, n states, and 2n+1
+    # sigma points. 
+#    ncomp = len(weights)
+    nstates = len(means[0])
+    npoints = nstates*2 + 1
+    state_params['nstates'] = nstates
+    state_params['npoints'] = npoints
+
+    # Loop over components
+    jj = 0
+    while jj < len(weights):
+        
+#        print('\nstart loop')
+#        print('jj', jj)
+#        print('ncomp', len(weights))
+#        print('t0', t0_list[jj])
+        
+        # Retrieve component values
+        wj = weights[jj]
+        mj = means[jj]
+        Pj = covars[jj]
+        ej = gaussian_entropy(Pj)
+        tin = [t0_list[jj], tk]
+            
+        # Compute sigma points
+        sqP = np.linalg.cholesky(Pj)
+        Xrep = np.tile(mj, (1, nstates))
+        chi = np.concatenate((mj, Xrep+(gam*sqP), Xrep-(gam*sqP)), axis=1)
+        chi_v = np.reshape(chi, (nstates*npoints, 1), order='F')
+        
+        # Setup initial state for integrator
+        int0 = np.zeros(nstates*npoints+1,)
+        int0[0] = ej
+        int0[1:1+(nstates*npoints)] = chi_v.flatten()
+        state_params['ncomp'] = 1
+        
+        # Integrate entropy and sigma point dynamics
+        if tin[0] == tk:
+            intout = np.reshape(int0, (1, len(int0)))
+            split_flag = False
+        else:
+            tout, intout, split_flag = \
+                dyn.general_dynamics(int0, tin, state_params, int_params)
+
+        # Retrieve output state        
+        chi_v = intout[-1, 1:1+(nstates*npoints)]
+        chi = np.reshape(chi_v, (nstates, npoints), order='F')
+
+        Xbar = np.dot(chi, Wm.T)
+        Xbar = np.reshape(Xbar, (nstates, 1))
+        chi_diff = chi - np.dot(Xbar, np.ones((1, npoints)))
+        Pbar = np.dot(chi_diff, np.dot(diagWc, chi_diff.T))
+        
+        # Compute the current time
+        if time_format == 'seconds':
+            t = t0_list[jj] + tout[-1]
+        elif time_format == 'JD':
+            t = t0_list[jj] + tout[-1]/86400.
+        elif time_format == 'datetime':
+            t = t0_list[jj] + timedelta(seconds=tout[-1])
+            
+#        print('post integration')
+#        print('t', t)
+#        print('split_flag', split_flag)
+        
+            
+        # Split if needed
+        if split_flag:
+            
+            # Split the component
+            GMM_in = {}
+            GMM_in['weights'] = [wj]
+            GMM_in['means'] = [Xbar]
+            GMM_in['covars'] = [Pbar]
+            GMM_out = split_GMM(GMM_in, N=3)
+            w_split = GMM_out['weights']
+            m_split = GMM_out['means']
+            P_split = GMM_out['covars']
+            
+            # Replace current component and add others
+            for comp in range(len(w_split)):
+
+                # Compute weights, entropy and sigma points
+                # Note: split_GMM function multiplies by wj, no need to 
+                # repeat here
+                w = w_split[comp]   
+                m = m_split[comp]
+                P = P_split[comp]
+                
+                if comp == 0:
+                    weights[jj] = w
+                    means[jj] = m
+                    covars[jj] = P
+                    t0_list[jj] = t
+                else:
+                    weights.append(w)
+                    means.append(m)
+                    covars.append(P)
+                    t0_list.append(t)
+        
+        # If no split, update mean and covariance from propagator
+        else:                
+            means[jj] = Xbar
+            covars[jj] = Pbar
+            
+        # If final time is reached, go to next component
+        if t >= tk:
+            jj += 1
+            
+
+    # After tk is reached, incorporate process noise
+    # State Noise Compensation
+    # Zero out SNC for long time gaps
+    if delta_t < gap_seconds:        
+
+        Gamma = np.zeros((nstates,q))
+        Gamma[0:q,:] = (delta_t**2./2) * np.eye(q)
+        Gamma[q:2*q,:] = delta_t * np.eye(q)
+        
+        for jj in range(len(weights)):
+            covars[jj] += np.dot(Gamma, np.dot(Q, Gamma.T))
+            
+    # Form output
+    GMM_bar = {}
+    GMM_bar['weights'] = weights
+    GMM_bar['means'] = means
+    GMM_bar['covars'] = covars    
+    
+    return GMM_bar
+
+
+
+
+
+def aegis_corrector(GMM_bar, tk, Yk, sensor_id, meas_fcn, params_dict):
+    '''
+    
+    
+    '''
+    
+    # Retrieve inputs
+    filter_params = params_dict['filter_params']
+    state_params = params_dict['state_params']
+    sensor_params = params_dict['sensor_params']
+    gam = filter_params['gam']
+    Wm = filter_params['Wm']
+    diagWc = filter_params['diagWc']
+    
+    # Break out GMM
+    weights0 = GMM_bar['weights']
+    means0 = GMM_bar['means']
+    covars0 = GMM_bar['covars']
+    nstates = len(means0[0])
+    npoints = nstates*2 + 1
+    
+    # Loop over components and compute measurement update
+    means = []
+    covars = []
+    beta_list = []
+    for jj in range(len(weights0)):        
+        
+        mj = means0[jj]
+        Pj = covars0[jj]
+        
+        # Compute sigma points
+        sqP = np.linalg.cholesky(Pj)
+        Xrep = np.tile(mj, (1, nstates))
+        chi = np.concatenate((mj, Xrep+(gam*sqP), Xrep-(gam*sqP)), axis=1)
+        chi_diff = chi - np.dot(mj, np.ones((1, npoints)))
+
+        # Computed measurements and covariance
+        gamma_til_k, Rk = meas_fcn(tk, chi, state_params, sensor_params, sensor_id)
+        ybar = np.dot(gamma_til_k, Wm.T)
+        ybar = np.reshape(ybar, (len(ybar), 1))
+        Y_diff = gamma_til_k - np.dot(ybar, np.ones((1, (2*nstates+1))))
+        Pyy = np.dot(Y_diff, np.dot(diagWc, Y_diff.T)) + Rk
+        Pxy = np.dot(chi_diff,  np.dot(diagWc, Y_diff.T))
+        
+        print('Yk', Yk)
+        print('ybar', ybar)
+        
+        # Kalman gain and measurement update
+        Kk = np.dot(Pxy, np.linalg.inv(Pyy))
+        mf = mj + np.dot(Kk, Yk-ybar)
+        
+        # Joseph form
+        cholPbar = np.linalg.inv(np.linalg.cholesky(Pj))
+        invPbar = np.dot(cholPbar.T, cholPbar)
+        P1 = (np.eye(nstates) - np.dot(np.dot(Kk, np.dot(Pyy, Kk.T)), invPbar))
+        P2 = np.dot(Kk, np.dot(Rk, Kk.T))
+        Pf = np.dot(P1, np.dot(Pj, P1.T)) + P2
+        
+        # Compute Gaussian likelihood
+        beta_j = gaussian_likelihood(Yk, ybar, Pyy)
+
+        # Store output
+        means.append(mf)
+        covars.append(Pf)
+        beta_list.append(beta_j)
+        
+    # Normalize updated weights
+#    denom = np.dot(beta_list, weights0)    
+#    weights = [a1*a2/denom for a1,a2 in zip(weights0, beta_list)]
+    weights = list(np.multiply(beta_list, weights0)/np.dot(beta_list, weights0))
+    
+    # Merge and Prune components
+    GMM_in = {}
+    GMM_in['weights'] = weights
+    GMM_in['means'] = means
+    GMM_in['covars'] = covars
+    GMM_dict = merge_GMM(GMM_in, filter_params)
+    
+    # Compute post-fit residuals by merging all components
+    params = {}
+    params['prune_T'] = 0.
+    params['merge_U'] = 1e10
+    GMM_resids = merge_GMM(GMM_dict, params)
+    Xhat = GMM_resids['means'][0]
+    
+    ybar = mfunc.compute_measurement(Xhat, state_params, sensor_params,
+                                     sensor_id, tk)
+    resids_k = Yk - ybar
+    
+    return GMM_dict, resids_k
+
+
+def split_GMM(GMM0, N=3):
+    '''
+    This function splits a single gaussian PDF into multiple components.
+    For a multivariate PDF, it will split along the axis corresponding to the
+    largest eigenvalue (greatest uncertainty). The function splits along only
+    one axis.
+
+    Parameters
+    ------
+
+    '''
+
+    # Break out GMM
+    w0 = GMM0['weights'][0]
+    m0 = GMM0['means'][0]
+    P0 = GMM0['covars'][0]
+    n = len(m0)
+
+    # Get splitting library info
+    wbar, mbar, sigbar = split_gaussian_library(N)
+
+    # Decompose covariance matrix
+    lam, V = np.linalg.eig(P0)
+
+    # Find largest eigenvalue and corresponding eigenvector
+    kk = np.argmax(lam)
+    lam0_k = lam[kk]
+    vk = V[:,kk].reshape(n, 1)
+
+    # Compute updated weights
+    w = [w0 * wi for wi in wbar]
+
+    # All sigma values are equal, just use first entry
+    lam[kk] *= sigbar[0]**2
+    Lam = np.diag(lam)
+
+    # Compute updated means, covars
+    m = [m0 + np.sqrt(lam0_k)*mbar_ii*vk for mbar_ii in mbar]
+    P = [np.dot(V, np.dot(Lam, V.T))]*N
+    
+    # Form output
+    GMM = {}
+    GMM['weights'] = w
+    GMM['means'] = m
+    GMM['covars'] = P
+
+    return GMM
+
+
+def merge_GMM(GMM0, params) :
+    '''    
+    This function examines a GMM containing multiple components. It removes
+    components with weights below a given threshold, and merges components that
+    are close together (small NL2 distance).
+    
+    Parameters
+
+
+    References
+    ------
+    [1] Vo and Ma, "The Gaussian Mixture Probability Hypothesis Density
+        Filter," 2006.
+    
+    '''
+    
+    # Break out GMM
+    w0 = GMM0['weights']
+    m0 = GMM0['means']
+    P0 = GMM0['covars']
+
+    # Break out inputs
+    T = params['prune_T']
+    U = params['merge_U']
+    
+    # Number of states
+    nstates = len(m0[0])
+
+    # Only keep GM components whose weight is above the threshold   
+    # This applies DeMars threshold instead of Vo which just uses T
+    wmax = max(w0)
+    w = [w0[ii] for ii in range(len(w0)) if w0[ii] > T*wmax]
+    m = [m0[ii] for ii in range(len(w0)) if w0[ii] > T*wmax]
+    P = [P0[ii] for ii in range(len(w0)) if w0[ii] > T*wmax]
+    
+    # Normalize weights
+    w = list(np.asarray(w)/sum(w)*sum(w0))
+
+    # Loop to merge components that are close
+    wf = []
+    mf = []
+    Pf = []
+    I = np.arange(0, len(w))
+    while len(I) != 0:
+
+        # Loop over components to see if they are close to j
+        # Note, at least one will be when i == j        
+        L = []
+        wsum = 0.
+        msum = np.zeros((nstates, 1))
+        jj = np.argmax(w)
+        for ii in range(len(w)):
+            Pi = P[ii]
+            invP = np.linalg.inv(Pi)
+            prod = np.dot((m[ii] - m[jj]).T, np.dot(invP,(m[ii] - m[jj])))
+            if prod <= U:
+                L.append(ii)
+                wsum += w[ii]
+                msum += w[ii]*m[ii]                
+
+        # Compute final w,m,P
+        wf.append(wsum)
+        mf_bar = (1./wsum)*msum
+        mf.append(mf_bar)
+
+        Psum = np.zeros((nstates, nstates))
+        for ii in range(len(L)):
+            Psum += w[L[ii]]*(P[L[ii]] + np.dot((mf_bar - m[L[ii]]),
+                                                (mf_bar - m[L[ii]]).T))
+        Pf_bar = (1./wsum)*Psum
+        Pf.append(Pf_bar)
+
+        # Reduce w,m,P
+        I = list(set(I).difference(set(L)))
+        w = [w[ii] for ii in I]
+        m = [m[ii] for ii in I]
+        P = [P[ii] for ii in I]
+
+        # Reset I        
+        I = np.arange(0, len(w))
+
+    # Normalize weights
+    wf = list(np.asarray(wf)/sum(wf)*sum(w0))
+    
+    # Output
+    GMM = {}
+    GMM['weights'] = wf
+    GMM['means'] = mf
+    GMM['covars'] = Pf
+
+    return GMM
+
+
+def split_gaussian_library(N=3):
+    '''
+    This function outputs the splitting library for GM components. All outputs
+    are given to split a univariate standard normal distribution (m=0,sig=1).
+
+    Parameters
+    ------
+    N : int (optional)
+        number of components to split into (3, 4, or 5) (default = 3)
+
+    Returns
+    ------
+    w : list
+        component weights
+    m : list
+        component means (univariate)
+    sig : list 
+        component sigmas (univariate)
+
+    '''
+
+    if N == 3:
+        w = [0.2252246249136750, 0.5495507501726501, 0.2252246249136750]
+        m = [-1.057515461475881, 0., 1.057515461475881]
+        sig = [0.6715662886640760]*3
+
+    elif N == 4:
+        w = [0.1238046161618835, 0.3761953838381165, 0.3761953838381165,
+             0.1238046161618835]
+        m = [-1.437464136328835, -0.455886223973523, 0.455886223973523,
+             1.437464136328835]
+        sig = [0.5276007226175397]*4
+
+    elif N == 5:
+        w = [0.0763216490701042, 0.2474417859474436, 0.3524731299649044,
+             0.2474417859474436, 0.0763216490701042]
+        m = [-1.689972911128078, -0.800928383429953, 0., 0.800928383429953,
+             1.689972911128078]
+        sig = [0.4422555386310084]*5
+
+    return w, m, sig
+
+
+def gaussian_entropy(P) :
+    '''
+    This function computes the entropy of a Gaussian PDF given the covariance.
+    
+    Parameters
+    ------
+    P : nxn numpy array
+        covariance matrix
+    
+    Returns
+    ------
+    H : float
+        differential entropy
+        
+    Reference
+    ------
+    DeMars, K.J., Bishop, R.H., Jah, M.K., "Entropy-Based Approach for 
+        Uncertainty Propagation of Nonlinear Dynamical Systems," JGCD 2013.
+    '''
+
+    if np.linalg.det(2*math.pi*math.e*P) < 0. :
+        print(np.linalg.det(2*math.pi*math.e*P))
+        print(np.linalg.eig(P))
+        P2 = scipy.linalg.sqrtm(P)
+        P3 = np.real(np.dot(P2,P2.T))
+        print(np.linalg.eig(P3))
+        print(P3 - P)
+        mistake
+
+    # Differential Entropy (Eq. 5)
+    H = 0.5 * math.log(np.linalg.det(2.*math.pi*math.e*P))
+    
+#    print(np.linalg.det(2.*math.pi*math.e*P))
+
+    # Renyi Entropy (Eq. 8)
+    # kappa = 0.5
+    # R = 0.5 * log(np.linalg.det(2*pi*(kappa**(1/(1-kappa)))*P))
+
+    entropy = H
+
+    return entropy
+
+
+def gaussian_likelihood(x, m, P):
+    '''
+    This function computes the likelihood of the multivariate gaussian pdf
+    for a random vector x, assuming mean m and covariance P.  
+
+    Parameters
+    ------
+    x : nx1 numpy array
+        instance of a random vector
+    m : nx1 numpy array
+        mean
+    P : nxn numpy array
+        covariance
+
+    Returns
+    ------
+    pg : float
+        multivariate gaussian likelihood   
+
+    '''
+
+    K1 = np.sqrt(np.linalg.det(2*math.pi*(P)))
+    K2 = np.exp(-0.5 * np.dot((x-m).T, np.dot(np.linalg.inv(P),(x-m))))
+    pg = float((1./K1) * K2)
+
+    return pg
+
+
+def gmm_samples(GMM_dict, N):
+
+    # Break out GMM
+    w = GMM_dict['weights']
+    m = GMM_dict['means']
+    P = GMM_dict['covars']
+
+    # Loop over components and generate samples
+    for jj in range(len(w)):
+        wj = w[jj]
+        mj = m[jj]
+        Pj = P[jj]
+
+        mcj = np.random.multivariate_normal(mj.flatten(),Pj,int(wj*N))
+
+        if jj == 0 :
+            mc_points = mcj
+        else :
+            mc_points = np.concatenate((mc_points,mcj))
+
+    return mc_points
+
+
+def unscented_transform(m1, P1, transform_fcn, inputs, alpha=1., pnorm=2.):
+    '''
+    This function computes the unscented transform for a p-norm
+    distribution and user defined transform function.
+
+    Parameters
+    ------
+    m1 : nx1 numpy array
+      mean state vector
+    P1 : nxn numpy array
+      covariance matrix
+    transform_fcn : function handle
+      name of transform function
+    inputs : dictionary
+      input parameters for transform function
+    alpha : float, optional
+      sigma point distribution parameter (default=1)
+    pnorm : float, optional
+      value of p-norm distribution (default=2)
+
+    Returns
+    ------
+    m2 : mx1 numpy array
+      transformed mean state vector
+    P2 : mxm numpy array
+      transformed covariance matrix
+    Pcross : nxm numpy array
+      cross correlation covariance matrix
+    '''
+
+    # Number of States
+    L = len(m1)
+
+    # Prior information about the distribution
+    kurt = math.gamma(5./pnorm)*math.gamma(1./pnorm)/(math.gamma(3./pnorm)**2.)
+    beta = kurt - 1.
+    kappa = kurt - float(L)
+
+    # Compute sigma point weights
+    lam = alpha**2.*(L + kappa) - L
+    gam = np.sqrt(L + lam)
+    Wm = 1./(2.*(L + lam)) * np.ones((1, 2*L))
+    Wm = list(Wm.flatten())
+    Wc = copy.copy(Wm)
+    Wm.insert(0, lam/(L + lam))
+    Wc.insert(0, lam/(L + lam) + (1 - alpha**2 + beta))
+    Wm = np.asarray(Wm)
+    diagWc = np.diag(Wc)
+
+    # Compute chi - baseline sigma points
+    sqP = np.linalg.cholesky(P1)
+    Xrep = np.tile(m1, (1, L))
+    chi = np.concatenate((m1, Xrep+(gam*sqP), Xrep-(gam*sqP)), axis=1)
+    chi_diff = chi - np.dot(m1, np.ones((1, (2*L+1))))
+    
+    # Compute transformed sigma points
+    Y = transform_fcn(chi, inputs)
+    row2 = int(Y.shape[0])
+    col2 = int(Y.shape[1])
+
+    # Compute mean and covar
+    m2 = np.dot(Y, Wm.T)
+    m2 = np.reshape(m2, (row2, 1))
+    Y_diff = Y - np.dot(m2, np.ones((1, col2)))
+    P2 = np.dot(Y_diff, np.dot(diagWc, Y_diff.T))
+    Pcross = np.dot(chi_diff,  np.dot(diagWc, Y_diff.T))
+
+    return m2, P2, Pcross
+
+
+def unscented_kep2cart(chi, inputs):
+    '''
+    Function for use with unscented_transform.
+    Converts sigma point matrix from keplerian elements to inertial cartesian
+    coordinates.
+
+    Parameters
+    ------
+    chi : L x (2L+1) numpy array
+      sigma point matrix
+    inputs : dictionary
+      input parameters
+
+    Returns
+    ------
+    Y : m x (2L+1) numpy array
+      transformed sigma point matrix
+    '''
+
+    # Size of input/output
+    L = int(chi.shape[1])
+    Y = np.zeros((6, L))
+
+    for jj in range(L):
+
+        # Pull out column of chi
+        elem = chi[:,jj]
+
+        # Convert to ECI
+        Xeci = astro.kep2cart(elem)
+        Y[:,jj] = Xeci.flatten()
+
+    return Y
 
 
 

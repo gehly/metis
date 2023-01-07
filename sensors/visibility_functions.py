@@ -21,9 +21,9 @@ sys.path.append(metis_dir)
 from sensors.sensors import define_sensors
 from sensors.brdf_models import compute_mapp_lambert
 from utilities.ephemeris import compute_sun_coords, compute_moon_coords
-from utilities.tle_functions import get_spacetrack_tle_data
-from utilities.tle_functions import find_closest_tle_epoch
-from utilities.tle_functions import propagate_TLE
+# from utilities.tle_functions import get_spacetrack_tle_data
+# from utilities.tle_functions import find_closest_tle_epoch
+# from utilities.tle_functions import propagate_TLE
 
 from utilities.eop_functions import get_eop_data
 from utilities.eop_functions import get_celestrak_eop_alldata
@@ -35,10 +35,16 @@ from utilities.coordinate_systems import itrf2gcrf
 from utilities.coordinate_systems import ecef2enu
 from utilities.time_systems import utcdt2ttjd
 from utilities.time_systems import jd2cent
+
+from utilities import tle_functions as tle
+
+
 from utilities.constants import Re, AU_km
-from sensors.measurement_functions import compute_measurement
-from sensors.measurement_functions import ecef2azelrange_deg
-from sensors.measurement_functions import ecef2azelrange_rad
+
+from sensors import measurement_functions as mfunc
+#from sensors.measurement_functions import compute_measurement
+#from sensors.measurement_functions import ecef2azelrange_deg
+#from sensors.measurement_functions import ecef2azelrange_rad
 
 
 def define_RSOs(obj_id_list, UTC_list, tle_dict={}, prev_flag=False,
@@ -73,7 +79,7 @@ def define_RSOs(obj_id_list, UTC_list, tle_dict={}, prev_flag=False,
     
     
     if source == 'spacetrack':
-        rso_dict = propagate_TLE(obj_id_list, UTC_list, tle_dict,
+        rso_dict = tle.propagate_TLE(obj_id_list, UTC_list, tle_dict,
                                  prev_flag, offline_flag, frame_flag,
                                  username, password)
     
@@ -565,7 +571,7 @@ def compute_transit_dict(UTC_window, obj_id_list, site_dict, increment=10.,
     if source == 'spacetrack':            
         
         UTC_window_more = [UTC0 - timedelta(days=3.), UTCf + timedelta(days=3.)]
-        tle_dict, tle_df = get_spacetrack_tle_data(obj_id_list, UTC_window_more,
+        tle_dict, tle_df = tle.get_spacetrack_tle_data(obj_id_list, UTC_window_more,
                                                     username, password)
     
     # Propagate TLEs for all times in actual window, using increment
@@ -581,7 +587,7 @@ def compute_transit_dict(UTC_window, obj_id_list, site_dict, increment=10.,
      
     print('\nGet TLE Time: ', time.time()-start)
     
-    state_dict = propagate_TLE(obj_id_list, UTC_list_full, tle_dict,
+    state_dict = tle.propagate_TLE(obj_id_list, UTC_list_full, tle_dict,
                                offline_flag, username, password)
     
     
@@ -618,7 +624,7 @@ def compute_transit_dict(UTC_window, obj_id_list, site_dict, increment=10.,
                 r_ecef = ITRF_list[ii]
                 
                 # Compute az, el, range
-                az, el, rg = ecef2azelrange_deg(r_ecef, site_ecef)
+                az, el, rg = mfunc.ecef2azelrange_deg(r_ecef, site_ecef)
                 
                 if el > 0.:
                     az_list.append(az)
@@ -767,7 +773,8 @@ def compile_transit_data(transit_dict, site, obj_id, UTC_list, az_list,
     return transit_dict
 
 
-def check_visibility(X, state_params, sensor, UTC, EOP_data, XYs_df):
+def check_visibility(X, state_params, sensor_params, sensor_id, UTC, EOP_data,
+                     XYs_df):
     '''
     This function returns the visibility status (true/false) of an object 
     according to sensor constraints in elevation, range, brightness, etc.
@@ -780,12 +787,14 @@ def check_visibility(X, state_params, sensor, UTC, EOP_data, XYs_df):
     vis_flag = True
     
     # Retrieve sensor location and rotate to GCRF
+    sensor = sensor_params[sensor_id]
     sensor_itrf = sensor['site_ecef']
     sensor_gcrf, dum = itrf2gcrf(sensor_itrf, np.zeros((3,1)), UTC, EOP_data, XYs_df)
     
     # Compute az, el, range [rad, rad, km]
     meas_types = ['az', 'el', 'rg']
-    meas = compute_measurement(X, state_params, sensor, UTC, EOP_data, XYs_df, meas_types)
+    meas = mfunc.compute_measurement(X, state_params, sensor_params, sensor_id, UTC,
+                                     EOP_data, XYs_df, meas_types)
     
     # Check az, el, range limits
     az_rad = float(meas[0])
@@ -799,7 +808,7 @@ def check_visibility(X, state_params, sensor, UTC, EOP_data, XYs_df):
         
     if rg_km < sensor['rg_lim'][0] or rg_km > sensor['rg_lim'][1]:
         vis_flag = False
-        
+                
     # Check optional constraints
     if vis_flag:
         
@@ -840,7 +849,8 @@ def check_visibility(X, state_params, sensor, UTC, EOP_data, XYs_df):
                 sun_elmask = sensor['sun_elmask']
                     
                 # Compute sun elevation angle
-                sun_el = compute_measurement(sun_eci_app, state_params, sensor, UTC, EOP_data, XYs_df, ['el'])[0]
+                sun_el = mfunc.compute_measurement(sun_eci_app, state_params, sensor_params,
+                                                   sensor_id, UTC, EOP_data, XYs_df, ['el'])[0]
                 
                 if sun_el > sun_elmask:
                     vis_flag = False

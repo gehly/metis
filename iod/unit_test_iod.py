@@ -21,6 +21,7 @@ import dynamics.dynamics_functions as dyn
 import estimation.analysis_functions as analysis
 import estimation.estimation_functions as est
 import iod.iod_functions as iod
+import iod.iod_functions2 as iod2
 import sensors.measurement_functions as mfunc
 import sensors.sensors as sens
 import sensors.visibility_functions as visfunc
@@ -73,8 +74,6 @@ def lambert_test():
     
     
     
-    results_flag = 'all'
-    periapsis_check = True
     
     # Propagate several orbit fractions
     elem0 = astro.cart2kep(Xo)
@@ -82,7 +81,7 @@ def lambert_test():
     print('a', a)
     theta0 = float(elem0[5])
     P = 2.*math.pi*np.sqrt(a**3./GM)
-    fraction_list = [0., 0.2, 0.8, 1.2, 1.8, 10.2, 10.8, 50.2]
+    fraction_list = [0., 0.2, 0.8, 1.2, 1.8, 5.8, 10.8, 50.2]
     
     
     tvec = np.asarray([frac*P for frac in fraction_list])
@@ -108,7 +107,11 @@ def lambert_test():
     # Setup and run Lambert Solvers
     t0 = tk_list[0]    
 #    for kk in range(1,len(fraction_list)):
-    for kk in range(3,4):
+    for kk in range(5,6):
+        
+        M_star = np.nan
+        results_flag = 'all'
+        periapsis_check = True
         
         frac = fraction_list[kk]        
         tf = tk_list[kk]
@@ -162,7 +165,10 @@ def lambert_test():
         
         start_time = time.time()
         
-        v0_list, vf_list, M_list = iod.izzo_lambert(r0_true, rf_true, tof, GM, Re, results_flag, periapsis_check)
+        v0_list, vf_list, M_list, type_list, lr_list = \
+            iod.izzo_lambert(r0_true, rf_true, tof, M_star=M_star, GM=GM, R=Re, 
+                             results_flag=results_flag,
+                             periapsis_check=periapsis_check)
         
         izzo_time = time.time() - start_time
         
@@ -176,6 +182,7 @@ def lambert_test():
         
         print('')
         print('M_list', M_list)
+        print('type_list', type_list)
         print('len M_list', len(M_list))
         
         # Propagate output to ensure it achieves the right final position
@@ -206,8 +213,8 @@ def lambert_test():
             X = Xout[-1,:].reshape(6, 1)
             
 #            print('tof diff', tout[-1] - tof)
-            print('tout', tout)
-            print('X', X)
+#            print('tout', tout)
+#            print('X', X)
             
             rf_test = X[0:3].reshape(3,1)
             vf_test = X[3:6].reshape(3,1)
@@ -220,16 +227,17 @@ def lambert_test():
             print('')
             print('ii', ii)
             print('Mi', M_list[ii])
+            print('type', type_list[ii])
             print('rf_test', rf_test)
             print('rf_true', rf_true)
             print('vf_test', vf_test)
             print('vf_true', vf_true)
             
-            print('')
-            print('X_test', X_test)
-            print('elem_test', elem_test)
-            print('v0_ii', v0_ii)
-            print('vf_ii', vf_ii)
+#            print('')
+#            print('X_test', X_test)
+#            print('elem_test', elem_test)
+#            print('v0_ii', v0_ii)
+#            print('vf_ii', vf_ii)
             
             if np.linalg.norm(vf_test - vf_ii) > 1e-6:
                 print(vf_test)
@@ -321,6 +329,404 @@ def lambert_test():
 
     
     
+    return
+
+
+def lambert_test_jit():
+    
+    # Define state parameters
+    state_params = {}
+    state_params['GM'] = GME
+    GM = state_params['GM']
+
+    
+    # Integration function and additional settings
+    int_params = {}
+    int_params['integrator'] = 'solve_ivp'
+    int_params['ode_integrator'] = 'DOP853'
+    int_params['intfcn'] = dyn.ode_twobody
+    int_params['rtol'] = 1e-12
+    int_params['atol'] = 1e-12
+    int_params['step'] = 10.
+    int_params['time_format'] = 'datetime'
+    
+    # Initial object state vector
+    # Sun-Synch Orbit
+    Xo = np.reshape([757.700301, 5222.606566, 4851.49977,
+                     2.213250611, 4.678372741, -5.371314404], (6,1))
+    
+    
+    # MEO Orbit
+#    elem0 = [26560., 0.001,55, 0., 0., 0.]
+#    Xo = astro.kep2cart(elem0, GM)
+    
+    # HEO Molniya Orbit
+#    Xo = np.reshape([2.88824880e3, -7.73903934e2, -5.97116199e3, 2.64414431,
+#                     9.86808092, 0.0], (6,1))
+    
+    
+    # GEO Orbit
+#    elem0 = [42164.2, 0.001, 0.01, 0., 0., 0.]
+#    Xo = astro.kep2cart(elem0, GM)
+    
+    # Setup for IOD
+    results_flag = 'retrograde'
+    periapsis_check = True
+    
+    
+    # Propagate several orbit fractions
+    elem0 = astro.cart2kep(Xo)
+    a = float(elem0[0])
+    print('a', a)
+    theta0 = float(elem0[5])
+    P = 2.*math.pi*np.sqrt(a**3./GM)
+    fraction_list = [0., 0.2, 0.8, 1.2, 1.8, 5.8, 10.8, 50.2]
+    
+    
+    tvec = np.asarray([frac*P for frac in fraction_list])
+    UTC0 = datetime(1999, 10, 4, 1, 45, 0)
+    tk_list = [UTC0 + timedelta(seconds=ti) for ti in tvec]
+    
+    
+    # Generate truth fata
+    truth_dict = {}
+    X = Xo.copy()
+    for kk in range(len(tk_list)):
+        
+        if kk > 0:
+            tin = [tk_list[kk-1], tk_list[kk]]
+            tout, Xout = dyn.general_dynamics(X, tin, state_params, int_params)
+            X = Xout[-1,:].reshape(6, 1)
+        
+        truth_dict[tk_list[kk]] = X
+        
+        
+    print(truth_dict)
+    
+    # Setup and run Lambert Solvers
+    t0 = tk_list[0]    
+#    for kk in range(1,len(fraction_list)):
+    for kk in range(7,8):
+        
+
+        
+        
+        frac = fraction_list[kk]        
+        tf = tk_list[kk]
+        tof = (tf - t0).total_seconds()
+        r0_true = np.zeros((3,1))
+        v0_true = np.zeros((3,1))
+        rf_true = np.zeros((3,1))
+        vf_true = np.zeros((3,1))
+        r0_true[0:3] = truth_dict[t0][0:3]
+        v0_true[0:3] = truth_dict[t0][3:6]
+        rf_true[0:3] = truth_dict[tf][0:3]
+        vf_true[0:3] = truth_dict[tf][3:6]
+        
+        print(r0_true)
+        print(v0_true)
+        print(rf_true)
+        print(vf_true)
+        
+        
+        
+        elemf = astro.cart2kep(truth_dict[tf])
+        thetaf = float(elemf[5])
+        
+        # Get m, transfer type, and branch
+        d, m = math.modf(frac)        
+        M_star = int(m)
+        
+        dtheta = thetaf - theta0
+        if dtheta < 0.:
+            dtheta += 360.
+            
+        if dtheta < 180.:
+            transfer_type = 1
+            branch = 'right'
+        else:
+            transfer_type = 2
+            branch = 'left'
+            
+        print('')
+        print(kk)
+        print('tof [hours]', tof/3600.)
+        print('dtheta', dtheta)
+        print('transfer_type', transfer_type)
+        print('branch', branch)
+        
+        print('\n')
+        
+        # Compute truth data
+        # Compute RIC direction and velocity components at t0
+        print('Initial Vectors and Velocity')
+        v0_ric = eci2ric(r0_true, v0_true, v0_true)
+        print('v0_ric', v0_ric)
+        print('V1r', float(v0_ric[0]))
+        print('V1t', float(v0_ric[1]))
+        
+        print('Final Vectors and Velocity')
+        vf_ric = eci2ric(rf_true, vf_true, vf_true)
+        print('vf_ric', vf_ric)
+        print('V2r', float(vf_ric[0]))
+        print('V2t', float(vf_ric[1]))
+        print('\n')
+        
+        v0_vect, vf_vect, fail_flag = \
+                iod2.izzo_lambert(r0_true, rf_true, tof, M_star=M_star, lr_star=branch,
+                                 GM=GM, R=Re, 
+                                 results_flag=results_flag,
+                                 periapsis_check=periapsis_check)
+        
+        
+        izzo_time = 0.
+        izzo_jit_time = 0.
+        
+        for loop in range(1000):
+        
+            start_time = time.time()
+            
+            v0_list, vf_list, M_list, type_list, lr_list = \
+                iod.izzo_lambert(r0_true, rf_true, tof, M_star=M_star, lr_star=branch,
+                                 GM=GM, R=Re, 
+                                 results_flag=results_flag,
+                                 periapsis_check=periapsis_check)
+            
+            izzo_time += time.time() - start_time
+            
+            start_time = time.time()
+            
+            v0_vect, vf_vect, fail_flag = \
+                iod2.izzo_lambert(r0_true, rf_true, tof, M_star=M_star, lr_star=branch,
+                                 GM=GM, R=Re, 
+                                 results_flag=results_flag,
+                                 periapsis_check=periapsis_check)
+            
+            izzo_jit_time += time.time() - start_time
+        
+        print('\n')
+        print('izzo time', izzo_time)
+        print('izzo jit time', izzo_jit_time)
+
+#        print('v0_list', v0_list)
+#        print('vf_list', vf_list)
+        print('v0_true', v0_true)
+        print('vf_true', vf_true)
+        
+        
+        print('v0_vect', v0_vect)
+        print('vf_vect', vf_vect)
+        print('fail_flag', fail_flag)
+        
+        mistake
+        
+        print('')
+        print('M_list', M_list)
+        print('type_list', type_list)
+        print('len M_list', len(M_list))
+
+        
+        # Propagate output to ensure it achieves the right final position
+        
+        rf_err_list = []
+        v0_err_list = []
+        vf_err_list = []
+        for ii in range(len(M_list)):
+            
+            v0_ii = v0_list[ii]
+            vf_ii = vf_list[ii]
+#            M_ii = M_list[ii]
+                        
+            X_test = np.concatenate((r0_true, v0_ii), axis=0)
+            elem_test = astro.cart2kep(X_test, GM)
+            
+            tin = [t0, tf]
+#            print('tin', tin)
+#            print('tof [hours]', tof/3600.)
+            
+#            tin = [t0 + timedelta(seconds=tii) for tii in np.arange(0, tof, 10)]
+#            tin.append(tf)
+#            print('tf', tf)
+#            print('tin[-1]', tin[-1])
+#            mistake
+            
+            tout, Xout = dyn.general_dynamics(X_test, tin, state_params, int_params)
+            X = Xout[-1,:].reshape(6, 1)
+            
+#            print('tof diff', tout[-1] - tof)
+#            print('tout', tout)
+#            print('X', X)
+            
+            rf_test = X[0:3].reshape(3,1)
+            vf_test = X[3:6].reshape(3,1)
+            
+            # Check analytic orbit prediction
+            Xout2 = astro.element_conversion(X_test, 1, 1, GM, tof)
+            print('Xout2', Xout2)
+            
+            
+            print('')
+            print('ii', ii)
+            print('Mi', M_list[ii])
+            print('type', type_list[ii])
+            print('rf_test', rf_test)
+            print('rf_true', rf_true)
+            print('vf_test', vf_test)
+            print('vf_true', vf_true)
+            
+#            print('')
+#            print('X_test', X_test)
+#            print('elem_test', elem_test)
+#            print('v0_ii', v0_ii)
+#            print('vf_ii', vf_ii)
+            
+            if np.linalg.norm(vf_test - vf_ii) > 1e-6:
+                print(vf_test)
+                print(vf_ii)
+                print(np.linalg.norm(vf_test - vf_ii))
+                mistake
+            
+            
+            
+            
+            rf_err = np.linalg.norm(rf_test - rf_true)
+            v0_err = np.linalg.norm(v0_ii - v0_true)
+            vf_err = np.linalg.norm(vf_ii - vf_true)
+            
+            rf_err_list.append(rf_err)
+            v0_err_list.append(v0_err)
+            vf_err_list.append(vf_err)
+            
+            
+#            rbg = (colors[ii], colors[ii], colors[ii])
+#            
+#            plt.subplot(3,1,1)
+#            plt.plot(M_ii, rf_err, 'o', color=rbg)
+#            
+#            plt.subplot(3,1,2)
+#            plt.plot(M_ii, v0_err, 'o', color=rbg)
+#            
+#            plt.subplot(3,1,3)
+#            plt.plot(M_ii, vf_err, 'o', color=rbg)
+            
+            
+#        colors = np.linspace(0, 1, len(M_list))
+        colors = np.random.rand(len(M_list),3)
+        
+        plt.figure()
+        
+        plt.subplot(3,1,1)
+        for ii in range(len(M_list)):            
+            rbg = (colors[ii,0], colors[ii,1], colors[ii,2])
+            plt.plot(M_list[ii], rf_err_list[ii], 'o', color=rbg)
+        plt.ylabel('Final Pos [km]')
+        plt.title('Lambert Pos/Vel Errors')
+        if max(rf_err_list) < 1.:
+            plt.ylim([0., 1])
+        
+        plt.subplot(3,1,2)
+        for ii in range(len(M_list)):            
+            rbg = (colors[ii,0], colors[ii,1], colors[ii,2])
+            plt.plot(M_list[ii], v0_err_list[ii], 'o', color=rbg)
+        plt.ylabel('Initial Vel [km/s]')
+        
+        plt.subplot(3,1,3)
+        for ii in range(len(M_list)):            
+            rbg = (colors[ii,0], colors[ii,1], colors[ii,2])
+            plt.plot(M_list[ii], vf_err_list[ii], 'o', color=rbg)
+        plt.ylabel('Final Vel [km/s]')
+
+
+
+        plt.show()
+
+      
+#        start_time = time.time()
+#        
+#        v0_vect, vf_vect, extremal_distances, exit_flag = \
+#            iod.fast_lambert(r0_true, rf_true, tof, m, GM, transfer_type, branch)
+#            
+#        fast_lambert_time = time.time() - start_time
+#        
+#        v0_err = v0_vect - v0_true
+#        vf_err = vf_vect - vf_true
+#        
+#        print(v0_err)
+#        print(vf_err)
+#        
+#        start_time = time.time()
+#        
+#        v0_vect, vf_vect, extremal_distances, exit_flag = \
+#            iod.robust_lambert(r0_true, rf_true, tof, m, GM, transfer_type, branch)
+#            
+#        robust_lambert_time = time.time() - start_time
+#        
+#        v0_err = v0_vect - v0_true
+#        vf_err = vf_vect - vf_true
+#        
+#        print(v0_err)
+#        print(vf_err)
+#        
+
+    
+    
+    return
+
+
+def lambert_test_special():
+    
+    
+    # Time vector
+#    UTC0 = datetime(2021, 6, 21, 0, 0, 0)
+#    UTC2 = datetime(2021, 6, 21, 6, 0, 0)
+#    
+#    
+#
+#    r0_vect = np.array([[-2823.6493363 ], [53886.30127711], [ 1201.3599599 ]])
+#    rf_vect = np.array([[-53747.58363224], [ -4088.97163985], [  1226.6602041 ]])
+    
+    
+#    v0_vect [[-3.01862531]
+#     [ 0.8452397 ]
+#     [-0.08520894]]
+    
+#    vf_vect [[ 1.02292154]
+#     [-2.96932209]
+#     [ 0.08660587]]
+    
+    
+    
+    
+    # HEO Molniya case
+    UTC0 = datetime(1999, 10, 4, 2, 3)
+    UTC2 = datetime(1999, 10, 4, 11, 44)
+    
+    r0_vect = np.array([[ 1085.07121139], [ 9294.12313532], [-1611.11613065]])
+    rf_vect = np.array([[-10785.04618542], [-17036.11892906], [ 21668.73671188]])
+    
+    
+    tof = (UTC2 - UTC0).total_seconds()
+    v0_list, vf_list, M_list, type_list = \
+        iod.izzo_lambert(r0_vect, rf_vect, tof)
+        
+    print(v0_list)
+    print(vf_list)
+    print(M_list)
+    print(type_list)
+    
+    for ii in range(len(M_list)):
+        
+        Xo_test = np.concatenate((r0_vect, v0_list[ii]), axis=0)
+        Xf_test = astro.element_conversion(Xo_test, 1, 1, dt=tof)
+        
+        print('')
+        print('ii', ii)
+        print('Xo_test', Xo_test)
+        print('Xf_test', Xf_test)
+        print('elem0', astro.cart2kep(Xo_test))
+        print('elemf', astro.cart2kep(Xf_test))
+        print('rf err', np.linalg.norm(Xf_test[0:3].reshape(3,1) - rf_vect))
+
     return
 
 
@@ -1076,6 +1482,125 @@ def unit_test_gauss_iod():
     return
 
 
+#def unit_test_gooding_iod():
+#    
+#    # Vallado Test Case (Example 7-2)
+#    UTC2 = datetime(2012, 8, 20, 11, 48, 28)
+#    r2_true = np.reshape([6356.486034, 5290.5322578, 6511.396979], (3,1))
+#    v2_true = np.reshape([-4.172948, 4.776550, 1.720271], (3,1))
+#    
+#    X = np.concatenate((r2_true, v2_true), axis=0)
+#    elem2 = astro.cart2kep(X)
+#    
+#    print('Orbit Elements\n', elem2)
+#    
+#    # Observations
+#    UTC1 = datetime(2012, 8, 20, 11, 40, 28)
+#    UTC3 = datetime(2012, 8, 20, 11, 52, 28)
+#    
+#    Y1 = np.array([[0.939913*math.pi/180.],
+#                   [18.667717*math.pi/180.]])
+#    
+#    Y2 = np.array([[45.025748*math.pi/180.],
+#                   [35.664741*math.pi/180.]])
+#    
+#    Y3 = np.array([[67.886655*math.pi/180.],
+#                   [36.996583*math.pi/180.]])
+#    
+#    # Sensor parameters
+#    sensor_id = 'Vallado 7-2'
+#    lat = 40.
+#    lon = -110.
+#    ht = 2.
+#    
+#    site_ecef = coord.latlonht2ecef(lat, lon, ht)
+#    
+#    sensor_params = {}
+#    sensor_params[sensor_id] = {}
+#    sensor_params[sensor_id]['site_ecef'] = site_ecef
+#    sensor_params[sensor_id]['meas_types'] = ['ra', 'dec']
+#    
+#    # Form inputs
+#    UTC_list = [UTC1, UTC2, UTC3]
+#    Yk_list = [Y1, Y2, Y3]
+#    sensor_id_list = [sensor_id]*3
+#    
+#    # Execute function
+#    iod.gooding_angles_iod(UTC_list, Yk_list, sensor_id_list, sensor_params)
+#        
+##    print('')
+##    print('r2_vect', r2_vect)
+##    print('r2_true', r2_true)
+##    print('v2_vect', v2_vect)
+##    print('v2_true', v2_true)
+#    
+#    
+#    
+#    return
+    
+
+def unit_test_gooding_iod():
+    
+    # Generic GEO Orbit
+    elem = [42164.1, 0.01, 0.1, 90., 1., 1.]
+    Xo = np.reshape(astro.kep2cart(elem), (6,1))
+    print('Xo true', Xo)
+    
+    # Time vector
+    UTC0 = datetime(2021, 6, 21, 0, 0, 0)
+    UTC1 = datetime(2021, 6, 21, 4, 0, 0)
+    UTC2 = datetime(2021, 6, 21, 6, 0, 0)
+    UTC_list = [UTC0, UTC1, UTC2]
+    
+    # Sensor data
+    sensor_id = 'UNSW Falcon'
+    sensor_params = sens.define_sensors([sensor_id])
+    sensor_params[sensor_id]['meas_types'] = ['ra', 'dec']
+    sensor = sensor_params[sensor_id]
+    
+    # Retrieve latest EOP data from celestrak.com
+    eop_alldata = eop.get_celestrak_eop_alldata()
+        
+    # Retrieve polar motion data from file
+    XYs_df = eop.get_XYs2006_alldata()
+    
+    # Compute measurements
+    Yk_list = []
+    sensor_id_list = []
+    rho_list = []
+    for UTC in UTC_list:
+        
+        dt_sec = (UTC - UTC0).total_seconds()
+        EOP_data = eop.get_eop_data(eop_alldata, UTC)
+        Xk = astro.element_conversion(Xo, 1, 1, dt=dt_sec)
+        all_meas = mfunc.compute_measurement(Xk, {}, sensor, UTC, EOP_data,
+                                             XYs_df, meas_types=['ra', 'dec', 'rg', 'az', 'el'])
+        
+        
+        print(all_meas)
+        
+        Yk = all_meas[0:2].reshape(2,1)
+        Yk_list.append(Yk)
+        sensor_id_list.append(sensor_id)
+        rho_list.append(float(all_meas[2]))
+        
+    
+    
+    print(Yk_list)
+    print(sensor_id_list)
+    print(rho_list)
+    
+
+    # Execute function
+    iod.gooding_angles_iod(UTC_list, Yk_list, sensor_id_list, sensor_params)
+    
+    
+    
+    
+    
+    return
+
+
 if __name__ == '__main__':
     
     plt.close('all')
@@ -1084,12 +1609,18 @@ if __name__ == '__main__':
     
 #    unit_test_herrick_gibbs_iod()
     
-    unit_test_gauss_iod()
+#    unit_test_gauss_iod()
+    
+#    unit_test_gooding_iod()
     
     
 #    lambert_test()
     
+    lambert_test_jit()
+    
 #    lambert_test_hyperbolic()
+    
+#    lambert_test_special()
     
 #    porkchop_plot_demo()
     

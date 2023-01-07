@@ -14,10 +14,11 @@ metis_dir = current_dir[0:ind+5]
 sys.path.append(metis_dir)
 
 
-import utilities.coordinate_systems as coord
-import utilities.eop_functions as eop
-import utilities.time_systems as timesys
-import utilities.tle_functions as tle
+from utilities import coordinate_systems as coord
+from utilities import eop_functions as eop
+from utilities import numerical_methods as num
+from utilities import time_systems as timesys
+from utilities import tle_functions as tle
 
 
 
@@ -100,6 +101,57 @@ def read_sp3_file(sp3_fname):
 
     
     return output_dict
+
+
+def interpolate_sp3_truth(UTC_list, truth_file, sp3_id, eop_alldata='', XYs_df=''):
+    
+    
+    # Reference time
+    UTC0 = UTC_list[0]
+    
+    # Read truth data
+    sp3_dict = read_sp3_file(truth_file)
+    
+    # Retrieve latest EOP data from celestrak.com
+    if len(eop_alldata) == 0:
+        eop_alldata = eop.get_celestrak_eop_alldata()        
+        
+    # Retrieve polar motion data from file
+    if len(XYs_df) == 0:
+        XYs_df = eop.get_XYs2006_alldata()
+    
+    # Convert truth dict times to UTC and states to ECI
+    gps_list = sp3_dict[sp3_id]['gps_time']
+    ecef_list = sp3_dict[sp3_id]['r_ecef']
+    dt_sec_truth = np.zeros((len(gps_list),))
+    ECI_array = np.zeros((len(gps_list), 3))
+    for ii in range(len(gps_list)):
+        
+        gps_time = gps_list[ii]
+        sp3_ecef = ecef_list[ii]
+        EOP_data = eop.get_eop_data(eop_alldata, gps_time)
+        
+        # Convert to UTC
+        UTC = timesys.gpsdt2utcdt(gps_time, EOP_data['TAI_UTC'])
+        dt_sec_truth[ii] = (UTC - UTC0).total_seconds() 
+        
+        # Convert to GCRF
+        EOP_data = eop.get_eop_data(eop_alldata, UTC)
+        sp3_eci, dum = coord.itrf2gcrf(sp3_ecef, np.zeros((3,1)), UTC, EOP_data, XYs_df)
+        ECI_array[ii,:] = sp3_eci.flatten()
+        
+    r_eci_list = []
+    for ii in range(len(UTC_list)):
+        
+        # Retrieve values
+        UTC = UTC_list[ii]
+        dt_sec = (UTC - UTC0).total_seconds()
+
+        # Interpolate truth data to current measurement time
+        r_eci = num.interp_lagrange(dt_sec_truth, ECI_array, dt_sec, 9)
+        r_eci_list.append(r_eci)
+        
+    return r_eci_list
 
 
 def unit_test_sp3_reader():

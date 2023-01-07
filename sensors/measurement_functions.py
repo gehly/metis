@@ -3,6 +3,7 @@ from math import pi, asin, atan2
 import sys
 import os
 import inspect
+from datetime import datetime, timedelta
 
 filename = inspect.getframeinfo(inspect.currentframe()).filename
 current_dir = os.path.dirname(os.path.abspath(filename))
@@ -12,13 +13,28 @@ metis_dir = current_dir[0:ind+5]
 sys.path.append(metis_dir)
 
 #from sensors.brdf_models import compute_mapp
-import utilities.coordinate_systems as coord
-import utilities.eop_functions as eop
+from dynamics import dynamics_functions as dyn
+from sensors import visibility_functions as visfunc
+from utilities import astrodynamics as astro
+from utilities import coordinate_systems as coord
+from utilities import eop_functions as eop
+from utilities import tle_functions as tle
+from utilities import time_systems as timesys
 
 
 
-def compute_measurement(X, state_params, sensor, UTC, EOP_data, XYs_df=[], meas_types=[],
-                        sun_gcrf=[]):
+def compute_measurement(X, state_params, sensor_params, sensor_id, UTC, 
+                        EOP_data=[], XYs_df=[], meas_types=[], sun_gcrf=[]):
+    
+    # Retrieve data from sensor params
+    sensor = sensor_params[sensor_id]
+    
+    if len(EOP_data) == 0:
+        eop_alldata = sensor_params['eop_alldata']
+        EOP_data = eop.get_eop_data(eop_alldata, UTC)
+    
+    if len(XYs_df) == 0:    
+        XYs_df = sensor_params['XYs_df']    
     
     # Retrieve measurement types
     if len(meas_types) == 0:
@@ -89,11 +105,100 @@ def compute_measurement(X, state_params, sensor, UTC, EOP_data, XYs_df=[], meas_
     return Y
 
 
+def tracklet_generator(obj_id, Xo, UTC0, dt_interval, dt_max, sensor_id, params_dict,
+                       tracklet_dict={}, truth_dict={}, orbit_regime='none'):
+    '''
+    
+    
+    '''
+    
+    # Break out inputs
+    sensor_params = params_dict['sensor_params']
+    state_params = params_dict['state_params']
+    int_params = params_dict['int_params']
+    eop_alldata = sensor_params['eop_alldata']
+    XYs_df = sensor_params['XYs_df']
+    sensor = sensor_params[sensor_id]
+    sigma_dict = sensor['sigma_dict']
+    
+    # Initialize output
+    if len(tracklet_dict) > 0:
+        tracklet_id = max(tracklet_dict.keys()) + 1
+    else:
+        tracklet_id = 0
+        
+    if obj_id not in truth_dict:
+        truth_dict[obj_id] = {}
+
+    
+    tk_prior = UTC0
+    tk = UTC0
+    Xk = Xo.copy()
+    tk_list = []
+    Yk_list = []
+    sensor_id_list = []
+    while tk < UTC0 + timedelta(hours=6.):
+        
+        # Integrate for this step
+        tin = [tk_prior, tk]
+        tout, Xout = dyn.general_dynamics(Xk, tin, state_params, int_params)
+        Xk = Xout[-1,:].reshape(6, 1)
+        
+        Xk_check = astro.element_conversion(Xo, 1, 1, dt=(tk - UTC0).total_seconds())
+        
+        print(tk)
+        print('dt', (tk - UTC0).total_seconds())
+        print(Xk)
+        print(Xk_check)
+        
+        # Check visibility conditions and compute measurements
+        EOP_data = eop.get_eop_data(eop_alldata, tk)
+        if visfunc.check_visibility(Xk, state_params, sensor_params,
+                                    sensor_id, tk, EOP_data, XYs_df):
+            
+            # Compute measurements
+            Yk = compute_measurement(Xk, state_params, sensor_params,
+                                     sensor_id, tk, EOP_data, XYs_df)
+            
+            # Add noise
+            for ii in range(len(Yk)):                
+                mtype = sensor['meas_types'][ii]
+                Yk[ii] += np.random.randn()*sigma_dict[mtype]
+            
+            # Store output
+            tk_list.append(tk)
+            Yk_list.append(Yk)
+            sensor_id_list.append(sensor_id)
+            truth_dict[obj_id][tk] = Xk
+            
+        # Exit condition
+        if len(tk_list) > 0:
+            if (tk - tk_list[0]).total_seconds() >= dt_max:
+                break
+    
+        # Increment for next time step
+        tk_prior = tk
+        tk += timedelta(seconds=dt_interval)
+        
+        
+    # Store output
+    if len(tk_list) > 0:
+        tracklet_dict[tracklet_id] = {}
+        tracklet_dict[tracklet_id]['tk_list'] = tk_list
+        tracklet_dict[tracklet_id]['Yk_list'] = Yk_list
+        tracklet_dict[tracklet_id]['sensor_id_list'] = sensor_id_list
+        tracklet_dict[tracklet_id]['orbit_regime'] = orbit_regime
+        tracklet_dict[tracklet_id]['obj_id'] = obj_id
+
+
+    return tracklet_dict, truth_dict
+
+
 
 def ecef2azelrange_deg(r_sat, r_site):
     '''
     This function computes the azimuth, elevation, and range of a satellite
-    from a given ground station, all position in ECEF.
+    from a given ground station, all position coordinates in ECEF.
 
     Parameters
     ------
@@ -141,7 +246,7 @@ def ecef2azelrange_deg(r_sat, r_site):
 def ecef2azelrange_rad(r_sat, r_site):
     '''
     This function computes the azimuth, elevation, and range of a satellite
-    from a given ground station, all position in ECEF.
+    from a given ground station, all position coordinates in ECEF.
 
     Parameters
     ------
@@ -289,6 +394,40 @@ def unscented_balldrop(tk, chi, state_params, sensor_params, sensor_id):
         
         gamma_til[0,jj] = y
         gamma_til[1,jj] = dy
+
+    return gamma_til, Rk
+
+
+def unscented_coordturn_azrg(tk, chi, state_params, sensor_params, sensor_id):
+    
+    # Number of states
+    n = int(chi.shape[0])
+    
+    # Measurement information
+    sensor_kk = sensor_params[sensor_id]
+    r_site = sensor_kk['r_site']
+    meas_types = sensor_kk['meas_types']
+    sigma_dict = sensor_kk['sigma_dict']
+    p = len(meas_types)
+    Rk = np.zeros((p, p))
+    for ii in range(p):
+        mtype = meas_types[ii]
+        sig = sigma_dict[mtype]
+        Rk[ii,ii] = sig**2.
+    
+    # Compute transformed sigma points   
+    gamma_til = np.zeros((p, (2*n+1)))
+    for jj in range(2*n+1):
+        
+        x = chi[0,jj]
+        y = chi[2,jj]
+        pos = np.reshape([x, y], (2,1))
+        rho_vect = pos - r_site
+        az = atan2(rho_vect[0], rho_vect[1])
+        rg = np.linalg.norm(rho_vect)
+
+        gamma_til[0,jj] = az
+        gamma_til[1,jj] = rg
 
     return gamma_til, Rk
 
