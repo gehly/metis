@@ -576,19 +576,19 @@ def compute_orbit_errors(filter_output, full_state_output, truth_dict):
         
         
     # Fix Units
-    X_err *= 1000.      # convert to m, m/s
-    X_err_meas *= 1000.
-    X_err_ric *= 1000.
-    X_err_ric_meas *= 1000.
-    sig_x *= 1000.
-    sig_y *= 1000.
-    sig_z *= 1000.
-    sig_dx *= 1000.
-    sig_dy *= 1000.
-    sig_dz *= 1000.
-    sig_r *= 1000.
-    sig_i *= 1000.
-    sig_c *= 1000.
+    X_err *= 1      # convert to m, m/s
+    X_err_meas *= 1
+    X_err_ric *= 1
+    X_err_ric_meas *= 1
+    sig_x *= 1
+    sig_y *= 1
+    sig_z *= 1
+    sig_dx *= 1
+    sig_dy *= 1
+    sig_dz *= 1
+    sig_r *= 1
+    sig_i *= 1
+    sig_c *= 1
     
     if n > 6:
         X_err[6,:] *= 1000.
@@ -695,21 +695,21 @@ def compute_orbit_errors(filter_output, full_state_output, truth_dict):
     plt.plot(thrs_meas, X_err_ric_meas[0,:], 'b.')
     plt.plot(thrs, 3*sig_r, 'k--')
     plt.plot(thrs, -3*sig_r, 'k--')
-    plt.ylabel('Radial [m]')
+    plt.ylabel('Radial [km]')
     
     plt.subplot(3,1,2)
     plt.plot(thrs, X_err_ric[1,:], 'k.')
     plt.plot(thrs_meas, X_err_ric_meas[1,:], 'b.')
     plt.plot(thrs, 3*sig_i, 'k--')
     plt.plot(thrs, -3*sig_i, 'k--')
-    plt.ylabel('In-Track [m]')
+    plt.ylabel('In-Track [km]')
     
     plt.subplot(3,1,3)
     plt.plot(thrs, X_err_ric[2,:], 'k.')
     plt.plot(thrs_meas, X_err_ric_meas[2,:], 'b.')
     plt.plot(thrs, 3*sig_c, 'k--')
     plt.plot(thrs, -3*sig_c, 'k--')
-    plt.ylabel('Cross-Track [m]')
+    plt.ylabel('Cross-Track [km]')
 
     plt.xlabel('Time [hours]')
     
@@ -2712,8 +2712,8 @@ def evaluate_tracklet_correlation(correlation_file, ra_lim, dec_lim, plot_flag=F
         # if tdiff_hrs % 24. < 1. or tdiff_hrs % 24 > 23.:
         #     continue
     
-        # if tdiff_hrs > 12.:
-        #     continue
+        if tdiff_hrs > 12.:
+            continue
         
         
         N_cases += 1

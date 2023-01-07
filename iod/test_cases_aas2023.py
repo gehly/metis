@@ -2807,7 +2807,7 @@ def tracklets_to_birth_model(correlation_file, ra_lim, dec_lim, birth_type='simp
             tk = tracklet_dict[tracklet_id]['tk_list'][1]
             # tin = [t0, tk]
             
-            if t0 > datetime(2022, 11, 10, 0, 0, 0):
+            if t0 > datetime(2022, 11, 8, 0, 0, 0):
                 continue
             
             # Retrieve initial state
@@ -2998,6 +2998,8 @@ def tudat_geo_lmb_setup_birth(truth_file, meas_file, correlation_file,
     # LMB Birth Model
     birth_time_dict, label_truth_dict, tk_meas_del = \
         tracklets_to_birth_model(correlation_file, ra_lim, dec_lim, birth_type)
+        
+    mistake
     
     # Filter parameters
     filter_params = {}
@@ -3657,11 +3659,13 @@ if __name__ == '__main__':
     fname = 'geo_real_3obj_3day_corr_summary.csv'
     corr_csv = os.path.join(trackdir, fname)
     
-    fname = 'geo_real_3obj_3day_corr.pkl'
-    corr_pkl = os.path.join(trackdir, fname)
+    # fname = 'geo_real_3obj_3day_corr.pkl'
     
-    # fname = 'geo_twobody_1obj_7day_setup_noise1_lam0_pd1_batchbirth.pkl'
-    # setup_file = os.path.join(filterdir, fname)  
+    fname = 'geo_twobody_1obj_7day_corr_2pass_300sec_noise1_lam0_pd1.pkl'
+    corr_pkl = os.path.join(filterdir, fname)
+    
+    fname = 'geo_twobody_1obj_7day_setup_noise1_lam0_pd1_batchbirth.pkl'
+    setup_file = os.path.join(filterdir, fname)  
     
     
     # fname = 'geo_twobody_1obj_7day_batchbirth3_results_1.pkl'
@@ -3710,7 +3714,7 @@ if __name__ == '__main__':
     orbit_regime = 'GEO'
     # generate_meas_file(noise, lam_c, p_det, orbit_regime, truth_file, obs_time_file, meas_file)
     
-    check_meas_file(meas_file)
+    # check_meas_file(meas_file)
     
     
     
@@ -3752,8 +3756,8 @@ if __name__ == '__main__':
     ra_lim = 50.
     dec_lim = 50.
     birth_type = 'gooding_batch'
-    # tudat_geo_lmb_setup_birth(truth_file2, meas_file2, corr_pkl,
-    #                           ra_lim, dec_lim, birth_type, setup_file)
+    tudat_geo_lmb_setup_birth(truth_file2, meas_file2, corr_pkl,
+                              ra_lim, dec_lim, birth_type, setup_file)
     
     
     # fname = 'geo_twobody_singletarget_setup.pkl'
