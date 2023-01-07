@@ -28,7 +28,7 @@ sys.path.append(metis_dir)
 
 from estimation import analysis_functions as analysis
 from estimation import estimation_functions as est
-from estimation import multitarget_functions3 as mult
+from estimation import multitarget_functions as mult
 from dynamics import dynamics_functions as dyn
 from sensors import measurement_functions as mfunc
 from sensors import sensors as sens
@@ -823,17 +823,26 @@ def tudat_geo_2obj_setup(setup_file):
     state_params['Cr'] = 0.
     state_params['drag_area_m2'] = 4.
     state_params['srp_area_m2'] = 4.
+    state_params['nstates'] = 6
+    
+    # LMB Birth Model
+    birth_model = {}
     
     # Filter parameters
     filter_params = {}
     filter_params['Q'] = 1e-16 * np.diag([1, 1, 1])
+    filter_params['snc_flag'] = 'gamma'
     filter_params['gap_seconds'] = 900.
     filter_params['alpha'] = 1e-4
     filter_params['pnorm'] = 2.
     filter_params['prune_T'] = 1e-3
     filter_params['merge_U'] = 36.
+    filter_params['H_max'] = 1000
+    filter_params['H_max_birth'] = 5
+    filter_params['T_max'] = 100
+    filter_params['T_threshold'] = 1e-3
     filter_params['p_surv'] = 1.
-    filter_params['p_det'] = 0.9
+    filter_params['birth_model'] = birth_model
     
     # Integration function and additional settings    
     int_params = {}
@@ -868,11 +877,31 @@ def tudat_geo_2obj_setup(setup_file):
     X2_init = X2_true + np.reshape(pert_vect2, (6, 1))
     
     
+    # PHD Filter Setup
+    # state_dict = {}
+    # state_dict[tk_list[0]] = {}
+    # state_dict[tk_list[0]]['weights'] = [1., 1.]
+    # state_dict[tk_list[0]]['means'] = [X1_init, X2_init]
+    # state_dict[tk_list[0]]['covars'] = [P1, P2]
+    
+    # LMB Filter Setup
+    LMB_dict = {}
+    LMB_dict[(tk_list[0], 1)] = {}
+    LMB_dict[(tk_list[0], 1)]['r'] = 0.999
+    LMB_dict[(tk_list[0], 1)]['weights'] = [1.]
+    LMB_dict[(tk_list[0], 1)]['means'] = [X1_init]
+    LMB_dict[(tk_list[0], 1)]['covars'] = [P1]
+    
+    LMB_dict[(tk_list[0], 2)] = {}
+    LMB_dict[(tk_list[0], 2)]['r'] = 0.999
+    LMB_dict[(tk_list[0], 2)]['weights'] = [1.]
+    LMB_dict[(tk_list[0], 2)]['means'] = [X2_init]
+    LMB_dict[(tk_list[0], 2)]['covars'] = [P2]
+    
     state_dict = {}
     state_dict[tk_list[0]] = {}
-    state_dict[tk_list[0]]['weights'] = [1., 1.]
-    state_dict[tk_list[0]]['means'] = [X1_init, X2_init]
-    state_dict[tk_list[0]]['covars'] = [P1, P2]
+    state_dict[tk_list[0]]['LMB_dict'] = LMB_dict
+    
     
     
     # Sensor and measurement parameters
@@ -888,8 +917,11 @@ def tudat_geo_2obj_setup(setup_file):
         sigma_dict['dec'] = 5.*arcsec2rad  # rad
         sensor_params[sensor_id]['sigma_dict'] = sigma_dict
         sensor_params[sensor_id]['lam_clutter'] = 5.
-        FOV_hlim = sensor_params[sensor_id]['FOV_hlim']
-        FOV_vlim = sensor_params[sensor_id]['FOV_vlim']        
+        sensor_params[sensor_id]['p_det'] = 0.99
+        FOV_hlim = [-0.5*np.pi/180., 0.5*np.pi/180.]  # sensor_params[sensor_id]['FOV_hlim']
+        FOV_vlim = [-0.5*np.pi/180., 0.5*np.pi/180.]  # sensor_params[sensor_id]['FOV_vlim']
+        sensor_params[sensor_id]['FOV_hlim'] = FOV_hlim
+        sensor_params[sensor_id]['FOV_vlim'] = FOV_vlim
         sensor_params[sensor_id]['V_sensor'] = (FOV_hlim[1] - FOV_hlim[0])*(FOV_vlim[1] - FOV_vlim[0])
 
         
@@ -926,20 +958,17 @@ def tudat_geo_2obj_setup(setup_file):
         EOP_data = eop.get_eop_data(eop_alldata, UTC)
         Zk_list = []
         sensor_kk_list = []
+        center_list = []
         for sensor_id in sensor_id_list:
             
             sensor = sensor_params[sensor_id]
-            p_det = filter_params['p_det']
+            p_det = sensor['p_det']
             center_flag = True            
             for Xj in truth_dict[tk_list[kk]]['Xt_list']:            
                           
                 if visfunc.check_visibility(Xj, state_params, sensor_params,
                                             sensor_id, UTC, EOP_data, XYs_df):
-                    
-                    # Incorporate missed detection
-                    if np.random.rand() > p_det:
-                        continue
-                    
+                                        
                     # Compute measurements
                     zj = mfunc.compute_measurement(Xj, state_params, sensor_params,
                                                    sensor_id, UTC, EOP_data, XYs_df,
@@ -949,6 +978,41 @@ def tudat_geo_2obj_setup(setup_file):
                     if center_flag:
                         center = zj.copy()
                         center_flag = False
+                        
+                    # Check if measurement is in FOV
+                    else:
+                        
+                        # Angle rollover in RA
+                        zj_test = zj - center
+                        if zj_test[0] > np.pi:
+                            zj_test[0] -= 2.*np.pi
+                        if zj_test[0] < -np.pi:
+                            zj_test[0] += 2.*np.pi                        
+                        
+                        if (zj_test[0] < FOV_hlim[0] or zj_test[0] > FOV_hlim[1] 
+                            or zj_test[1] < FOV_vlim[0] or zj_test[1] > FOV_vlim[1]):
+                            
+                            print('missed det')
+                            print('center', center)
+                            print('zj', zj)
+                            print('zj_test', zj_test)
+                            print('FOV_hlim', FOV_hlim)
+                            print('FOV_vlim', FOV_vlim)
+                            
+                            continue
+                        
+                        print('detection')
+                        print('center', center)
+                        print('zj', zj)
+                        print('zj_test', zj_test)
+                        print('FOV_hlim', FOV_hlim)
+                        print('FOV_vlim', FOV_vlim)
+                        
+                        
+
+                    # Incorporate missed detection
+                    if np.random.rand() > p_det:
+                        continue
                     
                     # Add noise and store measurement data
                     zj[0] += np.random.randn()*sigma_dict['ra']
@@ -956,6 +1020,7 @@ def tudat_geo_2obj_setup(setup_file):
                     
                     Zk_list.append(zj)
                     sensor_kk_list.append(sensor_id)
+                    center_list.append(center)
             
             # Incorporate clutter measurements
             n_clutter = ss.poisson.rvs(sensor['lam_clutter'])
@@ -966,10 +1031,17 @@ def tudat_geo_2obj_setup(setup_file):
                 FOV_vlim = sensor['FOV_vlim']
                 ra  = center[0] + (FOV_hlim[1]-FOV_hlim[0])*(np.random.rand() - 0.5)
                 dec = center[1] + (FOV_vlim[1]-FOV_vlim[0])*(np.random.rand() - 0.5)
+                
+                # Angle rollover in RA
+                if ra > np.pi:
+                    ra -= 2.*np.pi
+                if ra < -np.pi:
+                    ra += 2.*np.pi
 
                 zclutter = np.reshape([ra, dec], (2,1))
                 Zk_list.append(zclutter)
                 sensor_kk_list.append(sensor_id)
+                center_list.append(center)
 
         # If measurements were collected, randomize order and store
         if len(Zk_list) > 0:
@@ -980,6 +1052,7 @@ def tudat_geo_2obj_setup(setup_file):
             meas_dict[UTC] = {}
             meas_dict[UTC]['Zk_list'] = [Zk_list[ii] for ii in inds]
             meas_dict[UTC]['sensor_id_list'] = [sensor_kk_list[ii] for ii in inds]
+            meas_dict[UTC]['center_list'] = [center_list[ii] for ii in inds]
                 
 
     # Plot data
@@ -1077,7 +1150,7 @@ def run_multitarget_filter(setup_file, results_file):
     pklFile.close()
     
     # Update to use UKF propagator function
-    params_dict['int_params']['intfcn'] = dyn.ode_coordturn_ukf
+    # params_dict['int_params']['intfcn'] = dyn.ode_coordturn_ukf
     
     
     # filter_output, full_state_output = mult.phd_filter(state_dict, truth_dict, meas_dict, meas_fcn, params_dict)
@@ -1107,9 +1180,11 @@ def multitarget_analysis(results_file):
     pklFile.close()
     
     
-    analysis.compute_coordturn_errors(filter_output, filter_output, truth_dict)
+    # analysis.compute_coordturn_errors(filter_output, filter_output, truth_dict)
     
     # analysis.multitarget_orbit_errors(filter_output, filter_output, truth_dict)
+    
+    analysis.lmb_orbit_errors(filter_output, filter_output, truth_dict)
     
     return
 
@@ -1118,20 +1193,20 @@ if __name__ == '__main__':
     
     plt.close('all')
     
-    fdir = r'D:\documents\research_projects\multitarget\data\sim\test\2022_12_07_vo_coordturn_10obj'
+    fdir = r'D:\documents\research_projects\multitarget\data\sim\test\2022_12_14_lmb_geo_2obj'
     
     
-    # setup_file = os.path.join(fdir, 'tudat_geo_twobody_2obj_pd09_lam0_setup.pkl')
-    # results_file = os.path.join(fdir, 'tudat_geo_twobody_2obj_pd09_lam0_phd_results.pkl')
+    setup_file = os.path.join(fdir, 'tudat_geo_twobody_2obj_pd099_lam5_fov05_setup.pkl')
+    results_file = os.path.join(fdir, 'tudat_geo_twobody_2obj_pd099_lam5_fov05_lmb_results.pkl')
     
     
     # tudat_geo_2obj_setup(setup_file)    
     
     
     
-    setup_file = os.path.join(fdir, 'vo_coordturn_10obj_setup.pkl')
-    setup_file_mat = os.path.join(fdir, 'vo_coordturn_10obj_setup.mat')
-    results_file = os.path.join(fdir, 'vo_coordturn_10boj_lmb_results.pkl')
+    # setup_file = os.path.join(fdir, 'vo_coordturn_10obj_setup.pkl')
+    # setup_file_mat = os.path.join(fdir, 'vo_coordturn_10obj_setup.mat')
+    # results_file = os.path.join(fdir, 'vo_coordturn_10boj_lmb_results.pkl')
     
     
     # vo_2d_motion_setup(setup_file)
@@ -1141,7 +1216,7 @@ if __name__ == '__main__':
     
     # run_multitarget_filter(setup_file, results_file)
     
-    multitarget_analysis(results_file)
+    # multitarget_analysis(results_file)
     
     
     

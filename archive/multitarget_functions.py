@@ -4,7 +4,6 @@ import sys
 import os
 import inspect
 import copy
-import time
 
 
 filename = inspect.getframeinfo(inspect.currentframe()).filename
@@ -17,8 +16,6 @@ sys.path.append(metis_dir)
 from dynamics import dynamics_functions as dyn
 from estimation import estimation_functions as est
 from sensors import measurement_functions as mfunc
-from utilities import coordinate_systems as coord
-from utilities import eop_functions as eop
 from utilities import time_systems as timesys
 
 
@@ -464,7 +461,7 @@ def phd_state_extraction(GMM_dict, tk, Zk, sensor_id_list, meas_fcn,
 ###############################################################################
 
 
-def lmb_filter(state_dict, truth_dict, meas_dict, birth_time_dict, meas_fcn, params_dict):
+def lmb_filter(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):
     
     # Break out inputs
     state_params = params_dict['state_params']
@@ -474,10 +471,7 @@ def lmb_filter(state_dict, truth_dict, meas_dict, birth_time_dict, meas_fcn, par
     # State information
     state_tk = sorted(state_dict.keys())[-1]
     LMB_dict = state_dict[state_tk]['LMB_dict']
-    
-    print(state_tk)
-    print(LMB_dict)
-    
+
     # Prior information about the distribution
     pnorm = 2.
     kurt = math.gamma(5./pnorm)*math.gamma(1./pnorm)/(math.gamma(3./pnorm)**2.)
@@ -500,12 +494,8 @@ def lmb_filter(state_dict, truth_dict, meas_dict, birth_time_dict, meas_fcn, par
     # Initialize output
     filter_output = {}
 
-    # Measurement/Birth times
-    tk_list = list(meas_dict.keys())
-    tk_list2 = list(birth_time_dict.keys())
-    tk_list.extend(tk_list2)
-    tk_list = sorted(tk_list)
-    # tk_list = tk_list[0:15]
+    # Measurement times
+    tk_list = sorted(meas_dict.keys())
     
     # Number of epochs
     N = len(tk_list)
@@ -514,7 +504,6 @@ def lmb_filter(state_dict, truth_dict, meas_dict, birth_time_dict, meas_fcn, par
     print(state_tk)
     print(tk_list)
     print(N)
-
 
   
     # Loop over times
@@ -530,77 +519,36 @@ def lmb_filter(state_dict, truth_dict, meas_dict, birth_time_dict, meas_fcn, par
         
         print('')
         print(tk)
-        # print(LMB_dict)
+        print(LMB_dict)
         print('ntracks', len(LMB_dict))
 
         # Predictor Step
-        if tk in birth_time_dict:
-            birth_model = birth_time_dict[tk]
-            LMB_birth = {}
-            for ii in birth_model.keys():
-                label = (tk, ii)
-                LMB_birth[label] = {}        
-                LMB_birth[label]['r'] = birth_model[ii]['r_birth']
-                LMB_birth[label]['weights'] = birth_model[ii]['weights']
-                LMB_birth[label]['means'] = birth_model[ii]['means']
-                LMB_birth[label]['covars'] = birth_model[ii]['covars']
-            
-            print('')
-            print('LMB Birth')
-            print(LMB_birth)
-            
-        else:
-            LMB_birth = {}
+        tin = [tk_prior, tk]
+        LMB_birth, LMB_surv = lmb_predictor(LMB_dict, tin, params_dict)
         
-        tin = [tk_prior, tk]        
-        LMB_birth, LMB_surv = lmb_predictor(LMB_birth, LMB_surv, tin, params_dict)
-        
-        print('')
-        print('tk', tk)
         print('predictor')
         print(LMB_birth)
         print(LMB_surv)
         print('birth tracks', len(LMB_birth))
         print('surv tracks', len(LMB_surv))
-        
-        
-        
 
         # Corrector Step
-        if tk in meas_dict:
-            Zk = meas_dict[tk]['Zk_list']
-            center_list = meas_dict[tk]['center_list']
-            sensor_id_list = meas_dict[tk]['sensor_id_list']
-            
-            LMB_surv = lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list,
-                                     sensor_id_list, meas_fcn, params_dict)
-            
-            LMB_dict = copy.deepcopy(LMB_surv)
-            
-        else:
-            Zk = []
-            center_list = []
-            sensor_id_list = []
-            LMB_dict = copy.deepcopy(LMB_surv)
-            LMB_dict.update(LMB_birth)
-            
+        Zk = meas_dict[tk]['Zk_list']
+        sensor_id_list = meas_dict[tk]['sensor_id_list']
+        LMB_dict = lmb_corrector(LMB_birth, LMB_surv, tk, Zk, sensor_id_list,
+                                 meas_fcn, params_dict)
         
-        print('')
-        print('tk', tk)
         print('corrector')
-        print(LMB_dict)
-        print('nlabels', len(LMB_dict))
+        # print('ncomps', len(GMM_dict['weights']))
+        # print('Nk est', sum(GMM_dict['weights']))
         
-
         # Prune/Merge Step
         LMB_dict = lmb_cleanup(LMB_dict, params_dict)
         
-        print('')
-        print('tk', tk)
         print('merge')
-        print(LMB_dict)
-        print('nlabels', len(LMB_dict))
-
+        # print('ncomps', len(GMM_dict['weights']))
+        # print('Nk est', sum(GMM_dict['weights']))
+        
         
         # State extraction and residuals calculation
         pk, Nk, labelk_list, rk_list, Xk_list, Pk_list, resids_k = \
@@ -608,17 +556,9 @@ def lmb_filter(state_dict, truth_dict, meas_dict, birth_time_dict, meas_fcn, par
                                  params_dict)
             
             
-        print('')
-        print('tk', tk)
-        print('state extraction')
-        print('pk', pk)
-        print('Nk', Nk)
-        print('labelk_list', labelk_list)
-        print('rk_list', rk_list)
-        print('Xk_list', Xk_list)
-        print('Pk_list', Pk_list)
-        print('resids', resids_k)
-
+        
+        # print('wk_list', wk_list)
+        
         
         # Store output
         filter_output[tk] = {}
@@ -642,7 +582,7 @@ def lmb_filter(state_dict, truth_dict, meas_dict, birth_time_dict, meas_fcn, par
 
 
 
-def lmb_predictor(LMB_birth, LMB_surv, tin, params_dict):
+def lmb_predictor(LMB_dict, tin, params_dict):
     '''
     
     
@@ -655,7 +595,7 @@ def lmb_predictor(LMB_birth, LMB_surv, tin, params_dict):
     int_params = params_dict['int_params']
     
     # Copy input to ensure pass by value
-    LMB_surv = copy.deepcopy(LMB_surv)
+    LMB_dict = copy.deepcopy(LMB_dict)
     filter_params = copy.deepcopy(filter_params)
     state_params = copy.deepcopy(state_params)
     int_params = copy.deepcopy(int_params)
@@ -685,46 +625,41 @@ def lmb_predictor(LMB_birth, LMB_surv, tin, params_dict):
         delta_t = (tk - tk_prior)*86400.
     elif time_format == 'datetime':
         delta_t = (tk - tk_prior).total_seconds()
-        
-    print('delta_t', delta_t)
 
 
     # Birth Components
-    # birth_model = filter_params['birth_model']
-    
+    birth_model = filter_params['birth_model']
+    LMB_birth = {}
+    for ii in birth_model.keys():
+        label = (tk, ii)
+        LMB_birth[label] = {}        
+        LMB_birth[label]['r'] = birth_model[ii]['r_birth']
+        LMB_birth[label]['weights'] = birth_model[ii]['weights']
+        LMB_birth[label]['means'] = birth_model[ii]['means']
+        LMB_birth[label]['covars'] = birth_model[ii]['covars']
 
+    
 
     # Check if propagation is needed
     if delta_t == 0.:
+        LMB_surv = LMB_dict
         return LMB_birth, LMB_surv
     
     # Surviving components
     # Initialize for integrator
     # Loop over labels
-    label_list = list(LMB_surv.keys())
-    
-    print('label_list', label_list)
-    
-    LMB_surv2 = {}
+    label_list = list(LMB_dict.keys())
+    LMB_surv = {}
     for label in label_list:
         
         # Retrieve current GMM
-        r = LMB_surv[label]['r']
-        weights = LMB_surv[label]['weights']
-        means = LMB_surv[label]['means']
-        covars = LMB_surv[label]['covars']    
+        r = LMB_dict[label]['r']
+        weights = LMB_dict[label]['weights']
+        means = LMB_dict[label]['means']
+        covars = LMB_dict[label]['covars']    
         ncomp = len(weights)
         nstates = len(means[0])
         npoints = 2*nstates + 1
-        
-        print('label', label)
-        print('r', r)
-        print('weights', weights)
-        print('means', means)
-        print('covars', covars)
-        print('ncomp', ncomp)
-        print('nstates', nstates)
-        print('npoints', npoints)
     
         # Loop over components
         for jj in range(ncomp):
@@ -733,8 +668,6 @@ def lmb_predictor(LMB_birth, LMB_surv, tin, params_dict):
     #        print('jj', jj)
     #        print('ncomp', len(weights))
     #        print('t0', t0_list[jj])
-    
-            # print('jj', jj)
             
             # Retrieve component values
             wj = weights[jj]
@@ -747,8 +680,6 @@ def lmb_predictor(LMB_birth, LMB_surv, tin, params_dict):
             Xrep = np.tile(mj, (1, nstates))
             chi = np.concatenate((mj, Xrep+(gam*sqP), Xrep-(gam*sqP)), axis=1)
             chi_v = np.reshape(chi, (nstates*npoints, 1), order='F')
-            
-            # print('chi_v', chi_v)
             
             # Integrate sigma points
             int0 = chi_v.flatten()
@@ -768,7 +699,7 @@ def lmb_predictor(LMB_birth, LMB_surv, tin, params_dict):
                 
                 # Zero out SNC for long time gaps
                 Gamma = np.zeros((nstates,q))
-                if delta_t > gap_seconds:   
+                if delta_t < gap_seconds:   
                     Gamma[0:q,:] = (delta_t**2./2) * np.eye(q)
                     Gamma[q:2*q,:] = delta_t * np.eye(q)
                 
@@ -777,7 +708,7 @@ def lmb_predictor(LMB_birth, LMB_surv, tin, params_dict):
             elif snc_flag == 'qfull':
                 
                 # Zero out SNC for long time gaps
-                if delta_t > gap_seconds:   
+                if delta_t < gap_seconds:   
                     Q = np.zeros((q,q))
                 
                 Pbar = np.dot(chi_diff, np.dot(diagWc, chi_diff.T)) + Q
@@ -788,115 +719,18 @@ def lmb_predictor(LMB_birth, LMB_surv, tin, params_dict):
             covars[jj] = Pbar
 
         # Store LMB
-        LMB_surv2[label] = {}
-        LMB_surv2[label]['r'] = r*p_surv
-        LMB_surv2[label]['weights'] = weights
-        LMB_surv2[label]['means'] = means
-        LMB_surv2[label]['covars'] = covars
-        
-        
-    # Birth components
-    # Initialize for integrator
-    # Loop over labels
-    label_list = list(LMB_birth.keys())
-    
-    print('label_list', label_list)
-    
-    LMB_birth2 = {}
-    for label in label_list:
-        
-        # Retrieve current GMM
-        r = LMB_birth[label]['r']
-        weights = LMB_birth[label]['weights']
-        means = LMB_birth[label]['means']
-        covars = LMB_birth[label]['covars']    
-        ncomp = len(weights)
-        nstates = len(means[0])
-        npoints = 2*nstates + 1
-        
-        print('label', label)
-        print('r', r)
-        print('weights', weights)
-        print('means', means)
-        print('covars', covars)
-        print('ncomp', ncomp)
-        print('nstates', nstates)
-        print('npoints', npoints)
-    
-        # Loop over components
-        for jj in range(ncomp):
-            
-    #        print('\nstart loop')
-    #        print('jj', jj)
-    #        print('ncomp', len(weights))
-    #        print('t0', t0_list[jj])
-    
-            # print('jj', jj)
-            
-            # Retrieve component values
-            wj = weights[jj]
-            mj = means[jj]
-            Pj = covars[jj]
-            tin = [tk_prior, tk]
-                
-            # Compute sigma points
-            sqP = np.linalg.cholesky(Pj)
-            Xrep = np.tile(mj, (1, nstates))
-            chi = np.concatenate((mj, Xrep+(gam*sqP), Xrep-(gam*sqP)), axis=1)
-            chi_v = np.reshape(chi, (nstates*npoints, 1), order='F')
-            
-            # print('chi_v', chi_v)
-            
-            # Integrate sigma points
-            int0 = chi_v.flatten()
-            tout, intout = \
-                dyn.general_dynamics(int0, tin, state_params, int_params)
-    
-            # Retrieve output state        
-            chi_v = intout[-1,:]
-            chi = np.reshape(chi_v, (nstates, npoints), order='F')
-    
-            Xbar = np.dot(chi, Wm.T)
-            Xbar = np.reshape(Xbar, (nstates, 1))
-            chi_diff = chi - np.dot(Xbar, np.ones((1, npoints)))
-    
-            # State Noise Compensation            
-            if snc_flag == 'gamma':
-                
-                # Zero out SNC for long time gaps
-                Gamma = np.zeros((nstates,q))
-                if delta_t > gap_seconds:   
-                    Gamma[0:q,:] = (delta_t**2./2) * np.eye(q)
-                    Gamma[q:2*q,:] = delta_t * np.eye(q)
-                
-                Pbar = np.dot(chi_diff, np.dot(diagWc, chi_diff.T)) + np.dot(Gamma, np.dot(Q, Gamma.T))
-                
-            elif snc_flag == 'qfull':
-                
-                # Zero out SNC for long time gaps
-                if delta_t > gap_seconds:   
-                    Q = np.zeros((q,q))
-                
-                Pbar = np.dot(chi_diff, np.dot(diagWc, chi_diff.T)) + Q
-    
-            # Store GMM components
-            weights[jj] = wj
-            means[jj] = Xbar
-            covars[jj] = Pbar
-
-        # Store LMB
-        LMB_birth2[label] = {}
-        LMB_birth2[label]['r'] = r*p_surv
-        LMB_birth2[label]['weights'] = weights
-        LMB_birth2[label]['means'] = means
-        LMB_birth2[label]['covars'] = covars
+        LMB_surv[label] = {}
+        LMB_surv[label]['r'] = r*p_surv
+        LMB_surv[label]['weights'] = weights
+        LMB_surv[label]['means'] = means
+        LMB_surv[label]['covars'] = covars
 
 
-    return LMB_birth2, LMB_surv2
+    return LMB_birth, LMB_surv
 
 
 
-def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list, sensor_id_list, meas_fcn, params_dict):
+def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, sensor_id_list, meas_fcn, params_dict):
     '''
     
     
@@ -918,14 +752,10 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list, sensor_id_list, meas
     gam = filter_params['gam']
     Wm = filter_params['Wm']
     diagWc = filter_params['diagWc']
+    p_det = filter_params['p_det']
     nstates = state_params['nstates']
     npoints = 2*nstates + 1
     nmeas = len(Zk)
-    
-    # EOP data
-    eop_alldata = sensor_params['eop_alldata']
-    XYs_df = sensor_params['XYs_df']
-    EOP_data = eop.get_eop_data(eop_alldata, tk) 
     
     # Form GLMB from input LMB
     GLMB_birth = lmb2glmb(LMB_birth, H_max_birth)
@@ -938,17 +768,12 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list, sensor_id_list, meas
 
     
     # Combine and normalize weights
-    GLMB_dict = combine_glmb(GLMB_birth, GLMB_surv, H_max)
+    GLMB_dict = combine_glmb(GLMB_birth, GLMB_surv)
     wsum = 0.
     for hyp in GLMB_dict:
         wsum += GLMB_dict[hyp]['hyp_weight']
     for hyp in GLMB_dict:
         GLMB_dict[hyp]['hyp_weight'] *= (1./wsum)
-        
-    
-    print('nbirth hyp', len(GLMB_birth))
-    print('nsurv hyp', len(GLMB_surv))
-    print('ntotal hyp', len(GLMB_dict))
         
     
     print('GLMB_dict', GLMB_dict)
@@ -958,14 +783,13 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list, sensor_id_list, meas
         total_weight += GLMB_dict[hyp]['hyp_weight']
         
     print('total hyp weight', total_weight)
-    
 
     # Get unique sensor id's
     unique_sensors = list(set(sensor_id_list))
     
     # Components for missed detection case
     LMB_bar = combine_lmb(LMB_birth, LMB_surv)
-    full_label_list = sorted(list(LMB_bar.keys()))
+    full_label_list = list(LMB_bar.keys())
     track_update = {}
     tind = 0
     for label in full_label_list:
@@ -978,68 +802,7 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list, sensor_id_list, meas
         track_update[tind]['meas_ind'] = 'missed'
         tind += 1
         
-        
-    pd_start = time.time()
-    # Generate state dependent pd_table
-    merge_all_params = {}
-    merge_all_params['prune_T'] = 1e-5
-    merge_all_params['merge_U'] = 1e6
-    pd_table = np.zeros((len(sensor_id_list), len(full_label_list)))
-    for ii in range(len(sensor_id_list)):
-        
-        sensor_id = sensor_id_list[ii]
-        fov_center = center_list[ii]
-        sensor = sensor_params[sensor_id]
-        sensor_itrf = sensor['site_ecef']
-        pd_sensor = sensor['p_det']
-        FOV_hlim = sensor['FOV_hlim']
-        FOV_vlim = sensor['FOV_vlim']
-        sensor_gcrf, dum = coord.itrf2gcrf(sensor_itrf, np.zeros((3,1)), tk,
-                                           EOP_data, XYs_df)
-        
-        for jj in range(len(full_label_list)):
-            
-            label = full_label_list[jj]
-            GMM_dict = {}
-            GMM_dict['weights'] = LMB_bar[label]['weights']
-            GMM_dict['means'] = LMB_bar[label]['means']
-            GMM_dict['covars'] = LMB_bar[label]['covars']
-            GMM_dict = est.merge_GMM(GMM_dict, merge_all_params)
-            ind = GMM_dict['weights'].index(max(GMM_dict['weights']))
-            r_gcrf = GMM_dict['means'][ind][0:3].reshape(3,1)
-            
-            rg = np.linalg.norm(r_gcrf - sensor_gcrf)
-            rho_hat_gcrf = (r_gcrf - sensor_gcrf)/rg
-            
-            ra = math.atan2(rho_hat_gcrf[1], rho_hat_gcrf[0])
-            dec = math.asin(rho_hat_gcrf[2])
-            
-            zbar = np.array([[ra], [dec]])
-            
-            pd_fov = 1.
-            zbar_test = zbar - fov_center
-            
-            # Angle rollover in RA
-            if zbar_test[0] > np.pi:
-                zbar_test[0] -= 2.*np.pi
-            if zbar_test[0] < -np.pi:
-                zbar_test[0] += 2.*np.pi                        
-            
-            if (zbar_test[0] < FOV_hlim[0] or zbar_test[0] > FOV_hlim[1] 
-                or zbar_test[1] < FOV_vlim[0] or zbar_test[1] > FOV_vlim[1]):
-                
-                pd_fov = 0.
-            
-            # Multiply to get full pd
-            pd_table[ii,jj] = pd_sensor*pd_fov
-    
-    
-    
-    print(pd_table)
-    print('pd_time', time.time() - pd_start)
-
-        
-    # print(track_update)
+    print(track_update)
 
     # Loop over each measurement and compute updates
     allcost_mat = np.zeros((len(full_label_list), nmeas))
@@ -1048,7 +811,6 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list, sensor_id_list, meas
         # Retrieve measurement
         zi = Zk[ii]
         sensor_id = sensor_id_list[ii]
-        center = center_list[ii]
     
         # Loop over tracks
         for tt in range(len(full_label_list)):
@@ -1057,8 +819,6 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list, sensor_id_list, meas
             means0 = LMB_bar[label]['means']
             covars0 = LMB_bar[label]['covars']
             
-            p_det = pd_table[ii,tt]
-            
             # Loop over components
             ncomp = len(weights0)
             qk_list = []
@@ -1066,7 +826,6 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list, sensor_id_list, meas
             covars = []
             for jj in range(ncomp):        
                 
-                wj = weights0[jj]
                 mj = means0[jj]
                 Pj = covars0[jj]
                 
@@ -1085,7 +844,6 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list, sensor_id_list, meas
                 Pxy = np.dot(chi_diff,  np.dot(diagWc, z_diff.T))
                 
                 print('')
-                print(tk)
                 print('ii', ii)
                 print('zi', zi)
                 print('label', label)
@@ -1127,20 +885,16 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list, sensor_id_list, meas
             
             # Normalize updated weights (this will always sum to 1?)
             # Vo, Vo, Phung 2014 Eq 27-28
-            # p_det = compute_pd_statedep(tk, [wj], [mj], [Pj], meas_fcn, sensor_id,
-            #                             center, state_params, filter_params, 
-            #                             sensor_params)
             factor = p_det/clutter_intensity(zi, sensor_id, sensor_params)            
             
-            # print('factor', factor)
-            # print('p_det', p_det)
-            # print('clutter', clutter_intensity(zi, sensor_id, sensor_params))
-            # print('weights0', weights0)
-            # print('qk_list', qk_list)
-            # print('machine_eps', machine_eps)
+            print('factor', factor)
+            print('p_det', p_det)
+            print('clutter', clutter_intensity(zi, sensor_id, sensor_params))
+            print('weights0', weights0)
+            print('qk_list', qk_list)
+            print('machine_eps', machine_eps)
             
             
-            # Do not normalize weights - used later for likelihood calculation
             weights = [a1*a2*factor + machine_eps for a1,a2 in zip(weights0, qk_list)]
             sum_weights = sum(weights)
             # weights = [wi/sum_weights for wi in weights]
@@ -1160,21 +914,21 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list, sensor_id_list, meas
             # Update cost matrix (Vo, Vo, Phung 2014 Eq 26)
             # allcost_mat[tt,ii] = machine_eps + factor*sum_weights/(1.-p_det)
             
-            # weights2 = [a1*a2 + machine_eps for a1,a2 in zip(weights0, qk_list)]
-            # print('sum_weights', sum_weights)
-            # print('sum_weights2', sum(weights2))
-            # print('entry check', p_det/(1. - p_det)*sum(weights2)/clutter_intensity(zi, sensor_id, sensor_params))
+            weights2 = [a1*a2 + machine_eps for a1,a2 in zip(weights0, qk_list)]
+            print('sum_weights', sum_weights)
+            print('sum_weights2', sum(weights2))
+            print('entry check', p_det/(1. - p_det)*sum(weights2)/clutter_intensity(zi, sensor_id, sensor_params))
             
             allcost_mat[tt,ii] = sum_weights/(1. - p_det)
             
-        # print('check column allcost_mat')
-        # print('meas_ind', ii)
-        # print('zi', zi)
-        # print(allcost_mat[:,ii])
+        print('check column allcost_mat')
+        print('meas_ind', ii)
+        print('zi', zi)
+        print(allcost_mat[:,ii])
         
         # mistake
           
-    # print(allcost_mat)
+    print(allcost_mat)
 
     
     # # TEST ONLY
@@ -1191,9 +945,8 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list, sensor_id_list, meas
     # print(assign_lists)
     
     # Reference Mahler (2014) Eq 15.191 for labeled RFS measurement likelihood
-    # function. Using Vo Matlab code log likelihood formulation.
+    # function
 
-    start_update = time.time()
             
     # Measurement update
     # All missed detections
@@ -1207,46 +960,11 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list, sensor_id_list, meas
             hyp_weight = GLMB_dict[hyp]['hyp_weight']
             label_list = GLMB_dict[hyp]['label_list']
             nlabel = len(label_list)
+            GLMB_dict[hyp]['hyp_weight'] = hyp_weight*(1-p_det)**nlabel
             
-            
-            # TODO - Work out how to handle multisensor case where each
-            # could have a different clutter rate lam_clutter
-            
-            # Single sensor case
-            # sensor_id = sensor_id_list[0]
-            # center = center_list[0]
-            sensor_id = 'RMIT ROO'
-            lam_clutter = sensor_params[sensor_id]['lam_clutter']
-            
-            log_likelihood = -lam_clutter + np.log(hyp_weight)
-            
-            for label in label_list:
-                
-                weights = GLMB_dict[hyp][label]['weights']
-                means = GLMB_dict[hyp][label]['means']
-                covars = GLMB_dict[hyp][label]['covars']
-                
-                # p_det = compute_pd_statedep(tk, weights, means, covars, meas_fcn,
-                #                             sensor_id, center, state_params,
-                #                             filter_params, sensor_params)
-                
-                # if len(sensor_id_list)
-                
-                # label_ind = full_label_list.index(label)
-                # p_det = pd_table[0,label_ind]
-                
-                # TODO - fix this to handle missed detections properly, need
-                # sensor pointing information even when no meas recorded
-                # For now, assume nmeas=0 corresponds to a birth time when
-                # no measurements were attempted, so pd = 0
-                p_det = 0.
-                
-                
-                log_likelihood += np.log(1. - p_det)
-            
-            
-            GLMB_dict[hyp]['hyp_weight'] = np.exp(log_likelihood)
-            
+            for sensor_id in unique_sensors:
+                lam_clutter = sensor_params[sensor_id]['lam_clutter']
+                GLMB_dict[hyp]['hyp_weight'] *= np.exp(-lam_clutter)
             
             # No measurements to update tracks/state estimates
     else:
@@ -1259,16 +977,9 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list, sensor_id_list, meas
             nlabel = len(label_list)
             
             print('')
-            print(tk)
             print('hyp', hyp)
             print('hyp_weight', hyp_weight)
             print('label_list', label_list)
-            
-            assign_time = 0.
-            pd_time = 0.
-            clutter_time = 0.
-            missed_time = 0.
-            det_time = 0.
             
             # No tracks means all measurements are clutter
             if nlabel == 0:
@@ -1296,31 +1007,17 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list, sensor_id_list, meas
                 # Single sensor case
                 sensor_id = sensor_id_list[0]
                 lam_clutter = sensor_params[sensor_id]['lam_clutter']
-                # likelihood = np.exp(-lam_clutter)
-                # for ii in range(nmeas):
-                #     zi = Zk[ii]
-                #     sensor_id = sensor_id_list[ii]
-                #     likelihood *= clutter_intensity(zi, sensor_id, sensor_params)
-                
-                log_likelihood = -lam_clutter + np.log(hyp_weight)
+                likelihood = np.exp(-lam_clutter)
                 for ii in range(nmeas):
                     zi = Zk[ii]
                     sensor_id = sensor_id_list[ii]
-                    log_likelihood += np.log(clutter_intensity(zi, sensor_id, sensor_params))
-                
-                # Update hypothesis weight, no tracks to update
-                GLMB_dict[hyp]['hyp_weight'] = np.exp(log_likelihood)
-                
-                
-                # print('no meas all clutter')
-                # print('likelihood', GLMB_dict[hyp]['hyp_weight'])
-                
+                    likelihood *= clutter_intensity(zi, sensor_id, sensor_params)
+                    
+                    
+                    
             
             # Compute measurement to track associations
             else:
-                
-                # print('assign')
-                # print(time.time() - start_update)
                 
                 # Need to replace the current hypothesis with new ones spawned
                 # by it
@@ -1335,23 +1032,19 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list, sensor_id_list, meas
                 cost_mat = allcost_mat[label_inds,:]
                 neglog_mat = -np.log(cost_mat)
                 
-                # print('')
-                # print('hyp', hyp)
-                # print('hyp_weight', hyp_weight)
-                # print('label_list', label_list)
-                # print('cost_mat', cost_mat)
-                
-                start_assign = time.time()
+                print('')
+                print('hyp', hyp)
+                print('hyp_weight', hyp_weight)
+                print('label_list', label_list)
+                print('cost_mat', cost_mat)
                 
                 # Compute measurement to track assignments
                 kbest = int(np.ceil(np.sqrt(H_max*hyp_weight)))
                 assign_lists = glmb_kbest_assignments(neglog_mat, kbest)
                 
-                assign_time += time.time() - start_assign
-                
-                # print('kbest', kbest)
-                # print('assign_lists', assign_lists)
-                # print('nmeas', nmeas)
+                print('kbest', kbest)
+                print('assign_lists', assign_lists)
+                print('nmeas', nmeas)
                 
 
                 
@@ -1359,12 +1052,9 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list, sensor_id_list, meas
                 new_hyp_list = []
                 for alist in assign_lists:
                     
-                    # print('alist', alist)
-                    # print(time.time() - start_update)
-                    
                     # Create a new hypothesis for each new assignment
                     GLMB_dict[new_hyp_ind] = {}
-                    # GLMB_dict[new_hyp_ind]['hyp_weight'] = hyp_weight
+                    GLMB_dict[new_hyp_ind]['hyp_weight'] = hyp_weight
                     GLMB_dict[new_hyp_ind]['label_list'] = label_list
                     
                     # TODO - Work out how to handle multisensor case where each
@@ -1373,56 +1063,7 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list, sensor_id_list, meas
                     # Single sensor case
                     sensor_id = sensor_id_list[0]
                     lam_clutter = sensor_params[sensor_id]['lam_clutter']
-                    # likelihood = np.exp(-lam_clutter)
-                    # for ii in range(nmeas):
-                    #     zi = Zk[ii]
-                    #     sensor_id = sensor_id_list[ii]
-                    #     likelihood *= clutter_intensity(zi, sensor_id, sensor_params)
-
-                    # # TODO - incorporate state and label dependent p_det
-                    # likelihood *= (1-p_det)**nlabel
-                    
-                    start_clutter = time.time()
-                    log_likelihood = -lam_clutter + np.log(hyp_weight)
-                    for ii in range(nmeas):
-                        zi = Zk[ii]
-                        sensor_id = sensor_id_list[ii]
-                        log_likelihood += np.log(clutter_intensity(zi, sensor_id, sensor_params))
-                        
-                    clutter_time += time.time() - start_clutter
-                        
-                    # print('external setup')
-                    # print(time.time() - start_update)
-                    
-                    # TODO - work out how to handle multisensor case where
-                    # each could have different pointing/p_det
-                    for nn in range(nlabel):
-                        
-                        # Single sensor, 1 center value for all meas at this time
-                        center = center_list[0]
-                        
-                        # Retrieve state information for this track
-                        label = label_list[nn]
-                        # weights = GLMB_dict[hyp][label]['weights']
-                        # means = GLMB_dict[hyp][label]['means']
-                        # covars = GLMB_dict[hyp][label]['covars']                        
-                        
-                        # # Compute state dependent p_det for this track
-                        start_pd = time.time()
-                        # p_det = compute_pd_statedep(tk, weights, means, covars, meas_fcn,
-                        #                             sensor_id, center, state_params,
-                        #                             filter_params, sensor_params)
-                        
-                        p_det = pd_table[0,full_label_list.index(label)]
-                        
-                        pd_time += time.time() - start_pd
-                        
-                        log_likelihood += np.log(1. - p_det)
-                    
-                    # print('actual assign')
-                    # print(time.time() - start_update)
-                    
-                    
+                    likelihood = np.exp(-lam_clutter)
                     
                     # Loop over tracks
                     for jj in range(len(alist)):
@@ -1430,41 +1071,18 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list, sensor_id_list, meas
                         label = label_list[jj]
                         meas_ind = alist[jj]
                         
+                        #######################################################
+                        # TODO CHECK RETRIEVAL OF TIND
+                        #######################################################
                         
-                        # TODO - work out how to handle multisensor case where
-                        # each could have different pointing/p_det
-                        
-                        # Single sensor, 1 center value for all meas at this time
-                        center = center_list[0]
-                        
-                        # Retrieve state information for this track
-                        # weights = GLMB_dict[hyp][label]['weights']
-                        # means = GLMB_dict[hyp][label]['means']
-                        # covars = GLMB_dict[hyp][label]['covars']
-                        
-                        # Compute state dependent p_det for this track
-                        start_pd = time.time()
-                        # p_det = compute_pd_statedep(tk, weights, means, covars, meas_fcn,
-                        #                             sensor_id, center, state_params,
-                        #                             filter_params, sensor_params)
-                        
-                        p_det = pd_table[0,full_label_list.index(label)]
-                        
-                        pd_time += time.time() - start_pd
-                        
-                        
-                        # print('alist', alist)
-                        # print('label_list', label_list)
-                        # print('jj', jj)
-                        # print('label', label)
-                        # print('meas_ind', meas_ind)
-                        
-                        
+                        print('alist', alist)
+                        print('label_list', label_list)
+                        print('jj', jj)
+                        print('label', label)
+                        print('meas_ind', meas_ind)
                         
                         # Missed detection                        
                         if meas_ind >= nmeas:
-                            
-                            start_missed = time.time()
                             
                             # Compute update to track GMM
                             tind = full_label_list.index(label)
@@ -1473,19 +1091,16 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list, sensor_id_list, meas
                             means = track_update[tind]['means']
                             covars = track_update[tind]['covars']
                             
-                            # print('missed det')
-                            # print('tind', tind)
-                            # print('label', track_update[tind]['label'])
-                            # print('meas_ind', track_update[tind]['meas_ind'])
+                            print('missed det')
+                            print('tind', tind)
+                            print('label', track_update[tind]['label'])
+                            print('meas_ind', track_update[tind]['meas_ind'])
                             
                             weights = [(1. - p_det)*wi for wi in weights]
                             
                             # Incorporate likelihood
                             eta = sum(weights)
-                            # likelihood *= eta
-                            
-                            
-                            log_likelihood += 0.
+                            assignment_likelihood *= eta
                             
                             # Normalize weights
                             weights = [wi/eta for wi in weights]
@@ -1496,13 +1111,9 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list, sensor_id_list, meas
                             GLMB_dict[new_hyp_ind][label]['weights'] = weights
                             GLMB_dict[new_hyp_ind][label]['means'] = means
                             GLMB_dict[new_hyp_ind][label]['covars'] = covars
-                            
-                            missed_time += time.time() - start_missed
 
                         # Detection
                         else:
-                            
-                            start_det = time.time()
                             
                             zi = Zk[meas_ind]
                             sensor_id = sensor_id_list[meas_ind]
@@ -1515,16 +1126,14 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list, sensor_id_list, meas
                             covars = track_update[tind]['covars']
                             qk_list = track_update[tind]['qk_list']
                             
-                            # print('det')
-                            # print('tind', tind)
-                            # print('label', track_update[tind]['label'])
-                            # print('meas_ind', track_update[tind]['meas_ind'])
+                            print('det')
+                            print('tind', tind)
+                            print('label', track_update[tind]['label'])
+                            print('meas_ind', track_update[tind]['meas_ind'])
                             
-                            # Incorporate likelihood (includes p_det from before)
+                            # Incorporate likelihood
                             eta = sum(weights)
-                            # likelihood *= eta
-                            
-                            log_likelihood += np.log(cost_mat[jj,meas_ind])
+                            assignment_likelihood *= eta
                             
                             # Normalize weights
                             weights = [wi/eta for wi in weights]
@@ -1536,41 +1145,40 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list, sensor_id_list, meas
                             GLMB_dict[new_hyp_ind][label]['means'] = means
                             GLMB_dict[new_hyp_ind][label]['covars'] = covars
                             
-                            det_time += time.time() - start_det
                             
-                    # Compute likelihood
-                    likelihood = np.exp(log_likelihood)
+                    # Account for measurements not assigned to tracks as clutter
+                    # Not needed, included in denominator of factor?
                     
+                    
+                    
+                    
+                            
                     # Store likelihood
                     new_hyp_list.append(new_hyp_ind)
-                    likelihood_list.append(likelihood)
+                    likelihood_list.append(assignment_likelihood)
             
                     # Increment hypothesis index
                     new_hyp_ind += 1
                     
+                # Normalize likelihood list to get updated hypothesis weights
+                # prob_list = [eta/sum(likelihood_list) for eta in likelihood_list]
                 
-                # print('new_hyp_list', new_hyp_list)
-                # print('likelihood_list', likelihood_list)
-
+                
+                print('new_hyp_list', new_hyp_list)
+                print('likelihood_list', likelihood_list)
+                # print('prob_list', prob_list)
+                
                 
                 
                 # Update hypothesis weights in GLMB_dict
                 for hh in range(len(new_hyp_list)):
                     new_hyp_ind2 = new_hyp_list[hh]
-                    likelihood = float(likelihood_list[hh])
-                    GLMB_dict[new_hyp_ind2]['hyp_weight'] = likelihood
+                    # prob = prob_list[hh]
+                    likelihood = likelihood_list[hh]
                     
-    
-    print('update time', time.time() - start_update)
-    # print('assign_time', assign_time)
-    # print('pd_time', pd_time)
-    # print('clutter_time', clutter_time)
-    # print('missed_time', missed_time)
-    # print('det_time', det_time)
-    
-    # mistake
-    
-    
+                    GLMB_dict[new_hyp_ind2]['hyp_weight'] *= likelihood
+                    
+                
     # Delete old hypotheses
     for hyp in hyp_del_list:
         del GLMB_dict[hyp]
@@ -1600,8 +1208,8 @@ def lmb_corrector(LMB_birth, LMB_surv, tk, Zk, center_list, sensor_id_list, meas
     print('LMB posterior')
     print(LMB_dict)
     
-
-
+    mistake
+    
     return LMB_dict
 
 
@@ -1688,7 +1296,7 @@ def glmb2lmb(GLMB_dict, full_label_list=[]):
     return LMB_dict
 
 
-def combine_glmb(GLMB_birth, GLMB_surv, H_max=1000):
+def combine_glmb(GLMB_birth, GLMB_surv):
     
     
     hyp_list_birth = list(GLMB_birth.keys())
@@ -1735,33 +1343,7 @@ def combine_glmb(GLMB_birth, GLMB_surv, H_max=1000):
 
             # Increment hypothesis index
             hyp_ind += 1
-            
-    # Reduce to H_max entries and/or avoid divide by zero for small 
-    # probability hypotheses
-    if len(GLMB_dict) > H_max:
-        
-        weight_list = []
-        for hyp in GLMB_dict:
-            weight_list.append(GLMB_dict[hyp]['hyp_weight'])
-            
-        sorted_weights = sorted(weight_list, reverse=True)
-        wmin = sorted_weights[H_max-1]
-        wmin = max(wmin, 1e-10)
-    else:
-        wmin = 1e-10
-        
     
-    wsum = 0.
-    hyp_list = list(GLMB_dict.keys())
-    for hyp in hyp_list:
-        if GLMB_dict[hyp]['hyp_weight'] < wmin:
-            del GLMB_dict[hyp]
-        else:
-            wsum += GLMB_dict[hyp]['hyp_weight']
-    
-    # Renormalize weights
-    for hyp in GLMB_dict:
-        GLMB_dict[hyp]['hyp_weight'] *= (1./wsum)
     
     return GLMB_dict
 
@@ -1777,9 +1359,6 @@ def combine_lmb(LMB_dict1, LMB_dict2):
 
 def lmb_cleanup(LMB_in, params_dict):
     
-    print('')
-    print('LMB Cleanup')
-    
     filter_params = params_dict['filter_params']
     T_max = filter_params['T_max']
     T_threshold = filter_params['T_threshold']
@@ -1793,14 +1372,9 @@ def lmb_cleanup(LMB_in, params_dict):
     # Compute minimum existence probability to keep
     if len(r_list) > T_max:
         sorted_r = sorted(r_list)
-        rmin = max([T_threshold, sorted_r[T_max]])
+        rmin = min([T_threshold, sorted_r[T_max]])
     else:
         rmin = T_threshold
-        
-    print('r_list', r_list)
-    print('ntracks', len(r_list))
-    print('T_max', T_max)
-    print('rmin')
         
     # Only keep tracks with r greater than rmin
     LMB_dict = {}
@@ -1823,19 +1397,12 @@ def lmb_cleanup(LMB_in, params_dict):
             LMB_dict[label]['weights'] = GMM_dict['weights']
             LMB_dict[label]['means'] = GMM_dict['means']
             LMB_dict[label]['covars'] = GMM_dict['covars']
-            
-            
-    print('Cleaned LMB')
-    # print(LMB_dict)
 
     return LMB_dict
 
 
 def lmb_state_extraction(LMB_dict, tk, Zk, sensor_id_list, meas_fcn,
                          params_dict):
-    
-    print('')
-    print('state_extraction')
     
     # Break out inputs
     state_params = params_dict['state_params']
@@ -1894,7 +1461,6 @@ def lmb_state_extraction(LMB_dict, tk, Zk, sensor_id_list, meas_fcn,
     # Calculate residuals
     resids_out = []
     if len(rk_list) > 0:
-        
         for ii in range(len(Zk)):
             zi = Zk[ii]
             sensor_id = sensor_id_list[ii]
@@ -1903,32 +1469,20 @@ def lmb_state_extraction(LMB_dict, tk, Zk, sensor_id_list, meas_fcn,
             for jj in range(len(Xk_list)):
                 Xj = Xk_list[jj]            
                 zbar = mfunc.compute_measurement(Xj, state_params, sensor_params,
-                                                  sensor_id, tk)
+                                                 sensor_id, tk)
                 resids = zi - zbar
                 resids_list.append(resids)
-
+                
             # Take smallest magnitude as residual for this measurement
             min_list = [np.linalg.norm(resid) for resid in resids_list]
             resids_k = resids_list[min_list.index(min(min_list))]
             resids_out.append(resids_k)
-            
-            print(resids_list)
-            print(min_list)
-            print(resids_k)
-            
-            
-    print(resids_out)
-    print('')
-    
-
     
     
     return pk, Nk, labelk_list, rk_list, Xk_list, Pk_list, resids_out
 
 
 def compute_hypothesis_dict(r_list, label_list, H_max=1000):
-    
-    print('compute hypothesis dict')
     
     hyp_dict = {}
     
@@ -1989,93 +1543,6 @@ def compute_hypothesis_dict(r_list, label_list, H_max=1000):
 ###############################################################################
 # Utility Functions
 ###############################################################################
-
-
-def compute_pd_statedep(tk, weights, means, covars, meas_fcn, sensor_id,
-                        fov_center, state_params, filter_params, 
-                        sensor_params):
-    
-    
-    # Break out inputs
-    # gam = filter_params['gam']
-    # Wm = filter_params['Wm']
-    sensor = sensor_params[sensor_id]
-    pd_sensor = sensor['p_det']
-    FOV_hlim = sensor['FOV_hlim']
-    FOV_vlim = sensor['FOV_vlim']
-    
-    # Form GMM and merge components
-    GMM_dict = {}
-    GMM_dict['weights'] = weights
-    GMM_dict['means'] = means
-    GMM_dict['covars'] = covars
-    
-    params = {}
-    params['prune_T'] = 1e-5
-    params['merge_U'] = 1e6
-    GMM_dict = est.merge_GMM(GMM_dict, params)
-    
-    ind = GMM_dict['weights'].index(max(GMM_dict['weights']))
-    mj = GMM_dict['means'][ind]
-    # Pj = GMM_dict['covars'][ind]
-    # nstates = len(mj)
-    
-    eop_alldata = sensor_params['eop_alldata']
-    EOP_data = eop.get_eop_data(eop_alldata, tk)  
-    XYs_df = sensor_params['XYs_df']  
-    
-    sensor_itrf = sensor['site_ecef']
-    sensor_gcrf, dum = coord.itrf2gcrf(sensor_itrf, np.zeros((3,1)), tk, EOP_data,
-                                       XYs_df)
-    
-    # Object location in GCRF
-    r_gcrf = mj[0:3].reshape(3,1)
-    
-    # Compute range and line of sight vector
-    rg = np.linalg.norm(r_gcrf - sensor_gcrf)
-    rho_hat_gcrf = (r_gcrf - sensor_gcrf)/rg
-    
-    ra = math.atan2(rho_hat_gcrf[1], rho_hat_gcrf[0])
-    dec = math.asin(rho_hat_gcrf[2])
-    
-    zbar = np.array([[ra], [dec]])
-    
-    
-    
-    # zbar = mfunc.compute_measurement(mj, state_params, sensor_params, sensor_id, 
-    #                                  tk, meas_types=['ra', 'dec'])
-    
-    # # Compute sigma points
-    # sqP = np.linalg.cholesky(Pj)
-    # Xrep = np.tile(mj, (1, nstates))
-    # chi = np.concatenate((mj, Xrep+(gam*sqP), Xrep-(gam*sqP)), axis=1)
-
-    # # Computed measurement
-    # gamma_til_k, Rk = meas_fcn(tk, chi, state_params, sensor_params, sensor_id)
-    # zbar = np.dot(gamma_til_k, Wm.T)
-    # zbar = np.reshape(zbar, (len(zbar), 1))
-    
-    # Compare zbar against FOV center and limits to get pd_fov
-    pd_fov = 1.
-    zbar_test = zbar - fov_center
-    
-    # Angle rollover in RA
-    if zbar_test[0] > np.pi:
-        zbar_test[0] -= 2.*np.pi
-    if zbar_test[0] < -np.pi:
-        zbar_test[0] += 2.*np.pi                        
-    
-    if (zbar_test[0] < FOV_hlim[0] or zbar_test[0] > FOV_hlim[1] 
-        or zbar_test[1] < FOV_vlim[0] or zbar_test[1] > FOV_vlim[1]):
-        
-        pd_fov = 0.
-        
-    
-    # Multiply to get full pd
-    pd = pd_sensor*pd_fov
-    
-    return pd
-
 
 
 def clutter_intensity(zi, sensor_id, sensor_params):
@@ -2246,17 +1713,17 @@ def glmb_kbest_assignments(C, kbest=1):
     dum = -np.log(np.ones((n1,n1)))
     C1 = np.concatenate((C, dum), axis=1)
     
-    # print('C', C)
-    # print('C1', C1)
+    print('C', C)
+    print('C1', C1)
     
     # Transpose and reformulate as maximization problem
     A = C1.T
     
-    # print('A', A)
+    print('A', A)
     
     A = np.max(A) - A
     
-    # print('A', A)
+    print('A', A)
     
     # Run Murty to get kbest solutions
     final_list = murty(A, kbest)

@@ -1228,6 +1228,14 @@ def gooding_angles_iod(tk_list, Yk_list, sensor_id_list, sensor_params,
             print(r0_final)
             print(v0_final)
             print(elem0)
+            
+        # Prune solutions that don't fit orbit regime
+        if orbit_regime == 'GEO':
+            sma = float(elem0[0])
+            if sma < 41664. or sma > 42664.:
+                                
+                continue
+            
 
 #        # There should only be one solution with everything specified
 #        if len(M_final) > 1:
@@ -1636,6 +1644,8 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, lr_star, orbit_type,
         if debug:
             print('fc', fc)
 
+        #TODO Should this increment iters or not???
+
         # Exception Handling
         # If previous step has produced a much larger penalty value, update
         # range values and restart loop (Gooding 1997 Eq. 8)
@@ -1658,6 +1668,8 @@ def iterate_rho(rho0_init, rhof_init, tof, M_star, lr_star, orbit_type,
         
         # Use central finite difference to compute numerical derivatives of f
         # and g with respect to small changes in rho0 and rhof
+        
+        #TODO Does this actually exit/break the loop correctly???
         
         # Exception Handling
         # If any of the finite difference steps does not return
