@@ -2261,6 +2261,19 @@ def check_meas_file(meas_file):
                 
     plt.show() 
     
+    ra_mean = np.mean(ra_plot)
+    ra_std = np.std(ra_plot)
+    ra_rms = float(np.sqrt((1./len(ra_plot)) * sum([ra**2. for ra in ra_plot])))
+    
+    dec_mean = np.mean(dec_plot)
+    dec_std = np.std(dec_plot)
+    dec_rms = float(np.sqrt((1./len(dec_plot)) * sum([dec**2. for dec in dec_plot])))
+    
+    print('')
+    print('Resids Mean, STD, and RMS')
+    print('RA [arcsec]: ', ra_mean, ra_std, ra_rms)
+    print('DEC [arcsec]: ', dec_mean, dec_std, dec_rms)
+    
     
     return
 
@@ -3647,8 +3660,8 @@ if __name__ == '__main__':
     # fname = 'geo_twobody_6obj_7day_obstime_2pass_300sec.pkl'
     # obs_time_file = os.path.join(visdir, fname)
     
-    fname = 'geo_twobody_6obj_7day_meas_2pass_300sec_noise1_lam0_pd1.pkl'
-    # fname = 'geo_real_3obj_3day_meas.pkl'
+    # fname = 'geo_twobody_6obj_7day_meas_2pass_300sec_noise1_lam0_pd1.pkl'
+    fname = 'geo_real_3obj_3day_meas.pkl'
     meas_file = os.path.join(measdir, fname)
     
     fname = 'geo_twobody_1obj_7day_meas_2pass_300sec_noise1_lam0_pd1.pkl'
@@ -3714,7 +3727,7 @@ if __name__ == '__main__':
     orbit_regime = 'GEO'
     # generate_meas_file(noise, lam_c, p_det, orbit_regime, truth_file, obs_time_file, meas_file)
     
-    # check_meas_file(meas_file)
+    check_meas_file(meas_file)
     
     
     
@@ -3756,8 +3769,8 @@ if __name__ == '__main__':
     ra_lim = 50.
     dec_lim = 50.
     birth_type = 'gooding_batch'
-    tudat_geo_lmb_setup_birth(truth_file2, meas_file2, corr_pkl,
-                              ra_lim, dec_lim, birth_type, setup_file)
+    # tudat_geo_lmb_setup_birth(truth_file2, meas_file2, corr_pkl,
+    #                           ra_lim, dec_lim, birth_type, setup_file)
     
     
     # fname = 'geo_twobody_singletarget_setup.pkl'
