@@ -25,7 +25,7 @@ from data_processing import data_processing as proc
 from iod import iod_functions_jit as iod
 import estimation.analysis_functions as analysis
 import estimation.estimation_functions as est
-from estimation import multitarget_functions as mult
+from estimation import multitarget_functions2 as mult
 import dynamics.dynamics_functions as dyn
 import sensors.measurement_functions as mfunc
 import sensors.sensors as sens
