@@ -17,11 +17,13 @@ sys.path.append(metis_dir)
 
 from dynamics import dynamics_functions as dyn
 from estimation import estimation_functions as est
+from iod import iod_functions_jit as iod
 from sensors import measurement_functions as mfunc
+from utilities import astrodynamics as astro
 from utilities import coordinate_systems as coord
 from utilities import eop_functions as eop
 from utilities import time_systems as timesys
-
+from utilities.constants import GME, arcsec2rad
 
 
 
@@ -465,7 +467,7 @@ def phd_state_extraction(GMM_dict, tk, Zk, sensor_id_list, meas_fcn,
 ###############################################################################
 
 
-def lmb_filter(state_dict, truth_dict, meas_dict, birth_time_dict, meas_fcn, params_dict):
+def lmb_filter(state_dict, truth_dict, meas_dict, tracklet_dict, meas_fcn, params_dict):
     
     # Break out inputs
     state_params = params_dict['state_params']
@@ -498,17 +500,18 @@ def lmb_filter(state_dict, truth_dict, meas_dict, birth_time_dict, meas_fcn, par
     filter_params['Wm'] = Wm
     filter_params['diagWc'] = diagWc
 
-    # Initialize output
+    # Initialize
     ucm_dict = {}
+    birth_model = {}
     filter_output = {}
 
     # Measurement/Birth times
     tk_list = list(meas_dict.keys())
-    tk_list2 = list(birth_time_dict.keys())
+    # tk_list2 = list(birth_time_dict.keys())
     
-    for tk2 in tk_list2:
-        if tk2 not in tk_list:
-            tk_list.append(tk2)
+    # for tk2 in tk_list2:
+    #     if tk2 not in tk_list:
+    #         tk_list.append(tk2)
     
     tk_list = sorted(tk_list)
     # tk_list = tk_list[0:15]
@@ -539,11 +542,11 @@ def lmb_filter(state_dict, truth_dict, meas_dict, birth_time_dict, meas_fcn, par
         # print(LMB_dict)
         print('ntracks', len(LMB_dict))
 
-        # Predictor Step
-        if tk in birth_time_dict:
-            birth_model = birth_time_dict[tk]
-        else:
-            birth_model = {}
+        # # Predictor Step
+        # if tk in birth_time_dict:
+        #     birth_model = birth_time_dict[tk]
+        # else:
+        #     birth_model = {}
         
         tin = [tk_prior, tk]        
         LMB_birth, LMB_surv = lmb_predictor(LMB_dict, tin, birth_model, params_dict)
@@ -557,6 +560,9 @@ def lmb_filter(state_dict, truth_dict, meas_dict, birth_time_dict, meas_fcn, par
         print('surv tracks', len(LMB_surv))
         
         
+        
+        #TODO: inconsistent use of Zk as measurement set (here) or single measurement
+        # (e.g. meas2tracklet function)
         
 
         # Corrector Step
@@ -597,7 +603,6 @@ def lmb_filter(state_dict, truth_dict, meas_dict, birth_time_dict, meas_fcn, par
         
         birth_model = adaptive_birth_model(ucm_dict)
         
-        uct_dict = meas2tracklet(ucm_dict)
         
         
 
@@ -1799,50 +1804,6 @@ def lmb_cleanup(LMB_in, params_dict):
     return LMB_dict
 
 
-def adaptive_birth_model(ucm_dict):
-    
-    
-    uct_dict = meas2testset(ucm_dict)
-    
-    
-    
-    #TODO  propagate to next time step tk+1??
-    birth_model = {}
-    
-    return birth_model
-
-
-
-def meas2testset(ucm_dict):
-    
-    
-    tk_list = sorted(ucm_dict.keys())
-    
-    #TODO generalize this
-    # Loop over times and extract measurements (single object no clutter)
-    tk_full = []
-    Zk_full = []
-    pexist_full = []
-    sensor_id_full = []
-    for tk in tk_list:
-        Zk = ucm_dict['Zk_list'][0]
-        pexist = ucm_dict['pexist_list'][0]
-        sensor_id = ucm_dict['sensor_id_list'][0]
-        
-        if pexist < 1.:
-            tk_full.append(tk)
-            Zk_full.append(Zk)
-            pexist_full.append(pexist)
-            sensor_id_full.append(sensor_id)
-       
-    
-    
-    
-    return 
-
-
-
-
 def lmb_state_extraction(LMB_dict, tk, Zk, sensor_id_list, meas_fcn,
                          params_dict):
     
@@ -2000,6 +1961,437 @@ def compute_hypothesis_dict(r_list, label_list, H_max=1000):
 
     
     return hyp_dict
+
+
+
+###############################################################################
+# Adaptive Birth Model
+###############################################################################
+
+
+def adaptive_birth_model(ucm_dict, uct_dict, tracklet_dict, params_dict):
+    
+    
+    # Initialize output
+    birth_model = {}
+    
+    # Form tracklets from uncorrelated measurements
+    ucm_dict, uct_dict = meas2tracklet(ucm_dict, uct_dict, tracklet_dict)
+    
+    # Perform tracklet correlation
+    if len(uct_dict) > 1:
+        
+        correlation_dict = correlate_tracklets(uct_dict, params_dict)
+        
+        # Incorporate/calculate pexist in correlation dict???
+        
+        # Generate birth model
+    
+    
+    
+    #TODO  propagate to next time step tk+1??
+    
+    
+    return birth_model, ucm_dict, uct_dict
+
+
+
+def meas2tracklet(ucm_dict, uct_dict, tracklet_dict):
+    
+    
+    tk_list = sorted(ucm_dict.keys())
+    tracklet_id_list = sorted(tracklet_dict.keys())
+    
+    # Loop over times, retrieve measurement data from uncorrelated measurement
+    # dictionary, additional data from tracklet dictionary, and form 
+    # uncorrelated tracklet dictionary
+    for tk in tk_list:
+        
+        Zk_list = ucm_dict['Zk_list']
+        sensor_id_list = ucm_dict['sensor_id_list']
+        pexist_list = ucm_dict['pexist_list']
+        
+        for ii in range(len(Zk_list)):
+            
+            Zk = Zk_list[ii]
+            sensor_id = sensor_id_list[ii]
+            pexist = pexist_list[ii]
+        
+            # Don't use measurement if it is 100% associated to existing 
+            # target(s)
+            if pexist < 1.:
+                
+                # Find tracklet_id
+                for tracklet_id in tracklet_id_list:
+                    if tk in tracklet_dict[tracklet_id]['tk_list']:
+                        
+                        # Initialize entry for tracklet_id
+                        if tracklet_id not in uct_dict:
+                            uct_dict[tracklet_id] = {}
+                            uct_dict[tracklet_id]['orbit_regime'] = tracklet_dict[tracklet_id]['orbit_regime']
+                            uct_dict[tracklet_id]['obj_id'] = tracklet_dict[tracklet_id]['obj_id']
+                            uct_dict[tracklet_id]['tk_list'] = []
+                            uct_dict[tracklet_id]['Zk_list'] = []
+                            uct_dict[tracklet_id]['sensor_id_list'] = []
+                            uct_dict[tracklet_id]['pexist_list'] = []
+                            
+                        # Append this entry
+                        uct_dict[tracklet_id]['tk_list'].append(tk)
+                        uct_dict[tracklet_id]['Zk_list'].append(Zk)
+                        uct_dict[tracklet_id]['sensor_id_list'].append(sensor_id)
+                        uct_dict[tracklet_id]['pexist_list'].append(pexist)
+                        
+                        # Delete from uncorrelated measurement dictionary (only add to tracklet once)
+                        del ucm_dict[tk]['Zk_list'][ii]
+                        del ucm_dict[tk]['sensor_id_list'][ii]
+                        del ucm_dict[tk]['pexist_list'][ii]
+                        
+                        if len(ucm_dict[tk]['Zk_list']) == 0:
+                            del ucm_dict[tk]
+       
+    
+    
+    
+    return ucm_dict, uct_dict
+
+
+def correlate_tracklets(uct_dict, params_dict):
+    
+    
+    # Retrieve input data
+    sensor_params = params_dict['sensor_params']
+    
+    # EOP data
+    eop_alldata = sensor_params['eop_alldata']
+    XYs_df = sensor_params['XYs_df']
+    
+    # Initialize output
+    df_list = []
+    correlation_dict = {}
+    
+    # Execution time
+    gooding_time = 0.
+    resids_time = 0.
+    
+    # Exclusion times
+    exclude_short = 0.*3600.
+    exclude_long = 3.*86400.
+    
+
+    # Loop through tracklets and compute association
+    tracklet_id_list = list(uct_dict.keys())
+    case_id = 0
+    for ind in range(len(tracklet_id_list)):
+        ii = tracklet_id_list[ind]
+        tracklet_ii = uct_dict[ii]
+        
+        for ind2 in range(ind+1, len(tracklet_id_list)):            
+        # for jj in tracklet_id_list[ii+1:]:
+            
+            jj = tracklet_id_list[ind2]
+            tracklet_jj = uct_dict[jj]
+            
+            # Check times and switch if needed
+            if tracklet_jj['tk_list'][0] > tracklet_ii['tk_list'][-1]:
+                tracklet1 = copy.deepcopy(tracklet_ii)
+                tracklet2 = copy.deepcopy(tracklet_jj)
+                tracklet1_id = ii
+                tracklet2_id = jj
+            else:
+                tracklet1 = copy.deepcopy(tracklet_jj)
+                tracklet2 = copy.deepcopy(tracklet_ii)
+                tracklet1_id = jj
+                tracklet2_id = ii
+            
+            # Check exclusion criteria
+            if (tracklet2['tk_list'][0] - tracklet1['tk_list'][-1]).total_seconds() < exclude_short:
+                continue
+            
+            if (tracklet2['tk_list'][0] - tracklet1['tk_list'][-1]).total_seconds() > exclude_long:
+                continue
+            
+            
+            case_id += 1
+            
+            
+            print('')
+            print('case_id', case_id)
+            print('tracklet1')
+            print(tracklet1['obj_id'])
+            print(tracklet1['tk_list'][0])
+            print('tracklet2')
+            print(tracklet2['obj_id'])
+            print(tracklet2['tk_list'][0])
+    
+            
+            # Set up for correlation
+            tk_list = [tracklet1['tk_list'][0], tracklet1['tk_list'][-1], tracklet2['tk_list'][-1]]
+            Zk_list = [tracklet1['Zk_list'][0], tracklet1['Zk_list'][-1], tracklet2['Zk_list'][-1]]
+            sensor_id_list = [tracklet1['sensor_id_list'][0],
+                              tracklet1['sensor_id_list'][-1],
+                              tracklet2['sensor_id_list'][-1]]
+            
+            orbit_regime = tracklet1['orbit_regime']
+            
+            # print(tracklet1['tk_list'])
+            # print(tracklet2['tk_list'])
+            
+            print(tk_list)
+            print(Zk_list)
+            print(sensor_id_list)
+            
+            # # Compute true association details
+            # obj_id = tracklet1['obj_id']
+            # Xo_true = truth_dict[tk_list[0]][obj_id]
+            
+            # if len(Xo_true) == 6:
+            #     elem_true = astro.cart2kep(Xo_true)
+            #     sma = elem_true[0]
+            #     period = astro.sma2period(sma)
+            #     M_true = int(np.floor((tk_list[-1]-tk_list[0]).total_seconds()/period))
+                
+            #     print('Tracklet1 Elem Truth: ', elem_true)
+            #     print('Xo_true', Xo_true)
+            #     print('sma', sma)
+            #     print('period', period/3600.)
+            #     print('M_frac', (tk_list[-1]-tk_list[0]).total_seconds()/period)
+            #     print('M_true', M_true)
+            
+
+                
+            # Run Gooding IOD
+            start = time.time()
+            X_list, M_list = iod.gooding_angles_iod(tk_list, Zk_list, sensor_id_list,
+                                                    sensor_params, 
+                                                    eop_alldata=eop_alldata,
+                                                    XYs_df=XYs_df,
+                                                    orbit_regime=orbit_regime,
+                                                    search_mode='middle_out',
+                                                    periapsis_check=True,
+                                                    rootfind='min', debug=False)
+
+            
+            gooding_time += time.time() - start
+            
+            
+            
+            # print('Final Answers')
+            # print('X_list', X_list)
+            # print('M_list', M_list)
+    
+            # If no solutions found, record basic data
+            if len(M_list) == 0:
+                
+                # if tracklet1['obj_id'] == tracklet2['obj_id']:
+                #     corr_truth = True
+                # else:
+                #     corr_truth = False
+                
+                correlation_dict[case_id] = {}
+                correlation_dict[case_id]['tracklet1_id'] = tracklet1_id
+                correlation_dict[case_id]['tracklet2_id'] = tracklet2_id
+                # correlation_dict[case_id]['corr_truth_list'] = [corr_truth]
+                correlation_dict[case_id]['obj1_id'] = tracklet1['obj_id']
+                correlation_dict[case_id]['obj2_id'] = tracklet2['obj_id']
+                # correlation_dict[case_id]['Xo_true'] = Xo_true
+                correlation_dict[case_id]['Xo_list'] = []
+                correlation_dict[case_id]['M_list'] = []
+                correlation_dict[case_id]['resids_list'] = []
+                correlation_dict[case_id]['ra_rms_list'] = []
+                correlation_dict[case_id]['dec_rms_list'] = []
+                
+                
+            
+            
+            # Compute sensor locations and observed measurements at all times
+            # not used for IOD solution
+            start = time.time()
+            tk_list1, Zk_list1, Rmat1 = reduce_tracklets(tracklet1, tracklet2,
+                                                         params_dict)
+            resids_time += time.time() - start
+            
+            
+            for ind in range(len(M_list)):
+                
+                
+                # elem = astro.cart2kep(X_list[ind])
+                start = time.time()
+                resids, ra_rms, dec_rms = \
+                    compute_resids(X_list[ind], tk_list[0], tk_list1, Zk_list1,
+                                   Rmat1, params_dict)
+                    
+                resids_time += time.time() - start
+                                    
+                # if len(Xo_true) == 3:
+                #     Xo_err = np.linalg.norm(X_list[ind][0:3] - Xo_true)
+                # else:
+                #     Xo_err = np.linalg.norm(X_list[ind] - Xo_true)
+                
+                # # True correlation status
+                # if (tracklet1['obj_id'] == tracklet2['obj_id']): # and (M_list[ind] == M_true):
+                #     corr_truth = True
+                # else:
+                #     corr_truth = False
+                
+                print('')
+                print(ind)
+                print('Mi', M_list[ind])
+                # print('Xi', X_list[ind])
+                # print('elem', elem)
+                # print('Xo Err: ', Xo_err)
+                print('RA Resids RMS [arcsec]: ', ra_rms)
+                print('DEC Resids RMS [arcsec]: ', dec_rms)
+                
+                # df_list.append([case_id, tracklet1['obj_id'], tracklet2['obj_id'],
+                #                tracklet1['tk_list'][0], tracklet2['tk_list'][0],
+                #                M_list[ind], Xo_err, ra_rms, dec_rms, corr_truth])
+                
+                # print(df_list)
+                
+                if ind == 0:
+                    correlation_dict[case_id] = {}
+                    correlation_dict[case_id]['tracklet1_id'] = tracklet1_id
+                    correlation_dict[case_id]['tracklet2_id'] = tracklet2_id
+                    # correlation_dict[case_id]['corr_truth_list'] = [corr_truth]
+                    correlation_dict[case_id]['obj1_id'] = tracklet1['obj_id']
+                    correlation_dict[case_id]['obj2_id'] = tracklet2['obj_id']
+                    # correlation_dict[case_id]['Xo_true'] = Xo_true
+                    correlation_dict[case_id]['Xo_list'] = X_list
+                    correlation_dict[case_id]['M_list'] = M_list
+                    correlation_dict[case_id]['resids_list'] = [resids]
+                    correlation_dict[case_id]['ra_rms_list'] = [ra_rms]
+                    correlation_dict[case_id]['dec_rms_list'] = [dec_rms]
+                    
+                else:
+                    # correlation_dict[case_id]['corr_truth_list'].append(corr_truth)
+                    correlation_dict[case_id]['resids_list'].append(resids)
+                    correlation_dict[case_id]['ra_rms_list'].append(ra_rms)
+                    correlation_dict[case_id]['dec_rms_list'].append(dec_rms)
+                
+
+                
+            print('Gooding Time: ', gooding_time)
+            print('Resids Time: ', resids_time)
+            
+            
+
+    
+    
+    return
+
+
+def reduce_tracklets(tracklet1, tracklet2, params_dict):
+    
+    # Break out inputs
+    # state_params = params_dict['state_params']
+    # int_params = params_dict['int_params']
+    sensor_params = params_dict['sensor_params']
+    eop_alldata = sensor_params['eop_alldata']
+    XYs_df = sensor_params['XYs_df']
+    
+    # Retrieve tracklet data
+    tk_list1 = tracklet1['tk_list']
+    Zk_list1 = tracklet1['Zk_list']
+    sensor_id_list1 = tracklet1['sensor_id_list']
+    
+    tk_list2 = tracklet2['tk_list']
+    Zk_list2 = tracklet2['Zk_list']
+    sensor_id_list2 = tracklet2['sensor_id_list']
+    
+    # Combine into single lists
+    tk_list1.extend(tk_list2)
+    Zk_list1.extend(Zk_list2)
+    sensor_id_list1.extend(sensor_id_list2)
+    
+    # Remove entries used to compute Gooding IOD solution
+    del tk_list1[-1]
+    del tk_list1[0]
+    del Zk_list1[-1]
+    del Zk_list1[0]
+    del sensor_id_list1[-1]
+    del sensor_id_list1[0]
+    del tk_list2[-1]
+    del Zk_list2[-1]
+    del sensor_id_list2[-1]
+    
+    # Compute sensor ECI coordinates
+    Rmat = np.zeros((3,len(tk_list1)))
+    for kk in range(len(tk_list1)):
+        tk = tk_list1[kk]
+        sensor_id = sensor_id_list1[kk]        
+        site_ecef = sensor_params[sensor_id]['site_ecef']
+        
+        # Compute sensor location in ECI
+        EOP_data = eop.get_eop_data(eop_alldata, tk)
+        site_eci, dum = coord.itrf2gcrf(site_ecef, np.zeros((3,1)), tk,
+                                        EOP_data, XYs_df)
+        
+        Rmat[:,kk] = site_eci.flatten()
+
+    
+    return tk_list1, Zk_list1, Rmat
+
+
+def compute_resids(Xo, UTC0, tk_list1, Zk_list1, Rmat1, params_dict):
+    
+
+    
+    # Break out inputs
+    # state_params = params_dict['state_params']
+    # int_params = params_dict['int_params']
+    # sensor_params = params_dict['sensor_params']
+    
+    # Propagate initial orbit, compute measurements and resids
+    resids = np.zeros((2, len(tk_list1)))
+    loop_start = time.time()
+    eop_time = 0.
+    astro_time = 0.
+    meas_time = 0.
+    for kk in range(len(tk_list1)):
+        tk = tk_list1[kk]
+        Zk = Zk_list1[kk]
+        sensor_eci = Rmat1[:,kk].reshape(3,1)
+        
+        start = time.time()
+        Xk = astro.element_conversion(Xo, 1, 1, dt=(tk-UTC0).total_seconds())
+        astro_time += time.time() - start
+        
+        start = time.time()
+        r_eci = Xk[0:3].reshape(3,1)
+        rho_eci = r_eci - sensor_eci
+        ra_calc = math.atan2(rho_eci[1], rho_eci[0])
+        dec_calc = math.asin(rho_eci[2]/np.linalg.norm(rho_eci))
+        Z_calc = np.reshape([ra_calc, dec_calc], (2,1))
+        meas_time += time.time() - start
+        
+        
+        diff = Zk - Z_calc
+        if diff[0] > np.pi:
+            diff[0] -= 2.*np.pi
+        if diff[0] < -np.pi:
+            diff[0] += 2.*np.pi
+
+        resids[:,kk] = diff.flatten()
+        
+    # print('orbit prop/meas time', time.time() - loop_start)
+    # print('eop time', eop_time)
+    # print('astro time', astro_time)
+    # print('meas time', meas_time)
+        
+    ra_resids = resids[0,:]
+    dec_resids = resids[1,:]
+    
+    ra_rms = np.sqrt(np.dot(ra_resids, ra_resids)/len(ra_resids))*(1./arcsec2rad)
+    dec_rms = np.sqrt(np.dot(dec_resids, dec_resids)/len(dec_resids))*(1./arcsec2rad)
+    
+    # print('ra std', np.std(ra_resids)*(1./arcsec2rad))
+    # print('dec std', np.std(dec_resids)*(1./arcsec2rad))
+    
+    # mistake
+    
+    return resids, ra_rms, dec_rms
+
+
 
 
 

@@ -3522,8 +3522,9 @@ def run_multitarget_filter(setup_file, prev_results, results_file):
     meas_dict = data[2]
     params_dict = data[3]
     truth_dict = data[4]
-    birth_time_dict = data[5]
-    label_truth_dict = data[6]
+    tracklet_dict = data[5]
+    # birth_time_dict = data[5]
+    # label_truth_dict = data[6]
     pklFile.close()
     
     # # Load previous results and reset state_dict
@@ -3555,7 +3556,7 @@ def run_multitarget_filter(setup_file, prev_results, results_file):
     print(birth_time_dict.keys())
     
 
-    filter_output, full_state_output = mult.lmb_filter(state_dict, truth_dict, meas_dict, birth_time_dict, meas_fcn, params_dict)
+    filter_output, full_state_output = mult.lmb_filter(state_dict, truth_dict, meas_dict, tracklet_dict, meas_fcn, params_dict)
     
     
     pklFile = open( results_file, 'wb' )
@@ -3731,10 +3732,10 @@ if __name__ == '__main__':
     p_det = 1.
     orbit_regime = 'GEO'
     obj_id_list = [49336]
-    generate_meas_file(noise, lam_c, p_det, orbit_regime, truth_file,
-                       obs_time_file, meas_file, obj_id_list, reduce_meas=False)
+    # generate_meas_file(noise, lam_c, p_det, orbit_regime, truth_file,
+    #                    obs_time_file, meas_file, obj_id_list, reduce_meas=False)
     
-    check_meas_file(meas_file)
+    # check_meas_file(meas_file)
     
     
     
