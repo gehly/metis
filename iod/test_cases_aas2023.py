@@ -1844,7 +1844,8 @@ def compute_obs_times2(vis_file, pass_length, obs_time_file):
     return
 
 
-def generate_meas_file(noise, lam_c, p_det, orbit_regime, truth_file, obs_time_file, meas_file):
+def generate_meas_file(noise, lam_c, p_det, orbit_regime, truth_file, obs_time_file, meas_file,
+                       obj_id_list=[], reduce_meas=True):
     
     gap_length = 100.  # seconds
     
@@ -1878,7 +1879,8 @@ def generate_meas_file(noise, lam_c, p_det, orbit_regime, truth_file, obs_time_f
         sensor_params[sensor_id]['p_det'] = min(p_det, 0.99)
     
     # Form obj_id_list from obs_times
-    obj_id_list = sorted(list(obs_times.keys()))    
+    if len(obj_id_list) == 0:
+        obj_id_list = sorted(list(obs_times.keys()))    
     
     
     
@@ -2115,10 +2117,12 @@ def generate_meas_file(noise, lam_c, p_det, orbit_regime, truth_file, obs_time_f
                 # Gooding IOD solution. Skip these entries for the 
                 # meas_dict supplied to the filter to avoid double
                 # counting measurements
-                t0 = tracklet_dict[tracklet_id]['tk_list'][0]
-                tf = tracklet_dict[tracklet_id]['tk_list'][-1]
-                del meas_dict[t0]
-                del meas_dict[tf]
+                
+                if reduce_meas:
+                    t0 = tracklet_dict[tracklet_id]['tk_list'][0]
+                    tf = tracklet_dict[tracklet_id]['tk_list'][-1]
+                    del meas_dict[t0]
+                    del meas_dict[tf]
                 
                 # print(meas_dict.keys())
                 
@@ -3641,7 +3645,8 @@ if __name__ == '__main__':
     visdir = os.path.join(fdir, 'visibility')
     measdir = os.path.join(fdir, 'meas')
     trackdir = os.path.join(fdir, 'tracklet_corr')
-    filterdir = r'D:\documents\research_projects\iod\data\aas2023_preprint\geo_twobody_1obj_3day'
+    # filterdir = r'D:\documents\research_projects\iod\data\aas2023_preprint\geo_twobody_1obj_3day'
+    filterdir = r'D:\documents\research_projects\iod\data\sim\test\aas2023_geo_6obj_7day\2023_01_12_geo_twobody_singletarget'
     
     
     # fname = 'geo_twobody_6obj_7day_truth_13.pkl'    
@@ -3650,22 +3655,22 @@ if __name__ == '__main__':
     # fname = 'geo_twobody_6obj_7day_visibility.csv'
     # vis_file = os.path.join(visdir, fname)
     
-    fname = 'geo_twobody_6obj_7day_truth.pkl'    
-    truth_file = os.path.join(truthdir, fname)
+    # fname = 'geo_twobody_6obj_7day_truth.pkl'    
+    # truth_file = os.path.join(truthdir, fname)
     
     fname = 'geo_twobody_1obj_7day_truth.pkl'    
-    truth_file2 = os.path.join(filterdir, fname)
+    truth_file = os.path.join(filterdir, fname)
     
     
-    # fname = 'geo_twobody_6obj_7day_obstime_2pass_300sec.pkl'
-    # obs_time_file = os.path.join(visdir, fname)
+    fname = 'geo_twobody_6obj_7day_obstime_2pass_300sec.pkl'
+    obs_time_file = os.path.join(filterdir, fname)
     
     # fname = 'geo_twobody_6obj_7day_meas_2pass_300sec_noise1_lam0_pd1.pkl'
-    fname = 'geo_real_3obj_3day_meas.pkl'
-    meas_file = os.path.join(measdir, fname)
+    # fname = 'geo_real_3obj_3day_meas.pkl'
+    # meas_file = os.path.join(measdir, fname)
     
     fname = 'geo_twobody_1obj_7day_meas_2pass_300sec_noise1_lam0_pd1.pkl'
-    meas_file2 = os.path.join(filterdir, fname)
+    meas_file = os.path.join(filterdir, fname)
     
     
     
@@ -3725,7 +3730,9 @@ if __name__ == '__main__':
     lam_c = 0.
     p_det = 1.
     orbit_regime = 'GEO'
-    # generate_meas_file(noise, lam_c, p_det, orbit_regime, truth_file, obs_time_file, meas_file)
+    obj_id_list = [49336]
+    generate_meas_file(noise, lam_c, p_det, orbit_regime, truth_file,
+                       obs_time_file, meas_file, obj_id_list, reduce_meas=False)
     
     check_meas_file(meas_file)
     

@@ -499,6 +499,7 @@ def lmb_filter(state_dict, truth_dict, meas_dict, birth_time_dict, meas_fcn, par
     filter_params['diagWc'] = diagWc
 
     # Initialize output
+    ucm_dict = {}
     filter_output = {}
 
     # Measurement/Birth times
@@ -591,6 +592,12 @@ def lmb_filter(state_dict, truth_dict, meas_dict, birth_time_dict, meas_fcn, par
         
         
         # Adaptive Birth Model formation
+        ucm_dict[tk] = copy.deepcopy(meas_dict[tk])
+        ucm_dict[tk]['pexist_list'] = pexist_list
+        
+        birth_model = adaptive_birth_model(ucm_dict)
+        
+        uct_dict = meas2tracklet(ucm_dict)
         
         
 
@@ -1790,6 +1797,50 @@ def lmb_cleanup(LMB_in, params_dict):
     # print(LMB_dict)
 
     return LMB_dict
+
+
+def adaptive_birth_model(ucm_dict):
+    
+    
+    uct_dict = meas2testset(ucm_dict)
+    
+    
+    
+    #TODO  propagate to next time step tk+1??
+    birth_model = {}
+    
+    return birth_model
+
+
+
+def meas2testset(ucm_dict):
+    
+    
+    tk_list = sorted(ucm_dict.keys())
+    
+    #TODO generalize this
+    # Loop over times and extract measurements (single object no clutter)
+    tk_full = []
+    Zk_full = []
+    pexist_full = []
+    sensor_id_full = []
+    for tk in tk_list:
+        Zk = ucm_dict['Zk_list'][0]
+        pexist = ucm_dict['pexist_list'][0]
+        sensor_id = ucm_dict['sensor_id_list'][0]
+        
+        if pexist < 1.:
+            tk_full.append(tk)
+            Zk_full.append(Zk)
+            pexist_full.append(pexist)
+            sensor_id_full.append(sensor_id)
+       
+    
+    
+    
+    return 
+
+
 
 
 def lmb_state_extraction(LMB_dict, tk, Zk, sensor_id_list, meas_fcn,
