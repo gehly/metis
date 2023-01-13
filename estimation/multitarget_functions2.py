@@ -506,6 +506,7 @@ def lmb_filter(state_dict, truth_dict, meas_dict, tracklet_dict, meas_fcn,
     ucm_dict = {}
     uct_dict = {}
     birth_model = {}
+    label_truth_full = {}
     filter_output = {}
 
     # Measurement times
@@ -596,7 +597,16 @@ def lmb_filter(state_dict, truth_dict, meas_dict, tracklet_dict, meas_fcn,
             birth_model, label_truth_dict, ucm_dict, uct_dict = \
                 adaptive_birth_model(tk_next, ucm_dict, uct_dict, tracklet_dict,
                                      truth_dict, params_dict, ra_lim, dec_lim)
-
+                
+                
+            label_truth_full.update(label_truth_dict)
+                
+            print('')
+            print('post adaptive birth model')
+            print('ucm_dict', ucm_dict)
+            print('uct_dict', uct_dict)
+            
+            
         
         # State extraction and residuals calculation
         pk, Nk, labelk_list, rk_list, Xk_list, Pk_list, resids_k = \
@@ -636,7 +646,7 @@ def lmb_filter(state_dict, truth_dict, meas_dict, tracklet_dict, meas_fcn,
     # Use filter_output for error analysis
     full_state_output = {}
     
-    return filter_output, full_state_output
+    return filter_output, full_state_output, label_truth_full
     
 
 
@@ -734,8 +744,6 @@ def lmb_predictor(LMB_dict, tin, birth_model, params_dict):
             
         #     LMB_birth[label]['r'] = 1e-6
         
-        print(LMB_birth)
-        mistake
         
         
         
@@ -1967,15 +1975,29 @@ def adaptive_birth_model(tk_next, ucm_dict, uct_dict, tracklet_dict, truth_dict,
                          params_dict, ra_lim, dec_lim):
     
     
+    print('')
+    print('adaptive_birth_model')
+    
+    # Copy to avoid changing values
+    params_dict = copy.deepcopy(params_dict)
+    ucm_dict = copy.deepcopy(ucm_dict)
+    uct_dict = copy.deepcopy(uct_dict)
+    tracklet_dict = copy.deepcopy(tracklet_dict)
+    
     # Initialize output
     birth_model = {}
     label_truth_dict = {}
     
+    print('ucm_dict', ucm_dict)
+    print('uct_dict', uct_dict)
+    print('tracklet_dict[0]', tracklet_dict[0])
+    print('tracklet_dict[1]', tracklet_dict[1])
+    
     # Form tracklets from uncorrelated measurements
     ucm_dict, uct_dict = meas2tracklet(ucm_dict, uct_dict, tracklet_dict)
     
-    print(ucm_dict)
-    print(uct_dict)
+    print('ucm_dict', ucm_dict)
+    print('uct_dict', uct_dict)
     
     
     # Perform tracklet correlation and generate birth model
@@ -1986,10 +2008,16 @@ def adaptive_birth_model(tk_next, ucm_dict, uct_dict, tracklet_dict, truth_dict,
         
         print(correlation_dict)
         
+        print('post correlate_tracklets')
+        print('uct_dict', uct_dict)
+        
         
         birth_model, label_truth_dict = \
             tracklets_to_birth_model(tk_next, correlation_dict, uct_dict,
                                      truth_dict, params_dict, ra_lim, dec_lim)
+            
+        print('post tracklets to birth model')
+        print('uct_dict', uct_dict)
     
     return birth_model, label_truth_dict, ucm_dict, uct_dict
 
@@ -1997,9 +2025,22 @@ def adaptive_birth_model(tk_next, ucm_dict, uct_dict, tracklet_dict, truth_dict,
 
 def meas2tracklet(ucm_dict, uct_dict, tracklet_dict):
     
+    print('meas2tracklet')
+    
+    # Copy to avoid changing values
+    ucm_dict = copy.deepcopy(ucm_dict)
+    uct_dict = copy.deepcopy(uct_dict)
+    tracklet_dict = copy.deepcopy(tracklet_dict)
+    
+    print('ucm_dict', ucm_dict)
+    print('uct_dict', uct_dict)
+    print('tracklet_dict[0]', tracklet_dict[0])
+    print('tracklet_dict[1]', tracklet_dict[1])
     
     tk_list = sorted(ucm_dict.keys())
     tracklet_id_list = sorted(tracklet_dict.keys())
+    
+    print('tk_list', tk_list)
     
     # Loop over times, retrieve measurement data from uncorrelated measurement
     # dictionary, additional data from tracklet dictionary, and form 
@@ -2062,7 +2103,12 @@ def meas2tracklet(ucm_dict, uct_dict, tracklet_dict):
     tracklet_id_list = sorted(list(uct_dict.keys()))
     for tracklet_id in tracklet_id_list:
         pexist_max = max(uct_dict[tracklet_id]['pexist_list'])
-        if pexist_max == 1.:
+        if (1. - pexist_max) < 1e-6:
+            
+            print('pexist == 1')
+            print('tracklet_id', tracklet_id)
+            print('pexist_list', uct_dict[tracklet_id]['pexist_list'])
+            
             del uct_dict[tracklet_id]
     
     
@@ -2071,6 +2117,10 @@ def meas2tracklet(ucm_dict, uct_dict, tracklet_dict):
 
 def correlate_tracklets(uct_dict, params_dict):
     
+    print('correlate_tracklets')
+    
+    # Copy to avoid changing values
+    uct_dict = copy.deepcopy(uct_dict)
     
     # Retrieve input data
     sensor_params = params_dict['sensor_params']
@@ -2094,6 +2144,7 @@ def correlate_tracklets(uct_dict, params_dict):
 
     # Loop through tracklets and compute association
     tracklet_id_list = list(uct_dict.keys())
+    print('tracklet_id_list', tracklet_id_list)
     case_id = 0
     for ind in range(len(tracklet_id_list)):
         ii = tracklet_id_list[ind]
@@ -2104,6 +2155,11 @@ def correlate_tracklets(uct_dict, params_dict):
             
             jj = tracklet_id_list[ind2]
             tracklet_jj = uct_dict[jj]
+            
+            print(ii)
+            print(tracklet_ii)
+            print(jj)
+            print(tracklet_jj)
             
             # Check times and switch if needed
             if tracklet_jj['tk_list'][0] > tracklet_ii['tk_list'][-1]:
@@ -2418,7 +2474,10 @@ def compute_resids(Xo, UTC0, tk_list1, Zk_list1, Rmat1, params_dict):
 
 def tracklets_to_birth_model(tk_next, correlation_dict, uct_dict, truth_dict, params_dict, ra_lim, dec_lim):
     
-
+    
+    # Copy to avoid changing values
+    params_dict = copy.deepcopy(params_dict)
+    uct_dict = copy.deepcopy(uct_dict)
     
     # Params
     state_params = params_dict['state_params']
@@ -2534,8 +2593,10 @@ def run_batch(Xo, tk_next, tracklet1, tracklet2, params_dict, truth_dict, plot_f
     # t0 = datetime(2022, 11, 7, 0, 0, 0)
     # tf = datetime(2022, 11, 8, 0, 0, 0)
     
+    params_dict = copy.deepcopy(params_dict)
+    
     t0 = tracklet1['tk_list'][0]
-    obj_id = tracklet1['obj_id']
+    obj_id = tracklet2['obj_id']
     
     
     # Reformat truth data for single target filter
@@ -2594,6 +2655,19 @@ def run_batch(Xo, tk_next, tracklet1, tracklet2, params_dict, truth_dict, plot_f
     # the birth model for tk+1 is created by measurements from t0 to tk
     X_birth = full_state_output[tk_next]['X']
     P_birth = 100.*full_state_output[tk_next]['P']
+    
+    print('')
+    print('birth model and errors')
+    print('X_birth', X_birth)
+    print('X_truth', truth_dict2[tk_next])
+    
+    Xerr = X_birth - truth_dict2[tk_next]
+    
+    print('Xerr', Xerr)
+    print('3D pos err', np.linalg.norm(Xerr[0:3]))
+    print('sigmas', np.sqrt(np.diag(P_birth)))
+    
+
     
     
     if plot_flag:

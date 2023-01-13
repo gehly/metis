@@ -2245,9 +2245,9 @@ def lmb_orbit_errors2(filter_output, full_state_output, truth_dict, meas_dict, l
     # Number of states and measurements
     obj_id = list(truth_dict[meas_t0].keys())[0]
     Xo = truth_dict[meas_t0][obj_id]
-    resids0 = filter_output[meas_t0]['resids'][0]
+    # resids0 = filter_output[meas_t0]['resids'][0]
     n = len(Xo)
-    p = len(resids0)
+    # p = len(resids0)
     
     
     # Compute OSPA Errors
@@ -2388,23 +2388,23 @@ def lmb_orbit_errors2(filter_output, full_state_output, truth_dict, meas_dict, l
         
         
     
-        # Compute and print statistics
-        conv_ind = int(len(full_state_output)/2)
-        print('\n\nState Error and Residuals Analysis')
-        print('Object ', obj_id, ' Label ', label_ii)
-        print('\n\t\t\t\t  Mean\t\tSTD')
-        # print('----------------------------------------')
-        # print('X ECI [km]\t\t', '{0:0.2E}'.format(np.mean(X_err[0,conv_ind:])), '\t{0:0.2E}'.format(np.std(X_err[0,conv_ind:])))
-        # print('Y ECI [km]\t\t', '{0:0.2E}'.format(np.mean(X_err[1,conv_ind:])), '\t{0:0.2E}'.format(np.std(X_err[1,conv_ind:])))
-        # print('Z ECI [km]\t\t', '{0:0.2E}'.format(np.mean(X_err[2,conv_ind:])), '\t{0:0.2E}'.format(np.std(X_err[2,conv_ind:])))
-        # print('dX ECI [km/s]\t', '{0:0.2E}'.format(np.mean(X_err[3,conv_ind:])), '\t{0:0.2E}'.format(np.std(X_err[3,conv_ind:])))
-        # print('dY ECI [km/s]\t', '{0:0.2E}'.format(np.mean(X_err[4,conv_ind:])), '\t{0:0.2E}'.format(np.std(X_err[4,conv_ind:])))
-        # print('dZ ECI [km/s]\t', '{0:0.2E}'.format(np.mean(X_err[5,conv_ind:])), '\t{0:0.2E}'.format(np.std(X_err[5,conv_ind:])))
-        print('')
-        print('Radial [km]\t\t', '{0:0.2E}'.format(np.mean(r_err[conv_ind:])), '\t{0:0.2E}'.format(np.std(r_err[conv_ind:])))
-        print('In-Track [km]\t', '{0:0.2E}'.format(np.mean(i_err[conv_ind:])), '\t{0:0.2E}'.format(np.std(i_err[conv_ind:])))
-        print('Cross-Track [km]\t', '{0:0.2E}'.format(np.mean(c_err[conv_ind:])), '\t{0:0.2E}'.format(np.std(c_err[conv_ind:])))
-        print('')
+        # # Compute and print statistics
+        # conv_ind = int(len(full_state_output)/2)
+        # print('\n\nState Error and Residuals Analysis')
+        # print('Object ', obj_id, ' Label ', label_ii)
+        # print('\n\t\t\t\t  Mean\t\tSTD')
+        # # print('----------------------------------------')
+        # # print('X ECI [km]\t\t', '{0:0.2E}'.format(np.mean(X_err[0,conv_ind:])), '\t{0:0.2E}'.format(np.std(X_err[0,conv_ind:])))
+        # # print('Y ECI [km]\t\t', '{0:0.2E}'.format(np.mean(X_err[1,conv_ind:])), '\t{0:0.2E}'.format(np.std(X_err[1,conv_ind:])))
+        # # print('Z ECI [km]\t\t', '{0:0.2E}'.format(np.mean(X_err[2,conv_ind:])), '\t{0:0.2E}'.format(np.std(X_err[2,conv_ind:])))
+        # # print('dX ECI [km/s]\t', '{0:0.2E}'.format(np.mean(X_err[3,conv_ind:])), '\t{0:0.2E}'.format(np.std(X_err[3,conv_ind:])))
+        # # print('dY ECI [km/s]\t', '{0:0.2E}'.format(np.mean(X_err[4,conv_ind:])), '\t{0:0.2E}'.format(np.std(X_err[4,conv_ind:])))
+        # # print('dZ ECI [km/s]\t', '{0:0.2E}'.format(np.mean(X_err[5,conv_ind:])), '\t{0:0.2E}'.format(np.std(X_err[5,conv_ind:])))
+        # print('')
+        # print('Radial [km]\t\t', '{0:0.2E}'.format(np.mean(r_err[conv_ind:])), '\t{0:0.2E}'.format(np.std(r_err[conv_ind:])))
+        # print('In-Track [km]\t', '{0:0.2E}'.format(np.mean(i_err[conv_ind:])), '\t{0:0.2E}'.format(np.std(i_err[conv_ind:])))
+        # print('Cross-Track [km]\t', '{0:0.2E}'.format(np.mean(c_err[conv_ind:])), '\t{0:0.2E}'.format(np.std(c_err[conv_ind:])))
+        # print('')
         
     
         

@@ -3603,7 +3603,7 @@ def run_multitarget_filter(setup_file, prev_results, results_file):
     
     # Reduce meas and birth dict to times of interest
     t0 = datetime(2022, 11, 7, 0, 0, 0)
-    tf = datetime(2022, 11, 10, 0, 0, 0)
+    tf = datetime(2022, 11, 8, 0, 0, 0)
     tk_list = sorted(list(meas_dict.keys()))
     # tk_list2 = sorted(list(birth_time_dict.keys()))
 
@@ -3623,7 +3623,7 @@ def run_multitarget_filter(setup_file, prev_results, results_file):
     # print(birth_time_dict.keys())
     
 
-    filter_output, full_state_output = mult.lmb_filter(state_dict, truth_dict, meas_dict, tracklet_dict, meas_fcn, params_dict)
+    filter_output, full_state_output, label_truth_dict = mult.lmb_filter(state_dict, truth_dict, meas_dict, tracklet_dict, meas_fcn, params_dict)
     
     
     pklFile = open( results_file, 'wb' )
@@ -3868,13 +3868,13 @@ if __name__ == '__main__':
     
     
     # Run Filter
-    run_multitarget_filter(setup_file, prev_results, results_file)
+    # run_multitarget_filter(setup_file, prev_results, results_file)
     
     # combine_results()
     
     
     
-    # multitarget_analysis(results_file, setup_file)
+    multitarget_analysis(results_file, setup_file)
     
     
     
