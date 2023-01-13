@@ -1983,7 +1983,7 @@ def adaptive_birth_model(ucm_dict, uct_dict, tracklet_dict, params_dict):
         
         correlation_dict = correlate_tracklets(uct_dict, params_dict)
         
-        # Incorporate/calculate pexist in correlation dict???
+        
         
         # Generate birth model
     
@@ -2132,6 +2132,7 @@ def correlate_tracklets(uct_dict, params_dict):
                               tracklet2['sensor_id_list'][-1]]
             
             orbit_regime = tracklet1['orbit_regime']
+            pexist = min(min(tracklet1['pexist_list'], min(tracklet2['pexist_list'])))
             
             # print(tracklet1['tk_list'])
             # print(tracklet2['tk_list'])
@@ -2193,6 +2194,7 @@ def correlate_tracklets(uct_dict, params_dict):
                 # correlation_dict[case_id]['corr_truth_list'] = [corr_truth]
                 correlation_dict[case_id]['obj1_id'] = tracklet1['obj_id']
                 correlation_dict[case_id]['obj2_id'] = tracklet2['obj_id']
+                correlation_dict[case_id]['pexist'] = pexist
                 # correlation_dict[case_id]['Xo_true'] = Xo_true
                 correlation_dict[case_id]['Xo_list'] = []
                 correlation_dict[case_id]['M_list'] = []
@@ -2255,6 +2257,7 @@ def correlate_tracklets(uct_dict, params_dict):
                     # correlation_dict[case_id]['corr_truth_list'] = [corr_truth]
                     correlation_dict[case_id]['obj1_id'] = tracklet1['obj_id']
                     correlation_dict[case_id]['obj2_id'] = tracklet2['obj_id']
+                    correlation_dict[case_id]['pexist'] = pexist
                     # correlation_dict[case_id]['Xo_true'] = Xo_true
                     correlation_dict[case_id]['Xo_list'] = X_list
                     correlation_dict[case_id]['M_list'] = M_list
@@ -2273,10 +2276,7 @@ def correlate_tracklets(uct_dict, params_dict):
             print('Gooding Time: ', gooding_time)
             print('Resids Time: ', resids_time)
             
-            
 
-    
-    
     return
 
 
@@ -2392,7 +2392,151 @@ def compute_resids(Xo, UTC0, tk_list1, Zk_list1, Rmat1, params_dict):
     return resids, ra_rms, dec_rms
 
 
+def tracklets_to_birth_model(correlation_dict, uct_dict, params_dict, ra_lim, dec_lim):
+    
 
+    
+    # Params
+    state_params = params_dict['state_params']
+    int_params = params_dict['int_params']
+    
+    gmm_params = {}
+    gmm_params['prune_T'] = 1e-3
+    gmm_params['merge_U'] = 36.
+    
+    
+    # Initialize
+    label_truth_dict = {}
+    
+    
+        
+    # Get estimated correlation status    
+    corr_est_dict = {}
+    for case_id in correlation_dict:        
+        
+        # Exclude cases near 24 hour time difference
+        tracklet1_id = correlation_dict[case_id]['tracklet1_id']
+        tracklet2_id = correlation_dict[case_id]['tracklet2_id']
+        tracklet1_t0 = uct_dict[tracklet1_id]['tk_list'][0]
+        tracklet2_t0 = uct_dict[tracklet2_id]['tk_list'][0]
+        
+        tdiff_hrs = (tracklet2_t0 - tracklet1_t0).total_seconds()/3600.
+        
+        # if tdiff_hrs % 24. < 1. or tdiff_hrs % 24 > 23.:
+        #     continue
+    
+        # if tdiff_hrs > 12.:
+        #     continue
+        
+        # True correlation status determined by object id
+        obj1_id = correlation_dict[case_id]['obj1_id']
+        obj2_id = correlation_dict[case_id]['obj2_id']
+        
+        if obj1_id == obj2_id:
+            corr_truth = True
+        else:
+            corr_truth = False
+        
+        # If no IOD solution fit, correlation is estimated to be false
+        if len(correlation_dict[case_id]['M_list']) == 0:
+            corr_est = False
+        
+        # Otherwise, estimate correlation status based on residuals
+        else:            
+            ra_rms_list = correlation_dict[case_id]['ra_rms_list']
+            dec_rms_list = correlation_dict[case_id]['dec_rms_list']
+            resids_list = correlation_dict[case_id]['resids_list']
+            
+            rms_list = []
+            for ii in range(len(resids_list)):
+                resids_ii = resids_list[ii]
+                resids_rms = np.sqrt(np.mean(np.sum(np.multiply(resids_ii, resids_ii), axis=0)))
+                rms_list.append(resids_rms)
+                
+                # Check for individual instances within the case that pass and
+                # store for output
+                ra_rms = ra_rms_list[ii]
+                dec_rms = dec_rms_list[ii]                
+                if ra_rms < ra_lim and dec_rms < dec_lim:
+                    Xo = correlation_dict[case_id]['Xo_list'][ii]
+                    
+                    # Run batch estimator to refine Xo, Po
+                    
+  
+                        
+                    # tracklet1_id = correlation_dict[case_id]['tracklet1_id']
+                    # if tracklet1_id not in corr_est_dict:
+                    #     corr_est_dict[tracklet1_id] = {}
+                    #     corr_est_dict[tracklet1_id]['means'] = []
+                        
+                    # corr_est_dict[tracklet1_id]['means'].append(Xo)
+                    # corr_est_dict[tracklet1_id]['Xo_err'].append(Xo_err)
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    # Build birth model
+    for tracklet_id in corr_est_dict:
+        
+        # Set up propagation to second tracklet time
+        t0 = tracklet_dict[tracklet_id]['tk_list'][0]
+        tk = tracklet_dict[tracklet_id]['tk_list'][1]
+        # tin = [t0, tk]
+        
+        if t0 > datetime(2022, 11, 8, 0, 0, 0):
+            continue
+        
+        # Retrieve initial state
+        means0 = corr_est_dict[tracklet_id]['means']
+        ncomp = len(means0)
+        
+        print(corr_est_dict[tracklet_id])
+        
+        
+        # Setup and run batch estimator
+        Xo = means0[0]
+        t0_batch = datetime(t0.year, t0.month, t0.day)
+        tf_batch = t0_batch + timedelta(days=1.)
+        X_birth, P_birth, tk_meas_del_ii = run_batch(Xo, tracklet_dict, params_dict, truth_dict,
+                                                     t0_batch, tf_batch)
+        tk_birth = tk_meas_del_ii[0]
+        tk_meas_del.extend(tk_meas_del_ii)
+    
+        birth_model = {}
+        birth_model[1] = {}
+        birth_model[1]['r_birth'] = 0.01
+        birth_model[1]['weights'] = [1.]
+        birth_model[1]['means'] = [X_birth]
+        birth_model[1]['covars'] = [P_birth]
+        
+        birth_time_dict[tk_birth] = birth_model
+        
+        label = (tk_birth, 1)
+        label_truth_dict[label] = tracklet_dict[tracklet_id]['obj_id']
+        
+        obj_id = tracklet_dict[tracklet_id]['obj_id']
+        X_true = truth_dict[tk_birth][obj_id]
+        
+        
+        print('X_birth', X_birth)
+        print('X_true', X_true)
+        
+    
+    print(birth_time_dict)
+    print(sorted(list(birth_time_dict.keys())))
+    print(len(birth_time_dict.keys()))
+    
+    print(label_truth_dict)
+    
+
+    return birth_time_dict, label_truth_dict, tk_meas_del
 
 
 ###############################################################################
