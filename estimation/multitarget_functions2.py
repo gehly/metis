@@ -468,7 +468,8 @@ def phd_state_extraction(GMM_dict, tk, Zk, sensor_id_list, meas_fcn,
 ###############################################################################
 
 
-def lmb_filter(state_dict, truth_dict, meas_dict, tracklet_dict, meas_fcn, params_dict):
+def lmb_filter(state_dict, truth_dict, meas_dict, tracklet_dict, meas_fcn,
+               params_dict, ra_lim=50., dec_lim=50.):
     
     # Break out inputs
     state_params = params_dict['state_params']
@@ -503,6 +504,7 @@ def lmb_filter(state_dict, truth_dict, meas_dict, tracklet_dict, meas_fcn, param
 
     # Initialize
     ucm_dict = {}
+    uct_dict = {}
     birth_model = {}
     filter_output = {}
 
@@ -605,10 +607,9 @@ def lmb_filter(state_dict, truth_dict, meas_dict, tracklet_dict, meas_fcn, param
             ucm_dict[tk] = copy.deepcopy(meas_dict[tk])
             ucm_dict[tk]['pexist_list'] = pexist_list
             
-            birth_model = adaptive_birth_model(ucm_dict, tk_next)
-        
-        
-        
+            birth_model, label_truth_dict, ucm_dict, uct_dict = \
+                adaptive_birth_model(tk_next, ucm_dict, uct_dict, tracklet_dict,
+                                     truth_dict, params_dict, ra_lim, dec_lim)
 
         
         # State extraction and residuals calculation
@@ -1973,7 +1974,8 @@ def compute_hypothesis_dict(r_list, label_list, H_max=1000):
 ###############################################################################
 
 
-def adaptive_birth_model(tk_next, ucm_dict, uct_dict, tracklet_dict, params_dict):
+def adaptive_birth_model(tk_next, ucm_dict, uct_dict, tracklet_dict, truth_dict,
+                         params_dict, ra_lim, dec_lim):
     
     
     # Initialize output
@@ -1982,21 +1984,16 @@ def adaptive_birth_model(tk_next, ucm_dict, uct_dict, tracklet_dict, params_dict
     # Form tracklets from uncorrelated measurements
     ucm_dict, uct_dict = meas2tracklet(ucm_dict, uct_dict, tracklet_dict)
     
-    # Perform tracklet correlation
+    # Perform tracklet correlation and generate birth model
     if len(uct_dict) > 1:
         
         correlation_dict = correlate_tracklets(uct_dict, params_dict)
         
-        
-        
-        # Generate birth model
+        birth_model, label_truth_dict = \
+            tracklets_to_birth_model(tk_next, correlation_dict, uct_dict,
+                                     truth_dict, params_dict, ra_lim, dec_lim)
     
-    
-    
-    #TODO  propagate to next time step tk+1??
-    
-    
-    return birth_model, ucm_dict, uct_dict
+    return birth_model, label_truth_dict, ucm_dict, uct_dict
 
 
 
@@ -2144,7 +2141,7 @@ def correlate_tracklets(uct_dict, params_dict):
                               tracklet2['sensor_id_list'][-1]]
             
             orbit_regime = tracklet1['orbit_regime']
-            pexist = min(min(tracklet1['pexist_list'], min(tracklet2['pexist_list'])))
+            pexist = max(max(tracklet1['pexist_list'], max(tracklet2['pexist_list'])))
             
             # print(tracklet1['tk_list'])
             # print(tracklet2['tk_list'])
@@ -2470,7 +2467,11 @@ def tracklets_to_birth_model(tk_next, correlation_dict, uct_dict, truth_dict, pa
                 ra_rms = ra_rms_list[ii]
                 dec_rms = dec_rms_list[ii]                
                 if ra_rms < ra_lim and dec_rms < dec_lim:
+                    
+                    # Retrieve case data
                     Xo = correlation_dict[case_id]['Xo_list'][ii]
+                    pexist = correlation_dict[case_id]['pexist']
+                    pnew = 1. - pexist
                     
                     # Run batch estimator to refine Xo, Po
                     tracklet1 = uct_dict[tracklet1_id]
@@ -2481,22 +2482,23 @@ def tracklets_to_birth_model(tk_next, correlation_dict, uct_dict, truth_dict, pa
   
                         
                     # Add to birth model
-                    if tracklet1_id not in birth_model:
-                        birth_model[tracklet1_id] = {}
-                        birth_model[tracklet1_id]['r_birth'] = min(0.01, )
-                        birth_model[tracklet1_id]['weights'] = []
-                        birth_model[tracklet1_id]['means'] = []
-                        birth_model[tracklet1_id]['covars'] = []
+                    if tracklet2_id not in birth_model:
+                        birth_model[tracklet2_id] = {}
+                        birth_model[tracklet2_id]['r_birth'] = min(0.01, pnew)
+                        birth_model[tracklet2_id]['weights'] = []
+                        birth_model[tracklet2_id]['means'] = []
+                        birth_model[tracklet2_id]['covars'] = []
                         
-                        label = (tk_next, tracklet1_id)
-                        label_truth_dict[label] = obj1_id
+                        label = (tk_next, tracklet2_id)
+                        label_truth_dict[label] = obj2_id
                         
-                    birth_model[tracklet1_id]['weights'].append(1.)
-                    birth_model[tracklet1_id]['means'].append(X_birth)
-                    birth_model[tracklet1_id]['covars'].append(P_birth)
+                    birth_model[tracklet2_id]['weights'].append(1.)
+                    birth_model[tracklet2_id]['means'].append(X_birth)
+                    birth_model[tracklet2_id]['covars'].append(P_birth)
                     
                     # Adaptively set birth existence probability
-                    
+                    #TODO should this be max or min???
+                    birth_model[tracklet2_id]['r_birth'] = max(birth_model[tracklet2_id]['r_birth'], pnew)
                     
                     
                     
