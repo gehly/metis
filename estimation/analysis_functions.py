@@ -576,7 +576,7 @@ def compute_orbit_errors(filter_output, full_state_output, truth_dict):
         
         
     # Fix Units
-    X_err *= 1      # convert to m, m/s
+    X_err *= 1      
     X_err_meas *= 1
     X_err_ric *= 1
     X_err_ric_meas *= 1
@@ -647,21 +647,21 @@ def compute_orbit_errors(filter_output, full_state_output, truth_dict):
     plt.plot(thrs_meas, X_err_meas[0,:], 'b.')
     plt.plot(thrs, 3*sig_x, 'k--')
     plt.plot(thrs, -3*sig_x, 'k--')
-    plt.ylabel('X Err [m]')
+    plt.ylabel('X Err [km]')
     
     plt.subplot(3,1,2)
     plt.plot(thrs, X_err[1,:], 'k.')
     plt.plot(thrs_meas, X_err_meas[1,:], 'b.')
     plt.plot(thrs, 3*sig_y, 'k--')
     plt.plot(thrs, -3*sig_y, 'k--')
-    plt.ylabel('Y Err [m]')
+    plt.ylabel('Y Err [km]')
     
     plt.subplot(3,1,3)
     plt.plot(thrs, X_err[2,:], 'k.')
     plt.plot(thrs_meas, X_err_meas[2,:], 'b.')
     plt.plot(thrs, 3*sig_z, 'k--')
     plt.plot(thrs, -3*sig_z, 'k--')
-    plt.ylabel('Z Err [m]')
+    plt.ylabel('Z Err [km]')
 
     plt.xlabel('Time [hours]')
     
@@ -671,21 +671,21 @@ def compute_orbit_errors(filter_output, full_state_output, truth_dict):
     plt.plot(thrs_meas, X_err_meas[3,:], 'b.')
     plt.plot(thrs, 3*sig_dx, 'k--')
     plt.plot(thrs, -3*sig_dx, 'k--')
-    plt.ylabel('dX Err [m/s]')
+    plt.ylabel('dX Err [km/s]')
     
     plt.subplot(3,1,2)
     plt.plot(thrs, X_err[4,:], 'k.')
     plt.plot(thrs_meas, X_err_meas[4,:], 'b.')
     plt.plot(thrs, 3*sig_dy, 'k--')
     plt.plot(thrs, -3*sig_dy, 'k--')
-    plt.ylabel('dY Err [m/s]')
+    plt.ylabel('dY Err [km/s]')
     
     plt.subplot(3,1,3)
     plt.plot(thrs, X_err[5,:], 'k.')
     plt.plot(thrs_meas, X_err_meas[5,:], 'b.')
     plt.plot(thrs, 3*sig_dz, 'k--')
     plt.plot(thrs, -3*sig_dz, 'k--')
-    plt.ylabel('dZ Err [m/s]')
+    plt.ylabel('dZ Err [km/s]')
 
     plt.xlabel('Time [hours]')
     

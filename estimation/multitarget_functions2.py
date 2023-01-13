@@ -16,7 +16,7 @@ metis_dir = current_dir[0:ind+5]
 sys.path.append(metis_dir)
 
 from dynamics import dynamics_functions as dyn
-from estimation import analysis_function as analysis
+from estimation import analysis_functions as analysis
 from estimation import estimation_functions as est
 from iod import iod_functions_jit as iod
 from sensors import measurement_functions as mfunc
@@ -508,22 +508,13 @@ def lmb_filter(state_dict, truth_dict, meas_dict, tracklet_dict, meas_fcn,
     birth_model = {}
     filter_output = {}
 
-    # Measurement/Birth times
+    # Measurement times
     tk_list = list(meas_dict.keys())
-    # tk_list2 = list(birth_time_dict.keys())
-    
-    # for tk2 in tk_list2:
-    #     if tk2 not in tk_list:
-    #         tk_list.append(tk2)
-    
     tk_list = sorted(tk_list)
-    # tk_list = tk_list[0:15]
     
     # Number of epochs
     N = len(tk_list)
     
-    print(LMB_dict)
-    print(state_tk)
     print(tk_list)
     print(N)
 
@@ -546,11 +537,6 @@ def lmb_filter(state_dict, truth_dict, meas_dict, tracklet_dict, meas_fcn,
         print('ntracks', len(LMB_dict))
 
         # # Predictor Step
-        # if tk in birth_time_dict:
-        #     birth_model = birth_time_dict[tk]
-        # else:
-        #     birth_model = {}
-        
         tin = [tk_prior, tk]        
         LMB_birth, LMB_surv = lmb_predictor(LMB_dict, tin, birth_model, params_dict)
         
@@ -715,38 +701,41 @@ def lmb_predictor(LMB_dict, tin, birth_model, params_dict):
         
         LMB_birth[label]['r'] = birth_model[ii]['r_birth']
         
-        # Compute Mahalanobis distance against existing components
-        for label_jj in LMB_dict:
-            GMM_dict = copy.deepcopy(LMB_dict[label_jj])
-            GMM_birth = copy.deepcopy(LMB_birth[label])
+        # # Compute Mahalanobis distance against existing components
+        # for label_jj in LMB_dict:
+        #     GMM_dict = copy.deepcopy(LMB_dict[label_jj])
+        #     GMM_birth = copy.deepcopy(LMB_birth[label])
             
-            print('GMM_dict', GMM_dict)
-            print('GMM_birth', GMM_birth)
+        #     print('GMM_dict', GMM_dict)
+        #     print('GMM_birth', GMM_birth)
             
-            merge_params = {}
-            merge_params['prune_T'] = 1e-3
-            merge_params['merge_U'] = 1e6
+        #     merge_params = {}
+        #     merge_params['prune_T'] = 1e-3
+        #     merge_params['merge_U'] = 1e6
             
-            GMM_dict = est.merge_GMM(GMM_dict, merge_params)
-            GMM_birth = est.merge_GMM(GMM_birth, merge_params)
-            x1 = GMM_dict['means'][0]
-            P1 = GMM_dict['covars'][0]
-            x2 = GMM_birth['means'][0]
-            P2 = GMM_birth['covars'][0]
+        #     GMM_dict = est.merge_GMM(GMM_dict, merge_params)
+        #     GMM_birth = est.merge_GMM(GMM_birth, merge_params)
+        #     x1 = GMM_dict['means'][0]
+        #     P1 = GMM_dict['covars'][0]
+        #     x2 = GMM_birth['means'][0]
+        #     P2 = GMM_birth['covars'][0]
             
-            mahalanobis = np.dot((x1 - x2).T, np.dot(np.linalg.inv(P1 + P2), (x1 - x2)))
+        #     mahalanobis = np.dot((x1 - x2).T, np.dot(np.linalg.inv(P1 + P2), (x1 - x2)))
             
-            print('x1', x1)
-            print('x2', x2)
-            print('P1', P1)
-            print('P2', P2)
+        #     print('x1', x1)
+        #     print('x2', x2)
+        #     print('P1', P1)
+        #     print('P2', P2)
             
-            print('diff', x1-x2)
-            print(mahalanobis)
+        #     print('diff', x1-x2)
+        #     print(mahalanobis)
             
-            # mistake
+        #     # mistake
             
-            LMB_birth[label]['r'] = 1e-6
+        #     LMB_birth[label]['r'] = 1e-6
+        
+        print(LMB_birth)
+        mistake
         
         
         
@@ -1980,14 +1969,23 @@ def adaptive_birth_model(tk_next, ucm_dict, uct_dict, tracklet_dict, truth_dict,
     
     # Initialize output
     birth_model = {}
+    label_truth_dict = {}
     
     # Form tracklets from uncorrelated measurements
     ucm_dict, uct_dict = meas2tracklet(ucm_dict, uct_dict, tracklet_dict)
     
+    print(ucm_dict)
+    print(uct_dict)
+    
+    
     # Perform tracklet correlation and generate birth model
     if len(uct_dict) > 1:
         
+        
         correlation_dict = correlate_tracklets(uct_dict, params_dict)
+        
+        print(correlation_dict)
+        
         
         birth_model, label_truth_dict = \
             tracklets_to_birth_model(tk_next, correlation_dict, uct_dict,
@@ -2008,9 +2006,9 @@ def meas2tracklet(ucm_dict, uct_dict, tracklet_dict):
     # uncorrelated tracklet dictionary
     for tk in tk_list:
         
-        Zk_list = ucm_dict['Zk_list']
-        sensor_id_list = ucm_dict['sensor_id_list']
-        pexist_list = ucm_dict['pexist_list']
+        Zk_list = ucm_dict[tk]['Zk_list']
+        sensor_id_list = ucm_dict[tk]['sensor_id_list']
+        pexist_list = ucm_dict[tk]['pexist_list']
         
         for ii in range(len(Zk_list)):
             
@@ -2018,47 +2016,54 @@ def meas2tracklet(ucm_dict, uct_dict, tracklet_dict):
             sensor_id = sensor_id_list[ii]
             pexist = pexist_list[ii]
         
-            # Don't use measurement if it is 100% associated to existing 
-            # target(s)
-            if pexist == 1.:
-                del ucm_dict[tk]['Zk_list'][ii]
-                del ucm_dict[tk]['sensor_id_list'][ii]
-                del ucm_dict[tk]['pexist_list'][ii]
+            # # Don't use measurement if it is 100% associated to existing 
+            # # target(s)
+            # if pexist == 1.:
+            #     del ucm_dict[tk]['Zk_list'][ii]
+            #     del ucm_dict[tk]['sensor_id_list'][ii]
+            #     del ucm_dict[tk]['pexist_list'][ii]
                 
-                if len(ucm_dict[tk]['Zk_list']) == 0:
-                    del ucm_dict[tk]
+            #     if len(ucm_dict[tk]['Zk_list']) == 0:
+            #         del ucm_dict[tk]
 
-            else:
+            # else:
                 
-                # Find tracklet_id
-                for tracklet_id in tracklet_id_list:
-                    if tk in tracklet_dict[tracklet_id]['tk_list']:
+            # Find tracklet_id
+            for tracklet_id in tracklet_id_list:
+                if tk in tracklet_dict[tracklet_id]['tk_list']:
+                    
+                    # Initialize entry for tracklet_id
+                    if tracklet_id not in uct_dict:
+                        uct_dict[tracklet_id] = {}
+                        uct_dict[tracklet_id]['orbit_regime'] = tracklet_dict[tracklet_id]['orbit_regime']
+                        uct_dict[tracklet_id]['obj_id'] = tracklet_dict[tracklet_id]['obj_id']
+                        uct_dict[tracklet_id]['tk_list'] = []
+                        uct_dict[tracklet_id]['Zk_list'] = []
+                        uct_dict[tracklet_id]['sensor_id_list'] = []
+                        uct_dict[tracklet_id]['pexist_list'] = []
                         
-                        # Initialize entry for tracklet_id
-                        if tracklet_id not in uct_dict:
-                            uct_dict[tracklet_id] = {}
-                            uct_dict[tracklet_id]['orbit_regime'] = tracklet_dict[tracklet_id]['orbit_regime']
-                            uct_dict[tracklet_id]['obj_id'] = tracklet_dict[tracklet_id]['obj_id']
-                            uct_dict[tracklet_id]['tk_list'] = []
-                            uct_dict[tracklet_id]['Zk_list'] = []
-                            uct_dict[tracklet_id]['sensor_id_list'] = []
-                            uct_dict[tracklet_id]['pexist_list'] = []
-                            
-                        # Append this entry
-                        uct_dict[tracklet_id]['tk_list'].append(tk)
-                        uct_dict[tracklet_id]['Zk_list'].append(Zk)
-                        uct_dict[tracklet_id]['sensor_id_list'].append(sensor_id)
-                        uct_dict[tracklet_id]['pexist_list'].append(pexist)
-                        
-                        # Delete from uncorrelated measurement dictionary (only add to tracklet once)
-                        del ucm_dict[tk]['Zk_list'][ii]
-                        del ucm_dict[tk]['sensor_id_list'][ii]
-                        del ucm_dict[tk]['pexist_list'][ii]
-                        
-                        if len(ucm_dict[tk]['Zk_list']) == 0:
-                            del ucm_dict[tk]
+                    # Append this entry
+                    uct_dict[tracklet_id]['tk_list'].append(tk)
+                    uct_dict[tracklet_id]['Zk_list'].append(Zk)
+                    uct_dict[tracklet_id]['sensor_id_list'].append(sensor_id)
+                    uct_dict[tracklet_id]['pexist_list'].append(pexist)
+                    
+                    # Delete from uncorrelated measurement dictionary (only add to tracklet once)
+                    del ucm_dict[tk]['Zk_list'][ii]
+                    del ucm_dict[tk]['sensor_id_list'][ii]
+                    del ucm_dict[tk]['pexist_list'][ii]
+                    
+                    if len(ucm_dict[tk]['Zk_list']) == 0:
+                        del ucm_dict[tk]
        
-    
+    # Clean up
+    # If an uncorrelated tracklet has a measurement with pexist = 1.0 then it
+    # has been successfully correlated and should be deleted from uct dict
+    tracklet_id_list = sorted(list(uct_dict.keys()))
+    for tracklet_id in tracklet_id_list:
+        pexist_max = max(uct_dict[tracklet_id]['pexist_list'])
+        if pexist_max == 1.:
+            del uct_dict[tracklet_id]
     
     
     return ucm_dict, uct_dict
@@ -2141,10 +2146,20 @@ def correlate_tracklets(uct_dict, params_dict):
                               tracklet2['sensor_id_list'][-1]]
             
             orbit_regime = tracklet1['orbit_regime']
-            pexist = max(max(tracklet1['pexist_list'], max(tracklet2['pexist_list'])))
+            
+            
+            print(tracklet1['pexist_list'])
+            print(tracklet2['pexist_list'])
+            print(max(tracklet1['pexist_list']))
+            print(max(tracklet2['pexist_list']))
+            
+            pexist = max(max(tracklet1['pexist_list']), max(tracklet2['pexist_list']))
             
             # print(tracklet1['tk_list'])
             # print(tracklet2['tk_list'])
+            
+            print('pexist', pexist)
+            
             
             print(tk_list)
             print(Zk_list)
@@ -2286,7 +2301,7 @@ def correlate_tracklets(uct_dict, params_dict):
             print('Resids Time: ', resids_time)
             
 
-    return
+    return correlation_dict
 
 
 def reduce_tracklets(tracklet1, tracklet2, params_dict):
@@ -2485,20 +2500,23 @@ def tracklets_to_birth_model(tk_next, correlation_dict, uct_dict, truth_dict, pa
                     if tracklet2_id not in birth_model:
                         birth_model[tracklet2_id] = {}
                         birth_model[tracklet2_id]['r_birth'] = min(0.01, pnew)
-                        birth_model[tracklet2_id]['weights'] = []
                         birth_model[tracklet2_id]['means'] = []
                         birth_model[tracklet2_id]['covars'] = []
                         
                         label = (tk_next, tracklet2_id)
                         label_truth_dict[label] = obj2_id
                         
-                    birth_model[tracklet2_id]['weights'].append(1.)
+                    
                     birth_model[tracklet2_id]['means'].append(X_birth)
                     birth_model[tracklet2_id]['covars'].append(P_birth)
                     
+                    # Use evenly weighted Gaussian components
+                    ncomp = len(birth_model[tracklet2_id]['means'])
+                    birth_model[tracklet2_id]['weights'] = [1./ncomp]*ncomp
+                    
                     # Adaptively set birth existence probability
                     #TODO should this be max or min???
-                    birth_model[tracklet2_id]['r_birth'] = max(birth_model[tracklet2_id]['r_birth'], pnew)
+                    birth_model[tracklet2_id]['r_birth'] = min(0.01, max(birth_model[tracklet2_id]['r_birth'], pnew))
                     
                     
                     
@@ -2574,22 +2592,13 @@ def run_batch(Xo, tk_next, tracklet1, tracklet2, params_dict, truth_dict, plot_f
     # Retrieve estimated state and covariance at final time 
     # This should be the next measurement time of the filter (tk+1) therefore
     # the birth model for tk+1 is created by measurements from t0 to tk
-    X_birth = filter_output[tk_next]['X']
-    P_birth = 100.*filter_output[tk_next]['P']
+    X_birth = full_state_output[tk_next]['X']
+    P_birth = 100.*full_state_output[tk_next]['P']
     
     
     if plot_flag:
         analysis.compute_orbit_errors(filter_output, full_state_output, truth_dict2)
         
-        t0_truth = sorted(truth_dict2.keys())[0]
-        
-        print('')
-        print('t0_truth', t0_truth)
-        print(full_state_output[t0_truth])
-        
-        print('')
-        print('t0_state', t0_state)
-        print(full_state_output[t0_state])
     
     
     

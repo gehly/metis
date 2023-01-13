@@ -3109,6 +3109,73 @@ def tudat_geo_lmb_setup_birth(truth_file, meas_file, correlation_file,
     return
 
 
+def tudat_geo_lmb_setup_adaptivebirth(truth_file, meas_file, setup_file):
+    
+    
+    # Don't use sensor_params from truth file it has been updated for meas
+    pklFile = open(truth_file, 'rb' )
+    data = pickle.load( pklFile )
+    truth_dict = data[0]
+    state_params = data[1]
+    int_params = data[2]
+    pklFile.close()
+        
+    # Load measurement data and sensor params
+    pklFile = open(meas_file, 'rb' )
+    data = pickle.load( pklFile )
+    tracklet_dict = data[0]
+    meas_dict = data[1]
+    sensor_params = data[2]
+    pklFile.close()
+    
+    # Setup filter params
+    filter_params = {}
+    filter_params['Q'] = 1e-15 * np.diag([1, 1, 1])
+    filter_params['snc_flag'] = 'gamma'
+    filter_params['gap_seconds'] = 900.
+    filter_params['alpha'] = 1e-4
+    filter_params['pnorm'] = 2.
+    filter_params['prune_T'] = 1e-3
+    filter_params['merge_U'] = 36.
+    filter_params['H_max'] = 1000
+    filter_params['H_max_birth'] = 5
+    filter_params['T_max'] = 100
+    filter_params['T_threshold'] = 1e-3
+    filter_params['p_surv'] = 1.0
+    # filter_params['birth_model'] = birth_model
+    
+    # Additions to other parameter dictionaries
+    state_params['nstates'] = 6
+ 
+    
+    # Initial state LMB for filter
+    tk_list = sorted(truth_dict.keys())
+
+
+    # Initialize empty
+    state_dict = {}
+    state_dict[tk_list[0]] = {}
+    state_dict[tk_list[0]]['LMB_dict'] = {}
+    
+    
+    
+    # Save final setup file
+    params_dict = {}
+    params_dict['state_params'] = state_params
+    params_dict['filter_params'] = filter_params
+    params_dict['int_params'] = int_params
+    params_dict['sensor_params'] = sensor_params
+    
+    meas_fcn = mfunc.unscented_radec
+                
+    pklFile = open( setup_file, 'wb' )
+    pickle.dump( [state_dict, meas_fcn, meas_dict, params_dict, truth_dict, tracklet_dict], pklFile, -1 )
+    pklFile.close()
+
+
+    return
+
+
 def tudat_geo_setup_singletarget(mult_setup_file, obs_time_file, single_setup_file):
     
     
@@ -3538,22 +3605,22 @@ def run_multitarget_filter(setup_file, prev_results, results_file):
     t0 = datetime(2022, 11, 7, 0, 0, 0)
     tf = datetime(2022, 11, 10, 0, 0, 0)
     tk_list = sorted(list(meas_dict.keys()))
-    tk_list2 = sorted(list(birth_time_dict.keys()))
+    # tk_list2 = sorted(list(birth_time_dict.keys()))
 
     
     for tk in tk_list:
         if tk < t0 or tk > tf:
             del meas_dict[tk]
             
-    for tk in tk_list2:
-        if tk < t0 or tk > tf:
-            del birth_time_dict[tk]
+    # for tk in tk_list2:
+    #     if tk < t0 or tk > tf:
+    #         del birth_time_dict[tk]
             
-    print(meas_dict.keys())
-    print(len(meas_dict.keys()))
+    # print(meas_dict.keys())
+    # print(len(meas_dict.keys()))
     
-    print(meas_dict.keys())
-    print(birth_time_dict.keys())
+    # print(meas_dict.keys())
+    # print(birth_time_dict.keys())
     
 
     filter_output, full_state_output = mult.lmb_filter(state_dict, truth_dict, meas_dict, tracklet_dict, meas_fcn, params_dict)
@@ -3683,15 +3750,15 @@ if __name__ == '__main__':
     fname = 'geo_twobody_1obj_7day_corr_2pass_300sec_noise1_lam0_pd1.pkl'
     corr_pkl = os.path.join(filterdir, fname)
     
-    fname = 'geo_twobody_1obj_7day_setup_noise1_lam0_pd1_batchbirth.pkl'
+    fname = 'geo_twobody_1obj_7day_setup_noise1_lam0_pd1_adaptivebirth.pkl'
     setup_file = os.path.join(filterdir, fname)  
     
     
-    # fname = 'geo_twobody_1obj_7day_batchbirth3_results_1.pkl'
-    # prev_results = os.path.join(filterdir, fname)
+    fname = 'geo_twobody_1obj_7day_adaptivebirth_results_1.pkl'
+    prev_results = os.path.join(filterdir, fname)
     
-    # fname = 'geo_twobody_1obj_7day_batchbirth_results_1.pkl'
-    # results_file = os.path.join(filterdir, fname)
+    fname = 'geo_twobody_1obj_7day_adaptivebirth_results_1.pkl'
+    results_file = os.path.join(filterdir, fname)
     
     
     
@@ -3773,6 +3840,8 @@ if __name__ == '__main__':
     # tudat_geo_lmb_setup_no_birth(truth_file2, meas_file2, setup_file)
     
     
+    # tudat_geo_lmb_setup_adaptivebirth(truth_file, meas_file, setup_file)
+    
     
     ra_lim = 50.
     dec_lim = 50.
@@ -3799,7 +3868,7 @@ if __name__ == '__main__':
     
     
     # Run Filter
-    # run_multitarget_filter(setup_file, prev_results, results_file)
+    run_multitarget_filter(setup_file, prev_results, results_file)
     
     # combine_results()
     
