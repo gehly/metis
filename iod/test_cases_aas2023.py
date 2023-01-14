@@ -3666,7 +3666,7 @@ def run_multitarget_filter(setup_file, prev_results, results_file):
     
     # Reduce meas and birth dict to times of interest
     t0 = datetime(2022, 11, 7, 0, 0, 0)
-    tf = datetime(2022, 11, 9, 0, 0, 0)
+    tf = datetime(2022, 11, 10, 0, 0, 0)
     tk_list = sorted(list(meas_dict.keys()))
     # tk_list2 = sorted(list(birth_time_dict.keys()))
 
@@ -3749,12 +3749,14 @@ def multitarget_analysis(results_file, setup_file):
     pklFile = open(setup_file, 'rb' )
     data = pickle.load( pklFile )
     meas_dict = data[2]
+    tracklet_dict = data[5]
     pklFile.close()
     
     
     
     
-    analysis.lmb_orbit_errors2(filter_output, filter_output, truth_dict, meas_dict, label_truth_dict)
+    analysis.lmb_orbit_errors2(filter_output, filter_output, truth_dict, meas_dict, label_truth_dict,
+                               tracklet_dict)
     
     return
 
@@ -3937,7 +3939,7 @@ if __name__ == '__main__':
     
     
     # Run Filter
-    # run_multitarget_filter(setup_file, prev_results, results_file)
+    run_multitarget_filter(setup_file, prev_results, results_file)
     
     # combine_results()
     

@@ -2217,7 +2217,8 @@ def lmb_orbit_errors(filter_output, full_state_output, truth_dict, meas_dict, la
 
 
 
-def lmb_orbit_errors2(filter_output, full_state_output, truth_dict, meas_dict, label_truth_dict):
+def lmb_orbit_errors2(filter_output, full_state_output, truth_dict, meas_dict,
+                      label_truth_dict, tracklet_dict):
     
     # OSPA parameters
     pnorm = 2.
@@ -2249,6 +2250,9 @@ def lmb_orbit_errors2(filter_output, full_state_output, truth_dict, meas_dict, l
     n = len(Xo)
     # p = len(resids0)
     
+    observed_obj_list = []
+    tracklet_id_list = list(tracklet_dict.keys())
+    
     
     # Compute OSPA Errors
     ospa = np.zeros(len(full_state_output),)
@@ -2258,12 +2262,16 @@ def lmb_orbit_errors2(filter_output, full_state_output, truth_dict, meas_dict, l
     nlabel_array = np.zeros(len(full_state_output),)
     N_est = np.zeros(len(full_state_output),)
     N_true = np.zeros(len(full_state_output),)
+    N_uct = np.zeros(len(full_state_output),)
+    N_ct = np.zeros(len(full_state_output),)
     rksum_array = np.zeros(len(full_state_output),)
     for kk in range(len(full_state_output)):
         tk = tk_list[kk]
 
         # Retrieve GMM and extracted state estimate
         LMB_dict = full_state_output[tk]['LMB_dict']
+        uct_dict = full_state_output[tk]['uct_dict']
+        corr_tracklet_list = full_state_output[tk]['corr_tracklet_list']
         card = full_state_output[tk]['card']
         Nk = full_state_output[tk]['N']
         label_list = full_state_output[tk]['label_list']
@@ -2277,12 +2285,17 @@ def lmb_orbit_errors2(filter_output, full_state_output, truth_dict, meas_dict, l
         nlabel_array[kk] = len(label_list)
         N_est[kk] = Nk        
         rksum_array[kk] = sum(rk_list)
+        N_uct[kk] = len(uct_dict)
+        N_ct[kk] = len(corr_tracklet_list)
         
         # Compute OSPA errors
         Xt_list = []
         for obj_id in obj_id_list:
             Xt_list.append(truth_dict[tk][obj_id])
-        N_true[kk] = len(Xt_list)
+            
+            
+            
+        
         
         OSPA, OSPA_pos, OSPA_vel, OSPA_card, row_indices = \
             compute_ospa(Xt_list, Xk_list, pnorm, c)
@@ -2291,6 +2304,19 @@ def lmb_orbit_errors2(filter_output, full_state_output, truth_dict, meas_dict, l
         ospa_pos[kk] = OSPA_pos
         ospa_vel[kk] = OSPA_vel
         ospa_card[kk] = OSPA_card
+        
+        
+        # Number of objects observed
+        for tracklet_id in tracklet_id_list:
+            if tk in tracklet_dict[tracklet_id]['tk_list']:
+                obj_observed = tracklet_dict[tracklet_id]['obj_id']
+                
+                if obj_observed not in observed_obj_list:
+                    observed_obj_list.append(obj_observed)
+                
+                
+        N_true[kk] = len(observed_obj_list)
+        
     
     # ospa *= 1000.
     # ospa_pos *= 1000.
@@ -2430,26 +2456,35 @@ def lmb_orbit_errors2(filter_output, full_state_output, truth_dict, meas_dict, l
         plt.plot(thrs_ric, -3*c_sig, 'k--')
         plt.ylabel('Cross-Track [km]')
     
-        plt.xlabel('Time [hours]')
+        plt.xlabel('Time since ' + t0.strftime('%Y-%m-%d %H:%M:%S') + ' [hours]')
 
         
         
         
     # OSPA
+    # plt.figure()
+    # plt.subplot(4,1,1)
+    # plt.plot(thrs, ospa, 'k.')
+    # plt.ylabel('OSPA')
+    # plt.subplot(4,1,2)
+    # plt.plot(thrs, ospa_pos, 'k.')
+    # plt.ylabel('OSPA Pos [km]')
+    # plt.subplot(4,1,3)
+    # plt.plot(thrs, ospa_vel, 'k.')
+    # plt.ylabel('OSPA Vel [km/s]')
+    # plt.subplot(4,1,4)
+    # plt.plot(thrs, ospa_card, 'k.')
+    # plt.ylabel('OSPA Card')
+    # plt.xlabel('Time [hours]')
+    
     plt.figure()
-    plt.subplot(4,1,1)
-    plt.plot(thrs, ospa, 'k.')
-    plt.ylabel('OSPA')
-    plt.subplot(4,1,2)
+    plt.subplot(2,1,1)
     plt.plot(thrs, ospa_pos, 'k.')
     plt.ylabel('OSPA Pos [km]')
-    plt.subplot(4,1,3)
+    plt.subplot(2,1,2)
     plt.plot(thrs, ospa_vel, 'k.')
     plt.ylabel('OSPA Vel [km/s]')
-    plt.subplot(4,1,4)
-    plt.plot(thrs, ospa_card, 'k.')
-    plt.ylabel('OSPA Card')
-    plt.xlabel('Time [hours]')
+    plt.xlabel('Time since ' + t0.strftime('%Y-%m-%d %H:%M:%S') + ' [hours]')
     
     
     # Cardinaltiy/Number plots
@@ -2457,15 +2492,20 @@ def lmb_orbit_errors2(filter_output, full_state_output, truth_dict, meas_dict, l
     plt.subplot(3,1,1)
     plt.plot(thrs, N_true, 'k--')
     plt.plot(thrs, N_est, 'k.')
-    plt.legend(['True', 'Est'])
+    plt.legend(['True', 'Est'], loc='upper left')
     plt.ylabel('Cardinality')
+    plt.ylim([-0.1, max(max(N_true)+1, max(N_est)+1)])
     plt.subplot(3,1,2)
     plt.plot(thrs, nlabel_array, 'k.')
-    plt.ylabel('Num Labels')
+    plt.ylabel('Tracks')
+    plt.ylim([-0.1, max(nlabel_array)+1])
     plt.subplot(3,1,3)
-    plt.plot(thrs, rksum_array, 'k.')
-    plt.ylabel('sum(rk)')
-    plt.xlabel('Time [hours]')
+    # plt.plot(thrs, rksum_array, 'k.')
+    # plt.ylabel('sum(rk)')
+    plt.plot(thrs, N_uct, 'k.')
+    plt.ylim([-0.1, max(N_uct)+1])
+    plt.ylabel('UCTs')
+    plt.xlabel('Time since ' + t0.strftime('%Y-%m-%d %H:%M:%S') + ' [hours]')
     
         
     # Resids
@@ -2496,7 +2536,7 @@ def lmb_orbit_errors2(filter_output, full_state_output, truth_dict, meas_dict, l
     plt.ylabel('RA [arcsec]')
     plt.subplot(2,1,2)
     plt.ylabel('DEC [arcsec]')
-    plt.xlabel('Time [hours]')
+    plt.xlabel('Time since ' + t0.strftime('%Y-%m-%d %H:%M:%S') + ' [hours]')
     
     
     

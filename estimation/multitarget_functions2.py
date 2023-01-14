@@ -505,6 +505,7 @@ def lmb_filter(state_dict, truth_dict, meas_dict, tracklet_dict, meas_fcn,
     # Initialize
     ucm_dict = {}
     uct_dict = {}
+    corr_tracklet_list = []
     LMB_birth = {}
     label_truth_full = {}
     filter_output = {}
@@ -595,7 +596,8 @@ def lmb_filter(state_dict, truth_dict, meas_dict, tracklet_dict, meas_fcn,
             ucm_dict[tk]['pexist_list'] = pexist_list
             
             LMB_birth, label_truth_dict, ucm_dict, uct_dict = \
-                adaptive_birth_model(tk_next, ucm_dict, uct_dict, tracklet_dict,
+                adaptive_birth_model(tk_next, ucm_dict, uct_dict,
+                                     corr_tracklet_list, tracklet_dict,
                                      truth_dict, params_dict, ra_lim, dec_lim)
                 
                 
@@ -612,6 +614,10 @@ def lmb_filter(state_dict, truth_dict, meas_dict, tracklet_dict, meas_fcn,
         pk, Nk, labelk_list, rk_list, Xk_list, Pk_list, resids_k = \
             lmb_state_extraction(LMB_dict, tk, Zk, sensor_id_list, meas_fcn,
                                  params_dict)
+            
+            
+        uct_dict, corr_tracklet_list = \
+            tracklet_cleanup(LMB_dict, labelk_list, uct_dict)
             
             
         print('')
@@ -632,6 +638,8 @@ def lmb_filter(state_dict, truth_dict, meas_dict, tracklet_dict, meas_fcn,
         # Store output
         filter_output[tk] = {}
         filter_output[tk]['LMB_dict'] = copy.deepcopy(LMB_dict)
+        filter_output[tk]['uct_dict'] = copy.deepcopy(uct_dict)
+        filter_output[tk]['corr_tracklet_list'] = corr_tracklet_list
         filter_output[tk]['card'] = pk
         filter_output[tk]['N'] = Nk
         filter_output[tk]['label_list'] = labelk_list
@@ -1971,8 +1979,8 @@ def compute_hypothesis_dict(r_list, label_list, H_max=1000):
 ###############################################################################
 
 
-def adaptive_birth_model(tk_next, ucm_dict, uct_dict, tracklet_dict, truth_dict,
-                         params_dict, ra_lim, dec_lim):
+def adaptive_birth_model(tk_next, ucm_dict, uct_dict, corr_tracklet_list, 
+                         tracklet_dict, truth_dict, params_dict, ra_lim, dec_lim):
     
     
     print('')
@@ -1985,7 +1993,7 @@ def adaptive_birth_model(tk_next, ucm_dict, uct_dict, tracklet_dict, truth_dict,
     tracklet_dict = copy.deepcopy(tracklet_dict)
     
     # Initialize output
-    birth_model = {}
+    LMB_birth = {}
     label_truth_dict = {}
     
     print('ucm_dict', ucm_dict)
@@ -1994,7 +2002,8 @@ def adaptive_birth_model(tk_next, ucm_dict, uct_dict, tracklet_dict, truth_dict,
     # print('tracklet_dict[1]', tracklet_dict[1])
     
     # Form tracklets from uncorrelated measurements
-    ucm_dict, uct_dict = meas2tracklet(ucm_dict, uct_dict, tracklet_dict)
+    ucm_dict, uct_dict = meas2tracklet(ucm_dict, uct_dict, corr_tracklet_list, 
+                                       tracklet_dict)
     
     print('ucm_dict', ucm_dict)
     print('uct_dict', uct_dict)
@@ -2023,9 +2032,12 @@ def adaptive_birth_model(tk_next, ucm_dict, uct_dict, tracklet_dict, truth_dict,
 
 
 
-def meas2tracklet(ucm_dict, uct_dict, tracklet_dict):
+def meas2tracklet(ucm_dict, uct_dict, corr_tracklet_list, tracklet_dict):
     
     print('meas2tracklet')
+    
+    #TODO this whole thing breaks if more than one meassurement at the same
+    # time
     
     # Copy to avoid changing values
     ucm_dict = copy.deepcopy(ucm_dict)
@@ -2071,7 +2083,22 @@ def meas2tracklet(ucm_dict, uct_dict, tracklet_dict):
                 
             # Find tracklet_id
             for tracklet_id in tracklet_id_list:
+                                
                 if tk in tracklet_dict[tracklet_id]['tk_list']:
+                    
+                    # If measurement belongs to a tracklet that is already
+                    # confirmed in the LMB filter, don't make new UCT, just
+                    # delete and move on
+                    if tracklet_id in corr_tracklet_list:
+                        del ucm_dict[tk]['Zk_list'][ii]
+                        del ucm_dict[tk]['sensor_id_list'][ii]
+                        del ucm_dict[tk]['pexist_list'][ii]
+                        
+                        if len(ucm_dict[tk]['Zk_list']) == 0:
+                            del ucm_dict[tk]
+                            
+                        continue
+                        
                     
                     # Initialize entry for tracklet_id
                     if tracklet_id not in uct_dict:
@@ -2489,6 +2516,7 @@ def tracklets_to_birth_model(tk_next, correlation_dict, uct_dict, truth_dict, pa
     
     
     # Initialize
+    birth_model = {}
     label_truth_dict = {}
     LMB_birth = {}
     
@@ -2585,7 +2613,7 @@ def tracklets_to_birth_model(tk_next, correlation_dict, uct_dict, truth_dict, pa
         tracklet_id_list.append(tracklet2_id)
         tracklet_id_list = list(set(tracklet_id_list))        
         
-        label = (tk_next, tracklet_id_list)
+        label = (tk_next, tracklet2_id)
         label_truth_dict[label] = obj2_id
         
         # Form LMB for birth model
@@ -2594,6 +2622,7 @@ def tracklets_to_birth_model(tk_next, correlation_dict, uct_dict, truth_dict, pa
         LMB_birth[label]['means'] = birth_model[tracklet2_id]['means']
         LMB_birth[label]['covars'] = birth_model[tracklet2_id]['covars']        
         LMB_birth[label]['r'] = birth_model[tracklet2_id]['r_birth']   
+        LMB_birth[label]['tracklet_id_list'] = tracklet_id_list
                     
     
     
@@ -2694,6 +2723,29 @@ def run_batch(Xo, tk_next, tracklet1, tracklet2, params_dict, truth_dict, plot_f
     
     
     return X_birth, P_birth
+
+
+def tracklet_cleanup(LMB_dict, label_list, uct_dict):    
+    
+    uct_dict = copy.deepcopy(uct_dict)
+    LMB_dict = copy.deepcopy(LMB_dict)
+    
+    corr_tracklet_list = []
+    for label in label_list:
+        
+        if 'tracklet_id_list' in LMB_dict[label]:
+            tracklet_id_list = LMB_dict[label]['tracklet_id_list']        
+            corr_tracklet_list.extend(tracklet_id_list)
+        
+    corr_tracklet_list = list(set(corr_tracklet_list))
+    
+    tracklet_id_list = list(uct_dict.keys())
+    for tracklet_id in tracklet_id_list:
+        if tracklet_id in corr_tracklet_list:
+            del uct_dict[tracklet_id]
+    
+    
+    return uct_dict, corr_tracklet_list
 
 
 ###############################################################################
