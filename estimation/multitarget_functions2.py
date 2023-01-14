@@ -1990,8 +1990,8 @@ def adaptive_birth_model(tk_next, ucm_dict, uct_dict, tracklet_dict, truth_dict,
     
     print('ucm_dict', ucm_dict)
     print('uct_dict', uct_dict)
-    print('tracklet_dict[0]', tracklet_dict[0])
-    print('tracklet_dict[1]', tracklet_dict[1])
+    # print('tracklet_dict[0]', tracklet_dict[0])
+    # print('tracklet_dict[1]', tracklet_dict[1])
     
     # Form tracklets from uncorrelated measurements
     ucm_dict, uct_dict = meas2tracklet(ucm_dict, uct_dict, tracklet_dict)
@@ -2034,8 +2034,8 @@ def meas2tracklet(ucm_dict, uct_dict, tracklet_dict):
     
     print('ucm_dict', ucm_dict)
     print('uct_dict', uct_dict)
-    print('tracklet_dict[0]', tracklet_dict[0])
-    print('tracklet_dict[1]', tracklet_dict[1])
+    # print('tracklet_dict[0]', tracklet_dict[0])
+    # print('tracklet_dict[1]', tracklet_dict[1])
     
     tk_list = sorted(ucm_dict.keys())
     tracklet_id_list = sorted(tracklet_dict.keys())

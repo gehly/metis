@@ -3343,6 +3343,69 @@ def tudat_geo_setup_singletarget2(truth_file, meas_file, obj_id, truth_file2, me
     return
 
 
+def tudat_geo_reduce_setup(truth_file, meas_file, obj_id_list, truth_file2, meas_file2):
+    
+    # Don't use sensor_params from truth file it has been updated for meas
+    pklFile = open(truth_file, 'rb' )
+    data = pickle.load( pklFile )
+    truth_dict = data[0]
+    state_params = data[1]
+    int_params = data[2]
+    pklFile.close()
+        
+    # Load measurement data and sensor params
+    pklFile = open(meas_file, 'rb' )
+    data = pickle.load( pklFile )
+    tracklet_dict = data[0]
+    meas_dict = data[1]
+    sensor_params = data[2]
+    pklFile.close()
+    
+    
+    
+    # Reduce truth, tracklet, meas dictionaries to obj_id_list
+    tracklet_id_list = list(tracklet_dict.keys())
+    tk_tracklet_full = []
+    for tracklet_id in tracklet_id_list:
+        if tracklet_dict[tracklet_id]['obj_id'] not in obj_id_list:
+            del tracklet_dict[tracklet_id]
+        else:
+            tk_tracklet_full.extend(tracklet_dict[tracklet_id]['tk_list'])
+            
+            
+    print('tk tracklet full', tk_tracklet_full)
+            
+    tk_truth = sorted(list(truth_dict.keys()))  
+    for tk in tk_truth:
+        obj_id_truth = list(truth_dict[tk].keys())
+        
+        for obj_jj in obj_id_truth:
+            if obj_jj not in obj_id_list:
+                del truth_dict[tk][obj_jj]
+                
+        if tk in meas_dict and tk not in tk_tracklet_full:
+            del meas_dict[tk]
+            
+    
+    print(meas_dict)
+    print(tracklet_dict)
+        
+      
+        
+    # Save truth and params
+    pklFile = open( truth_file2, 'wb' )
+    pickle.dump( [truth_dict, state_params, int_params, sensor_params], pklFile, -1 )
+    pklFile.close()
+    
+    # Save data
+    pklFile = open( meas_file2, 'wb' )
+    pickle.dump( [tracklet_dict, meas_dict, sensor_params], pklFile, -1 )
+    pklFile.close()
+    
+    
+    return
+
+
 def run_batch(Xo, tracklet_dict, params_dict, truth_dict, t0, tf):
     
     
@@ -3603,7 +3666,7 @@ def run_multitarget_filter(setup_file, prev_results, results_file):
     
     # Reduce meas and birth dict to times of interest
     t0 = datetime(2022, 11, 7, 0, 0, 0)
-    tf = datetime(2022, 11, 8, 0, 0, 0)
+    tf = datetime(2022, 11, 9, 0, 0, 0)
     tk_list = sorted(list(meas_dict.keys()))
     # tk_list2 = sorted(list(birth_time_dict.keys()))
 
@@ -3714,7 +3777,7 @@ if __name__ == '__main__':
     measdir = os.path.join(fdir, 'meas')
     trackdir = os.path.join(fdir, 'tracklet_corr')
     # filterdir = r'D:\documents\research_projects\iod\data\aas2023_preprint\geo_twobody_1obj_3day'
-    filterdir = r'D:\documents\research_projects\iod\data\sim\test\aas2023_geo_6obj_7day\2023_01_12_geo_twobody_singletarget'
+    filterdir = r'D:\documents\research_projects\iod\data\sim\test\aas2023_geo_6obj_7day\2023_01_14_geo_twobody_3obj_3day'
     
     
     # fname = 'geo_twobody_6obj_7day_truth_13.pkl'    
@@ -3723,22 +3786,24 @@ if __name__ == '__main__':
     # fname = 'geo_twobody_6obj_7day_visibility.csv'
     # vis_file = os.path.join(visdir, fname)
     
-    # fname = 'geo_twobody_6obj_7day_truth.pkl'    
-    # truth_file = os.path.join(truthdir, fname)
+    fname = 'geo_twobody_6obj_7day_truth.pkl'    
+    truth_file = os.path.join(truthdir, fname)
     
-    fname = 'geo_twobody_1obj_7day_truth.pkl'    
-    truth_file = os.path.join(filterdir, fname)
+    # fname = 'geo_twobody_1obj_7day_truth.pkl'  
+    fname = 'geo_twobody_3obj_7day_truth.pkl'
+    truth_file2 = os.path.join(filterdir, fname)
     
     
     fname = 'geo_twobody_6obj_7day_obstime_2pass_300sec.pkl'
     obs_time_file = os.path.join(filterdir, fname)
     
-    # fname = 'geo_twobody_6obj_7day_meas_2pass_300sec_noise1_lam0_pd1.pkl'
+    fname = 'geo_twobody_6obj_7day_meas_2pass_300sec_noise1_lam0_pd1.pkl'
     # fname = 'geo_real_3obj_3day_meas.pkl'
-    # meas_file = os.path.join(measdir, fname)
+    meas_file = os.path.join(measdir, fname)
     
-    fname = 'geo_twobody_1obj_7day_meas_2pass_300sec_noise1_lam0_pd1.pkl'
-    meas_file = os.path.join(filterdir, fname)
+    # fname = 'geo_twobody_1obj_7day_meas_2pass_300sec_noise1_lam0_pd1.pkl'
+    fname = 'geo_twobody_3obj_7day_meas_2pass_300sec_noise1_lam0_pd1.pkl'
+    meas_file2 = os.path.join(filterdir, fname)
     
     
     
@@ -3750,14 +3815,15 @@ if __name__ == '__main__':
     fname = 'geo_twobody_1obj_7day_corr_2pass_300sec_noise1_lam0_pd1.pkl'
     corr_pkl = os.path.join(filterdir, fname)
     
-    fname = 'geo_twobody_1obj_7day_setup_noise1_lam0_pd1_adaptivebirth.pkl'
+    # fname = 'geo_twobody_1obj_7day_setup_noise1_lam0_pd1_adaptivebirth.pkl'
+    fname = 'geo_twobody_3obj_7day_setup_noise1_lam0_pd1_adaptivebirth.pkl'
     setup_file = os.path.join(filterdir, fname)  
     
     
-    fname = 'geo_twobody_1obj_7day_adaptivebirth_results_1.pkl'
+    fname = 'geo_twobody_3obj_3day_adaptivebirth_results_1.pkl'
     prev_results = os.path.join(filterdir, fname)
     
-    fname = 'geo_twobody_1obj_7day_adaptivebirth_results_1.pkl'
+    fname = 'geo_twobody_3obj_3day_adaptivebirth_results_1.pkl'
     results_file = os.path.join(filterdir, fname)
     
     
@@ -3793,6 +3859,9 @@ if __name__ == '__main__':
     obj_id = 49336
     # tudat_geo_setup_singletarget2(truth_file, meas_file, obj_id, truth_file2, meas_file2)
     
+    obj_id_list = [49336, 42917, 42965]
+    # tudat_geo_reduce_setup(truth_file, meas_file, obj_id_list, truth_file2, meas_file2)
+    
     
     noise = 1.
     lam_c = 0.
@@ -3802,7 +3871,7 @@ if __name__ == '__main__':
     # generate_meas_file(noise, lam_c, p_det, orbit_regime, truth_file,
     #                    obs_time_file, meas_file, obj_id_list, reduce_meas=False)
     
-    # check_meas_file(meas_file)
+    # check_meas_file(meas_file2)
     
     
     
@@ -3840,7 +3909,7 @@ if __name__ == '__main__':
     # tudat_geo_lmb_setup_no_birth(truth_file2, meas_file2, setup_file)
     
     
-    # tudat_geo_lmb_setup_adaptivebirth(truth_file, meas_file, setup_file)
+    # tudat_geo_lmb_setup_adaptivebirth(truth_file2, meas_file2, setup_file)
     
     
     ra_lim = 50.
