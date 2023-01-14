@@ -3777,7 +3777,7 @@ if __name__ == '__main__':
     measdir = os.path.join(fdir, 'meas')
     trackdir = os.path.join(fdir, 'tracklet_corr')
     # filterdir = r'D:\documents\research_projects\iod\data\aas2023_preprint\geo_twobody_1obj_3day'
-    filterdir = r'D:\documents\research_projects\iod\data\sim\test\aas2023_geo_6obj_7day\2023_01_14_geo_twobody_3obj_3day'
+    filterdir = r'D:\documents\research_projects\iod\data\sim\test\aas2023_geo_6obj_7day\2023_01_14_geo_twobody_singletarget'
     
     
     # fname = 'geo_twobody_6obj_7day_truth_13.pkl'    
@@ -3789,8 +3789,8 @@ if __name__ == '__main__':
     fname = 'geo_twobody_6obj_7day_truth.pkl'    
     truth_file = os.path.join(truthdir, fname)
     
-    # fname = 'geo_twobody_1obj_7day_truth.pkl'  
-    fname = 'geo_twobody_3obj_7day_truth.pkl'
+    fname = 'geo_twobody_1obj_7day_truth.pkl'  
+    # fname = 'geo_twobody_3obj_7day_truth.pkl'
     truth_file2 = os.path.join(filterdir, fname)
     
     
@@ -3801,8 +3801,8 @@ if __name__ == '__main__':
     # fname = 'geo_real_3obj_3day_meas.pkl'
     meas_file = os.path.join(measdir, fname)
     
-    # fname = 'geo_twobody_1obj_7day_meas_2pass_300sec_noise1_lam0_pd1.pkl'
-    fname = 'geo_twobody_3obj_7day_meas_2pass_300sec_noise1_lam0_pd1.pkl'
+    fname = 'geo_twobody_1obj_7day_meas_2pass_300sec_noise1_lam0_pd1.pkl'
+    # fname = 'geo_twobody_3obj_7day_meas_2pass_300sec_noise1_lam0_pd1.pkl'
     meas_file2 = os.path.join(filterdir, fname)
     
     
@@ -3815,15 +3815,15 @@ if __name__ == '__main__':
     fname = 'geo_twobody_1obj_7day_corr_2pass_300sec_noise1_lam0_pd1.pkl'
     corr_pkl = os.path.join(filterdir, fname)
     
-    # fname = 'geo_twobody_1obj_7day_setup_noise1_lam0_pd1_adaptivebirth.pkl'
-    fname = 'geo_twobody_3obj_7day_setup_noise1_lam0_pd1_adaptivebirth.pkl'
+    fname = 'geo_twobody_1obj_7day_setup_noise1_lam0_pd1_adaptivebirth.pkl'
+    # fname = 'geo_twobody_3obj_7day_setup_noise1_lam0_pd1_adaptivebirth.pkl'
     setup_file = os.path.join(filterdir, fname)  
     
     
-    fname = 'geo_twobody_3obj_3day_adaptivebirth_results_1.pkl'
+    fname = 'geo_twobody_1obj_7day_adaptivebirth_results_1.pkl'
     prev_results = os.path.join(filterdir, fname)
     
-    fname = 'geo_twobody_3obj_3day_adaptivebirth_results_1.pkl'
+    fname = 'geo_twobody_1obj_7day_adaptivebirth_results_1.pkl'
     results_file = os.path.join(filterdir, fname)
     
     
@@ -3943,7 +3943,7 @@ if __name__ == '__main__':
     
     
     
-    multitarget_analysis(results_file, setup_file)
+    # multitarget_analysis(results_file, setup_file)
     
     
     

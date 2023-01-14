@@ -505,7 +505,7 @@ def lmb_filter(state_dict, truth_dict, meas_dict, tracklet_dict, meas_fcn,
     # Initialize
     ucm_dict = {}
     uct_dict = {}
-    birth_model = {}
+    LMB_birth = {}
     label_truth_full = {}
     filter_output = {}
 
@@ -539,7 +539,7 @@ def lmb_filter(state_dict, truth_dict, meas_dict, tracklet_dict, meas_fcn,
 
         # # Predictor Step
         tin = [tk_prior, tk]        
-        LMB_birth, LMB_surv = lmb_predictor(LMB_dict, tin, birth_model, params_dict)
+        LMB_birth, LMB_surv = lmb_predictor(LMB_dict, tin, LMB_birth, params_dict)
         
         print('')
         print('tk', tk)
@@ -594,7 +594,7 @@ def lmb_filter(state_dict, truth_dict, meas_dict, tracklet_dict, meas_fcn,
             ucm_dict[tk] = copy.deepcopy(meas_dict[tk])
             ucm_dict[tk]['pexist_list'] = pexist_list
             
-            birth_model, label_truth_dict, ucm_dict, uct_dict = \
+            LMB_birth, label_truth_dict, ucm_dict, uct_dict = \
                 adaptive_birth_model(tk_next, ucm_dict, uct_dict, tracklet_dict,
                                      truth_dict, params_dict, ra_lim, dec_lim)
                 
@@ -651,7 +651,7 @@ def lmb_filter(state_dict, truth_dict, meas_dict, tracklet_dict, meas_fcn,
 
 
 
-def lmb_predictor(LMB_dict, tin, birth_model, params_dict):
+def lmb_predictor(LMB_dict, tin, LMB_birth, params_dict):
     '''
     
     
@@ -700,16 +700,16 @@ def lmb_predictor(LMB_dict, tin, birth_model, params_dict):
 
     # Birth Components
     # birth_model = filter_params['birth_model']
-    LMB_birth = {}
-    for ii in birth_model.keys():
-        label = (tk, ii)
-        LMB_birth[label] = {}        
+    # LMB_birth = {}
+    # for ii in birth_model.keys():
+    #     label = (tk, ii)
+    #     LMB_birth[label] = {}        
         
-        LMB_birth[label]['weights'] = birth_model[ii]['weights']
-        LMB_birth[label]['means'] = birth_model[ii]['means']
-        LMB_birth[label]['covars'] = birth_model[ii]['covars']
+    #     LMB_birth[label]['weights'] = birth_model[ii]['weights']
+    #     LMB_birth[label]['means'] = birth_model[ii]['means']
+    #     LMB_birth[label]['covars'] = birth_model[ii]['covars']
         
-        LMB_birth[label]['r'] = birth_model[ii]['r_birth']
+    #     LMB_birth[label]['r'] = birth_model[ii]['r_birth']
         
         # # Compute Mahalanobis distance against existing components
         # for label_jj in LMB_dict:
@@ -2012,14 +2012,14 @@ def adaptive_birth_model(tk_next, ucm_dict, uct_dict, tracklet_dict, truth_dict,
         print('uct_dict', uct_dict)
         
         
-        birth_model, label_truth_dict = \
+        LMB_birth, label_truth_dict = \
             tracklets_to_birth_model(tk_next, correlation_dict, uct_dict,
                                      truth_dict, params_dict, ra_lim, dec_lim)
             
         print('post tracklets to birth model')
         print('uct_dict', uct_dict)
     
-    return birth_model, label_truth_dict, ucm_dict, uct_dict
+    return LMB_birth, label_truth_dict, ucm_dict, uct_dict
 
 
 
@@ -2490,7 +2490,7 @@ def tracklets_to_birth_model(tk_next, correlation_dict, uct_dict, truth_dict, pa
     
     # Initialize
     label_truth_dict = {}
-    birth_model = {}
+    LMB_birth = {}
     
         
     # Get estimated correlation status    
@@ -2561,13 +2561,11 @@ def tracklets_to_birth_model(tk_next, correlation_dict, uct_dict, truth_dict, pa
                         birth_model[tracklet2_id]['r_birth'] = min(0.01, pnew)
                         birth_model[tracklet2_id]['means'] = []
                         birth_model[tracklet2_id]['covars'] = []
+                        birth_model[tracklet2_id]['tracklet_ids'] = []
                         
-                        label = (tk_next, tracklet2_id)
-                        label_truth_dict[label] = obj2_id
-                        
-                    
                     birth_model[tracklet2_id]['means'].append(X_birth)
                     birth_model[tracklet2_id]['covars'].append(P_birth)
+                    birth_model[tracklet2_id]['tracklet_ids'].append(tracklet1_id)
                     
                     # Use evenly weighted Gaussian components
                     ncomp = len(birth_model[tracklet2_id]['means'])
@@ -2578,13 +2576,32 @@ def tracklets_to_birth_model(tk_next, correlation_dict, uct_dict, truth_dict, pa
                     birth_model[tracklet2_id]['r_birth'] = min(0.01, max(birth_model[tracklet2_id]['r_birth'], pnew))
                     
                     
+    # Form birth LMB with labels
+    LMB_birth = {}
+    for tracklet2_id in birth_model.keys():
+        
+        # Form and save label data
+        tracklet_id_list = birth_model[tracklet2_id]['tracklet_ids']
+        tracklet_id_list.append(tracklet2_id)
+        tracklet_id_list = list(set(tracklet_id_list))        
+        
+        label = (tk_next, tracklet_id_list)
+        label_truth_dict[label] = obj2_id
+        
+        # Form LMB for birth model
+        LMB_birth[label] = {}       
+        LMB_birth[label]['weights'] = birth_model[tracklet2_id]['weights']
+        LMB_birth[label]['means'] = birth_model[tracklet2_id]['means']
+        LMB_birth[label]['covars'] = birth_model[tracklet2_id]['covars']        
+        LMB_birth[label]['r'] = birth_model[tracklet2_id]['r_birth']   
                     
     
-    print(birth_model)
+    
+    print(LMB_birth)
     print(label_truth_dict)
     
 
-    return birth_model, label_truth_dict
+    return LMB_birth, label_truth_dict
 
 
 def run_batch(Xo, tk_next, tracklet1, tracklet2, params_dict, truth_dict, plot_flag=False):
