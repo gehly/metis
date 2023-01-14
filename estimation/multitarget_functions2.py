@@ -617,7 +617,7 @@ def lmb_filter(state_dict, truth_dict, meas_dict, tracklet_dict, meas_fcn,
             
             
         uct_dict, corr_tracklet_list = \
-            tracklet_cleanup(LMB_dict, labelk_list, uct_dict)
+            tracklet_cleanup(labelk_list, uct_dict)
             
             
         print('')
@@ -633,7 +633,8 @@ def lmb_filter(state_dict, truth_dict, meas_dict, tracklet_dict, meas_fcn,
         
         # if tk == datetime(2022, 11, 8, 10, 5, 10):
         #     mistake
-
+        
+        
         
         # Store output
         filter_output[tk] = {}
@@ -2130,7 +2131,7 @@ def meas2tracklet(ucm_dict, uct_dict, corr_tracklet_list, tracklet_dict):
     tracklet_id_list = sorted(list(uct_dict.keys()))
     for tracklet_id in tracklet_id_list:
         pexist_max = max(uct_dict[tracklet_id]['pexist_list'])
-        if (1. - pexist_max) < 1e-6:
+        if (1. - pexist_max) < 1e-4:
             
             print('pexist == 1')
             print('tracklet_id', tracklet_id)
@@ -2611,9 +2612,22 @@ def tracklets_to_birth_model(tk_next, correlation_dict, uct_dict, truth_dict, pa
         # Form and save label data
         tracklet_id_list = birth_model[tracklet2_id]['tracklet_ids']
         tracklet_id_list.append(tracklet2_id)
-        tracklet_id_list = list(set(tracklet_id_list))        
+        tracklet_id_list = sorted(list(set(tracklet_id_list)))
         
-        label = (tk_next, tracklet2_id)
+        if len(tracklet_id_list) == 1:        
+            label = (tk_next, tracklet_id_list[0])
+        elif len(tracklet_id_list) == 2:
+            label = (tk_next, tracklet_id_list[0], tracklet_id_list[1])
+        elif len(tracklet_id_list) == 3:
+            label = (tk_next, tracklet_id_list[0], tracklet_id_list[1], tracklet_id_list[2])
+        else:
+            print(tk_next)
+            print(tracklet_id_list)
+            mistake
+            
+            
+            
+            
         label_truth_dict[label] = obj2_id
         
         # Form LMB for birth model
@@ -2622,7 +2636,7 @@ def tracklets_to_birth_model(tk_next, correlation_dict, uct_dict, truth_dict, pa
         LMB_birth[label]['means'] = birth_model[tracklet2_id]['means']
         LMB_birth[label]['covars'] = birth_model[tracklet2_id]['covars']        
         LMB_birth[label]['r'] = birth_model[tracklet2_id]['r_birth']   
-        LMB_birth[label]['tracklet_id_list'] = tracklet_id_list
+        # LMB_birth[label]['tracklet_id_list'] = tracklet_id_list
                     
     
     
@@ -2725,24 +2739,37 @@ def run_batch(Xo, tk_next, tracklet1, tracklet2, params_dict, truth_dict, plot_f
     return X_birth, P_birth
 
 
-def tracklet_cleanup(LMB_dict, label_list, uct_dict):    
+def tracklet_cleanup(label_list, uct_dict):   
+    
+    print('')
+    print('tracklet_cleanup')
     
     uct_dict = copy.deepcopy(uct_dict)
-    LMB_dict = copy.deepcopy(LMB_dict)
+    
+    print('uct_dict', uct_dict)
     
     corr_tracklet_list = []
     for label in label_list:
         
-        if 'tracklet_id_list' in LMB_dict[label]:
-            tracklet_id_list = LMB_dict[label]['tracklet_id_list']        
-            corr_tracklet_list.extend(tracklet_id_list)
+        print(label)
+        tracklet_ids = list(label[1:])
+        
+        print('tracklet_ids', tracklet_ids)
+        
+        corr_tracklet_list.extend(tracklet_ids)
+        
         
     corr_tracklet_list = list(set(corr_tracklet_list))
+    print('corr_tracklet_list')
     
     tracklet_id_list = list(uct_dict.keys())
     for tracklet_id in tracklet_id_list:
         if tracklet_id in corr_tracklet_list:
             del uct_dict[tracklet_id]
+    
+    
+    print('uct_dict', uct_dict)
+    
     
     
     return uct_dict, corr_tracklet_list
