@@ -3822,10 +3822,10 @@ if __name__ == '__main__':
     setup_file = os.path.join(filterdir, fname)  
     
     
-    fname = 'geo_twobody_3obj_3day_adaptivebirth_results_1.pkl'
+    fname = 'geo_twobody_3obj_3day_adaptivebirth_results.pkl'
     prev_results = os.path.join(filterdir, fname)
     
-    fname = 'geo_twobody_3obj_3day_adaptivebirth_results_1.pkl'
+    fname = 'geo_twobody_3obj_3day_adaptivebirth_results_P.pkl'
     results_file = os.path.join(filterdir, fname)
     
     

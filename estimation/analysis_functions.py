@@ -2282,7 +2282,7 @@ def lmb_orbit_errors2(filter_output, full_state_output, truth_dict, meas_dict,
         sorted_labels = sorted(label_list)
 
         # Cardinality related terms
-        nlabel_array[kk] = len(label_list)
+        nlabel_array[kk] = len(LMB_dict)
         N_est[kk] = Nk        
         rksum_array[kk] = sum(rk_list)
         N_uct[kk] = len(uct_dict)
@@ -2323,9 +2323,11 @@ def lmb_orbit_errors2(filter_output, full_state_output, truth_dict, meas_dict,
     # ospa_vel *= 1000.
     
     
-    for ii in range(len(obj_id_list)):
+    # for ii in range(len(obj_id_list)):
+    for label in label_truth_dict:
         
-        obj_id_plot = obj_id_list[ii]
+        obj_id_plot = label_truth_dict[label]
+        # obj_id_plot = obj_id_list[ii]
         
 
     
@@ -2337,6 +2339,7 @@ def lmb_orbit_errors2(filter_output, full_state_output, truth_dict, meas_dict,
         r_sig = []
         i_sig = []
         c_sig = []
+        r_exist = []
         
         
         meas_ind = 0 
@@ -2347,16 +2350,24 @@ def lmb_orbit_errors2(filter_output, full_state_output, truth_dict, meas_dict,
 
             # label_plot = label_list[ii]
             label_list = full_state_output[tk]['label_list']
-            obj_in_filter = False
-            for label in label_list:
-                if label_truth_dict[label] == obj_id_plot:
-                    label_ind = label_list.index(label)
-                    label_ii = label
-                    obj_in_filter = True
-                    break
-                
-            if not obj_in_filter:
+            
+            if label not in label_list:
                 continue
+            else:
+                label_ind = label_list.index(label)
+                label_ii = label
+            
+            
+            # obj_in_filter = False
+            # for label in label_list:
+            #     if label_truth_dict[label] == obj_id_plot:
+            #         label_ind = label_list.index(label)
+            #         label_ii = label
+            #         obj_in_filter = True
+            #         break
+                
+            # if not obj_in_filter:
+            #     continue
             
             print('')
             print(tk)
@@ -2403,6 +2414,8 @@ def lmb_orbit_errors2(filter_output, full_state_output, truth_dict, meas_dict,
             i_sig.append(np.sqrt(P_ric[1,1]))
             c_sig.append(np.sqrt(P_ric[2,2]))
             
+            r_exist.append(rk_list[label_ind])
+            
             
         
         r_err = np.asarray(r_err)
@@ -2433,28 +2446,38 @@ def lmb_orbit_errors2(filter_output, full_state_output, truth_dict, meas_dict,
         # print('')
         
     
-        
+        if len(thrs_ric) == 0:
+            continue
         
         
         plt.figure()
-        plt.subplot(3,1,1)
+        plt.subplot(4,1,1)
         plt.plot(thrs_ric, r_err, 'k.')
         plt.plot(thrs_ric, 3*r_sig, 'k--')
         plt.plot(thrs_ric, -3*r_sig, 'k--')
+        plt.xticks([0, 10, 20, 30, 40, 50, 60], labels=[])
         plt.ylabel('Radial [km]')
-        plt.title('NORAD ' + str(obj_id_plot) + ' (' + label_ii[0].strftime('%Y-%m-%d %H:%M:%S') + ', ' + str(label_ii[1]) + ')')
+        plt.title('NORAD ' + str(obj_id_plot) + ' (' + label_ii[0].strftime('%Y-%m-%d %H:%M:%S') + ', ' + str(label_ii[1]) + ', ' + str(label_ii[2]) +  ')')
         
-        plt.subplot(3,1,2)
+        plt.subplot(4,1,2)
         plt.plot(thrs_ric, i_err, 'k.')
         plt.plot(thrs_ric, 3*i_sig, 'k--')
         plt.plot(thrs_ric, -3*i_sig, 'k--')
+        plt.xticks([0, 10, 20, 30, 40, 50, 60], labels=[])
         plt.ylabel('In-Track [km]')
         
-        plt.subplot(3,1,3)
+        plt.subplot(4,1,3)
         plt.plot(thrs_ric, c_err, 'k.')
         plt.plot(thrs_ric, 3*c_sig, 'k--')
         plt.plot(thrs_ric, -3*c_sig, 'k--')
+        plt.xticks([0, 10, 20, 30, 40, 50, 60], labels=[])
         plt.ylabel('Cross-Track [km]')
+        
+        plt.subplot(4,1,4)
+        plt.plot(thrs_ric, r_exist, 'k.')
+        plt.ylabel('Pr(exist)')
+        plt.xticks([0, 10, 20, 30, 40, 50, 60])
+        plt.ylim([-0.1, 1.5])
     
         plt.xlabel('Time since ' + t0.strftime('%Y-%m-%d %H:%M:%S') + ' [hours]')
 
@@ -2492,12 +2515,12 @@ def lmb_orbit_errors2(filter_output, full_state_output, truth_dict, meas_dict,
     plt.subplot(3,1,1)
     plt.plot(thrs, N_true, 'k--')
     plt.plot(thrs, N_est, 'k.')
-    plt.legend(['True', 'Est'], loc='upper left')
+    plt.legend(['True', 'Est'], loc='best')
     plt.ylabel('Cardinality')
     plt.ylim([-0.1, max(max(N_true)+1, max(N_est)+1)])
     plt.subplot(3,1,2)
     plt.plot(thrs, nlabel_array, 'k.')
-    plt.ylabel('Tracks')
+    plt.ylabel('Labels')
     plt.ylim([-0.1, max(nlabel_array)+1])
     plt.subplot(3,1,3)
     # plt.plot(thrs, rksum_array, 'k.')
@@ -2547,6 +2570,9 @@ def lmb_orbit_errors2(filter_output, full_state_output, truth_dict, meas_dict,
         
     
     plt.show()
+    
+    print('')
+    print(label_truth_dict)
     
     
     
