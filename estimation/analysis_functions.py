@@ -2475,7 +2475,7 @@ def lmb_orbit_errors2(filter_output, full_state_output, truth_dict, meas_dict,
         
         plt.subplot(4,1,4)
         plt.plot(thrs_ric, r_exist, 'k.')
-        plt.ylabel('Pr(exist)')
+        plt.ylabel('r')
         plt.xticks([0, 10, 20, 30, 40, 50, 60])
         plt.ylim([-0.1, 1.5])
     

@@ -3753,7 +3753,7 @@ def multitarget_analysis(results_file, setup_file):
     pklFile.close()
     
     
-    
+    analysis.lmb_orbit_errors(filter_output, filter_output, truth_dict, meas_dict, tracklet_dict)
     
     analysis.lmb_orbit_errors2(filter_output, filter_output, truth_dict, meas_dict, label_truth_dict,
                                tracklet_dict)
@@ -3779,8 +3779,8 @@ if __name__ == '__main__':
     measdir = os.path.join(fdir, 'meas')
     trackdir = os.path.join(fdir, 'tracklet_corr')
     # filterdir = r'D:\documents\research_projects\iod\data\aas2023_preprint\geo_twobody_1obj_3day'
-    filterdir = r'D:\documents\research_projects\iod\data\sim\test\aas2023_geo_6obj_7day\2023_01_14_geo_twobody_3obj_3day'
-    
+    # filterdir = r'D:\documents\research_projects\iod\data\sim\test\aas2023_geo_6obj_7day\2023_01_14_geo_twobody_3obj_3day'
+    filterdir = r'D:\documents\research_projects\iod\data\sim\test\aas2023_geo_6obj_7day\2022_12_18_geo_twobody_6obj_2perday_redo'
     
     # fname = 'geo_twobody_6obj_7day_truth_13.pkl'    
     # prev_file = os.path.join(fdir, fname)
@@ -3818,14 +3818,16 @@ if __name__ == '__main__':
     corr_pkl = os.path.join(filterdir, fname)
     
     # fname = 'geo_twobody_1obj_7day_setup_noise1_lam0_pd1_adaptivebirth.pkl'
-    fname = 'geo_twobody_3obj_7day_setup_noise1_lam0_pd1_adaptivebirth.pkl'
+    # fname = 'geo_twobody_3obj_7day_setup_noise1_lam0_pd1_adaptivebirth.pkl'
+    fname = 'geo_twobody_6obj_7day_setup_10min_2perday_noise1_lam0_pd1.pkl'
     setup_file = os.path.join(filterdir, fname)  
     
     
     fname = 'geo_twobody_3obj_3day_adaptivebirth_results.pkl'
     prev_results = os.path.join(filterdir, fname)
     
-    fname = 'geo_twobody_3obj_3day_adaptivebirth_results_P.pkl'
+    # fname = 'geo_twobody_3obj_3day_adaptivebirth_results_1.pkl'
+    fname = 'geo_twobody_6obj_7day_10min_2perday_results_full.pkl'
     results_file = os.path.join(filterdir, fname)
     
     
