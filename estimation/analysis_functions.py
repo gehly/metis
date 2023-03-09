@@ -576,7 +576,7 @@ def compute_orbit_errors(filter_output, full_state_output, truth_dict):
         
         
     # Fix Units
-    X_err *= 1      # convert to m, m/s
+    X_err *= 1      
     X_err_meas *= 1
     X_err_ric *= 1
     X_err_ric_meas *= 1
@@ -647,21 +647,21 @@ def compute_orbit_errors(filter_output, full_state_output, truth_dict):
     plt.plot(thrs_meas, X_err_meas[0,:], 'b.')
     plt.plot(thrs, 3*sig_x, 'k--')
     plt.plot(thrs, -3*sig_x, 'k--')
-    plt.ylabel('X Err [m]')
+    plt.ylabel('X Err [km]')
     
     plt.subplot(3,1,2)
     plt.plot(thrs, X_err[1,:], 'k.')
     plt.plot(thrs_meas, X_err_meas[1,:], 'b.')
     plt.plot(thrs, 3*sig_y, 'k--')
     plt.plot(thrs, -3*sig_y, 'k--')
-    plt.ylabel('Y Err [m]')
+    plt.ylabel('Y Err [km]')
     
     plt.subplot(3,1,3)
     plt.plot(thrs, X_err[2,:], 'k.')
     plt.plot(thrs_meas, X_err_meas[2,:], 'b.')
     plt.plot(thrs, 3*sig_z, 'k--')
     plt.plot(thrs, -3*sig_z, 'k--')
-    plt.ylabel('Z Err [m]')
+    plt.ylabel('Z Err [km]')
 
     plt.xlabel('Time [hours]')
     
@@ -671,21 +671,21 @@ def compute_orbit_errors(filter_output, full_state_output, truth_dict):
     plt.plot(thrs_meas, X_err_meas[3,:], 'b.')
     plt.plot(thrs, 3*sig_dx, 'k--')
     plt.plot(thrs, -3*sig_dx, 'k--')
-    plt.ylabel('dX Err [m/s]')
+    plt.ylabel('dX Err [km/s]')
     
     plt.subplot(3,1,2)
     plt.plot(thrs, X_err[4,:], 'k.')
     plt.plot(thrs_meas, X_err_meas[4,:], 'b.')
     plt.plot(thrs, 3*sig_dy, 'k--')
     plt.plot(thrs, -3*sig_dy, 'k--')
-    plt.ylabel('dY Err [m/s]')
+    plt.ylabel('dY Err [km/s]')
     
     plt.subplot(3,1,3)
     plt.plot(thrs, X_err[5,:], 'k.')
     plt.plot(thrs_meas, X_err_meas[5,:], 'b.')
     plt.plot(thrs, 3*sig_dz, 'k--')
     plt.plot(thrs, -3*sig_dz, 'k--')
-    plt.ylabel('dZ Err [m/s]')
+    plt.ylabel('dZ Err [km/s]')
 
     plt.xlabel('Time [hours]')
     
@@ -2217,7 +2217,8 @@ def lmb_orbit_errors(filter_output, full_state_output, truth_dict, meas_dict, la
 
 
 
-def lmb_orbit_errors2(filter_output, full_state_output, truth_dict, meas_dict, label_truth_dict):
+def lmb_orbit_errors2(filter_output, full_state_output, truth_dict, meas_dict,
+                      label_truth_dict, tracklet_dict):
     
     # OSPA parameters
     pnorm = 2.
@@ -2245,9 +2246,12 @@ def lmb_orbit_errors2(filter_output, full_state_output, truth_dict, meas_dict, l
     # Number of states and measurements
     obj_id = list(truth_dict[meas_t0].keys())[0]
     Xo = truth_dict[meas_t0][obj_id]
-    resids0 = filter_output[meas_t0]['resids'][0]
+    # resids0 = filter_output[meas_t0]['resids'][0]
     n = len(Xo)
-    p = len(resids0)
+    # p = len(resids0)
+    
+    observed_obj_list = []
+    tracklet_id_list = list(tracklet_dict.keys())
     
     
     # Compute OSPA Errors
@@ -2258,12 +2262,16 @@ def lmb_orbit_errors2(filter_output, full_state_output, truth_dict, meas_dict, l
     nlabel_array = np.zeros(len(full_state_output),)
     N_est = np.zeros(len(full_state_output),)
     N_true = np.zeros(len(full_state_output),)
+    N_uct = np.zeros(len(full_state_output),)
+    N_ct = np.zeros(len(full_state_output),)
     rksum_array = np.zeros(len(full_state_output),)
     for kk in range(len(full_state_output)):
         tk = tk_list[kk]
 
         # Retrieve GMM and extracted state estimate
         LMB_dict = full_state_output[tk]['LMB_dict']
+        uct_dict = full_state_output[tk]['uct_dict']
+        corr_tracklet_list = full_state_output[tk]['corr_tracklet_list']
         card = full_state_output[tk]['card']
         Nk = full_state_output[tk]['N']
         label_list = full_state_output[tk]['label_list']
@@ -2274,15 +2282,20 @@ def lmb_orbit_errors2(filter_output, full_state_output, truth_dict, meas_dict, l
         sorted_labels = sorted(label_list)
 
         # Cardinality related terms
-        nlabel_array[kk] = len(label_list)
+        nlabel_array[kk] = len(LMB_dict)
         N_est[kk] = Nk        
         rksum_array[kk] = sum(rk_list)
+        N_uct[kk] = len(uct_dict)
+        N_ct[kk] = len(corr_tracklet_list)
         
         # Compute OSPA errors
         Xt_list = []
         for obj_id in obj_id_list:
             Xt_list.append(truth_dict[tk][obj_id])
-        N_true[kk] = len(Xt_list)
+            
+            
+            
+        
         
         OSPA, OSPA_pos, OSPA_vel, OSPA_card, row_indices = \
             compute_ospa(Xt_list, Xk_list, pnorm, c)
@@ -2291,15 +2304,30 @@ def lmb_orbit_errors2(filter_output, full_state_output, truth_dict, meas_dict, l
         ospa_pos[kk] = OSPA_pos
         ospa_vel[kk] = OSPA_vel
         ospa_card[kk] = OSPA_card
+        
+        
+        # Number of objects observed
+        for tracklet_id in tracklet_id_list:
+            if tk in tracklet_dict[tracklet_id]['tk_list']:
+                obj_observed = tracklet_dict[tracklet_id]['obj_id']
+                
+                if obj_observed not in observed_obj_list:
+                    observed_obj_list.append(obj_observed)
+                
+                
+        N_true[kk] = len(observed_obj_list)
+        
     
     # ospa *= 1000.
     # ospa_pos *= 1000.
     # ospa_vel *= 1000.
     
     
-    for ii in range(len(obj_id_list)):
+    # for ii in range(len(obj_id_list)):
+    for label in label_truth_dict:
         
-        obj_id_plot = obj_id_list[ii]
+        obj_id_plot = label_truth_dict[label]
+        # obj_id_plot = obj_id_list[ii]
         
 
     
@@ -2311,6 +2339,7 @@ def lmb_orbit_errors2(filter_output, full_state_output, truth_dict, meas_dict, l
         r_sig = []
         i_sig = []
         c_sig = []
+        r_exist = []
         
         
         meas_ind = 0 
@@ -2321,16 +2350,24 @@ def lmb_orbit_errors2(filter_output, full_state_output, truth_dict, meas_dict, l
 
             # label_plot = label_list[ii]
             label_list = full_state_output[tk]['label_list']
-            obj_in_filter = False
-            for label in label_list:
-                if label_truth_dict[label] == obj_id_plot:
-                    label_ind = label_list.index(label)
-                    label_ii = label
-                    obj_in_filter = True
-                    break
-                
-            if not obj_in_filter:
+            
+            if label not in label_list:
                 continue
+            else:
+                label_ind = label_list.index(label)
+                label_ii = label
+            
+            
+            # obj_in_filter = False
+            # for label in label_list:
+            #     if label_truth_dict[label] == obj_id_plot:
+            #         label_ind = label_list.index(label)
+            #         label_ii = label
+            #         obj_in_filter = True
+            #         break
+                
+            # if not obj_in_filter:
+            #     continue
             
             print('')
             print(tk)
@@ -2377,6 +2414,8 @@ def lmb_orbit_errors2(filter_output, full_state_output, truth_dict, meas_dict, l
             i_sig.append(np.sqrt(P_ric[1,1]))
             c_sig.append(np.sqrt(P_ric[2,2]))
             
+            r_exist.append(rk_list[label_ind])
+            
             
         
         r_err = np.asarray(r_err)
@@ -2388,68 +2427,87 @@ def lmb_orbit_errors2(filter_output, full_state_output, truth_dict, meas_dict, l
         
         
     
-        # Compute and print statistics
-        conv_ind = int(len(full_state_output)/2)
-        print('\n\nState Error and Residuals Analysis')
-        print('Object ', obj_id, ' Label ', label_ii)
-        print('\n\t\t\t\t  Mean\t\tSTD')
-        # print('----------------------------------------')
-        # print('X ECI [km]\t\t', '{0:0.2E}'.format(np.mean(X_err[0,conv_ind:])), '\t{0:0.2E}'.format(np.std(X_err[0,conv_ind:])))
-        # print('Y ECI [km]\t\t', '{0:0.2E}'.format(np.mean(X_err[1,conv_ind:])), '\t{0:0.2E}'.format(np.std(X_err[1,conv_ind:])))
-        # print('Z ECI [km]\t\t', '{0:0.2E}'.format(np.mean(X_err[2,conv_ind:])), '\t{0:0.2E}'.format(np.std(X_err[2,conv_ind:])))
-        # print('dX ECI [km/s]\t', '{0:0.2E}'.format(np.mean(X_err[3,conv_ind:])), '\t{0:0.2E}'.format(np.std(X_err[3,conv_ind:])))
-        # print('dY ECI [km/s]\t', '{0:0.2E}'.format(np.mean(X_err[4,conv_ind:])), '\t{0:0.2E}'.format(np.std(X_err[4,conv_ind:])))
-        # print('dZ ECI [km/s]\t', '{0:0.2E}'.format(np.mean(X_err[5,conv_ind:])), '\t{0:0.2E}'.format(np.std(X_err[5,conv_ind:])))
-        print('')
-        print('Radial [km]\t\t', '{0:0.2E}'.format(np.mean(r_err[conv_ind:])), '\t{0:0.2E}'.format(np.std(r_err[conv_ind:])))
-        print('In-Track [km]\t', '{0:0.2E}'.format(np.mean(i_err[conv_ind:])), '\t{0:0.2E}'.format(np.std(i_err[conv_ind:])))
-        print('Cross-Track [km]\t', '{0:0.2E}'.format(np.mean(c_err[conv_ind:])), '\t{0:0.2E}'.format(np.std(c_err[conv_ind:])))
-        print('')
+        # # Compute and print statistics
+        # conv_ind = int(len(full_state_output)/2)
+        # print('\n\nState Error and Residuals Analysis')
+        # print('Object ', obj_id, ' Label ', label_ii)
+        # print('\n\t\t\t\t  Mean\t\tSTD')
+        # # print('----------------------------------------')
+        # # print('X ECI [km]\t\t', '{0:0.2E}'.format(np.mean(X_err[0,conv_ind:])), '\t{0:0.2E}'.format(np.std(X_err[0,conv_ind:])))
+        # # print('Y ECI [km]\t\t', '{0:0.2E}'.format(np.mean(X_err[1,conv_ind:])), '\t{0:0.2E}'.format(np.std(X_err[1,conv_ind:])))
+        # # print('Z ECI [km]\t\t', '{0:0.2E}'.format(np.mean(X_err[2,conv_ind:])), '\t{0:0.2E}'.format(np.std(X_err[2,conv_ind:])))
+        # # print('dX ECI [km/s]\t', '{0:0.2E}'.format(np.mean(X_err[3,conv_ind:])), '\t{0:0.2E}'.format(np.std(X_err[3,conv_ind:])))
+        # # print('dY ECI [km/s]\t', '{0:0.2E}'.format(np.mean(X_err[4,conv_ind:])), '\t{0:0.2E}'.format(np.std(X_err[4,conv_ind:])))
+        # # print('dZ ECI [km/s]\t', '{0:0.2E}'.format(np.mean(X_err[5,conv_ind:])), '\t{0:0.2E}'.format(np.std(X_err[5,conv_ind:])))
+        # print('')
+        # print('Radial [km]\t\t', '{0:0.2E}'.format(np.mean(r_err[conv_ind:])), '\t{0:0.2E}'.format(np.std(r_err[conv_ind:])))
+        # print('In-Track [km]\t', '{0:0.2E}'.format(np.mean(i_err[conv_ind:])), '\t{0:0.2E}'.format(np.std(i_err[conv_ind:])))
+        # print('Cross-Track [km]\t', '{0:0.2E}'.format(np.mean(c_err[conv_ind:])), '\t{0:0.2E}'.format(np.std(c_err[conv_ind:])))
+        # print('')
         
     
-        
+        if len(thrs_ric) == 0:
+            continue
         
         
         plt.figure()
-        plt.subplot(3,1,1)
+        plt.subplot(4,1,1)
         plt.plot(thrs_ric, r_err, 'k.')
         plt.plot(thrs_ric, 3*r_sig, 'k--')
         plt.plot(thrs_ric, -3*r_sig, 'k--')
+        plt.xticks([0, 10, 20, 30, 40, 50, 60], labels=[])
         plt.ylabel('Radial [km]')
-        plt.title('NORAD ' + str(obj_id_plot) + ' (' + label_ii[0].strftime('%Y-%m-%d %H:%M:%S') + ', ' + str(label_ii[1]) + ')')
+        plt.title('NORAD ' + str(obj_id_plot) + ' (' + label_ii[0].strftime('%Y-%m-%d %H:%M:%S') + ', ' + str(label_ii[1]) + ', ' + str(label_ii[2]) +  ')')
         
-        plt.subplot(3,1,2)
+        plt.subplot(4,1,2)
         plt.plot(thrs_ric, i_err, 'k.')
         plt.plot(thrs_ric, 3*i_sig, 'k--')
         plt.plot(thrs_ric, -3*i_sig, 'k--')
+        plt.xticks([0, 10, 20, 30, 40, 50, 60], labels=[])
         plt.ylabel('In-Track [km]')
         
-        plt.subplot(3,1,3)
+        plt.subplot(4,1,3)
         plt.plot(thrs_ric, c_err, 'k.')
         plt.plot(thrs_ric, 3*c_sig, 'k--')
         plt.plot(thrs_ric, -3*c_sig, 'k--')
+        plt.xticks([0, 10, 20, 30, 40, 50, 60], labels=[])
         plt.ylabel('Cross-Track [km]')
+        
+        plt.subplot(4,1,4)
+        plt.plot(thrs_ric, r_exist, 'k.')
+        plt.ylabel('r')
+        plt.xticks([0, 10, 20, 30, 40, 50, 60])
+        plt.ylim([-0.1, 1.5])
     
-        plt.xlabel('Time [hours]')
+        plt.xlabel('Time since ' + t0.strftime('%Y-%m-%d %H:%M:%S') + ' [hours]')
 
         
         
         
     # OSPA
+    # plt.figure()
+    # plt.subplot(4,1,1)
+    # plt.plot(thrs, ospa, 'k.')
+    # plt.ylabel('OSPA')
+    # plt.subplot(4,1,2)
+    # plt.plot(thrs, ospa_pos, 'k.')
+    # plt.ylabel('OSPA Pos [km]')
+    # plt.subplot(4,1,3)
+    # plt.plot(thrs, ospa_vel, 'k.')
+    # plt.ylabel('OSPA Vel [km/s]')
+    # plt.subplot(4,1,4)
+    # plt.plot(thrs, ospa_card, 'k.')
+    # plt.ylabel('OSPA Card')
+    # plt.xlabel('Time [hours]')
+    
     plt.figure()
-    plt.subplot(4,1,1)
-    plt.plot(thrs, ospa, 'k.')
-    plt.ylabel('OSPA')
-    plt.subplot(4,1,2)
+    plt.subplot(2,1,1)
     plt.plot(thrs, ospa_pos, 'k.')
     plt.ylabel('OSPA Pos [km]')
-    plt.subplot(4,1,3)
+    plt.subplot(2,1,2)
     plt.plot(thrs, ospa_vel, 'k.')
     plt.ylabel('OSPA Vel [km/s]')
-    plt.subplot(4,1,4)
-    plt.plot(thrs, ospa_card, 'k.')
-    plt.ylabel('OSPA Card')
-    plt.xlabel('Time [hours]')
+    plt.xlabel('Time since ' + t0.strftime('%Y-%m-%d %H:%M:%S') + ' [hours]')
     
     
     # Cardinaltiy/Number plots
@@ -2457,15 +2515,20 @@ def lmb_orbit_errors2(filter_output, full_state_output, truth_dict, meas_dict, l
     plt.subplot(3,1,1)
     plt.plot(thrs, N_true, 'k--')
     plt.plot(thrs, N_est, 'k.')
-    plt.legend(['True', 'Est'])
+    plt.legend(['True', 'Est'], loc='best')
     plt.ylabel('Cardinality')
+    plt.ylim([-0.1, max(max(N_true)+1, max(N_est)+1)])
     plt.subplot(3,1,2)
     plt.plot(thrs, nlabel_array, 'k.')
-    plt.ylabel('Num Labels')
+    plt.ylabel('Labels')
+    plt.ylim([-0.1, max(nlabel_array)+1])
     plt.subplot(3,1,3)
-    plt.plot(thrs, rksum_array, 'k.')
-    plt.ylabel('sum(rk)')
-    plt.xlabel('Time [hours]')
+    # plt.plot(thrs, rksum_array, 'k.')
+    # plt.ylabel('sum(rk)')
+    plt.plot(thrs, N_uct, 'k.')
+    plt.ylim([-0.1, max(N_uct)+1])
+    plt.ylabel('UCTs')
+    plt.xlabel('Time since ' + t0.strftime('%Y-%m-%d %H:%M:%S') + ' [hours]')
     
         
     # Resids
@@ -2496,7 +2559,7 @@ def lmb_orbit_errors2(filter_output, full_state_output, truth_dict, meas_dict, l
     plt.ylabel('RA [arcsec]')
     plt.subplot(2,1,2)
     plt.ylabel('DEC [arcsec]')
-    plt.xlabel('Time [hours]')
+    plt.xlabel('Time since ' + t0.strftime('%Y-%m-%d %H:%M:%S') + ' [hours]')
     
     
     
@@ -2507,6 +2570,9 @@ def lmb_orbit_errors2(filter_output, full_state_output, truth_dict, meas_dict, l
         
     
     plt.show()
+    
+    print('')
+    print(label_truth_dict)
     
     
     

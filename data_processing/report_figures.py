@@ -1,15 +1,18 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib import cm
 from pathlib import Path
 import pickle
 from datetime import datetime, timedelta
 from math import pi
+import sys
+import scipy.stats as ss
 
-from mpl_toolkits.basemap import Basemap
+# from mpl_toolkits.basemap import Basemap
 
-sys.path.append('../')
+# sys.path.append('../')
 
-from sensors.sensors import define_sensors
+# from sensors.sensors import define_sensors
 
 
 def multiple_model_plot_measurements(measdir):
@@ -292,17 +295,90 @@ def plot_sensor_map(sensor_id_list):
     return
 
 
+
+def plot_multitarget_gaussian():
+    
+    
+    x, y = np.mgrid[-4:4:0.1, -4:4:0.1]
+    pos = np.dstack((x, y))
+
+    # m_list = [np.array([0., 0.]), 
+    #           np.array([3., -4.]),
+    #           np.array([-6, 6.]),
+    #           np.array([-7., -7.])]
+    
+    # P_list = [np.diag([1., 2.]),
+    #           np.diag([4., 4.]),
+    #           np.diag([4., 1.]),
+    #           np.diag([1., 0.4])]
+    
+    # w_list = [0.5, 0.6, 0.4, 0.1]
+    
+    c_list = ['b', 'b', 'r', 'r']
+    
+    w_list = [1.]
+    m_list = [np.array([0., 0.])]
+    P_list = [np.diag([1., 1.])]
+    
+    
+    fig = plt.figure()
+    ax1 = fig.add_subplot(projection='3d')
+    
+    for ii in range(len(w_list)):
+        c = c_list[ii]
+        w = w_list[ii]
+        m = m_list[ii]
+        P = P_list[ii]
+        z = ss.multivariate_normal(m, P)
+    
+        ax1.plot_surface(x, y, w*z.pdf(pos), cmap=cm.jet, antialiased=False)
+        # ax1.plot_wireframe(x, y, w*z.pdf(pos), color='k')
+    
+    ax1.set_axis_off()
+    
+    plt.savefig('demo.png', transparent=True)
+    
+    plt.show()
+    
+    
+    
+    
+    # fig = plt.figure()
+    # ax = fig.add_subplot(projection='3d')
+    
+    # # Make data
+    # u = np.linspace(0, 2 * np.pi, 100)
+    # v = np.linspace(0, np.pi, 100)
+    # x = 10 * np.outer(np.cos(u), np.sin(v))
+    # y = 10 * np.outer(np.sin(u), np.sin(v))
+    # z = 10 * np.outer(np.ones(np.size(u)), np.cos(v))
+    
+    # # Plot the surface
+    # ax.plot_surface(x, y, z)
+    
+    # # Set an equal aspect ratio
+    # ax.set_aspect('equal')
+    
+    # plt.show()
+    
+    return
+
+
 if __name__ == '__main__':
     
-    # Data directory
-    measdir = Path('C:/Users/Steve/Documents/data/multiple_model/'
-                   '2018_07_12_leo/measurements')
+    
+    plt.close('all')
+    
+    # # Data directory
+    # measdir = Path('C:/Users/Steve/Documents/data/multiple_model/'
+    #                '2018_07_12_leo/measurements')
     
     
     
-    multiple_model_plot_measurements(measdir)
+    # multiple_model_plot_measurements(measdir)
     
     
+    plot_multitarget_gaussian()
     
     
     
