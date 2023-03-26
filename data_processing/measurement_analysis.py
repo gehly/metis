@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
 import os
 import sys
+import csv
 
 
 from data_processing import data_processing as proc
@@ -47,6 +48,63 @@ def read_roo_csv_data(fname, meas_time_offset=0., ra_bias=0., dec_bias=0.):
             
 
     return UTC_list, ra_list, dec_list
+
+
+def roo_measurements_txt2csv(txt_fname, csv_fname):
+    
+    with open(txt_fname) as textfile:
+        lines = textfile.readlines()
+    
+    
+    data = []
+    header = lines[0].split()
+    header.insert(0, '')
+    for ii in range(1,len(lines)):
+        line_list = lines[ii].split()
+        data.append(line_list)
+    
+    df = pd.DataFrame(data, columns = header)
+    
+    JD_list = df['JD_UTC'].tolist()
+    exp_list = df['EXPTIME'].tolist()
+    ra_list = df['RA_T1'].tolist()
+    dec_list = df['DEC_T1'].tolist()
+    x_list = df['X(FITS)_T1'].tolist()
+    y_list = df['Y(FITS)_T1'].tolist()
+    
+    JD_list = [float(JD) for JD in JD_list]
+    exp_list = [float(ex) for ex in exp_list]
+    ra_list = [float(ra)*15. for ra in ra_list]
+    dec_list = [float(dec) for dec in dec_list]
+    
+    
+    # Generate UTC times - correct for midexposure
+    UTC_list = []
+    for ii in range(len(JD_list)):
+        
+        JD = JD_list[ii] + 0.5*exp_list[ii]/86400.
+        UTC = timesys.jd2dt(JD)
+        UTC_list.append(UTC)
+        
+    # Create output csv
+    csv_header = ['Date-obs_corrected_midexp', 'XPOS', 'YPOS', 'RA', 'DEC']
+    with open(csv_fname, 'w', newline='') as csv_file:
+        
+        write = csv.writer(csv_file)
+        write.writerow(csv_header)
+        
+        for ii in range(len(UTC_list)):
+            UTC_str = UTC_list[ii].strftime('%Y-%m-%dT%H:%M:%S.%f')
+            x = x_list[ii]
+            y = y_list[ii]
+            ra = str(ra_list[ii])
+            dec = str(dec_list[ii])
+            
+            write.writerow([UTC_str, x, y, ra, dec])
+    
+    
+    
+    return 
 
 
 
