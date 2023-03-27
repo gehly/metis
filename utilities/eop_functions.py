@@ -1,5 +1,6 @@
 import numpy as np
-from math import pi, sin, cos, modf
+#from math import pi, sin, cos, modf
+import math
 import requests
 import pandas as pd
 import os
@@ -15,10 +16,12 @@ current_dir = os.path.dirname(os.path.abspath(filename))
 ind = current_dir.find('metis')
 metis_dir = current_dir[0:ind+5]
 input_data_dir = os.path.join(metis_dir, 'input_data')
-sys.path.append(metis_dir)
+# sys.path.append(metis_dir)
 
-from utilities.time_systems import dt2mjd, mjd2dt, utcdt2ut1jd, utcdt2ttjd, jd2cent
-from utilities.numerical_methods import interp_lagrange
+from utilities import numerical_methods as num
+from utilities import time_systems as timesys
+# from utilities.time_systems import dt2mjd, mjd2dt, utcdt2ut1jd, utcdt2ttjd, jd2cent
+# from utilities.numerical_methods import interp_lagrange
 
 ###############################################################################
 #
@@ -154,7 +157,7 @@ def get_TAI_UTC(data_text, UTC):
     '''
     
     # Compute MJD for desired time
-    MJD = dt2mjd(UTC)
+    MJD = timesys.dt2mjd(UTC)
     MJD_int = int(MJD)
     
     # Find EOP data lines around time of interest
@@ -198,7 +201,7 @@ def get_eop_data(data_text, UTC):
     '''    
         
     # Compute MJD for desired time
-    MJD = dt2mjd(UTC)
+    MJD = timesys.dt2mjd(UTC)
     MJD_int = int(MJD)
     
     # Find EOP data lines around time of interest
@@ -266,7 +269,7 @@ def eop_linear_interpolate(line0, line1, MJD):
         (line1_array[0] - line0_array[0]) * dt + line0_array[1:]
 
     # Convert final output
-    arcsec2rad = (1./3600.) * pi/180.
+    arcsec2rad = (1./3600.) * math.pi/180.
     EOP_data['xp'] = interp[0]*arcsec2rad
     EOP_data['yp'] = interp[1]*arcsec2rad
     EOP_data['UT1_UTC'] = interp[2] + EOP_data['TAI_UTC']
@@ -407,8 +410,8 @@ def init_XYs2006(TT1, TT2, XYs_df=[]):
     XYs_alldata = XYs_df.values
     
     # Compute MJD and round to nearest whole day
-    MJD1 = int(round(dt2mjd(TT1)))
-    MJD2 = int(round(dt2mjd(TT2)))
+    MJD1 = int(round(timesys.dt2mjd(TT1)))
+    MJD2 = int(round(timesys.dt2mjd(TT2)))
     
     # Number of additional data points to include on either side
     num = 10
@@ -471,13 +474,13 @@ def get_XYs(XYs_data, TT_JD):
     '''
     
     # Conversion
-    arcsec2rad  = (1./3600.) * (pi/180.)
+    arcsec2rad  = (1./3600.) * (math.pi/180.)
     
     # Compute MJD
     TT_MJD = TT_JD - 2400000.5
     
     # Compute interpolation
-    XYs = interp_lagrange(XYs_data[:,3], XYs_data[:,4:], TT_MJD, 11)
+    XYs = num.interp_lagrange(XYs_data[:,3], XYs_data[:,4:], TT_MJD, 11)
     
     X = float(XYs[0,0])*arcsec2rad
     Y = float(XYs[0,1])*arcsec2rad
@@ -505,7 +508,7 @@ def compute_precession_IAU1976(TT_cent):
     '''
     
     # Conversion
-    arcsec2rad  = (1./3600.) * (pi/180.)
+    arcsec2rad  = (1./3600.) * (math.pi/180.)
 
     # Table values in arcseconds
     Pcoef = np.array([[2306.2181,   0.30188,   0.017998], 
@@ -521,12 +524,12 @@ def compute_precession_IAU1976(TT_cent):
 
     # Construct IAU 1976 Precession Matrix
     # P76 = ROT3(zeta) * ROT2(-theta) * ROT3(z);    
-    czet = cos(M[0])
-    szet = sin(M[0])  
-    cth  = cos(M[1])
-    sth  = sin(M[1]) 
-    cz   = cos(M[2])
-    sz   = sin(M[2])
+    czet = math.cos(M[0])
+    szet = math.sin(M[0])
+    cth  = math.cos(M[1])
+    sth  = math.sin(M[1])
+    cz   = math.cos(M[2])
+    sz   = math.sin(M[2])
     
     
     P76 = np.array([[cth*cz*czet-sz*szet,   sz*cth*czet+szet*cz,  sth*czet],
@@ -572,7 +575,7 @@ def compute_nutation_IAU1980(IAU1980nut, TT_cent, ddPsi, ddEps):
     '''
     
     # Conversion
-    arcsec2rad  = (1./3600.) * (pi/180.)
+    arcsec2rad  = (1./3600.) * (math.pi/180.)
     
     # Compute fundamental arguments of nutation
     FA = compute_fundarg_IAU1980(TT_cent)
@@ -601,12 +604,12 @@ def compute_nutation_IAU1980(IAU1980nut, TT_cent, ddPsi, ddEps):
     
     # Construct Nutation matrix
     # N = ROT1(-Eps_0 * ROT3(dPsi) * ROT1(Eps_true)
-    cep  = cos(Eps0)
-    sep  = sin(Eps0)
-    cPsi = cos(dPsi)
-    sPsi = sin(dPsi)
-    cept = cos(Eps_true)
-    sept = sin(Eps_true)    
+    cep  = math.cos(Eps0)
+    sep  = math.sin(Eps0)
+    cPsi = math.cos(dPsi)
+    sPsi = math.sin(dPsi)
+    cept = math.cos(Eps_true)
+    sept = math.sin(Eps_true)
     
     N80 = \
         np.array([[ cPsi,     sPsi*cept,              sept*sPsi             ],
@@ -634,7 +637,7 @@ def compute_fundarg_IAU1980(TT_cent):
     '''
     
     # Conversion
-    arcsec2rad  = (1./3600.) * (pi/180.)
+    arcsec2rad  = (1./3600.) * (math.pi/180.)
     arcsec360 = 3600.*360.
     
     # Construct table for fundamental arguments of nutation
@@ -683,12 +686,12 @@ def eqnequinox_IAU1982_simple(dPsi, Eps0):
     '''
     
     # Equation of the Equinoxes (simple form for use with TEME) (see [1])
-    Eq1982 = dPsi*cos(Eps0) # rad
+    Eq1982 = dPsi*math.cos(Eps0) # rad
     
     # Construct Rotation matrix
     # R  = ROT3(-Eq1982) (Eq. 3-80 in [1])
-    cEq = cos(Eq1982) 
-    sEq = sin(Eq1982)
+    cEq = math.cos(Eq1982)
+    sEq = math.sin(Eq1982)
 
     R = np.array([[cEq,    -sEq,    0.],
                   [sEq,     cEq,    0.],
@@ -721,7 +724,7 @@ def compute_polarmotion(xp, yp, TT_cent):
     '''
     
     # Conversion
-    arcsec2rad  = (1./3600.) * (pi/180.)
+    arcsec2rad  = (1./3600.) * (math.pi/180.)
     
     # Calcuate the Terrestrial Intermediate Origin (TIO) locator 
     # Eq 5.13 in [5]
@@ -729,12 +732,12 @@ def compute_polarmotion(xp, yp, TT_cent):
     
     # Construct rotation matrix
     # W = ROT3(-sp)*ROT2(xp)*ROT1(yp) (Eq. 5.3 in [5])
-    cx = cos(xp)
-    sx = sin(xp)
-    cy = cos(yp)
-    sy = sin(yp)
-    cs = cos(sp)
-    ss = sin(sp)
+    cx = math.cos(xp)
+    sx = math.sin(xp)
+    cy = math.cos(yp)
+    sy = math.sin(yp)
+    cs = math.cos(sp)
+    ss = math.sin(sp)
     
     W = np.array([[cx*cs,  -cy*ss + sy*sx*cs,  -sy*ss - cy*sx*cs],
                   [cx*ss,   cy*cs + sy*sx*ss,   sy*cs - cy*sx*ss],
@@ -769,20 +772,20 @@ def compute_ERA(UT1_JD):
     '''
     
     # Compute ERA based on Eq. 5.15 of [5]
-    d,i = modf(UT1_JD)
-    ERA = 2.*pi*(d + 0.7790572732640 + 0.00273781191135448*(UT1_JD - 2451545.))
+    d,i = math.modf(UT1_JD)
+    ERA = 2.*math.pi*(d + 0.7790572732640 + 0.00273781191135448*(UT1_JD - 2451545.))
     
     # Compute ERA between [0, 2*pi]
-    ERA = ERA % (2.*pi)
+    ERA = ERA % (2.*math.pi)
     if ERA < 0.:
-        ERA += 2*pi
+        ERA += 2*math.pi
         
 #    print(ERA)
     
     # Construct rotation matrix
     # R = ROT3(-ERA)
-    ct = cos(ERA)
-    st = sin(ERA)
+    ct = math.cos(ERA)
+    st = math.sin(ERA)
     R = np.array([[ct, -st, 0.],
                   [st,  ct, 0.],
                   [0.,  0., 1.]])
@@ -819,8 +822,8 @@ def compute_BPN(X, Y, s):
     
     # Construct BPN (Bias-Precession-Nutation Matrix) 
     # Eq. 5.1 in [5]:  BPN = [f(X,Y)]*ROT3(s)
-    cs = cos(s)
-    ss = sin(s)
+    cs = math.cos(s)
+    ss = math.sin(s)
     
     f = np.array([[1-aa*X*X,    -aa*X*Y,                X],
                   [ -aa*X*Y,   1-aa*Y*Y,                Y], 
@@ -883,7 +886,7 @@ def batch_eop_rotation_matrices(UTC_list, eop_alldata_text,
     ITRF_GCRF_list = []
     
     # Constants    
-    arcsec2rad = (1./3600.) * pi/180.
+    arcsec2rad = (1./3600.) * math.pi/180.
     
     # Retrieve IAU Nutation data from file
     IAU1980_nut = get_nutation_data()
@@ -892,7 +895,7 @@ def batch_eop_rotation_matrices(UTC_list, eop_alldata_text,
     XYs_df = get_XYs2006_alldata()
     
     # Generate MJD list
-    MJD_list = [dt2mjd(UTC) for UTC in UTC_list]
+    MJD_list = [timesys.dt2mjd(UTC) for UTC in UTC_list]
     
     # Loop over times
     for kk in range(len(MJD_list)):
@@ -1061,9 +1064,9 @@ def batch_eop_rotation_matrices(UTC_list, eop_alldata_text,
         
         # Compute rotation matrices for transform
         # Compute current times
-        UT1_JD = utcdt2ut1jd(UTC_kk, UT1_UTC)
-        TT_JD = utcdt2ttjd(UTC_kk, TAI_UTC)
-        TT_cent = jd2cent(TT_JD)
+        UT1_JD = timesys.utcdt2ut1jd(UTC_kk, UT1_UTC)
+        TT_JD = timesys.utcdt2ttjd(UTC_kk, TAI_UTC)
+        TT_cent = timesys.jd2cent(TT_JD)
         
         # GCRF/ITRF Transformation
         # Contruct Earth rotaion angle matrix (TIRS to CIRS)
@@ -1123,7 +1126,7 @@ if __name__ == '__main__':
     
 #    print(EOP_data)
     
-    UT1_JD = utcdt2ut1jd(UTC, EOP_data['UT1_UTC'])
+    UT1_JD = timesys.utcdt2ut1jd(UTC, EOP_data['UT1_UTC'])
     
     R = compute_ERA(UT1_JD)
     

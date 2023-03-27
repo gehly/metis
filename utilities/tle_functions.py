@@ -12,32 +12,38 @@ import json
 import time
 import pickle
 import copy
+from sgp4.io import twoline2rv
+from sgp4.earth_gravity import wgs84
 
-filename = inspect.getframeinfo(inspect.currentframe()).filename
-current_dir = os.path.dirname(os.path.abspath(filename))
-
-ind = current_dir.find('metis')
-metis_dir = current_dir[0:ind+5]
-sys.path.append(metis_dir)
+# filename = inspect.getframeinfo(inspect.currentframe()).filename
+# current_dir = os.path.dirname(os.path.abspath(filename))
+#
+# ind = current_dir.find('metis')
+# metis_dir = current_dir[0:ind+5]
+# sys.path.append(metis_dir)
 
 from sensors import sensors as sens
 from sensors import measurement_functions as mfunc
-from utilities.eop_functions import get_celestrak_eop_alldata
-from utilities.eop_functions import get_nutation_data
-from utilities.eop_functions import get_eop_data
-from utilities.eop_functions import get_XYs2006_alldata
-from utilities.coordinate_systems import teme2gcrf
-from utilities.coordinate_systems import gcrf2teme
-from utilities.coordinate_systems import gcrf2itrf
-from utilities.coordinate_systems import itrf2gcrf
-from utilities.coordinate_systems import latlonht2ecef
-from utilities.astrodynamics import element_conversion
-from utilities.astrodynamics import meanmot2sma
-from utilities.constants import GME, Re, wE
-from utilities.time_systems import gpsdt2utcdt
+from utilities import astrodynamics as astro
+from utilities import coordinate_systems as coord
+from utilities import eop_functions as eop
 
-from sgp4.io import twoline2rv
-from sgp4.earth_gravity import wgs84
+
+# from utilities.eop_functions import get_celestrak_eop_alldata
+# from utilities.eop_functions import get_nutation_data
+# from utilities.eop_functions import get_eop_data
+# from utilities.eop_functions import get_XYs2006_alldata
+# from utilities.coordinate_systems import teme2gcrf
+# from utilities.coordinate_systems import gcrf2teme
+# from utilities.coordinate_systems import gcrf2itrf
+# from utilities.coordinate_systems import itrf2gcrf
+# from utilities.coordinate_systems import latlonht2ecef
+# from utilities.astrodynamics import element_conversion
+# from utilities.astrodynamics import meanmot2sma
+from utilities.constants import GME, Re, wE
+#from utilities.time_systems import gpsdt2utcdt
+
+
 
 
 ###############################################################################

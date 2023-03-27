@@ -17,22 +17,6 @@ import copy
 
 from utilities import eop_functions as eop
 from utilities import time_systems as timesys
-# from utilities.time_systems import utcdt2ttjd
-# from utilities.time_systems import utcdt2ut1jd
-# from utilities.time_systems import jd2cent
-
-# from utilities.eop_functions import get_celestrak_eop_alldata
-# from utilities.eop_functions import get_eop_data
-# from utilities.eop_functions import compute_precession_IAU1976
-# from utilities.eop_functions import get_nutation_data
-# from utilities.eop_functions import compute_nutation_IAU1980
-# from utilities.eop_functions import eqnequinox_IAU1982_simple
-# from utilities.eop_functions import compute_polarmotion
-# from utilities.eop_functions import compute_ERA
-# from utilities.eop_functions import init_XYs2006
-# from utilities.eop_functions import get_XYs
-# from utilities.eop_functions import compute_BPN
-
 from utilities.constants import Re, rec_f
 
 

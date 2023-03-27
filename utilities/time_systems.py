@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from math import pi, sin
+import math
 
 
 def dt2mjd(dt):
@@ -330,10 +330,10 @@ def ttjd2jedjd(TT_JD):
     
     # Find approximate mean anomaly of Earth
     TT_cent = jd2cent(TT_JD)
-    M_Earth = (357.5277233 + 35999.05034*TT_cent)*pi/180.
+    M_Earth = (357.5277233 + 35999.05034*TT_cent)*math.pi/180.
     
     # Add in relativity correction
-    JED_JD = TT_JD + (0.001658*sin(M_Earth) + 1.385e-5*sin(2*M_Earth))/86400.
+    JED_JD = TT_JD + (0.001658*math.sin(M_Earth) + 1.385e-5*math.sin(2*M_Earth))/86400.
     
     return JED_JD
 
@@ -357,10 +357,10 @@ def jedjd2ttjd(JED_JD):
     
     # Find approximate mean anomaly of Earth
     TT_cent = jd2cent(JED_JD)
-    M_Earth = (357.5277233 + 35999.05034*TT_cent)*pi/180.
+    M_Earth = (357.5277233 + 35999.05034*TT_cent)*math.pi/180.
     
     # Subtract relativity correction
-    TT_JD = JED_JD - (0.001658*sin(M_Earth) + 1.385e-5*sin(2*M_Earth))/86400.
+    TT_JD = JED_JD - (0.001658*math.sin(M_Earth) + 1.385e-5*math.sin(2*M_Earth))/86400.
     
     return TT_JD
 
