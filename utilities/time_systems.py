@@ -1,6 +1,15 @@
 from datetime import datetime, timedelta
 import math
+import inspect
+import os
+import sys
 
+filename = inspect.getframeinfo(inspect.currentframe()).filename
+current_dir = os.path.dirname(os.path.abspath(filename))
+
+ind = current_dir.find('metis')
+metis_dir = current_dir[0:ind+5]
+sys.path.append(metis_dir)
 
 def dt2mjd(dt):
     '''
