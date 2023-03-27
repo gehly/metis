@@ -1,5 +1,5 @@
 import numpy as np
-from math import pi, sin, cos, tan, asin, acos, atan, atan2
+import math
 import sys
 
 
@@ -282,10 +282,10 @@ def euler321_derivative(theta1, theta2, theta3, wB):
     '''
     
     
-    c2 = cos(theta2)
-    s2 = sin(theta2)
-    c3 = cos(theta3)
-    s3 = sin(theta3)  
+    c2 = math.cos(theta2)
+    s2 = math.sin(theta2)
+    c3 = math.cos(theta3)
+    s3 = math.sin(theta3)
     
     mat = (1./c2) * np.array([[0.,   s3,       c3],
                               [0.,  c3*c2, -s3*c2],
@@ -341,10 +341,10 @@ def euler313_derivative(theta1, theta2, theta3, wB):
     '''
     
     
-    c2 = cos(theta2)
-    s2 = sin(theta2)
-    c3 = cos(theta3)
-    s3 = sin(theta3)  
+    c2 = math.cos(theta2)
+    s2 = math.sin(theta2)
+    c3 = math.cos(theta3)
+    s3 = math.sin(theta3)
     
     mat = (1./c2) * np.array([[s3*s2,  c3,  0.],
                               [c3*s2, -s3,  0.],
@@ -542,8 +542,8 @@ def dcm_principal_axis(axis, angle):
         
     '''
     
-    c = cos(angle)
-    s = sin(angle)
+    c = math.cos(angle)
+    s = math.sin(angle)
     
     if axis == 1:
         DCM = np.array([[1.,  0., 0.],
@@ -900,10 +900,10 @@ def quat2ehatphi(q):
     qvec = q[0:3]
     q4 = float(q[3])    
     
-    phi = 2.*acos(q4)
+    phi = 2.*math.acos(q4)
     
-    if sin(phi/2.) != 0.:
-        ehat = (1./sin(phi/2.))*qvec
+    if math.sin(phi/2.) != 0.:
+        ehat = (1./math.sin(phi/2.))*qvec
     else:
         # phi = 0. is only condition to get here, just choose rotation axis
         ehat = np.array([[0.], [0.], [1.]])
@@ -935,8 +935,8 @@ def ehatphi2quat(ehat, phi):
     ''' 
     
     q = np.zeros((4,1))
-    q[0:3] = sin(phi/2.)*ehat
-    q[3] = cos(phi/2.)
+    q[0:3] = math.sin(phi/2.)*ehat
+    q[3] = math.cos(phi/2.)
     
     return q
   
@@ -1315,8 +1315,8 @@ def mrp2ehatphi(p):
     2nd ed., 2009.  Eq. 3.139
     '''
     
-    phi = 4.*atan(np.linalg.norm(p))
-    ehat = 1./(tan(phi/4.)) * p
+    phi = 4.*math.atan(np.linalg.norm(p))
+    ehat = 1./(math.tan(phi/4.)) * p
     
     return ehat, phi
 
@@ -1344,7 +1344,7 @@ def ehatphi2mrp(ehat, phi):
     2nd ed., 2009.  Eq. 3.139
     '''
     
-    p = ehat*tan(phi/4.)
+    p = ehat*math.tan(phi/4.)
 
     return p
 
@@ -1490,8 +1490,8 @@ def gibbs2ehatphi(g):
     B. Wie, "Space Vehicle Dynamics and Control," 2nd ed., 2008. Eq. 5.48
     '''  
     
-    phi = 2.*atan(np.linalg.norm(g))
-    ehat = 1./(tan(phi/2)) * g
+    phi = 2.*math.atan(np.linalg.norm(g))
+    ehat = 1./(math.tan(phi/2)) * g
     
     return ehat, phi
     
@@ -1518,7 +1518,7 @@ def ehatphi2gibbs(ehat, phi):
     B. Wie, "Space Vehicle Dynamics and Control," 2nd ed., 2008. Eq. 5.48
     '''
     
-    g = ehat*tan(phi/2.)
+    g = ehat*math.tan(phi/2.)
     
     return g
 
@@ -1551,13 +1551,13 @@ def dcm2euler321(DCM):
     
     '''
     
-    theta1 = atan2(DCM[0,1], DCM[0,0])
-    theta3 = atan2(DCM[1,2], DCM[2,2])
+    theta1 = math.atan2(DCM[0,1], DCM[0,0])
+    theta3 = math.atan2(DCM[1,2], DCM[2,2])
     
     try:
-        theta2 = -asin(DCM[0,2])
+        theta2 = -math.asin(DCM[0,2])
     except:
-        theta2 = -asin(round(DCM[0,2]))
+        theta2 = -math.asin(round(DCM[0,2]))
     
     return theta1, theta2, theta3
 
@@ -1590,12 +1590,12 @@ def dcm2euler123(DCM):
     
     '''
     
-    theta1 = -atan2(DCM[2,1], DCM[2,2])
-    theta3 = -atan2(DCM[1,0], DCM[0,0])
+    theta1 = -math.atan2(DCM[2,1], DCM[2,2])
+    theta3 = -math.atan2(DCM[1,0], DCM[0,0])
     try:
-        theta2 = asin(DCM[2,0])
+        theta2 = math.asin(DCM[2,0])
     except:
-        theta2 = asin(round(DCM[2,0]))
+        theta2 = math.asin(round(DCM[2,0]))
     
     return theta1, theta2, theta3
 
@@ -1628,9 +1628,9 @@ def dcm2euler313(DCM):
     
     '''
     
-    theta1 = atan2(DCM[2,0], -DCM[2,1])
-    theta2 = acos(DCM[2,2])
-    theta3 = atan2(DCM[0,2], DCM[1,2])
+    theta1 = math.atan2(DCM[2,0], -DCM[2,1])
+    theta2 = math.acos(DCM[2,2])
+    theta3 = math.atan2(DCM[0,2], DCM[1,2])
     
     return theta1, theta2, theta3
 
@@ -1659,10 +1659,10 @@ def dcm2ehatphi(DCM):
     '''    
     
     c = 0.5 * (DCM[0,0] + DCM[1,1] + DCM[2,2] - 1.)
-    phi = acos(c)
+    phi = math.acos(c)
     
-    if sin(phi) != 0:
-        ehat = (1./(2.*sin(phi))) * np.array([[DCM[1,2] - DCM[2,1]],
+    if math.sin(phi) != 0:
+        ehat = (1./(2.*math.sin(phi))) * np.array([[DCM[1,2] - DCM[2,1]],
                                               [DCM[2,0] - DCM[0,2]],
                                               [DCM[0,1] - DCM[1,0]]])
     else:
@@ -1696,8 +1696,8 @@ def ehatphi2dcm(ehat, phi):
     2nd ed., 2009.  Eq. 3.72
     '''    
     
-    c = cos(phi)
-    s = sin(phi)
+    c = math.cos(phi)
+    s = math.sin(phi)
     sig = 1 - c
     e1 = float(ehat[0])
     e2 = float(ehat[1])

@@ -1,22 +1,22 @@
 import numpy as np
 from math import pi, sin, cos, tan, fmod, fabs, atan, atan2, acos, asin
 from math import sinh, cosh, tanh, atanh
-from datetime import datetime
-import os
-import sys
-import inspect
+# from datetime import datetime
+# import os
+# import sys
+# import inspect
 
-filename = inspect.getframeinfo(inspect.currentframe()).filename
-current_dir = os.path.dirname(os.path.abspath(filename))
+# filename = inspect.getframeinfo(inspect.currentframe()).filename
+# current_dir = os.path.dirname(os.path.abspath(filename))
+#
+# ind = current_dir.find('metis')
+# metis_dir = current_dir[0:ind+5]
+# sys.path.append(metis_dir)
 
-ind = current_dir.find('metis')
-metis_dir = current_dir[0:ind+5]
-sys.path.append(metis_dir)
 
-
-import utilities.time_systems as timesys
-import utilities.ephemeris as eph
-import utilities.coordinate_systems as coord
+from utilities import time_systems as timesys
+from utilities import ephemeris as eph
+# import utilities.coordinate_systems as coord
 from utilities.constants import GME, J2E, Re, wE
 
 
