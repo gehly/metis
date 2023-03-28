@@ -6,8 +6,8 @@ import os
 import inspect
 import copy
 from datetime import datetime, timedelta
-from numba import types
-from numba.typed import Dict
+#from numba import types
+#from numba.typed import Dict
 
 # Load tudatpy modules  
 from tudatpy.kernel.interface import spice
@@ -29,7 +29,7 @@ metis_dir = current_dir[0:ind+5]
 sys.path.append(metis_dir)
 
 from dynamics import numerical_integration as numint
-from dynamics import fast_integration as fastint
+#from dynamics import fast_integration as fastint
 from utilities import astrodynamics as astro
 from utilities import numerical_methods as num
 
