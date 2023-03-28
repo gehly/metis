@@ -1,22 +1,18 @@
 import numpy as np
-from math import pi, sin, cos, tan, fmod, fabs, atan, atan2, acos, asin
-from math import sinh, cosh, tanh, atanh
-# from datetime import datetime
-# import os
-# import sys
-# import inspect
+import math
+import os
+import sys
+import inspect
 
-# filename = inspect.getframeinfo(inspect.currentframe()).filename
-# current_dir = os.path.dirname(os.path.abspath(filename))
-#
-# ind = current_dir.find('metis')
-# metis_dir = current_dir[0:ind+5]
-# sys.path.append(metis_dir)
+filename = inspect.getframeinfo(inspect.currentframe()).filename
+current_dir = os.path.dirname(os.path.abspath(filename))
 
+ind = current_dir.find('metis')
+metis_dir = current_dir[0:ind+5]
+sys.path.append(metis_dir)
 
 from utilities import time_systems as timesys
 from utilities import ephemeris as eph
-# import utilities.coordinate_systems as coord
 from utilities.constants import GME, J2E, Re, wE
 
 
@@ -154,21 +150,21 @@ def mean2ecc(M, e):
     '''
 
     # Ensure M is between 0 and 2*pi
-    M = fmod(M, 2*pi)
+    M = math.fmod(M, 2*math.pi)
     if M < 0:
-        M += 2*pi
+        M += 2*math.pi
 
     # Starting guess for E
-    E = M + e*sin(M)/(1 - sin(M + e) + sin(M))
+    E = M + e*math.sin(M)/(1 - math.sin(M + e) + math.sin(M))
 
     # Initialize loop variable
     f = 1
     tol = 1e-8
 
     # Iterate using Newton-Raphson Method
-    while fabs(f) > tol:
-        f = E - e*sin(E) - M
-        df = 1 - e*cos(E)
+    while math.fabs(f) > tol:
+        f = E - e*math.sin(E) - M
+        df = 1 - e*math.cos(E)
         E = E - f/df
 
     return E
@@ -191,7 +187,7 @@ def ecc2mean(E, e):
       mean anomaly [rad]
     '''
     
-    M = E - e*sin(E)
+    M = E - e*math.sin(E)
     
     return M
 
@@ -213,7 +209,7 @@ def ecc2true(E, e):
       true anomaly [rad]
     '''
 
-    f = 2*atan(np.sqrt((1+e)/(1-e))*tan(E/2))
+    f = 2*math.atan(np.sqrt((1+e)/(1-e))*math.tan(E/2))
 
     return f
 
@@ -235,7 +231,7 @@ def true2ecc(f, e):
       eccentric anomaly [rad]
     '''
 
-    E = 2*atan(np.sqrt((1-e)/(1+e))*tan(f/2))
+    E = 2*math.atan(np.sqrt((1-e)/(1+e))*math.tan(f/2))
 
     return E
 
@@ -276,9 +272,9 @@ def mean2hyp(M, e):
     tol = 1e-8
 
     # Iterate using Newton-Raphson Method
-    while fabs(f) > tol:
-        f = e*sinh(H) - H - M
-        df = e*cosh(H) - 1
+    while math.fabs(f) > tol:
+        f = e*math.sinh(H) - H - M
+        df = e*math.cosh(H) - 1
         H = H - f/df
 
     return H
@@ -302,7 +298,7 @@ def hyp2mean(H, e):
     
     '''
     
-    M = e*sinh(H) - H
+    M = e*math.sinh(H) - H
     
     return M
 
@@ -324,7 +320,7 @@ def true2hyp(f, e):
       hyperbolic anomaly [rad]
     '''
     
-    H = 2*atanh(np.sqrt((e-1)/(e+1))*tan(f/2))
+    H = 2*math.atanh(np.sqrt((e-1)/(e+1))*math.tan(f/2))
     
     return H
 
@@ -346,7 +342,7 @@ def hyp2true(H, e):
       true anomaly [rad]
     '''
     
-    f = 2*atan(np.sqrt((e+1)/(e-1))*tanh(H/2)) 
+    f = 2*math.atan(np.sqrt((e+1)/(e-1))*math.tanh(H/2))
     
     return f
 
@@ -377,13 +373,13 @@ def sunsynch_inclination(a, e):
     '''
     
     # Sun-synch condition
-    dRAAN = 360./365.2421897 * pi/180. * 1./86400.  # rad/sec
+    dRAAN = 360./365.2421897 * math.pi/180. * 1./86400.  # rad/sec
     
     # Compute required inclination
     n = sma2meanmot(a)
     p = smaecc2semilatusrectum(a, e)
     cosi = -(dRAAN*2.*p**2.)/(3.*n*Re**2.*J2E)  # Eq. 9-37
-    i = acos(cosi) * 180./pi  # deg    
+    i = math.acos(cosi) * 180./math.pi  # deg
     
     return i
 
@@ -417,7 +413,7 @@ def RAAN_to_LTAN(RAAN, UTC, EOP_data):
     
     # Compute apparent right ascension of the sun
     sun_eci_geom, sun_eci_app = eph.compute_sun_coords(TT_cent)
-    sun_ra = atan2(sun_eci_app[1], sun_eci_app[0]) * 180./pi     # deg
+    sun_ra = math.atan2(sun_eci_app[1], sun_eci_app[0]) * 180./math.pi     # deg
     
     # Compute LTAN in decimal hours
     LTAN = ((RAAN - sun_ra)/15. + 12.) % 24.    # decimal hours    
@@ -455,7 +451,7 @@ def LTAN_to_RAAN(LTAN, UTC, EOP_data):
     
     # Compute apparent right ascension of the sun
     sun_eci_geom, sun_eci_app = eph.compute_sun_coords(TT_cent)
-    sun_ra = atan2(sun_eci_app[1], sun_eci_app[0]) * 180./pi     # deg
+    sun_ra = math.atan2(sun_eci_app[1], sun_eci_app[0]) * 180./math.pi     # deg
     
     # Compute RAAN in degrees
     RAAN = ((LTAN - 12.)*15. + sun_ra) % 360.      
@@ -733,10 +729,10 @@ def mean2osc(mean_elem):
     # Retrieve input elements, convert to radians
     a0 = float(mean_elem[0])
     e0 = float(mean_elem[1])
-    i0 = float(mean_elem[2]) * pi/180
-    RAAN0 = float(mean_elem[3]) * pi/180
-    w0 = float(mean_elem[4]) * pi/180
-    M0 = float(mean_elem[5]) * pi/180
+    i0 = float(mean_elem[2]) * math.pi/180
+    RAAN0 = float(mean_elem[3]) * math.pi/180
+    w0 = float(mean_elem[4]) * math.pi/180
+    M0 = float(mean_elem[5]) * math.pi/180
     
     # Compute gamma parameter
     gamma0 = (J2E/2.) * (Re/a0)**2.
@@ -745,10 +741,10 @@ def mean2osc(mean_elem):
     a1,e1,i1,RAAN1,w1,M1 = brouwer_lyddane(a0,e0,i0,RAAN0,w0,M0,gamma0)
     
     # Convert angles to degree for output
-    i1 *= 180./pi
-    RAAN1 *= 180./pi
-    w1 *= 180./pi
-    M1 *= 180./pi
+    i1 *= 180./math.pi
+    RAAN1 *= 180./math.pi
+    w1 *= 180./math.pi
+    M1 *= 180./math.pi
     
     osc_elem = [a1,e1,i1,RAAN1,w1,M1]
     
@@ -781,10 +777,10 @@ def osc2mean(osc_elem):
     # Retrieve input elements, convert to radians
     a0 = float(osc_elem[0])
     e0 = float(osc_elem[1])
-    i0 = float(osc_elem[2]) * pi/180
-    RAAN0 = float(osc_elem[3]) * pi/180
-    w0 = float(osc_elem[4]) * pi/180
-    M0 = float(osc_elem[5]) * pi/180
+    i0 = float(osc_elem[2]) * math.pi/180
+    RAAN0 = float(osc_elem[3]) * math.pi/180
+    w0 = float(osc_elem[4]) * math.pi/180
+    M0 = float(osc_elem[5]) * math.pi/180
     
     # Compute gamma parameter
     gamma0 = -(J2E/2.) * (Re/a0)**2.
@@ -793,10 +789,10 @@ def osc2mean(osc_elem):
     a1,e1,i1,RAAN1,w1,M1 = brouwer_lyddane(a0,e0,i0,RAAN0,w0,M0,gamma0)
     
     # Convert angles to degree for output
-    i1 *= 180./pi
-    RAAN1 *= 180./pi
-    w1 *= 180./pi
-    M1 *= 180./pi
+    i1 *= 180./math.pi
+    RAAN1 *= 180./math.pi
+    w1 *= 180./math.pi
+    M1 *= 180./math.pi
     
     mean_elem = [a1,e1,i1,RAAN1,w1,M1]    
     
@@ -824,7 +820,7 @@ def osc2perifocal(elem):
     # Retrieve orbit parameters
     a = float(elem[0])
     e = float(elem[1])
-    M = float(elem[5])*pi/180.
+    M = float(elem[5])*math.pi/180.
     
     # Compute true anomaly
     E = mean2ecc(M, e)
@@ -834,11 +830,11 @@ def osc2perifocal(elem):
     p = smaecc2semilatusrectum(a, e)
     
     # Compute orbit radius
-    r = p/(1 + e*cos(f))
+    r = p/(1 + e*math.cos(f))
     
     # Compute cartesian coordinates
-    x = r*cos(f)
-    y = r*sin(f)
+    x = r*math.cos(f)
+    y = r*math.sin(f)
     
     
     return x, y
@@ -899,68 +895,68 @@ def brouwer_lyddane(a0,e0,i0,RAAN0,w0,M0,gamma0):
     f0 = ecc2true(E0, e0)
     
     # Compute intermediate terms
-    a_r = (1. + e0*cos(f0))/eta**2.
+    a_r = (1. + e0*math.cos(f0))/eta**2.
     
-    de1 = (gamma1/8.)*e0*eta**2.*(1. - 11.*cos(i0)**2. - 40.*((cos(i0)**4.) / 
-                                  (1.-5.*cos(i0)**2.)))*cos(2.*w0)
+    de1 = (gamma1/8.)*e0*eta**2.*(1. - 11.*math.cos(i0)**2. - 40.*((math.cos(i0)**4.) /
+                                  (1.-5.*math.cos(i0)**2.)))*math.cos(2.*w0)
     
     de = de1 + (eta**2./2.) * \
-        (gamma0*((3.*cos(i0)**2. - 1.)/(eta**6.) * 
-                 (e0*eta + e0/(1.+eta) + 3.*cos(f0) + 3.*e0*cos(f0)**2. + e0**2.*cos(f0)**3.) + 
-              3.*(1.-cos(i0)**2.)/eta**6.*(e0 + 3.*cos(f0) + 3.*e0*cos(f0)**2. + e0**2.*cos(f0)**3.) * cos(2.*w0 + 2.*f0))
-                - gamma1*(1.-cos(i0)**2.)*(3.*cos(2*w0 + f0) + cos(2.*w0 + 3.*f0)))
+        (gamma0*((3.*math.cos(i0)**2. - 1.)/(eta**6.) *
+                 (e0*eta + e0/(1.+eta) + 3.*math.cos(f0) + 3.*e0*math.cos(f0)**2. + e0**2.*math.cos(f0)**3.) +
+              3.*(1.-math.cos(i0)**2.)/eta**6.*(e0 + 3.*math.cos(f0) + 3.*e0*math.cos(f0)**2. + e0**2.*math.cos(f0)**3.) * math.cos(2.*w0 + 2.*f0))
+                - gamma1*(1.-math.cos(i0)**2.)*(3.*math.cos(2*w0 + f0) + math.cos(2.*w0 + 3.*f0)))
 
-    di = -(e0*de1/(eta**2.*tan(i0))) + (gamma1/2.)*cos(i0)*np.sqrt(1.-cos(i0)**2.) * \
-          (3.*cos(2*w0 + 2.*f0) + 3.*e0*cos(2.*w0 + f0) + e0*cos(2.*w0 + 3.*f0))
+    di = -(e0*de1/(eta**2.*math.tan(i0))) + (gamma1/2.)*math.cos(i0)*np.sqrt(1.-math.cos(i0)**2.) * \
+          (3.*math.cos(2*w0 + 2.*f0) + 3.*e0*math.cos(2.*w0 + f0) + e0*math.cos(2.*w0 + 3.*f0))
           
     MwRAAN1 = M0 + w0 + RAAN0 + (gamma1/8.)*eta**3. * \
-              (1. - 11.*cos(i0)**2. - 40.*((cos(i0)**4.)/(1.-5.*cos(i0)**2.))) - (gamma1/16.) * \
-              (2. + e0**2. - 11.*(2.+3.*e0**2.)*cos(i0)**2. 
-               - 40.*(2.+5.*e0**2.)*((cos(i0)**4.)/(1.-5.*cos(i0)**2.))  
-               - 400.*e0**2.*(cos(i0)**6.)/((1.-5.*cos(i0)**2.)**2.)) + (gamma1/4.) * \
-              (-6.*(1.-5.*cos(i0)**2.)*(f0 - M0 + e0*sin(f0)) 
-               + (3.-5.*cos(i0)**2.)*(3.*sin(2.*w0 + 2.*f0) + 3.*e0*sin(2.*w0 + f0) + e0*sin(2.*w0 + 3.*f0))) \
-               - (gamma1/8.)*e0**2.*cos(i0) * \
-              (11. + 80.*(cos(i0)**2.)/(1.-5.*cos(i0)**2.) + 200.*(cos(i0)**4.)/((1.-5.*cos(i0)**2.)**2.)) \
-               - (gamma1/2.)*cos(i0) * \
-              (6.*(f0 - M0 + e0*sin(f0)) - 3.*sin(2.*w0 + 2.*f0) - 3.*e0*sin(2.*w0 + f0) - e0*sin(2.*w0 + 3.*f0))
+              (1. - 11.*math.cos(i0)**2. - 40.*((math.cos(i0)**4.)/(1.-5.*math.cos(i0)**2.))) - (gamma1/16.) * \
+              (2. + e0**2. - 11.*(2.+3.*e0**2.)*math.cos(i0)**2.
+               - 40.*(2.+5.*e0**2.)*((math.cos(i0)**4.)/(1.-5.*math.cos(i0)**2.))
+               - 400.*e0**2.*(math.cos(i0)**6.)/((1.-5.*math.cos(i0)**2.)**2.)) + (gamma1/4.) * \
+              (-6.*(1.-5.*math.cos(i0)**2.)*(f0 - M0 + e0*math.sin(f0))
+               + (3.-5.*math.cos(i0)**2.)*(3.*math.sin(2.*w0 + 2.*f0) + 3.*e0*math.sin(2.*w0 + f0) + e0*math.sin(2.*w0 + 3.*f0))) \
+               - (gamma1/8.)*e0**2.*math.cos(i0) * \
+              (11. + 80.*(math.cos(i0)**2.)/(1.-5.*math.cos(i0)**2.) + 200.*(math.cos(i0)**4.)/((1.-5.*math.cos(i0)**2.)**2.)) \
+               - (gamma1/2.)*math.cos(i0) * \
+              (6.*(f0 - M0 + e0*math.sin(f0)) - 3.*math.sin(2.*w0 + 2.*f0) - 3.*e0*math.sin(2.*w0 + f0) - e0*math.sin(2.*w0 + 3.*f0))
                
     edM = (gamma1/8.)*e0*eta**3. * \
-          (1. - 11.*cos(i0)**2. - 40.*((cos(i0)**4.)/(1.-5.*cos(i0)**2.))) - (gamma1/4.)*eta**3. * \
-          (2.*(3.*cos(i0)**2. - 1.)*((a_r*eta)**2. + a_r + 1.)*sin(f0) + 
-           3.*(1. - cos(i0)**2.)*((-(a_r*eta)**2. - a_r + 1.)*sin(2.*w0 + f0) +
-           ((a_r*eta)**2. + a_r + (1./3.))*sin(2*w0 + 3.*f0)))
+          (1. - 11.*math.cos(i0)**2. - 40.*((math.cos(i0)**4.)/(1.-5.*math.cos(i0)**2.))) - (gamma1/4.)*eta**3. * \
+          (2.*(3.*math.cos(i0)**2. - 1.)*((a_r*eta)**2. + a_r + 1.)*math.sin(f0) +
+           3.*(1. - math.cos(i0)**2.)*((-(a_r*eta)**2. - a_r + 1.)*math.sin(2.*w0 + f0) +
+           ((a_r*eta)**2. + a_r + (1./3.))*math.sin(2*w0 + 3.*f0)))
           
-    dRAAN = -(gamma1/8.)*e0**2.*cos(i0) * \
-             (11. + 80.*(cos(i0)**2.)/(1.-5.*cos(i0)**2.) + 
-              200.*(cos(i0)**4.)/((1.-5.*cos(i0)**2.)**2.)) - (gamma1/2.)*cos(i0) * \
-             (6.*(f0 - M0 + e0*sin(f0)) - 3.*sin(2.*w0 + 2.*f0) - 
-              3.*e0*sin(2.*w0 + f0) - e0*sin(2.*w0 + 3.*f0))  
+    dRAAN = -(gamma1/8.)*e0**2.*math.cos(i0) * \
+             (11. + 80.*(math.cos(i0)**2.)/(1.-5.*math.cos(i0)**2.) +
+              200.*(math.cos(i0)**4.)/((1.-5.*math.cos(i0)**2.)**2.)) - (gamma1/2.)*math.cos(i0) * \
+             (6.*(f0 - M0 + e0*math.sin(f0)) - 3.*math.sin(2.*w0 + 2.*f0) -
+              3.*e0*math.sin(2.*w0 + f0) - e0*math.sin(2.*w0 + 3.*f0))
 
-    d1 = (e0 + de)*sin(M0) + edM*cos(M0)
-    d2 = (e0 + de)*cos(M0) - edM*sin(M0)
-    d3 = (sin(i0/2.) + cos(i0/2.)*(di/2.))*sin(RAAN0) + sin(i0/2.)*dRAAN*cos(RAAN0)
-    d4 = (sin(i0/2.) + cos(i0/2.)*(di/2.))*cos(RAAN0) - sin(i0/2.)*dRAAN*sin(RAAN0)
+    d1 = (e0 + de)*math.sin(M0) + edM*math.cos(M0)
+    d2 = (e0 + de)*math.cos(M0) - edM*math.sin(M0)
+    d3 = (math.sin(i0/2.) + math.cos(i0/2.)*(di/2.))*math.sin(RAAN0) + math.sin(i0/2.)*dRAAN*math.cos(RAAN0)
+    d4 = (math.sin(i0/2.) + math.cos(i0/2.)*(di/2.))*math.cos(RAAN0) - math.sin(i0/2.)*dRAAN*math.sin(RAAN0)
     
     # Compute transformed elements
-    a1 = a0 + a0*gamma0*((3.*cos(i0)**2. - 1.)*(a_r**3. - (1./eta)**3.) + 
-                         (3.*(1.-cos(i0)**2.)*a_r**3.*cos(2.*w0 + 2.*f0)))
+    a1 = a0 + a0*gamma0*((3.*math.cos(i0)**2. - 1.)*(a_r**3. - (1./eta)**3.) +
+                         (3.*(1.-math.cos(i0)**2.)*a_r**3.*math.cos(2.*w0 + 2.*f0)))
     
     e1 = np.sqrt(d1**2. + d2**2.)
     
-    i1 = 2.*asin(np.sqrt(d3**2. + d4**2.))
+    i1 = 2.*math.asin(np.sqrt(d3**2. + d4**2.))
     
-    RAAN1 = atan2(d3, d4)
+    RAAN1 = math.atan2(d3, d4)
     
-    M1 = atan2(d1, d2)
+    M1 = math.atan2(d1, d2)
     
     w1 = MwRAAN1 - RAAN1 - M1
     
-    while w1 > 2.*pi:
-        w1 -= 2.*pi
+    while w1 > 2.*math.pi:
+        w1 -= 2.*math.pi
         
     while w1 < 0.:
-        w1 += 2.*pi
+        w1 += 2.*math.pi
                              
     
     return a1, e1, i1, RAAN1, w1, M1
@@ -1031,17 +1027,17 @@ def cart2kep(cart, GM=GME):
 
     # Calculate RAAN and inclination
     ih_vect = h_vect/h
-    RAAN = atan2(ih_vect[0], -ih_vect[1])   # rad
-    i = acos(ih_vect[2])   # rad
+    RAAN = math.atan2(ih_vect[0], -ih_vect[1])   # rad
+    i = math.acos(ih_vect[2])   # rad
     if RAAN < 0.:
-        RAAN += 2.*pi
+        RAAN += 2.*math.pi
 
     # Apply correction for circular orbit, choose e_vect to point
     # to ascending node
     if e != 0:
         ie_vect = e_vect/e
     else:
-        ie_vect = np.array([[cos(RAAN)], [sin(RAAN)], [0.]])
+        ie_vect = np.array([[math.cos(RAAN)], [math.sin(RAAN)], [0.]])
 
     # Find orthogonal unit vector to complete perifocal frame
     ip_vect = np.cross(ih_vect, ie_vect, axis=0)
@@ -1050,25 +1046,25 @@ def cart2kep(cart, GM=GME):
     PN = np.concatenate((ie_vect, ip_vect, ih_vect), axis=1).T
 
     # Calculate argument of periapsis
-    w = atan2(PN[0,2], PN[1,2])  # rad
+    w = math.atan2(PN[0,2], PN[1,2])  # rad
     if w < 0.:
-        w += 2.*pi
+        w += 2.*math.pi
 
     # Calculate true anomaly
     cross1 = np.cross(ie_vect, ir_vect, axis=0)
     tan1 = np.dot(cross1.T, ih_vect)
     tan2 = np.dot(ie_vect.T, ir_vect)
-    theta = atan2(tan1, tan2)    # rad
+    theta = math.atan2(tan1, tan2)    # rad
     
     # Update range of true anomaly for elliptical orbits
     if a > 0. and theta < 0.:
-        theta += 2.*pi    
+        theta += 2.*math.pi
     
     # Convert angles to deg
-    i *= 180./pi
-    RAAN *= 180./pi
-    w *= 180./pi
-    theta *= 180./pi
+    i *= 180./math.pi
+    RAAN *= 180./math.pi
+    w *= 180./math.pi
+    theta *= 180./math.pi
     
     # Form output
     elem = np.array([[a], [e], [i], [RAAN], [w], [theta]])
@@ -1125,29 +1121,29 @@ def kep2cart(elem, GM=GME):
     # Retrieve input elements, convert to radians
     a = float(elem[0])
     e = float(elem[1])
-    i = float(elem[2]) * pi/180
-    RAAN = float(elem[3]) * pi/180
-    w = float(elem[4]) * pi/180
-    theta = float(elem[5]) * pi/180
+    i = float(elem[2]) * math.pi/180
+    RAAN = float(elem[3]) * math.pi/180
+    w = float(elem[4]) * math.pi/180
+    theta = float(elem[5]) * math.pi/180
 
     # Calculate h and r
     p = a*(1 - e**2)
     h = np.sqrt(GM*p)
-    r = p/(1. + e*cos(theta))
+    r = p/(1. + e*math.cos(theta))
 
     # Calculate r_vect and v_vect
     r_vect = r * \
-        np.array([[cos(RAAN)*cos(theta+w) - sin(RAAN)*sin(theta+w)*cos(i)],
-                  [sin(RAAN)*cos(theta+w) + cos(RAAN)*sin(theta+w)*cos(i)],
-                  [sin(theta+w)*sin(i)]])
+        np.array([[math.cos(RAAN)*math.cos(theta+w) - math.sin(RAAN)*math.sin(theta+w)*math.cos(i)],
+                  [math.sin(RAAN)*math.cos(theta+w) + math.cos(RAAN)*math.sin(theta+w)*math.cos(i)],
+                  [math.sin(theta+w)*math.sin(i)]])
 
-    vv1 = cos(RAAN)*(sin(theta+w) + e*sin(w)) + \
-          sin(RAAN)*(cos(theta+w) + e*cos(w))*cos(i)
+    vv1 = math.cos(RAAN)*(math.sin(theta+w) + e*math.sin(w)) + \
+          math.sin(RAAN)*(math.cos(theta+w) + e*math.cos(w))*math.cos(i)
 
-    vv2 = sin(RAAN)*(sin(theta+w) + e*sin(w)) - \
-          cos(RAAN)*(cos(theta+w) + e*cos(w))*cos(i)
+    vv2 = math.sin(RAAN)*(math.sin(theta+w) + e*math.sin(w)) - \
+          math.cos(RAAN)*(math.cos(theta+w) + e*math.cos(w))*math.cos(i)
 
-    vv3 = -(cos(theta+w) + e*cos(w))*sin(i)
+    vv3 = -(math.cos(theta+w) + e*math.cos(w))*math.sin(i)
     
     v_vect = -GM/h * np.array([[vv1], [vv2], [vv3]])
 
@@ -1205,21 +1201,21 @@ def kep2eqn(kep):
     # Retrieve input elements, convert to radians
     a = float(kep[0])
     e = float(kep[1])
-    i = float(kep[2]) * pi/180
-    RAAN = float(kep[3]) * pi/180
-    w = float(kep[4]) * pi/180
-    theta = float(kep[5]) * pi/180
+    i = float(kep[2]) * math.pi/180
+    RAAN = float(kep[3]) * math.pi/180
+    w = float(kep[4]) * math.pi/180
+    theta = float(kep[5]) * math.pi/180
     
     # Compute mean anomaly
     E = true2ecc(theta, e)
     M = ecc2mean(E, e)
     
     # Compute equinoctial elements
-    k = e*cos(w + RAAN)
-    h = e*sin(w + RAAN)
-    q = tan(i/2)*cos(RAAN)
-    p = tan(i/2)*sin(RAAN)
-    lam = (RAAN + w + M)*180./pi
+    k = e*math.cos(w + RAAN)
+    h = e*math.sin(w + RAAN)
+    q = math.tan(i/2)*math.cos(RAAN)
+    p = math.tan(i/2)*math.sin(RAAN)
+    lam = (RAAN + w + M)*180./math.pi
     
     # Reset range to 0-360
     lam = lam % 360.
@@ -1279,18 +1275,18 @@ def kep2modeqn(kep):
     # Retrieve input elements, convert to radians
     a = float(kep[0])
     e = float(kep[1])
-    i = float(kep[2]) * pi/180
-    RAAN = float(kep[3]) * pi/180
-    w = float(kep[4]) * pi/180
-    theta = float(kep[5]) * pi/180
+    i = float(kep[2]) * math.pi/180
+    RAAN = float(kep[3]) * math.pi/180
+    w = float(kep[4]) * math.pi/180
+    theta = float(kep[5]) * math.pi/180
     
     # Compute modified equinoctial elements
     p = a*(1. - e**2.)
-    f = e*cos(w + RAAN)
-    g = e*sin(w + RAAN)
-    h = tan(i/2)*cos(RAAN)
-    k = tan(i/2)*sin(RAAN)
-    L = (RAAN + w + theta)*180./pi
+    f = e*math.cos(w + RAAN)
+    g = e*math.sin(w + RAAN)
+    h = math.tan(i/2)*math.cos(RAAN)
+    k = math.tan(i/2)*math.sin(RAAN)
+    L = (RAAN + w + theta)*180./math.pi
     
     # Reset range to 0-360
     L = L % 360.
@@ -1461,23 +1457,23 @@ def modeqn2cart(modeqn, GM=GME):
     g = float(modeqn[2])
     h = float(modeqn[3])
     k = float(modeqn[4])
-    L = float(modeqn[5]) * pi/180
+    L = float(modeqn[5]) * math.pi/180
     
     # Compute intermediate quantities (Betts Eq 6.37-6.41)
-    q = 1. + f*cos(L) + g*sin(L)
+    q = 1. + f*math.cos(L) + g*math.sin(L)
     r = p/q
     alpha2 = h**2. - k**2.
     chi = np.sqrt(h**2. + k**2.)
     s2 = 1. + chi**2.
     
     # Compute inertial position and velocity vectors
-    r_vect = (r/s2)*np.array([[cos(L) + alpha2*cos(L) + 2.*h*k*sin(L)],
-                               [sin(L) - alpha2*sin(L) + 2.*h*k*cos(L)],
-                               [2.*(h*sin(L) - k*cos(L))]])
+    r_vect = (r/s2)*np.array([[math.cos(L) + alpha2*math.cos(L) + 2.*h*k*math.sin(L)],
+                              [math.sin(L) - alpha2*math.sin(L) + 2.*h*k*math.cos(L)],
+                              [2.*(h*math.sin(L) - k*math.cos(L))]])
     
-    v1 =  sin(L) + alpha2*sin(L) - 2.*h*k*cos(L) + g - 2.*f*h*k + alpha2*g
-    v2 = -cos(L) + alpha2*cos(L) + 2.*h*k*sin(L) - f + 2.*g*h*k + alpha2*f
-    v3 = -2.*(h*cos(L) + k*sin(L) + f*h + g*k)
+    v1 =  math.sin(L) + alpha2*math.sin(L) - 2.*h*k*math.cos(L) + g - 2.*f*h*k + alpha2*g
+    v2 = -math.cos(L) + alpha2*math.cos(L) + 2.*h*k*math.sin(L) - f + 2.*g*h*k + alpha2*f
+    v3 = -2.*(h*math.cos(L) + k*math.sin(L) + f*h + g*k)
     
     v_vect = (-1./s2)*np.sqrt(GM/p)*np.array([[v1], [v2], [v3]])
     
@@ -1552,10 +1548,10 @@ def element_conversion(x_in, iflag, oflag, GM=GME, dt=0.):
         # Retrieve input elements, convert to radians
         a = float(x_in[0])
         e = float(x_in[1])
-        i = float(x_in[2]) * pi/180
-        RAAN = float(x_in[3]) * pi/180
-        w = float(x_in[4]) * pi/180
-        Mo = float(x_in[5]) * pi/180
+        i = float(x_in[2]) * math.pi/180
+        RAAN = float(x_in[3]) * math.pi/180
+        w = float(x_in[4]) * math.pi/180
+        Mo = float(x_in[5]) * math.pi/180
 
         # Calculate h
         p = a*(1 - e**2)
@@ -1587,10 +1583,10 @@ def element_conversion(x_in, iflag, oflag, GM=GME, dt=0.):
 
         # Calculate RAAN and inclination
         ih_vect = h_vect/h
-        RAAN = atan2(ih_vect[0], -ih_vect[1])   # rad
-        i = acos(ih_vect[2])   # rad
+        RAAN = math.atan2(ih_vect[0], -ih_vect[1])   # rad
+        i = math.acos(ih_vect[2])   # rad
         while RAAN < 0.:
-            RAAN += 2.*pi
+            RAAN += 2.*math.pi
 
         # Calculate eccentricity
         e_vect = np.cross(v_vect, h_vect, axis=0)/GM - ir_vect
@@ -1604,7 +1600,7 @@ def element_conversion(x_in, iflag, oflag, GM=GME, dt=0.):
         if e != 0:
             ie_vect = e_vect/e
         else:
-            ie_vect = np.array([[cos(RAAN)], [sin(RAAN)], [0.]])
+            ie_vect = np.array([[math.cos(RAAN)], [math.sin(RAAN)], [0.]])
 
         # Find orthogonal unit vector to complete perifocal frame
         ip_vect = np.cross(ih_vect, ie_vect, axis=0)
@@ -1613,29 +1609,29 @@ def element_conversion(x_in, iflag, oflag, GM=GME, dt=0.):
         PN = np.concatenate(([ie_vect], [ip_vect], [ih_vect]))
 
         # Calculate argument of periapsis
-        w = atan2(PN[0][2], PN[1][2])  # rad
+        w = math.atan2(PN[0][2], PN[1][2])  # rad
         while w < 0.:
-            w += 2.*pi
+            w += 2.*math.pi
 
         # Calculate true anomaly, eccentric/hyperbolic anomaly, mean anomaly
         cross1 = np.cross(ie_vect, ir_vect, axis=0)
         tan1 = np.dot(cross1.T, ih_vect)
         tan2 = np.dot(ie_vect.T, ir_vect)
-        f = atan2(tan1, tan2)    # rad
+        f = math.atan2(tan1, tan2)    # rad
 
         # Calculate M
         if a > 0:
             n = np.sqrt(GM/a**3)
 #            Erad = 2*atan(np.sqrt((1-e)/(1+e))*tan(f/2))    # rad
             Erad = true2ecc(f, e)
-            Mo = Erad - e*sin(Erad)   # rad
+            Mo = Erad - e*math.sin(Erad)   # rad
             while Mo < 0:
-                Mo = Mo + 2*pi
+                Mo = Mo + 2*math.pi
         elif a < 0:
             n = np.sqrt(GM/-a**3)
 #            Hrad = 2*atanh(np.sqrt((e-1)/(e+1))*tan(f/2))  # rad
             Hrad = true2hyp(f, e)
-            Mo = e*sinh(Hrad) - Hrad  # rad
+            Mo = e*math.sinh(Hrad) - Hrad  # rad
 
         else:
             print('Error, input orbit is parabolic, a = ', a)
@@ -1652,15 +1648,15 @@ def element_conversion(x_in, iflag, oflag, GM=GME, dt=0.):
         # Ensure M is between 0 and 2*pi for elliptical orbits
         if a > 0:
             
-            M = fmod(M, 2*pi)
+            M = math.fmod(M, 2*math.pi)
             if M < 0:
-                M += 2*pi
+                M += 2*math.pi
 
         # Convert angles to degrees
-        i = i * 180/pi
-        RAAN = RAAN * 180/pi
-        w = w * 180/pi
-        M = M * 180/pi
+        i = i * 180/math.pi
+        RAAN = RAAN * 180/math.pi
+        w = w * 180/math.pi
+        M = M * 180/math.pi
 
         x_out = np.array([[a], [e], [i], [RAAN], [w], [M]])
 
@@ -1671,29 +1667,29 @@ def element_conversion(x_in, iflag, oflag, GM=GME, dt=0.):
             Erad = mean2ecc(M, e)    # rad
             f = ecc2true(Erad, e)
 #            f = 2*atan(np.sqrt((1+e)/(1-e))*tan(Erad/2))    # rad
-            r = a*(1 - e*cos(Erad))     # km
+            r = a*(1 - e*math.cos(Erad))     # km
         elif a < 0:
             Hrad = mean2hyp(M, e)    # rad
             f = hyp2true(Hrad, e)
 #            f = 2*atan(np.sqrt((e+1)/(e-1))*tanh(Hrad/2))    # rad
-            r = a*(1 - e*cosh(Hrad))     # km
+            r = a*(1 - e*math.cosh(Hrad))     # km
             
         # Calculate theta
         theta = f + w   # rad
 
         # Calculate r_vect and v_vect
         r_vect2 = r * \
-            np.array([[cos(RAAN)*cos(theta) - sin(RAAN)*sin(theta)*cos(i)],
-                      [sin(RAAN)*cos(theta) + cos(RAAN)*sin(theta)*cos(i)],
-                      [sin(theta)*sin(i)]])
+            np.array([[math.cos(RAAN)*math.cos(theta) - math.sin(RAAN)*math.sin(theta)*math.cos(i)],
+                      [math.sin(RAAN)*math.cos(theta) + math.cos(RAAN)*math.sin(theta)*math.cos(i)],
+                      [math.sin(theta)*math.sin(i)]])
 
-        vv1 = cos(RAAN)*(sin(theta) + e*sin(w)) + \
-            sin(RAAN)*(cos(theta) + e*cos(w))*cos(i)
+        vv1 = math.cos(RAAN)*(math.sin(theta) + e*math.sin(w)) + \
+            math.sin(RAAN)*(math.cos(theta) + e*math.cos(w))*math.cos(i)
 
-        vv2 = sin(RAAN)*(sin(theta) + e*sin(w)) - \
-            cos(RAAN)*(cos(theta) + e*cos(w))*cos(i)
+        vv2 = math.sin(RAAN)*(math.sin(theta) + e*math.sin(w)) - \
+            math.cos(RAAN)*(math.cos(theta) + e*math.cos(w))*math.cos(i)
 
-        vv3 = -(cos(theta) + e*cos(w))*sin(i)
+        vv3 = -(math.cos(theta) + e*math.cos(w))*math.sin(i)
         v_vect2 = -GM/h * np.array([[vv1], [vv2], [vv3]])
 
         x_out = np.concatenate([r_vect2, v_vect2])
@@ -1732,7 +1728,7 @@ def compute_launch_velocity(lat_rad, R=Re, w=wE):
     
     '''
     
-    v0 = R*w*cos(lat_rad)
+    v0 = R*w*math.cos(lat_rad)
     
     return v0    
 

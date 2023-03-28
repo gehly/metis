@@ -1,5 +1,4 @@
 import numpy as np
-#from math import pi, sin, cos, modf
 import math
 import requests
 import pandas as pd
@@ -16,7 +15,7 @@ current_dir = os.path.dirname(os.path.abspath(filename))
 ind = current_dir.find('metis')
 metis_dir = current_dir[0:ind+5]
 input_data_dir = os.path.join(metis_dir, 'input_data')
-# sys.path.append(metis_dir)
+sys.path.append(metis_dir)
 
 from utilities import numerical_methods as num
 from utilities import time_systems as timesys
