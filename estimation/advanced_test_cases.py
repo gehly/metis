@@ -817,8 +817,8 @@ def tudat_geo_7day_setup():
 
 def execute_tudat_ukf():
     
-    setup_file = os.path.join('advanced_test', 'tudat_geo_perturbed_setup.pkl')    
-    # setup_file = os.path.join('advanced_test', 'tudat_geo_perturbed_7day_setup.pkl')
+    # setup_file = os.path.join('advanced_test', 'tudat_geo_perturbed_setup.pkl')    
+    setup_file = os.path.join('advanced_test', 'tudat_geo_perturbed_7day_setup.pkl')
     
     pklFile = open(setup_file, 'rb' )
     data = pickle.load( pklFile )
@@ -900,8 +900,10 @@ if __name__ == '__main__':
     
     # sso_j2_drag_setup()
     
-    tudat_geo_setup()
+    # tudat_geo_setup()
     
-    # execute_tudat_ukf()
+    # tudat_geo_7day_setup()
+    
+    execute_tudat_ukf()
     
     # execute_test()
