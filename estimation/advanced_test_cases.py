@@ -817,7 +817,8 @@ def tudat_geo_7day_setup():
 
 def execute_tudat_ukf():
     
-    setup_file = os.path.join('advanced_test', 'tudat_geo_perturbed_7day_setup.pkl')
+    setup_file = os.path.join('advanced_test', 'tudat_geo_perturbed_setup.pkl')    
+    # setup_file = os.path.join('advanced_test', 'tudat_geo_perturbed_7day_setup.pkl')
     
     pklFile = open(setup_file, 'rb' )
     data = pickle.load( pklFile )
@@ -884,8 +885,9 @@ def execute_test():
     analysis.compute_orbit_errors(filter_output, full_state_output, truth_dict)
     
     
-#    filter_output, full_state_output = est.ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, state_params, sensor_params, int_params)
-#    analysis.compute_orbit_errors(filter_output, filter_output, truth_dict)
+    filter_output, full_state_output = est.ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, params_dict)
+    analysis.compute_orbit_errors(filter_output, filter_output, truth_dict)
+
 
 
 
@@ -898,4 +900,8 @@ if __name__ == '__main__':
     
     # sso_j2_drag_setup()
     
-    execute_test()
+    tudat_geo_setup()
+    
+    # execute_tudat_ukf()
+    
+    # execute_test()
