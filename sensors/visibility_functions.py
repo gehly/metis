@@ -15,36 +15,16 @@ ind = current_dir.find('metis')
 metis_dir = current_dir[0:ind+5]
 sys.path.append(metis_dir)
 
-#from skyfield.constants import ERAD
-#from skyfield.api import Topos, EarthSatellite, Loader
-
-from sensors.sensors import define_sensors
-from sensors.brdf_models import compute_mapp_lambert
-from utilities.ephemeris import compute_sun_coords, compute_moon_coords
-# from utilities.tle_functions import get_spacetrack_tle_data
-# from utilities.tle_functions import find_closest_tle_epoch
-# from utilities.tle_functions import propagate_TLE
-
-from utilities.eop_functions import get_eop_data
-from utilities.eop_functions import get_celestrak_eop_alldata
-from utilities.eop_functions import batch_eop_rotation_matrices
-from utilities.eop_functions import get_TAI_UTC
-from utilities.coordinate_systems import latlonht2ecef
-from utilities.coordinate_systems import gcrf2itrf
-from utilities.coordinate_systems import itrf2gcrf
-from utilities.coordinate_systems import ecef2enu
-from utilities.time_systems import utcdt2ttjd
-from utilities.time_systems import jd2cent
-
+from sensors import brdf_models as brdf
+from sensors import measurement_functions as mfunc
+from sensors import sensors as sens
+from utilities import coordinate_systems as coord
+from utilities import eop_functions as eop
+from utilities import ephemeris as eph
+from utilities import time_systems as timesys
 from utilities import tle_functions as tle
-
-
 from utilities.constants import Re, AU_km
 
-from sensors import measurement_functions as mfunc
-#from sensors.measurement_functions import compute_measurement
-#from sensors.measurement_functions import ecef2azelrange_deg
-#from sensors.measurement_functions import ecef2azelrange_rad
 
 
 def define_RSOs(obj_id_list, UTC_list, tle_dict={}, prev_flag=False,
@@ -198,15 +178,15 @@ def compute_visible_passes(UTC_list, obj_id_list, sensor_dict, tle_dict={},
     # Compute sensor location in ITRF
     for sensor_id in sensor_dict:
         lat, lon, ht = sensor_dict[sensor_id]['geodetic_latlonht']
-        sensor_dict[sensor_id]['r_ITRF'] = latlonht2ecef(lat, lon, ht)
+        sensor_dict[sensor_id]['r_ITRF'] = coord.latlonht2ecef(lat, lon, ht)
         
         
     eop_start = time.time()
         
     # Generate coordinate frame rotation matrices
-    eop_alldata = get_celestrak_eop_alldata(offline_flag)    
+    eop_alldata = eop.get_celestrak_eop_alldata(offline_flag)    
     GCRF_TEME_list, ITRF_GCRF_list = \
-        batch_eop_rotation_matrices(UTC_list, eop_alldata)
+        eop.batch_eop_rotation_matrices(UTC_list, eop_alldata)
         
     print('Frame Rotation Time: ', time.time() - eop_start)
     
@@ -231,15 +211,15 @@ def compute_visible_passes(UTC_list, obj_id_list, sensor_dict, tle_dict={},
         ITRF_GCRF = ITRF_GCRF_list[ii]
 
         # Compute sun/moon position     
-        TT_JD = utcdt2ttjd(UTC, TAI_UTC)
-        TT_cent = jd2cent(TT_JD)
+        TT_JD = timesys.utcdt2ttjd(UTC, TAI_UTC)
+        TT_cent = timesys.jd2cent(TT_JD)
 
         start = time.time()
-        sun_eci_geom, sun_eci_app = compute_sun_coords(TT_cent)
+        sun_eci_geom, sun_eci_app = eph.compute_sun_coords(TT_cent)
         sun_calc_time += time.time() - start
         
         start = time.time()
-        moon_eci_geom, moon_eci_app = compute_moon_coords(TT_cent)
+        moon_eci_geom, moon_eci_app = eph.compute_moon_coords(TT_cent)
         moon_calc_time += time.time() - start
         
         # Store output
@@ -328,7 +308,7 @@ def compute_visible_passes(UTC_list, obj_id_list, sensor_dict, tle_dict={},
             
             # Compute topocentric RSO measurements
             difference = [r_itrf - sensor_itrf for r_itrf in rso_itrf_list]
-            diff_enu = [ecef2enu(diff_ecef, sensor_itrf) for diff_ecef in difference]
+            diff_enu = [coord.ecef2enu(diff_ecef, sensor_itrf) for diff_ecef in difference]
             
             az_list = []
             el_list = []
@@ -377,7 +357,7 @@ def compute_visible_passes(UTC_list, obj_id_list, sensor_dict, tle_dict={},
                 
                 # Compute sun elevation angle                
                 sun_diff = [sun_itrf - sensor_itrf for sun_itrf in sun_itrf_list]
-                sun_enu = [ecef2enu(diff_ecef, sensor_itrf) for diff_ecef in sun_diff]
+                sun_enu = [coord.ecef2enu(diff_ecef, sensor_itrf) for diff_ecef in sun_diff]
                 sun_el_list = [asin(enu[2]/np.linalg.norm(enu)) for enu in sun_enu]
                 
                 # Check sun constraint (ensures station is dark if needed)
@@ -476,7 +456,7 @@ def compute_visible_passes(UTC_list, obj_id_list, sensor_dict, tle_dict={},
                     # from catalog
                     if 'mapp_lim' in sensor:
                         mapp_lim = sensor['mapp_lim']
-                        mapp = compute_mapp_lambert(phase_angle, rg_km, radius_km, albedo)
+                        mapp = brdf.compute_mapp_lambert(phase_angle, rg_km, radius_km, albedo)
                         if mapp > mapp_lim:
                             vis_array[ii] = False
                             mapp_inds.append(ii)
@@ -611,7 +591,7 @@ def compute_transit_dict(UTC_window, obj_id_list, site_dict, increment=10.,
             
             # Compute ECEF site location
             latlonht = site_dict[site]['geodetic_latlonht']
-            site_ecef = latlonht2ecef(latlonht[0], latlonht[1], latlonht[2])
+            site_ecef = coord.latlonht2ecef(latlonht[0], latlonht[1], latlonht[2])
             
             # Loop over times
             az_list = []
@@ -789,7 +769,7 @@ def check_visibility(X, state_params, sensor_params, sensor_id, UTC, EOP_data,
     # Retrieve sensor location and rotate to GCRF
     sensor = sensor_params[sensor_id]
     sensor_itrf = sensor['site_ecef']
-    sensor_gcrf, dum = itrf2gcrf(sensor_itrf, np.zeros((3,1)), UTC, EOP_data, XYs_df)
+    sensor_gcrf, dum = coord.itrf2gcrf(sensor_itrf, np.zeros((3,1)), UTC, EOP_data, XYs_df)
     
     # Compute az, el, range [rad, rad, km]
     meas_types = ['az', 'el', 'rg']
@@ -839,10 +819,10 @@ def check_visibility(X, state_params, sensor_params, sensor_id, UTC, EOP_data,
             
             # Compute sun/moon position
             TAI_UTC = EOP_data['TAI_UTC']  
-            TT_JD = utcdt2ttjd(UTC, TAI_UTC)
-            TT_cent = jd2cent(TT_JD)
-            sun_eci_geom, sun_eci_app = compute_sun_coords(TT_cent)
-            moon_eci_geom, moon_eci_app = compute_moon_coords(TT_cent)
+            TT_JD = timesys.utcdt2ttjd(UTC, TAI_UTC)
+            TT_cent = timesys.jd2cent(TT_JD)
+            sun_eci_geom, sun_eci_app = eph.compute_sun_coords(TT_cent)
+            moon_eci_geom, moon_eci_app = eph.compute_moon_coords(TT_cent)
             
             # Sunlit/station dark constraint
             if 'sun_elmask' in sensor:
@@ -885,9 +865,9 @@ def check_visibility(X, state_params, sensor_params, sensor_id, UTC, EOP_data,
             # from catalog
             if 'mapp_lim' in sensor:
                 mapp_lim = sensor['mapp_lim']
-                mapp = compute_mapp_lambert(phase_angle, rg_km,
-                                            state_params['radius_m']/1000.,
-                                            state_params['albedo'])
+                mapp = brdf.compute_mapp_lambert(phase_angle, rg_km,
+                                                 state_params['radius_m']/1000.,
+                                                 state_params['albedo'])
                 print('\n', UTC, el_rad, mapp, vis_flag)
                 
                 
