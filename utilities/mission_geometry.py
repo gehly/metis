@@ -1,6 +1,5 @@
 import numpy as np
-from math import pi, sin, cos, tan, fmod, fabs, atan, atan2, acos, asin
-from math import sinh, cosh, tanh, atanh
+import math
 from datetime import datetime
 import pandas as pd
 import os
@@ -15,9 +14,9 @@ ind = current_dir.find('metis')
 metis_dir = current_dir[0:ind+5]
 sys.path.append(metis_dir)
 
-from utilities.astrodynamics import sma2meanmot, meanmot2sma, sunsynch_inclination, LTAN_to_RAAN
+from utilities import astrodynamics as astro
+from utilities import eop_functions as eop
 from utilities.constants import GME, J2E, Re, wE
-from utilities.eop_functions import get_celestrak_eop_alldata, get_eop_data
 
 
 
@@ -61,7 +60,7 @@ def compute_groundswath(a, fov, R=Re):
     
     # Compute angles using Ref 1 Eq 12.2 - 12.5
     f = (fov/2.)
-    zeta = asin(a*sin(f)/R)     
+    zeta = math.asin(a*math.sin(f)/R)
     alpha = zeta - f
     
     # Compute full swath using Ref 1 Eq 
@@ -78,8 +77,8 @@ def swath2fov(a, swath_rad, R=Re):
     
     
     alpha = swath_rad/2.
-    rho = np.sqrt(R**2. + a**2. - 2.*Re*a*cos(alpha))
-    f = asin((sin(alpha)/rho)*Re)
+    rho = np.sqrt(R**2. + a**2. - 2.*Re*a*math.cos(alpha))
+    f = math.asin((math.sin(alpha)/rho)*Re)
     fov = 2.*f
     
     return fov
@@ -88,15 +87,15 @@ def swath2fov(a, swath_rad, R=Re):
 def alpha2f(alpha, a, R=Re):
     
     
-    rho = np.sqrt(R**2. + a**2. - 2.*R*a*cos(alpha))
-    f = asin((sin(alpha)/rho)*R)
+    rho = np.sqrt(R**2. + a**2. - 2.*R*a*math.cos(alpha))
+    f = math.asin((math.sin(alpha)/rho)*R)
     
     return f
 
 def f2el(f, a, R=Re):
     
-    sinx = a*sin(f)/R
-    el = pi/2. - asin(sinx)
+    sinx = a*math.sin(f)/R
+    el = math.pi/2. - math.asin(sinx)
     
     return el
 
@@ -121,7 +120,7 @@ def swath2Nto(swath_km, R=Re):
     '''
     
     swath_rad = swath_km/R
-    Nto = int(np.ceil(2.*pi/swath_rad))
+    Nto = int(np.ceil(2.*math.pi/swath_rad))
     
     return Nto
 
@@ -157,8 +156,8 @@ def compute_minimum_repeat(h, fov, R=Re):
     Nto = swath2Nto(swath_km, R)
     
     # Compute minimum Cto
-    n = sma2meanmot(a)
-    n_revday = n * 86400./(2.*pi)
+    n = astro.sma2meanmot(a)
+    n_revday = n * 86400./(2.*math.pi)
     Cto = int(np.floor(Nto/n_revday))    
     
     return Nto, Cto
@@ -180,13 +179,13 @@ def plot_swath_vs_altitude():
     for fov in fov_list:
         for alt in alt_list:
             a = Re + alt
-            n = np.sqrt(GME/a**3.) * 86400./(2.*pi)     # rev/day
+            n = np.sqrt(GME/a**3.) * 86400./(2.*math.pi)     # rev/day
             
             
-            swath_rad, swath_km = compute_groundswath(a, fov*pi/180.)
-            swath_data[fov_list.index(fov), alt_list.index(alt)] = swath_rad*180./pi
+            swath_rad, swath_km = compute_groundswath(a, fov*math.pi/180.)
+            swath_data[fov_list.index(fov), alt_list.index(alt)] = swath_rad*180./math.pi
             
-            Nto_min = np.ceil(2.*pi/swath_rad)
+            Nto_min = np.ceil(2.*math.pi/swath_rad)
             Cto_min = np.floor(Nto_min/n)
             Nto_data[fov_list.index(fov), alt_list.index(alt)] = Nto_min
             Cto_data[fov_list.index(fov), alt_list.index(alt)] = Cto_min
@@ -285,7 +284,7 @@ def compute_recurrence_grid_parameters(vo, Dto, Cto):
     kappa = vo + float(Dto)/float(Cto)       # rev/day
     Nto = vo*Cto + Dto
     
-    delta = 2*pi/Nto
+    delta = 2*math.pi/Nto
     delta_rev = delta*Cto
     delta_day = delta*Dto   
     
@@ -356,7 +355,7 @@ def generate_candidate_recurrent_triples(hmin, hmax, fov, R=Re, GM=GME):
         # Compute swath and FOV requirements
         swath_km = delta*Re
         fov = swath2fov(a, delta)
-        fov_deg = fov * 180./pi
+        fov_deg = fov * 180./math.pi
         
         
         
@@ -388,7 +387,7 @@ def generate_candidate_recurrent_triples(hmin, hmax, fov, R=Re, GM=GME):
         # Compute swath and FOV requirements
         swath_km = delta*Re
         fov = swath2fov(a, delta)
-        fov_deg = fov * 180./pi
+        fov_deg = fov * 180./math.pi
         
         data_list = [vo, Dto, Cto, Nto, Eto, h, swath_km, fov_deg]
         pandas_data_list.append(data_list)
@@ -396,7 +395,7 @@ def generate_candidate_recurrent_triples(hmin, hmax, fov, R=Re, GM=GME):
         
       
     # Generate plots
-    n_15 = 15.*2.*pi/86400.
+    n_15 = 15.*2.*math.pi/86400.
     a_15 = (GM/n_15**2.)**(1./3.)
     h_15 = a_15 - R
         
@@ -464,8 +463,8 @@ def compute_triple_list(hmin, hmax, fov, Cto_list, R=Re, GM=GME):
     # nodal period and mean motion, but should be ok to set up these bounds
     a_min = R + hmin
     a_max = R + hmax
-    n_max = np.sqrt(GM/a_min**3.) * 86400./(2.*pi)     # rev/day
-    n_min = np.sqrt(GM/a_max**3.) * 86400./(2.*pi)     # rev/day
+    n_max = np.sqrt(GM/a_min**3.) * 86400./(2.*math.pi)     # rev/day
+    n_min = np.sqrt(GM/a_max**3.) * 86400./(2.*math.pi)     # rev/day
     
     
     
@@ -501,7 +500,7 @@ def compute_triple_list(hmin, hmax, fov, Cto_list, R=Re, GM=GME):
             # Assume near-circular sunsynch orbit
             a, i = nodal_period_to_sunsynch_orbit(Nto, Cto, 1e-4)
             swath_rad, swath_km = compute_groundswath(a, fov)
-            delta = 2*pi/Nto
+            delta = 2*math.pi/Nto
             
 #            print(Nto, Cto)
 #            print(a)
@@ -528,8 +527,8 @@ def Nto_to_triple(Nto_required, hmin, hmax, Cto_list, R=Re, GM=GME):
     # nodal period and mean motion, but should be ok to set up these bounds
     a_min = R + hmin
     a_max = R + hmax
-    n_max = np.sqrt(GM/a_min**3.) * 86400./(2.*pi)     # rev/day
-    n_min = np.sqrt(GM/a_max**3.) * 86400./(2.*pi)     # rev/day
+    n_max = np.sqrt(GM/a_min**3.) * 86400./(2.*math.pi)     # rev/day
+    n_min = np.sqrt(GM/a_max**3.) * 86400./(2.*math.pi)     # rev/day
     
     
     # Find values of Nto that create rational numbers for valid ranges of 
@@ -570,7 +569,7 @@ def Nto_to_triple(Nto_required, hmin, hmax, Cto_list, R=Re, GM=GME):
             # Assume near-circular sunsynch orbit
             a, i = nodal_period_to_sunsynch_orbit(Nto, Cto, 1e-4)
             swath_rad, swath_km = compute_groundswath(a, fov)
-            delta = 2*pi/Nto
+            delta = 2*math.pi/Nto
             
 #            print(Nto, Cto)
 #            print(a)
@@ -581,7 +580,7 @@ def Nto_to_triple(Nto_required, hmin, hmax, Cto_list, R=Re, GM=GME):
                 continue   
             
             # Compute delta at Equator
-            delta = 2*pi/Nto
+            delta = 2*math.pi/Nto
             delta_km = R*delta
             
             
@@ -704,19 +703,19 @@ def compute_orbit_periods(a, e, i, R=Re, GM=GME, J2=J2E):
     '''
     
     # Convert inclination to radians
-    i = i * pi/180.
+    i = i * math.pi/180.
     
     # Compute Keplerian orbit period
     no = np.sqrt(GM/a**3.)
-    To = 2.*pi/no
+    To = 2.*math.pi/no
     
     # Compute perturbation effects from J2
-    dn = (3./(4.*(1-e**2.)**(3./2.))) * no * J2 * (R/a)**2. * (3.*cos(i)**2. - 1)
-    dw = (3./(4.*(1-e**2.)**(2.))) * no * J2 * (R/a)**2. * (5.*cos(i)**2. - 1)
+    dn = (3./(4.*(1-e**2.)**(3./2.))) * no * J2 * (R/a)**2. * (3.*math.cos(i)**2. - 1)
+    dw = (3./(4.*(1-e**2.)**(2.))) * no * J2 * (R/a)**2. * (5.*math.cos(i)**2. - 1)
     
     # Compute anomalistic orbit period
     na = no + dn
-    Ta = 2.*pi/na
+    Ta = 2.*math.pi/na
     
     # Compute nodal period
     Td = ((1. - dn/no)/(1. + dw/no)) * To
@@ -727,13 +726,13 @@ def compute_orbit_periods(a, e, i, R=Re, GM=GME, J2=J2E):
 def nodal_period_to_sunsynch_orbit(Nto, Cto, e, R=Re, GM=GME, J2=J2E):
     
     # Compute constants
-    sidereal_day = 2.*pi/wE
-    k2 = 0.75 * (360./(2.*pi)) * J2 * np.sqrt(GM) * R**2. * sidereal_day
+    sidereal_day = 2.*math.pi/wE
+    k2 = 0.75 * (360./(2.*math.pi)) * J2 * np.sqrt(GM) * R**2. * sidereal_day
     
     # Initial guess for SMA
     Td = Cto/Nto * sidereal_day
-    n = 2.*pi/Td
-    a = meanmot2sma(n, GM)
+    n = 2.*math.pi/Td
+    a = astro.meanmot2sma(n, GM)
     
     # Iteratively solve for SMA
     a_prev = float(a)
@@ -742,23 +741,23 @@ def nodal_period_to_sunsynch_orbit(Nto, Cto, e, R=Re, GM=GME, J2=J2E):
     while diff > tol:
         
         # Compute inclination
-        i = sunsynch_inclination(a, e)         # deg
-        i = i * pi/180.                        # rad        
+        i = astro.sunsynch_inclination(a, e)         # deg
+        i = i * math.pi/180.                        # rad
     
         # Compute J2 effects 
         dL = 360.       # deg/sidereal day
-        dRAAN = -2.* k2 * a**(-7./2.) * cos(i) * (1. - e**2.)**(-2.)
-        dw = k2 * a**(-7./2.) * (5.*cos(i)**2. - 1) * (1. - e**2.)**(-2.)
-        dM = k2 * a**(-7./2.) * (3.*cos(i)**2. - 1) * (1. - e**2.)**(-3./2.)
+        dRAAN = -2.* k2 * a**(-7./2.) * math.cos(i) * (1. - e**2.)**(-2.)
+        dw = k2 * a**(-7./2.) * (5.*math.cos(i)**2. - 1) * (1. - e**2.)**(-2.)
+        dM = k2 * a**(-7./2.) * (3.*math.cos(i)**2. - 1) * (1. - e**2.)**(-3./2.)
         
         n = (Nto/Cto) * (dL - dRAAN) - (dw + dM)
-        a = (GM**(1./3.)) * ((n*pi)/(180.*sidereal_day))**(-2./3.)
+        a = (GM**(1./3.)) * ((n*math.pi)/(180.*sidereal_day))**(-2./3.)
         diff = abs(a - a_prev)
         a_prev = float(a)
     
     
     # Convert to deg
-    i = i * 180./pi
+    i = i * 180./math.pi
     
     return a, i
 
@@ -769,7 +768,7 @@ if __name__ == '__main__':
     print('\n\nLarge Satellite Case')
     
     h = 650
-    fov = 20.*pi/180.
+    fov = 20.*math.pi/180.
     Nto, Cto = compute_minimum_repeat(h, fov)
     
     print(Nto)
@@ -789,7 +788,7 @@ if __name__ == '__main__':
     h = 633.2428
     el = f2el(fov/2., h+Re)
     
-    print('el deg', el*180/pi)
+    print('el deg', el*180/math.pi)
     
     # Compute orbit parameters for Large Satellite
     e = 1e-4
@@ -802,10 +801,10 @@ if __name__ == '__main__':
     
     LTAN = 22.5
     UTC = datetime(2022, 2, 28, 22, 30, 0)
-    eop_alldata = get_celestrak_eop_alldata()
-    EOP_data = get_eop_data(eop_alldata, UTC)
+    eop_alldata = eop.get_celestrak_eop_alldata()
+    EOP_data = eop.get_eop_data(eop_alldata, UTC)
     
-    RAAN = LTAN_to_RAAN(LTAN, UTC, EOP_data)
+    RAAN = astro.LTAN_to_RAAN(LTAN, UTC, EOP_data)
     
     print(RAAN)
     
@@ -814,7 +813,7 @@ if __name__ == '__main__':
     print('\n\nSmall Satellite Case')
     
     h = 575
-    fov = 10.*pi/180.
+    fov = 10.*math.pi/180.
     Nto, Cto = compute_minimum_repeat(h, fov)
     
     print(Nto)
@@ -834,7 +833,7 @@ if __name__ == '__main__':
     h = 549.975
     el = f2el(fov/2., h+Re)
     
-    print('el deg', el*180/pi)
+    print('el deg', el*180/math.pi)
     
     # Compute orbit parameters for Large Satellite
     e = 1e-4
@@ -847,10 +846,10 @@ if __name__ == '__main__':
     
     LTAN = 22.5
     UTC = datetime(2022, 2, 28, 22, 30, 0)
-    eop_alldata = get_celestrak_eop_alldata()
-    EOP_data = get_eop_data(eop_alldata, UTC)
+    eop_alldata = eop.get_celestrak_eop_alldata()
+    EOP_data = eop.get_eop_data(eop_alldata, UTC)
     
-    RAAN = LTAN_to_RAAN(LTAN, UTC, EOP_data)
+    RAAN = astro.LTAN_to_RAAN(LTAN, UTC, EOP_data)
     
     print(RAAN)
     

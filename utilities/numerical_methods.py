@@ -1,16 +1,5 @@
 import numpy as np
-from math import floor
-
-import sys
-import os
-import inspect
-
-filename = inspect.getframeinfo(inspect.currentframe()).filename
-current_dir = os.path.dirname(os.path.abspath(filename))
-
-ind = current_dir.find('metis')
-metis_dir = current_dir[0:ind+5]
-sys.path.append(metis_dir)
+import math
 
 
 def interp_lagrange(X, Y, xx, p):
@@ -48,7 +37,7 @@ def interp_lagrange(X, Y, xx, p):
         
     # Compute number of elements on either side of middle element to grab
     No2 = 0.5*N
-    nn  = int(floor(No2))
+    nn  = int(math.floor(No2))
     
     # Find index such that X[row0] < xx < X[row0+1]
     row0 = list(np.where(X < xx)[0])[-1]

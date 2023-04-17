@@ -1,11 +1,12 @@
 import numpy as np
-from math import pi, sin, cos, tan, asin, acos, atan, atan2
-from datetime import datetime
+# from math import pi, sin, cos, tan, asin, acos, atan, atan2
+import math
+# from datetime import datetime
 import sys
 import os
 import inspect
 import copy
-import time
+# import time
 
 filename = inspect.getframeinfo(inspect.currentframe()).filename
 current_dir = os.path.dirname(os.path.abspath(filename))
@@ -14,22 +15,8 @@ ind = current_dir.find('metis')
 metis_dir = current_dir[0:ind+5]
 sys.path.append(metis_dir)
 
-from utilities.time_systems import utcdt2ttjd
-from utilities.time_systems import utcdt2ut1jd
-from utilities.time_systems import jd2cent
-
-from utilities.eop_functions import get_celestrak_eop_alldata
-from utilities.eop_functions import get_eop_data
-from utilities.eop_functions import compute_precession_IAU1976
-from utilities.eop_functions import get_nutation_data
-from utilities.eop_functions import compute_nutation_IAU1980
-from utilities.eop_functions import eqnequinox_IAU1982_simple
-from utilities.eop_functions import compute_polarmotion
-from utilities.eop_functions import compute_ERA
-from utilities.eop_functions import init_XYs2006
-from utilities.eop_functions import get_XYs
-from utilities.eop_functions import compute_BPN
-
+from utilities import eop_functions as eop
+from utilities import time_systems as timesys
 from utilities.constants import Re, rec_f
 
 
@@ -95,21 +82,21 @@ def teme2gcrf(r_TEME, v_TEME, UTC, IAU1980nut, EOP_data):
     '''
     
     # Compute TT in JD format
-    TT_JD = utcdt2ttjd(UTC, EOP_data['TAI_UTC'])
+    TT_JD = timesys.utcdt2ttjd(UTC, EOP_data['TAI_UTC'])
     
     # Compute TT in centuries since J2000 epoch
-    TT_cent = jd2cent(TT_JD)
+    TT_cent = timesys.jd2cent(TT_JD)
     
     # IAU 1976 Precession
-    P = compute_precession_IAU1976(TT_cent)
+    P = eop.compute_precession_IAU1976(TT_cent)
     
     # IAU 1980 Nutation
     N, FA, Eps0, Eps_true, dPsi, dEps = \
-        compute_nutation_IAU1980(IAU1980nut, TT_cent, EOP_data['ddPsi'],
+        eop.compute_nutation_IAU1980(IAU1980nut, TT_cent, EOP_data['ddPsi'],
                                  EOP_data['ddEps'])
 
     # Equation of the Equinonx 1982
-    R = eqnequinox_IAU1982_simple(dPsi, Eps0)
+    R = eop.eqnequinox_IAU1982_simple(dPsi, Eps0)
     
     # Compute transformation matrix and output
     GCRF_TEME = np.dot(P, np.dot(N, R))
@@ -148,21 +135,21 @@ def gcrf2teme(r_GCRF, v_GCRF, UTC, IAU1980nut, EOP_data):
     '''
     
     # Compute TT in JD format
-    TT_JD = utcdt2ttjd(UTC, EOP_data['TAI_UTC'])
+    TT_JD = timesys.utcdt2ttjd(UTC, EOP_data['TAI_UTC'])
     
     # Compute TT in centuries since J2000 epoch
-    TT_cent = jd2cent(TT_JD)
+    TT_cent = timesys.jd2cent(TT_JD)
     
     # IAU 1976 Precession
-    P = compute_precession_IAU1976(TT_cent)
+    P = eop.compute_precession_IAU1976(TT_cent)
     
     # IAU 1980 Nutation
     N, FA, Eps0, Eps_true, dPsi, dEps = \
-        compute_nutation_IAU1980(IAU1980nut, TT_cent, EOP_data['ddPsi'],
+        eop.compute_nutation_IAU1980(IAU1980nut, TT_cent, EOP_data['ddPsi'],
                                  EOP_data['ddEps'])
 
     # Equation of the Equinonx 1982
-    R = eqnequinox_IAU1982_simple(dPsi, Eps0)
+    R = eop.eqnequinox_IAU1982_simple(dPsi, Eps0)
     
     # Compute transformation matrix and output
     GCRF_TEME = np.dot(P, np.dot(N, R))
@@ -212,31 +199,31 @@ def gcrf2itrf(r_GCRF, v_GCRF, UTC, EOP_data, XYs_df=[]):
     v_GCRF = np.reshape(v_GCRF, (3,1))
         
     # Compute UT1 in JD format
-    UT1_JD = utcdt2ut1jd(UTC, EOP_data['UT1_UTC'])
+    UT1_JD = timesys.utcdt2ut1jd(UTC, EOP_data['UT1_UTC'])
     
     # Compute TT in JD format
-    TT_JD = utcdt2ttjd(UTC, EOP_data['TAI_UTC'])
+    TT_JD = timesys.utcdt2ttjd(UTC, EOP_data['TAI_UTC'])
     
     # Compute TT in centuries since J2000 epoch
-    TT_cent = jd2cent(TT_JD)
+    TT_cent = timesys.jd2cent(TT_JD)
     
     # Construct polar motion matrix (ITRS to TIRS)
-    W = compute_polarmotion(EOP_data['xp'], EOP_data['yp'], TT_cent)
+    W = eop.compute_polarmotion(EOP_data['xp'], EOP_data['yp'], TT_cent)
     
     # Contruct Earth rotaion angle matrix (TIRS to CIRS)
-    R = compute_ERA(UT1_JD)
+    R = eop.compute_ERA(UT1_JD)
     
     # Construct Bias-Precessino-Nutation matrix (CIRS to GCRS/ICRS)
-    XYs_data = init_XYs2006(UTC, UTC, XYs_df)
+    XYs_data = eop.init_XYs2006(UTC, UTC, XYs_df)
     
-    X, Y, s = get_XYs(XYs_data, TT_JD)
+    X, Y, s = eop.get_XYs(XYs_data, TT_JD)
     
     # Add in Free Core Nutation (FCN) correction
     X = EOP_data['dX'] + X  # rad
     Y = EOP_data['dY'] + Y  # rad
     
     # Compute Bias-Precssion-Nutation (BPN) matrix
-    BPN = compute_BPN(X, Y, s)
+    BPN = eop.compute_BPN(X, Y, s)
     
     # Transform position vector
     eci2ecef = np.dot(W.T, np.dot(R.T, BPN.T))
@@ -294,30 +281,30 @@ def itrf2gcrf(r_ITRF, v_ITRF, UTC, EOP_data, XYs_df=[]):
     v_ITRF = np.reshape(v_ITRF, (3,1))
     
     # Compute UT1 in JD format
-    UT1_JD = utcdt2ut1jd(UTC, EOP_data['UT1_UTC'])
+    UT1_JD = timesys.utcdt2ut1jd(UTC, EOP_data['UT1_UTC'])
     
     # Compute TT in JD format
-    TT_JD = utcdt2ttjd(UTC, EOP_data['TAI_UTC'])
+    TT_JD = timesys.utcdt2ttjd(UTC, EOP_data['TAI_UTC'])
     
     # Compute TT in centuries since J2000 epoch
-    TT_cent = jd2cent(TT_JD)
+    TT_cent = timesys.jd2cent(TT_JD)
     
     # Construct polar motion matrix (ITRS to TIRS)
-    W = compute_polarmotion(EOP_data['xp'], EOP_data['yp'], TT_cent)
+    W = eop.compute_polarmotion(EOP_data['xp'], EOP_data['yp'], TT_cent)
     
     # Contruct Earth rotaion angle matrix (TIRS to CIRS)
-    R = compute_ERA(UT1_JD)
+    R = eop.compute_ERA(UT1_JD)
     
     # Construct Bias-Precessino-Nutation matrix (CIRS to GCRS/ICRS)
-    XYs_data = init_XYs2006(UTC, UTC, XYs_df)
-    X, Y, s = get_XYs(XYs_data, TT_JD)
+    XYs_data = eop.init_XYs2006(UTC, UTC, XYs_df)
+    X, Y, s = eop.get_XYs(XYs_data, TT_JD)
     
     # Add in Free Core Nutation (FCN) correction
     X = EOP_data['dX'] + X  # rad
     Y = EOP_data['dY'] + Y  # rad
     
     # Compute Bias-Precssion-Nutation (BPN) matrix
-    BPN = compute_BPN(X, Y, s)
+    BPN = eop.compute_BPN(X, Y, s)
     
     # Transform position vector
     ecef2eci = np.dot(BPN, np.dot(R, W))
@@ -599,20 +586,20 @@ def ecef2enu(r_ecef, r_site):
 
     # Compute lat,lon,ht of ground station
     lat, lon, ht = ecef2latlonht(r_site)
-    lat = lat*pi/180  # rad
-    lon = lon*pi/180  # rad
+    lat = lat*math.pi/180  # rad
+    lon = lon*math.pi/180  # rad
 
     # Compute rotation matrix
-    lat1 = pi/2 - lat
-    lon1 = pi/2 + lon
+    lat1 = math.pi/2 - lat
+    lon1 = math.pi/2 + lon
 
-    R1 = np.array([[1.,   0.,               0.],
-                   [0.,   cos(lat1), sin(lat1)],
-                   [0.,  -sin(lat1), cos(lat1)]])
+    R1 = np.array([[1.,               0.,             0.],
+                   [0.,   math.cos(lat1), math.sin(lat1)],
+                   [0.,  -math.sin(lat1), math.cos(lat1)]])
 
-    R3 = np.array([[cos(lon1),  sin(lon1), 0.],
-                   [-sin(lon1), cos(lon1), 0.],
-                   [0.,          0.,       1.]])
+    R3 = np.array([[math.cos(lon1),  math.sin(lon1), 0.],
+                   [-math.sin(lon1), math.cos(lon1), 0.],
+                   [0.,              0.,             1.]])
 
     R = np.dot(R1, R3)
 
@@ -641,20 +628,20 @@ def enu2ecef(r_enu, r_site):
 
     # Compute lat,lon,ht of ground station
     lat, lon, ht = ecef2latlonht(r_site)
-    lat = lat*pi/180  # rad
-    lon = lon*pi/180  # rad
+    lat = lat*math.pi/180  # rad
+    lon = lon*math.pi/180  # rad
 
     # Compute rotation matrix
-    lat1 = pi/2 - lat
-    lon1 = pi/2 + lon
+    lat1 = math.pi/2 - lat
+    lon1 = math.pi/2 + lon
 
-    R1 = np.array([[1.,   0.,               0.],
-                   [0.,   cos(lat1), sin(lat1)],
-                   [0.,  -sin(lat1), cos(lat1)]])
+    R1 = np.array([[1.,               0.,             0.],
+                   [0.,   math.cos(lat1), math.sin(lat1)],
+                   [0.,  -math.sin(lat1), math.cos(lat1)]])
 
-    R3 = np.array([[cos(lon1),  sin(lon1), 0.],
-                   [-sin(lon1), cos(lon1), 0.],
-                   [0.,          0.,       1.]])
+    R3 = np.array([[math.cos(lon1),   math.sin(lon1), 0.],
+                   [-math.sin(lon1),  math.cos(lon1), 0.],
+                   [0.,                           0., 1.]])
 
     R = np.dot(R1, R3)
 
@@ -693,24 +680,24 @@ def ecef2latlonht(r_ecef):
     z = float(r_ecef[2])
 
     # Compute longitude
-    f = 1/rec_f
-    e = np.sqrt(2*f - f**2)
-    lon = atan2(y, x) * 180/pi  # deg
+    f = 1./rec_f
+    e = np.sqrt(2.*f - f**2.)
+    lon = math.atan2(y, x) * 180./math.pi  # deg
 
     # Iterate to find height and latitude
-    p = np.sqrt(x**2 + y**2)  # km
-    lat = 0.*pi/180.
+    p = np.sqrt(x**2. + y**2.)  # km
+    lat = 0.*math.pi/180.
     lat_diff = 1.
     tol = 1e-12
 
     while abs(lat_diff) > tol:
         lat0 = copy.copy(lat)  # rad
-        N = a/np.sqrt(1 - e**2*(sin(lat0)**2))  # km
-        ht = p/cos(lat0) - N
-        lat = atan((z/p)/(1 - e**2*(N/(N + ht))))
+        N = a/np.sqrt(1 - e**2*(math.sin(lat0)**2))  # km
+        ht = p/math.cos(lat0) - N
+        lat = math.atan((z/p)/(1 - e**2*(N/(N + ht))))
         lat_diff = lat - lat0
 
-    lat = lat*180/pi  # deg
+    lat = lat*180./math.pi  # deg
 
     return lat, lon, ht
 
@@ -736,22 +723,22 @@ def latlonht2ecef(lat, lon, ht):
     '''
 
     # Convert to radians
-    lat = lat*pi/180    # rad
-    lon = lon*pi/180    # rad
+    lat = lat*math.pi/180    # rad
+    lon = lon*math.pi/180    # rad
 
     # Compute flattening and eccentricity
     f = 1/rec_f
     e = np.sqrt(2*f - f**2)
 
     # Compute ecliptic plane and out of plane components
-    C = Re/np.sqrt(1 - e**2*sin(lat)**2)
-    S = Re*(1 - e**2)/np.sqrt(1 - e**2*sin(lat)**2)
+    C = Re/np.sqrt(1 - e**2*math.sin(lat)**2)
+    S = Re*(1 - e**2)/np.sqrt(1 - e**2*math.sin(lat)**2)
 
-    rd = (C + ht)*cos(lat)
-    rk = (S + ht)*sin(lat)
+    rd = (C + ht)*math.cos(lat)
+    rk = (S + ht)*math.sin(lat)
 
     # Compute ECEF position vector
-    r_ecef = np.array([[rd*cos(lon)], [rd*sin(lon)], [rk]])
+    r_ecef = np.array([[rd*math.cos(lon)], [rd*math.sin(lon)], [rk]])
 
     return r_ecef
 
@@ -790,10 +777,10 @@ def latlon2dist(lat1, lon1, lat2, lon2):
     '''
     
     # Convert angles to rad
-    lat1 = lat1*pi/180.
-    lon1 = lon1*pi/180.
-    lat2 = lat2*pi/180.
-    lon2 = lon2*pi/180.
+    lat1 = lat1*math.pi/180.
+    lon1 = lon1*math.pi/180.
+    lat2 = lat2*math.pi/180.
+    lon2 = lon2*math.pi/180.
     
     # Earth Parameters - WGS84 
     a = Re
@@ -801,8 +788,8 @@ def latlon2dist(lat1, lon1, lat2, lon2):
     b = (1-f)*a
     
     # Compute U1, U2, L
-    U1 = atan((1-f) * tan(lat1))
-    U2 = atan((1-f) * tan(lat2))
+    U1 = math.atan((1-f) * math.tan(lat1))
+    U2 = math.atan((1-f) * math.tan(lat2))
     L = lon2 - lon1
     
     # Iterate to convergence
@@ -817,11 +804,12 @@ def latlon2dist(lat1, lon1, lat2, lon2):
         count += 1
         lam_prev = float(lam)
                 
-        sin_sigma = np.sqrt( (cos(U2)*sin(lam))**2. + (cos(U1)*sin(U2) - sin(U1)*cos(U2)*cos(lam))**2. )
-        cos_sigma = sin(U1)*sin(U2) + cos(U1)*cos(U2)*cos(lam)
-        sigma = atan2(sin_sigma, cos_sigma)
-        sin_alpha = cos(U1)*cos(U2)*sin(lam)/sin(sigma)
-        cos_2sigm = cos(sigma) - (2.*sin(U1)*sin(U2))/(1. - sin_alpha**2.)
+        sin_sigma = np.sqrt( (math.cos(U2)*math.sin(lam))**2. +
+                             (math.cos(U1)*math.sin(U2) - math.sin(U1)*math.cos(U2)*math.cos(lam))**2. )
+        cos_sigma = math.sin(U1)*math.sin(U2) + math.cos(U1)*math.cos(U2)*math.cos(lam)
+        sigma = math.atan2(sin_sigma, cos_sigma)
+        sin_alpha = math.cos(U1)*math.cos(U2)*math.sin(lam)/math.sin(sigma)
+        cos_2sigm = math.cos(sigma) - (2.*math.sin(U1)*math.sin(U2))/(1. - sin_alpha**2.)
         C = (f/16.) * (1. - sin_alpha**2.) * (4. + f*(4. - 3.*(1 - sin_alpha**2.)))
         
         lam = L + (1.-C)*f*sin_alpha*(sigma + C*sin_sigma*(cos_2sigm + C*cos_sigma*(-1. + 2.*cos_2sigm**2.)))
@@ -838,8 +826,8 @@ def latlon2dist(lat1, lon1, lat2, lon2):
     B = (u2/1024.)*(256. + u2*(-128. + u2*(74. - 47.*u2)))
     delta_sigma = B*sin_sigma*(cos_2sigm + 0.25*B*(cos_sigma*(-1. + 2.*cos_2sigm**2.) - (B/6.)*cos_2sigm*(-3. + 4.*sin_sigma**2.)*(-3. + 4.*cos_2sigm**2.)))
     s = b*A*(sigma - delta_sigma)
-    alpha1 = atan2((cos(U2)*sin(lam)), (cos(U1)*sin(U2) - sin(U1)*cos(U2)*cos(lam))) * 180./pi
-    alpha2 = atan2((cos(U1)*sin(lam)), (-sin(U1)*cos(U2) + cos(U1)*sin(U2)*cos(lam))) * 180./pi
+    alpha1 = math.atan2((math.cos(U2)*math.sin(lam)), (math.cos(U1)*math.sin(U2) - math.sin(U1)*math.cos(U2)*math.cos(lam))) * 180./math.pi
+    alpha2 = math.atan2((math.cos(U1)*math.sin(lam)), (-math.sin(U1)*math.cos(U2) + math.cos(U1)*math.sin(U2)*math.cos(lam))) * 180./math.pi
     
     alpha1 = alpha1 % 360.
     alpha2 = alpha2 % 360.
@@ -881,9 +869,9 @@ def dist2latlon(lat1, lon1, s, alpha1):
     '''
     
     # Convert to radians
-    lat1 = lat1*pi/180.
-    lon1 = lon1*pi/180.
-    alpha1 = alpha1*pi/180.
+    lat1 = lat1*math.pi/180.
+    lon1 = lon1*math.pi/180.
+    alpha1 = alpha1*math.pi/180.
     
     # Earth Parameters - WGS84 
     a = Re
@@ -891,9 +879,9 @@ def dist2latlon(lat1, lon1, s, alpha1):
     b = (1-f)*a
     
     # Compute values
-    U1 = atan((1-f) * tan(lat1))
-    sigma1 = atan2(tan(U1), cos(alpha1))
-    sin_alpha = cos(U1)*sin(alpha1)
+    U1 = math.atan((1-f) * math.tan(lat1))
+    sigma1 = math.atan2(math.tan(U1), math.cos(alpha1))
+    sin_alpha = math.cos(U1)*math.sin(alpha1)
     u2 = (1. - sin_alpha**2.) * ((a**2. - b**2.)/b**2.)
     A = 1. + (u2/16384.)*(4096. + u2*(-768. + u2*(320. - 175.*u2)))
     B = (u2/1024.)*(256. + u2*(-128. + u2*(74. - 47.*u2)))
@@ -908,10 +896,12 @@ def dist2latlon(lat1, lon1, s, alpha1):
         
         sigma_prev = float(sigma)
         
-        sin_sigma = sin(sigma)
-        cos_sigma = cos(sigma)
-        cos_2sigm = cos(2.*sigma1 + sigma)
-        delta_sigma = B*sin_sigma*(cos_2sigm + 0.25*B*(cos_sigma*(-1. + 2.*cos_2sigm**2.) - (B/6.)*cos_2sigm*(-3. + 4.*sin_sigma**2.)*(-3. + 4.*cos_2sigm**2.)))
+        sin_sigma = math.sin(sigma)
+        cos_sigma = math.cos(sigma)
+        cos_2sigm = math.cos(2.*sigma1 + sigma)
+        delta_sigma = B*sin_sigma*(cos_2sigm + 0.25*B*(cos_sigma*(-1. + 2.*cos_2sigm**2.) -
+                                                       (B/6.)*cos_2sigm*(-3. + 4.*sin_sigma**2.) *
+                                                       (-3. + 4.*cos_2sigm**2.)))
         
         sigma = s/(b*A) + delta_sigma
         diff = abs(sigma - sigma_prev)
@@ -922,21 +912,24 @@ def dist2latlon(lat1, lon1, s, alpha1):
             print(diff)
             break
         
-    sin_sigma = sin(sigma)
-    cos_sigma = cos(sigma)
-    cos_2sigm = cos(2.*sigma1 + sigma)
+    sin_sigma = math.sin(sigma)
+    cos_sigma = math.cos(sigma)
+    cos_2sigm = math.cos(2.*sigma1 + sigma)
         
-    lat2 = atan2( (sin(U1)*cos_sigma + cos(U1)*sin_sigma*cos(alpha1)), (1.-f)*np.sqrt(sin_alpha**2. + (sin(U1)*sin_sigma - cos(U1)*cos_sigma*cos(alpha1))**2.) )
-    lam = atan2( sin_sigma*sin(alpha1), (cos(U1)*cos_sigma - sin(U1)*sin_sigma*cos(alpha1)) )
+    lat2 = math.atan2( (math.sin(U1)*cos_sigma + math.cos(U1)*sin_sigma*math.cos(alpha1)),
+                       (1.-f)*np.sqrt(sin_alpha**2. +
+                                      (math.sin(U1)*sin_sigma - math.cos(U1)*cos_sigma*math.cos(alpha1))**2.) )
+
+    lam = math.atan2( sin_sigma*math.sin(alpha1), (math.cos(U1)*cos_sigma - math.sin(U1)*sin_sigma*math.cos(alpha1)) )
     C = (f/16.) * (1. - sin_alpha**2.) * (4. + f*(4. - 3.*(1 - sin_alpha**2.)))
     L = lam - (1.-C)*f*sin_alpha*(sigma + C*sin_sigma*(cos_2sigm + C*cos_sigma*(-1. + 2.*cos_2sigm**2.)))
     lon2 = L + lon1
-    alpha2 = atan2(sin_alpha, (-sin(U1)*sin_sigma + cos(U1)*cos_sigma*cos(alpha1)))
+    alpha2 = math.atan2(sin_alpha, (-math.sin(U1)*sin_sigma + math.cos(U1)*cos_sigma*math.cos(alpha1)))
     
     # Convert to deg
-    lat2 = lat2 * 180./pi
-    lon2 = lon2 * 180./pi
-    alpha2 = alpha2 * 180./pi    
+    lat2 = lat2 * 180./math.pi
+    lon2 = lon2 * 180./math.pi
+    alpha2 = alpha2 * 180./math.pi
     
     alpha2 = alpha2 % 360.
     
@@ -964,16 +957,16 @@ def inc2az(lat, inc):
     '''
     
     # Conver to rad
-    lat = lat * pi/180.
-    inc = inc * pi/180.
+    lat = lat * math.pi/180.
+    inc = inc * math.pi/180.
         
     # Compute azimuth in deg for both ascending and descending passage
-    if cos(inc)/cos(lat) > 1.:
+    if math.cos(inc)/math.cos(lat) > 1.:
         az_asc = 90.
-    elif cos(inc)/cos(lat) < -1.:
+    elif math.cos(inc)/math.cos(lat) < -1.:
         az_asc = 270.
     else:    
-        az_asc = asin(cos(inc)/cos(lat)) * 180./pi   
+        az_asc = math.asin(math.cos(inc)/math.cos(lat)) * 180./math.pi
         
     az_desc = 180. - az_asc
     
@@ -1023,13 +1016,13 @@ def unit_test_inc2az():
 if __name__ == '__main__':
     
     
-#    unit_test_latlondist()
+    # unit_test_latlondist()
     
-    unit_test_inc2az()
+    # unit_test_inc2az()
     
     
 
-#    obj_id_list = [43014]
+    obj_id_list = [43014]
 #    UTC = datetime(2018, 6, 23, 0, 0, 0)   
 #    
 #    r_GCRF = np.array([[ 1970.55034496],

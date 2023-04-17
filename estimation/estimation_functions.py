@@ -17,8 +17,9 @@ sys.path.append(metis_dir)
 
 from dynamics import dynamics_functions as dyn
 from sensors import measurement_functions as mfunc
-from utilities.constants import arcsec2rad
 from utilities import astrodynamics as astro
+from utilities.constants import arcsec2rad
+
 
 
 
