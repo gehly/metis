@@ -1,0 +1,11 @@
+name: metis
+channels:
+  - conda-forge
+  - tudat-team
+dependencies:
+  - numba=0.56.3
+  - spyder
+  - tudatpy
+  - matplotlib
+  - scipy
+  - pandas

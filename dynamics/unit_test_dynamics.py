@@ -989,19 +989,19 @@ if __name__ == '__main__':
     
     plt.close('all')
     
-#    unit_test_orbit()
+    # unit_test_orbit()
     
     # test_orbit_timestep()
     
-#    test_hyperbolic_prop()
+    # test_hyperbolic_prop()
     
-#    test_dopri_computation()
+    # test_dopri_computation()
     
     # test_jit_twobody()
     
-    # test_tudat_prop()
+    test_tudat_prop()
     
-    test_coord_turn()
+    # test_coord_turn()
     
 
 #    test, test2, test3, test4, test5 = fastint.test_jit()

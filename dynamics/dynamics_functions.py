@@ -428,22 +428,12 @@ def general_dynamics(Xo, tvec, state_params, int_params):
             simulation_end_epoch, terminate_exactly_on_final_condition=True
         )
 
-        # Create propagation settings
-        propagator_settings = propagation_setup.propagator.translational(
-            central_bodies,
-            acceleration_models,
-            bodies_to_propagate,
-            initial_state,
-            termination_condition
-        )
-
-
 
         # Create numerical integrator settings
         if int_params['tudat_integrator'] == 'rk4':
             fixed_step_size = int_params['step']
             integrator_settings = propagation_setup.integrator.runge_kutta_4(
-                simulation_start_epoch, fixed_step_size
+                fixed_step_size
             )
             
         elif int_params['tudat_integrator'] == 'rkf78':
@@ -453,19 +443,26 @@ def general_dynamics(Xo, tvec, state_params, int_params):
             rtol = int_params['rtol']
             atol = int_params['atol']
             integrator_settings = propagation_setup.integrator.runge_kutta_variable_step_size(
-                simulation_start_epoch,
                 initial_step_size,
                 propagation_setup.integrator.CoefficientSets.rkf_78,
                 minimum_step_size,
                 maximum_step_size,
                 rtol,
                 atol)
-
-
-        # Create simulation object and propagate the dynamics
-        dynamics_simulator = numerical_simulation.SingleArcSimulator(
-            bodies, integrator_settings, propagator_settings
+            
+        # Create propagation settings
+        propagator_settings = propagation_setup.propagator.translational(
+            central_bodies,
+            acceleration_models,
+            bodies_to_propagate,
+            initial_state,
+            simulation_start_epoch,
+            integrator_settings,
+            termination_condition
         )
+        
+        dynamics_simulator = numerical_simulation.create_dynamics_simulator(
+            bodies, propagator_settings )
 
         # Extract the resulting state history and convert it to an ndarray
         states = dynamics_simulator.state_history

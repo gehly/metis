@@ -1,5 +1,5 @@
 import numpy as np
-from math import pi, cos, asin, atan2, floor, exp
+import math
 import requests
 import getpass
 from datetime import datetime, timedelta
@@ -12,6 +12,8 @@ import json
 import time
 import pickle
 import copy
+from sgp4.io import twoline2rv
+from sgp4.earth_gravity import wgs84
 
 filename = inspect.getframeinfo(inspect.currentframe()).filename
 current_dir = os.path.dirname(os.path.abspath(filename))
@@ -22,22 +24,26 @@ sys.path.append(metis_dir)
 
 from sensors import sensors as sens
 from sensors import measurement_functions as mfunc
-from utilities.eop_functions import get_celestrak_eop_alldata
-from utilities.eop_functions import get_nutation_data
-from utilities.eop_functions import get_eop_data
-from utilities.eop_functions import get_XYs2006_alldata
-from utilities.coordinate_systems import teme2gcrf
-from utilities.coordinate_systems import gcrf2teme
-from utilities.coordinate_systems import gcrf2itrf
-from utilities.coordinate_systems import itrf2gcrf
-from utilities.coordinate_systems import latlonht2ecef
-from utilities.astrodynamics import element_conversion
-from utilities.astrodynamics import meanmot2sma
-from utilities.constants import GME, Re, wE
-from utilities.time_systems import gpsdt2utcdt
+from utilities import astrodynamics as astro
+from utilities import coordinate_systems as coord
+from utilities import eop_functions as eop
 
-from sgp4.io import twoline2rv
-from sgp4.earth_gravity import wgs84
+
+# from utilities.eop_functions import get_celestrak_eop_alldata
+# from utilities.eop_functions import get_nutation_data
+# from utilities.eop_functions import get_eop_data
+# from utilities.eop_functions import get_XYs2006_alldata
+# from utilities.coordinate_systems import teme2gcrf
+# from utilities.coordinate_systems import gcrf2teme
+# from utilities.coordinate_systems import gcrf2itrf
+# from utilities.coordinate_systems import itrf2gcrf
+# from utilities.coordinate_systems import latlonht2ecef
+# from utilities.astrodynamics import element_conversion
+# from utilities.astrodynamics import meanmot2sma
+from utilities.constants import GME, Re, wE
+#from utilities.time_systems import gpsdt2utcdt
+
+
 
 
 ###############################################################################
@@ -188,7 +194,7 @@ def generate_tle_list(num_obj, UTC_list, max_obj_id, filename, username, passwor
     lat = -23.7
     lon = 133.9
     ht = 0.
-    site_ecef = latlonht2ecef(lat, lon, ht)
+    site_ecef = coord.latlonht2ecef(lat, lon, ht)
         
     
     # Proportions of object catalog
@@ -906,7 +912,7 @@ def plot_sma_rp_ra(obj_id_list, UTC_list):
         ra_array = np.array([])
         
         print(obj_id)
-        inc = elem_list[0][2] * pi/180.
+        inc = elem_list[0][2] * math.pi/180.
         print('ecc', elem_list[0][1])
         print('inc', elem_list[0][2])
         
@@ -1004,7 +1010,7 @@ def plot_sma_rp_ra(obj_id_list, UTC_list):
         print(label_dict[obj_id])
         
         # Compute density and ballistic coefficient info
-        ind2 = int(floor((ind+len(UTC_list))/2))
+        ind2 = int(math.floor((ind+len(UTC_list))/2))
         print(len(UTC_list))
         print(len(a_array))
         print(ind)
@@ -1016,8 +1022,8 @@ def plot_sma_rp_ra(obj_id_list, UTC_list):
         SMA = a_array[ind2]
         n = np.sqrt(GME/SMA**3.)
         h = SMA - Re        
-        rho = rho0*exp(-(h-h0)/H)
-        beta = -dadt/(rho*np.sqrt(GME*a)*(1. - (wE/n)*cos(inc))**2.) * 1e6
+        rho = rho0*math.exp(-(h-h0)/H)
+        beta = -dadt/(rho*np.sqrt(GME*a)*(1. - (wE/n)*math.cos(inc))**2.) * 1e6
         
         
         print('h = ', h)
@@ -1145,9 +1151,9 @@ def parse_tle_line2(line2):
     M = float(line2[43:51])
     n = float(line2[52:63])  # rev/day
     
-    n *= 2.*pi/86400.  # rad/s
+    n *= 2.*math.pi/86400.  # rad/s
     
-    a = meanmot2sma(n)
+    a = astro.meanmot2sma(n)
             
     elem = [a, e, i, RAAN, w, M]    
     
@@ -1246,14 +1252,14 @@ def launch2tle(obj_id_list, launch_elem_dict):
         # Compute mean motion in rev/day
         a = (ra + rp)/2.
         n = np.sqrt(GME/a**3.)
-        n *= 86400./(2.*pi)
+        n *= 86400./(2.*math.pi)
 
         # Compute eccentricity
         e = 1. - rp/a
 
         # Compute GCRF position and velocity
         x_in = [a,e,i,RAAN,w,M]
-        x_out = element_conversion(x_in, 0, 1)
+        x_out = astro.element_conversion(x_in, 0, 1)
         r_GCRF = np.reshape(x_out[0:3], (3,1))
         v_GCRF = np.reshape(x_out[3:6], (3,1))
 
@@ -1316,7 +1322,7 @@ def kep2tle(obj_id_list, kep_dict):
 
         # Compute GCRF position/velocity
         x_in = [a,e,i,RAAN,w,M]
-        x_out = element_conversion(x_in, 0, 1)
+        x_out = astro.element_conversion(x_in, 0, 1)
         r_GCRF = np.reshape(x_out[0:3], (3,1))
         v_GCRF = np.reshape(x_out[3:6], (3,1))
 
@@ -1368,10 +1374,10 @@ def launchecef2tle(obj_id_list, ecef_dict, offline_flag=False):
     tle_list = []
 
     # Retrieve latest EOP data from celestrak.com
-    eop_alldata = get_celestrak_eop_alldata(offline_flag)
+    eop_alldata = eop.get_celestrak_eop_alldata(offline_flag)
 
     # Retrieve IAU Nutation data from file
-    IAU1980nut = get_nutation_data()
+    IAU1980nut = eop.get_nutation_data()
 
     # Loop over objects
     for obj_id in obj_id_list:
@@ -1382,10 +1388,10 @@ def launchecef2tle(obj_id_list, ecef_dict, offline_flag=False):
         UTC = ecef_dict[obj_id]['UTC']
 
         # Get EOP data for this time
-        EOP_data = get_eop_data(eop_alldata, UTC)
+        EOP_data = eop.get_eop_data(eop_alldata, UTC)
 
         # Convert ITRF to GCRF
-        r_GCRF, v_GCRF = itrf2gcrf(r_ITRF, v_ITRF, UTC, EOP_data)
+        r_GCRF, v_GCRF = coord.itrf2gcrf(r_ITRF, v_ITRF, UTC, EOP_data)
 
         # Compute TLE data for this object
         line1, line2 = gcrf2tle(obj_id, r_GCRF, v_GCRF, UTC, EOP_data,
@@ -1442,17 +1448,17 @@ def gcrf2tle(obj_id, r_GCRF, v_GCRF, UTC, EOP_data=[], IAU1980nut=[],
     # Retrieve latest EOP data from celestrak.com, if needed
     if len(EOP_data) == 0:
 
-        eop_alldata = get_celestrak_eop_alldata(offline_flag)
-        EOP_data = get_eop_data(eop_alldata, UTC)
+        eop_alldata = eop.get_celestrak_eop_alldata(offline_flag)
+        EOP_data = eop.get_eop_data(eop_alldata, UTC)
 
     # Retrieve IAU Nutation data from file, if needed
     if len(IAU1980nut) == 0:
-        IAU1980nut = get_nutation_data()
+        IAU1980nut = eop.get_nutation_data()
 
     # Convert to TEME, recompute osculating elements
-    r_TEME, v_TEME = gcrf2teme(r_GCRF, v_GCRF, UTC, IAU1980nut, EOP_data)
+    r_TEME, v_TEME = coord.gcrf2teme(r_GCRF, v_GCRF, UTC, IAU1980nut, EOP_data)
     x_in = np.concatenate((r_TEME, v_TEME), axis=0)
-    osc_elem = element_conversion(x_in, 1, 0)
+    osc_elem = astro.element_conversion(x_in, 1, 0)
 
     print(osc_elem)
 
@@ -1474,7 +1480,7 @@ def gcrf2tle(obj_id, r_GCRF, v_GCRF, UTC, EOP_data=[], IAU1980nut=[],
 
     # Compute mean motion in rev/day
     n = np.sqrt(GME/a**3.)
-    n *= 86400./(2.*pi)
+    n *= 86400./(2.*math.pi)
 
     # Compute launch year and day of year
     year2 = str(UTC.year)[2:4]
@@ -1532,8 +1538,8 @@ def plot_tle_radec(tle_dict, UTC_list=[], sensor_list=[], display_flag=False,
             z = float(r_GCRF[2])
             r = np.linalg.norm(r_GCRF)
 
-            ra_array[ii,jj] = atan2(y,x)*180/pi
-            dec_array[ii,jj] = asin(z/r)*180/pi
+            ra_array[ii,jj] = math.atan2(y,x)*180/math.pi
+            dec_array[ii,jj] = math.asin(z/r)*180/math.pi
 
             jj += 1
 
@@ -1570,7 +1576,7 @@ def plot_tle_radec(tle_dict, UTC_list=[], sensor_list=[], display_flag=False,
     if len(sensor_list) > 0:
 
         # Retrieve latest EOP data from celestrak.com
-        eop_alldata = get_celestrak_eop_alldata(offline_flag)
+        eop_alldata = eop.get_celestrak_eop_alldata(offline_flag)
 
         # Retrive sensor parameters and loop over sensors
         sensor_dict = sens.define_sensors(sensor_list)
@@ -1580,11 +1586,11 @@ def plot_tle_radec(tle_dict, UTC_list=[], sensor_list=[], display_flag=False,
             lat = latlonht[0]
             lon = latlonht[1]
             ht = latlonht[2]
-            sensor_ecef = latlonht2ecef(lat, lon, ht)
+            sensor_ecef = coord.latlonht2ecef(lat, lon, ht)
 
             center = [85.82990416666667, 5.990788888888889]
-            FOV_hlim = [lim*180/pi for lim in sensor['FOV_hlim']]
-            FOV_vlim = [lim*180/pi for lim in sensor['FOV_vlim']]
+            FOV_hlim = [lim*180/math.pi for lim in sensor['FOV_hlim']]
+            FOV_vlim = [lim*180/math.pi for lim in sensor['FOV_vlim']]
             FOVh = [center[0] + FOV_hlim[0], center[0] + FOV_hlim[1]]
             FOVv = [center[1] + FOV_vlim[0], center[1] + FOV_vlim[1]]
 
@@ -1603,17 +1609,17 @@ def plot_tle_radec(tle_dict, UTC_list=[], sensor_list=[], display_flag=False,
                     r = np.linalg.norm(r_GCRF)
 
                     UTC = UTC_list[jj]
-                    EOP_data = get_eop_data(eop_alldata, UTC)
-                    sensor_eci, dum = itrf2gcrf(sensor_ecef, np.zeros((3,1)),
-                                                UTC, EOP_data)
+                    EOP_data = eop.get_eop_data(eop_alldata, UTC)
+                    sensor_eci, dum = coord.itrf2gcrf(sensor_ecef, np.zeros((3,1)),
+                                                      UTC, EOP_data)
 
                     xs = float(sensor_eci[0])
                     ys = float(sensor_eci[1])
                     zs = float(sensor_eci[2])
                     rg = np.linalg.norm(r_GCRF - sensor_eci)
 
-                    topo_ra_array[ii,jj] = atan2((y-ys),(x-xs))*180/pi
-                    topo_dec_array[ii,jj] = asin((z-zs)/rg)*180/pi
+                    topo_ra_array[ii,jj] = math.atan2((y-ys),(x-xs))*180/math.pi
+                    topo_dec_array[ii,jj] = math.asin((z-zs)/rg)*180/math.pi
 
                     print(obj_id)
                     print(topo_ra_array)
@@ -1813,13 +1819,13 @@ def propagate_TLE(obj_id_list, UTC_list, tle_dict={}, prev_flag=False,
     if frame_flag:  
         
         # Retrieve latest EOP data from celestrak.com
-        eop_alldata = get_celestrak_eop_alldata(offline_flag)
+        eop_alldata = eop.get_celestrak_eop_alldata(offline_flag)
     
         # Retrieve IAU Nutation data from file
-        IAU1980_nutation = get_nutation_data()
+        IAU1980_nutation = eop.get_nutation_data()
         
         # Retrieve polar motion data from file
-        XYs_df = get_XYs2006_alldata()
+        XYs_df = eop.get_XYs2006_alldata()
 
 
     # Loop over objects
@@ -1874,20 +1880,20 @@ def propagate_TLE(obj_id_list, UTC_list, tle_dict={}, prev_flag=False,
                 
                 # Get EOP data for this time
                 eop_start = time.time()
-                EOP_data = get_eop_data(eop_alldata, UTC)
+                EOP_data = eop.get_eop_data(eop_alldata, UTC)
                 
                 total_eop_time += time.time() - eop_start
     
                 # Convert from TEME to GCRF (ECI)
                 teme_start = time.time()
-                r_GCRF, v_GCRF = teme2gcrf(r_TEME, v_TEME, UTC, IAU1980_nutation,
+                r_GCRF, v_GCRF = coord.teme2gcrf(r_TEME, v_TEME, UTC, IAU1980_nutation,
                                            EOP_data)
                 
                 total_teme2gcrf += time.time() - teme_start
                 
                 # Convert from GCRF to ITRF (ECEF)
                 itrf_start = time.time()
-                r_ITRF, v_ITRF = gcrf2itrf(r_GCRF, v_GCRF, UTC, EOP_data, XYs_df)
+                r_ITRF, v_ITRF = coord.gcrf2itrf(r_GCRF, v_GCRF, UTC, EOP_data, XYs_df)
                 
                 total_gcrf2itrf += time.time() - itrf_start
 
@@ -1921,7 +1927,9 @@ def get_planet_ephem():
     YYYMMDD-HHMMSS_planet.states
     YYYMMDD-HHMMSS_jspoc_matches.txt
     '''
-    url_list = ['http://ephemerides.planet-labs.com/planet_mc.tle','http://ephemerides.planet-labs.com/planet.states','http://ephemerides.planet-labs.com/jspoc_matches.txt']
+    url_list = ['http://ephemerides.planet-labs.com/planet_mc.tle',
+                'http://ephemerides.planet-labs.com/planet.states',
+                'http://ephemerides.planet-labs.com/jspoc_matches.txt']
 
     for url in url_list:
         response = requests.get(url, allow_redirects=True)
