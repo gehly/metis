@@ -1946,6 +1946,24 @@ if __name__ == '__main__' :
     
     plt.close('all')
     
+    # Envisat
+    obj_id = 27386
+    UTC = datetime(2023, 5, 19, 0, 0, 0)
+    output_state = propagate_TLE([obj_id], [UTC])
+    
+    r_GCRF = output_state[obj_id]['r_GCRF'][0]
+    v_GCRF = output_state[obj_id]['v_GCRF'][0]
+    
+    cart = np.concatenate((r_GCRF, v_GCRF), axis=0)
+    
+    print(cart)
+    
+    elem = astro.cart2kep(cart)
+    
+    print(elem)
+    
+    
+    
     
 #    obj_id_list = [43164, 43166, 43691, 43692, 43851, 43863, 44074, 44075,
 #                   44227, 44228, 44372, 44496]
@@ -1958,31 +1976,31 @@ if __name__ == '__main__' :
 #    
 #    plot_sma_rp_ra(obj_id_list, UTC_list)
     
-    # Landsat-8 Data
-    landsat8_norad = 39084
+    # # Landsat-8 Data
+    # landsat8_norad = 39084
     
-    # Sentinel 2 Data
-    sentinel_2a_norad = 40697
-    sentinel_2b_norad = 42063
+    # # Sentinel 2 Data
+    # sentinel_2a_norad = 40697
+    # sentinel_2b_norad = 42063
     
-    # Retrieve TLE and print state vectors
-    obj_id_list = [landsat8_norad, sentinel_2a_norad, sentinel_2b_norad]
-    UTC_start = datetime(2020, 6, 29, 0, 0, 0)
-    UTC_stop = datetime(2020, 7, 1, 0, 0, 0)
-    dt = 10.
+    # # Retrieve TLE and print state vectors
+    # obj_id_list = [landsat8_norad, sentinel_2a_norad, sentinel_2b_norad]
+    # UTC_start = datetime(2020, 6, 29, 0, 0, 0)
+    # UTC_stop = datetime(2020, 7, 1, 0, 0, 0)
+    # dt = 10.
     
-    delta_t = (UTC_stop - UTC_start).total_seconds()
-    UTC_list = [UTC_start + timedelta(seconds=ti) for ti in list(np.arange(0, delta_t, dt))]
+    # delta_t = (UTC_stop - UTC_start).total_seconds()
+    # UTC_list = [UTC_start + timedelta(seconds=ti) for ti in list(np.arange(0, delta_t, dt))]
     
-    print(UTC_list[0], UTC_list[-1])
+    # print(UTC_list[0], UTC_list[-1])
     
-    # Retrieve TLE 
-    retrieve_list = [UTC_list[0] - timedelta(days=1), UTC_list[-1] + timedelta(days=1)]
-    tle_dict, dum = get_spacetrack_tle_data(obj_id_list, retrieve_list)
+    # # Retrieve TLE 
+    # retrieve_list = [UTC_list[0] - timedelta(days=1), UTC_list[-1] + timedelta(days=1)]
+    # tle_dict, dum = get_spacetrack_tle_data(obj_id_list, retrieve_list)
     
-    print(tle_dict)
+    # print(tle_dict)
     
-    output_state = propagate_TLE(obj_id_list, UTC_list, tle_dict, prev_flag=True)
+    # output_state = propagate_TLE(obj_id_list, UTC_list, tle_dict, prev_flag=True)
     
     # # Save output
     # fname = os.path.join(r'D:\documents\research\cubesats\GeoscienceAustralia\data\check_tle_propagation.pkl')
