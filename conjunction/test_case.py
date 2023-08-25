@@ -196,7 +196,10 @@ def TCA_chebyshev(X1, X2, a, b, N=16, GM=GME):
     gn_test = np.zeros(tvec.shape)
     tt = 0
     for t in tvec:
-        x = (2*t - (b+a))/(b-a)   #TODO Check use of (b+a) or (b-a) Eq 9 and Eq 24 seem to disagree
+        
+        # TODO Check use of (b+a) or (b-a) Eq 9 and Eq 24 seem to disagree
+        # From testing, this seems to be correct, should test more cases
+        x = (2*t - (b+a))/(b-a)   
         
         gn = 0.
         for jj in range(N+1):
@@ -227,7 +230,7 @@ def TCA_chebyshev(X1, X2, a, b, N=16, GM=GME):
     
     # Compute eigenvalues
     eig, dum = np.linalg.eig(Amat)
-    eig_real = np.asarray([float(ee) for ee in eig if (np.isreal(ee) and ee >= -1. and ee <= 1.)])
+    eig_real = np.asarray([np.real(ee) for ee in eig if (np.isreal(ee) and ee >= -1. and ee <= 1.)])
     roots = (b+a)/2. + eig_real*(b-a)/2.
     
     print(eig)
@@ -240,7 +243,11 @@ def TCA_chebyshev(X1, X2, a, b, N=16, GM=GME):
     ac_vec = np.dot(Fmat, cvec.reshape(N+1,1))
     rho_min = np.inf
     for t in roots:
-        x = (2*t - (b+a))/(b-a) #TODO Check use of (b+a) or (b-a) Eq 9 and Eq 24 seem to disagree
+        
+        
+        #TODO Check use of (b+a) or (b-a) Eq 9 and Eq 24 seem to disagree
+        # From testing, (b+a) as in Eq 9 seems to be correct but should check more cases
+        x = (2*t - (b+a))/(b-a) 
         
         r_n = 0.
         i_n = 0.
@@ -260,14 +267,9 @@ def TCA_chebyshev(X1, X2, a, b, N=16, GM=GME):
     print('tmin', tmin)
     print('rho_min', rho_min)
         
+
     
-    
-    
-    
-    
-    
-    
-    return
+    return tmin, rho_min
 
 
 def TCA_test():
@@ -280,8 +282,36 @@ def TCA_test():
     
     a = 0.
     b = dt_vect[-1] - dt_vect[0]
+    # a = dt_vect[0]
+    # b = dt_vect[-1]
     N = 16
-    TCA_chebyshev(Xc, Xd, a, b, N)
+    
+    
+    # # Adjust times to run with different a,b
+    # a = dt_vect[0]
+    # b = dt_vect[-1]
+    # Xc = astro.element_conversion(Xc, 1, 1, GME, 100.)
+    # Xd = astro.element_conversion(Xd, 1, 1, GME, 100.)
+    
+    
+    tmin, rho_min = TCA_chebyshev(Xc, Xd, a, b, N)
+    
+    # Test if this is actual min
+    ttest = np.arange(tmin-0.1, tmin+0.1, 0.001)
+    rho_vec = np.zeros(ttest.shape)
+    ii = 0
+    for tt in ttest:
+        Xc_test = astro.element_conversion(Xc, 1, 1, GME, tt)
+        Xd_test = astro.element_conversion(Xd, 1, 1, GME, tt)
+        rho_vec[ii] = np.linalg.norm(Xc_test[0:3]-Xd_test[0:3])
+        ii += 1
+        
+    rho_min2 = min(rho_vec)
+    ind = list(rho_vec).index(rho_min2)
+    tmin2 = ttest[ind]
+    
+    print('rho_min2', rho_min2)
+    print('tmin', tmin)
     
     
     return
