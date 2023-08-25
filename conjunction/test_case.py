@@ -1,17 +1,17 @@
 import numpy as np
 import math
 import matplotlib.pyplot as plt
-# import os
-# import sys
-# import inspect
+import os
+import sys
+import inspect
 
 
-# filename = inspect.getframeinfo(inspect.currentframe()).filename
-# current_dir = os.path.dirname(os.path.abspath(filename))
+filename = inspect.getframeinfo(inspect.currentframe()).filename
+current_dir = os.path.dirname(os.path.abspath(filename))
 
-# ind = current_dir.find('metis')
-# metis_dir = current_dir[0:ind+5]
-# sys.path.append(metis_dir)
+ind = current_dir.find('metis')
+metis_dir = current_dir[0:ind+5]
+sys.path.append(metis_dir)
 
 from utilities import astrodynamics as astro
 from utilities import coordinate_systems as coord
@@ -139,14 +139,17 @@ def TCA_chebyshev(X1, X2, a, b, N=16, GM=GME):
     kvec = jvec.copy()
     tvec = ((b-a)/2.)*(np.cos(np.pi*jvec/N)) + ((b+a)/2.)
     
-    print(jvec)
-    print(tvec)
+    # print(jvec)
+    # print(tvec)
     
     # Compute function values to find roots of
     # In order to minimize rho, we seek zeros of first derivative
     # f(t) = dot(rho_vect, rho_vect)
     # g(t) = df/dt = 2*dot(drho_vect, rho_vect)
     gvec = np.zeros(tvec.shape)
+    rvec = np.zeros(tvec.shape)
+    ivec = np.zeros(tvec.shape)
+    cvec = np.zeros(tvec.shape)
     jj = 0
     for t in tvec:
         X1_t = astro.element_conversion(X1, 1, 1, GM, t)
@@ -162,9 +165,12 @@ def TCA_chebyshev(X1, X2, a, b, N=16, GM=GME):
         drho_ric = coord.eci2ric_vel(rc_vect, vc_vect, rho_ric, drho_eci)
         
         gvec[jj] = float(2*np.dot(rho_ric.T, drho_ric))
+        rvec[jj] = float(rho_ric[0])
+        ivec[jj] = float(rho_ric[1])
+        cvec[jj] = float(rho_ric[2])
         jj += 1
         
-    print(gvec)
+    # print(gvec)
     
     # Compute interpolation matrix Fmat (Eq 12-13)
     pvec = np.ones(N+1,)
@@ -176,11 +182,11 @@ def TCA_chebyshev(X1, X2, a, b, N=16, GM=GME):
     for jj in range(N+1):
         Fmat[jj,:] = (2./(pvec[jj]*pvec*N))
         
-    print(Fmat)
-    print(Cmat)
+    # print(Fmat)
+    # print(Cmat)
     Fmat = np.multiply(Fmat, Cmat)
     
-    print(Fmat)
+    # print(Fmat)
     
     # Compute aj coefficients (Eq 14)
     aj_vec = np.dot(Fmat, gvec.reshape(N+1,1))
@@ -190,7 +196,7 @@ def TCA_chebyshev(X1, X2, a, b, N=16, GM=GME):
     gn_test = np.zeros(tvec.shape)
     tt = 0
     for t in tvec:
-        x = (2*t - (b+a))/(b-a)
+        x = (2*t - (b+a))/(b-a)   #TODO Check use of (b+a) or (b-a) Eq 9 and Eq 24 seem to disagree
         
         gn = 0.
         for jj in range(N+1):
@@ -200,18 +206,60 @@ def TCA_chebyshev(X1, X2, a, b, N=16, GM=GME):
         gn_test[tt] = float(gn)
         tt += 1
         
-    print('\n\n')
-    print(gvec)
-    print(gn_test)
+    # print('\n\n')
+    # print(gvec)
+    # print(gn_test)
     
-    print(gvec - gn_test)
+    # print(gvec - gn_test)
     
         
+    # Compute the companion matrix (Eq 18)
+    Amat = np.zeros((N,N))
+    Amat[0,1] = 1.
+    Amat[-1,:] = -aj_vec[0:N].flatten()/(2*aj_vec[N])
+    Amat[-1,-2] += 0.5
+    for jj in range(1,N-1):
+        Amat[jj,jj-1] = 0.5
+        Amat[jj,jj+1] = 0.5
     
+    # print(Amat)
+    # print(aj_vec)
     
+    # Compute eigenvalues
+    eig, dum = np.linalg.eig(Amat)
+    eig_real = np.asarray([float(ee) for ee in eig if (np.isreal(ee) and ee >= -1. and ee <= 1.)])
+    roots = (b+a)/2. + eig_real*(b-a)/2.
     
+    print(eig)
+    print(roots)
     
-    
+    # For each value in roots, compute Chebyshev proxy polynomial for RIC
+    # Compute aj coefficients (Eq 14)
+    ar_vec = np.dot(Fmat, rvec.reshape(N+1,1))
+    ai_vec = np.dot(Fmat, ivec.reshape(N+1,1))
+    ac_vec = np.dot(Fmat, cvec.reshape(N+1,1))
+    rho_min = np.inf
+    for t in roots:
+        x = (2*t - (b+a))/(b-a) #TODO Check use of (b+a) or (b-a) Eq 9 and Eq 24 seem to disagree
+        
+        r_n = 0.
+        i_n = 0.
+        c_n = 0.
+        for jj in range(N+1):            
+            Tj = np.cos(jj * math.acos(x))
+            r_n += ar_vec[jj]*Tj
+            i_n += ai_vec[jj]*Tj
+            c_n += ac_vec[jj]*Tj
+            
+        rho_n = float(np.sqrt(r_n**2 + i_n**2 + c_n**2))
+        if rho_n < rho_min:
+            rho_min = rho_n
+            tmin = t
+            
+            
+    print('tmin', tmin)
+    print('rho_min', rho_min)
+        
     
     
     
