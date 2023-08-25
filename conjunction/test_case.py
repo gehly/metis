@@ -48,6 +48,7 @@ def compute_initial_conditions(elem_chief, dt_vect, GM=GME):
     rho_eci = coord.ric2eci(rc_vect, vc_vect, rho_ric)
     drho_eci = coord.ric2eci_vel(rc_vect, vc_vect, rho_ric, drho_ric)
     
+    
     print(rho_eci)
     print(drho_eci)
     print(np.linalg.norm(rho_eci))
@@ -122,16 +123,117 @@ def compute_initial_conditions(elem_chief, dt_vect, GM=GME):
     return Xc_output, Xd_output, tmin, rho_min
 
 
-def TCA_test_setup():
+def TCA_chebyshev(X1, X2, a, b, N=16, GM=GME):
+    '''
+    
+    References
+    ------
+    [1] Denenberg, E., "Satellite Closest Approach Calculation Through 
+    Chebyshev Proxy Polynomials," Acta Astronautica, 2020.
     
     
+    '''
+    
+    # Determine Chebyshev-Gauss-Lobato node locations (Eq 10)
+    jvec = np.arange(0,N+1)
+    kvec = jvec.copy()
+    tvec = ((b-a)/2.)*(np.cos(np.pi*jvec/N)) + ((b+a)/2.)
+    
+    print(jvec)
+    print(tvec)
+    
+    # Compute function values to find roots of
+    # In order to minimize rho, we seek zeros of first derivative
+    # f(t) = dot(rho_vect, rho_vect)
+    # g(t) = df/dt = 2*dot(drho_vect, rho_vect)
+    gvec = np.zeros(tvec.shape)
+    jj = 0
+    for t in tvec:
+        X1_t = astro.element_conversion(X1, 1, 1, GM, t)
+        X2_t = astro.element_conversion(X2, 1, 1, GM, t)
+        rc_vect = X1_t[0:3].reshape(3,1)
+        vc_vect = X1_t[3:6].reshape(3,1)
+        rd_vect = X2_t[0:3].reshape(3,1)
+        vd_vect = X2_t[3:6].reshape(3,1)
+        
+        rho_eci = rd_vect - rc_vect
+        drho_eci = vd_vect - vc_vect
+        rho_ric = coord.eci2ric(rc_vect, vc_vect, rho_eci)
+        drho_ric = coord.eci2ric_vel(rc_vect, vc_vect, rho_ric, drho_eci)
+        
+        gvec[jj] = float(2*np.dot(rho_ric.T, drho_ric))
+        jj += 1
+        
+    print(gvec)
+    
+    # Compute interpolation matrix Fmat (Eq 12-13)
+    pvec = np.ones(N+1,)
+    pvec[0] = 2.
+    pvec[N] = 2.
+    jkmat = np.dot(jvec.reshape(N+1,1),kvec.reshape(1,N+1))
+    Cmat = np.cos(np.pi/N*jkmat)
+    Fmat = np.zeros((N+1, N+1))
+    for jj in range(N+1):
+        Fmat[jj,:] = (2./(pvec[jj]*pvec*N))
+        
+    print(Fmat)
+    print(Cmat)
+    Fmat = np.multiply(Fmat, Cmat)
+    
+    print(Fmat)
+    
+    # Compute aj coefficients (Eq 14)
+    aj_vec = np.dot(Fmat, gvec.reshape(N+1,1))
+    
+    
+    # Test approximation
+    gn_test = np.zeros(tvec.shape)
+    tt = 0
+    for t in tvec:
+        x = (2*t - (b+a))/(b-a)
+        
+        gn = 0.
+        for jj in range(N+1):
+            Tj = np.cos(jj * math.acos(x))
+            gn += aj_vec[jj]*Tj
+            
+        gn_test[tt] = float(gn)
+        tt += 1
+        
+    print('\n\n')
+    print(gvec)
+    print(gn_test)
+    
+    print(gvec - gn_test)
+    
+        
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    return
+
+
+def TCA_test():
+    
+    # Setup initial states and compute truth (Two-Body Dynamics)
     elem_chief = np.array([Re+550., 1e-4, 98.6, 30., 40., 50.])
-    dt_vect = np.arange(-100., 100.1, 0.01)
+    dt_vect = np.arange(-100., 100.1, 0.1)
     
-    Xc_output, Xd_output, tmin, rho_min = \
-        compute_initial_conditions(elem_chief, dt_vect)
+    Xc, Xd, tmin, rho_min = compute_initial_conditions(elem_chief, dt_vect)
     
-    
+    a = 0.
+    b = dt_vect[-1] - dt_vect[0]
+    N = 16
+    TCA_chebyshev(Xc, Xd, a, b, N)
     
     
     return
@@ -141,5 +243,5 @@ if __name__ == '__main__':
     
     plt.close('all')
     
-    TCA_test_setup()
+    TCA_test()
 
