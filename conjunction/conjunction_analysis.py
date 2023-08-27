@@ -132,11 +132,9 @@ def compute_subinterval(X1, X2, GM=GME):
         
     '''
     
-    # Convert X1 and X2 to orbit elements
-    elem1 = astro.cart2kep(X1, GM)
-    elem2 = astro.cart2kep(X2, GM)
-    a1 = float(elem1[0])
-    a2 = float(elem2[0])
+    # Compute semi-major axis
+    a1 = compute_SMA(X1)
+    a2 = compute_SMA(X2)
     
     # If both orbits are closed, choose the smaller to compute orbit period
     if (a1 > 0.) and (a2 > 0.):
@@ -160,6 +158,39 @@ def compute_subinterval(X1, X2, GM=GME):
     subinterval = period/2.    
     
     return subinterval
+
+
+def compute_SMA(cart, GM=GME):
+    '''
+    This function computes semi-major axis given a Cartesian state vector in
+    inertial coordinates.
+    
+    Parameters
+    ------
+    cart : 6x1 numpy array
+        cartesian state vector in ECI [km, km/s]
+    GM : float, optional
+        gravitational parameter (default=GME) [km^3/s^2]
+        
+    Returns
+    ------
+    a : float
+        semi-major axis [km]
+    
+    '''
+    
+    # Retrieve position and velocity vectors
+    r_vect = cart[0:3].flatten()
+    v_vect = cart[3:6].flatten()
+
+    # Calculate orbit parameters
+    r = np.linalg.norm(r_vect)
+    v2 = np.dot(v_vect, v_vect)
+
+    # Calculate semi-major axis
+    a = 1./(2./r - v2/GM)     # km    
+    
+    return a
 
 
 if __name__ == '__main__':
