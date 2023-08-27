@@ -1,5 +1,20 @@
 import numpy as np
+import math
+import matplotlib.pyplot as plt
+import os
+import sys
+import inspect
 
+filename = inspect.getframeinfo(inspect.currentframe()).filename
+current_dir = os.path.dirname(os.path.abspath(filename))
+
+ind = current_dir.find('metis')
+metis_dir = current_dir[0:ind+5]
+sys.path.append(metis_dir)
+
+from utilities import astrodynamics as astro
+from utilities import coordinate_systems as coord
+from utilities.constants import Re, GME
 
 ###############################################################################
 #
@@ -92,7 +107,59 @@ def compute_interpolation_matrix(N):
     return interp_mat
 
 
-
+def compute_subinterval(X1, X2, GM=GME):
+    '''
+    This function computes an appropriate length subinterval of the specified
+    (finite) total interval on which to find the closest approach. Per the
+    discussion in Denenberg Section 3, for 2 closed orbits, there will be at
+    most 4 extrema (2 minima) during one revolution of the smaller orbit. Use
+    of a subinterval equal to half this time yields a unique (local) minimum
+    over the subinterval and has shown to work well in testing.
+    
+    Parameters
+    ------
+    X1 : 6x1 numpy array
+        cartesian state vector of object 1 in ECI [km, km/s]
+    X2 : 6x1 numpy array
+        cartesian state vector of object 2 in ECI [km, km/s]
+    GM : float, optional
+        gravitational parameter (default=GME) [km^3/s^2]
+        
+    Returns
+    ------
+    subinterval : float
+        duration of appropriate subinterval [sec]
+        
+    '''
+    
+    # Convert X1 and X2 to orbit elements
+    elem1 = astro.cart2kep(X1, GM)
+    elem2 = astro.cart2kep(X2, GM)
+    a1 = float(elem1[0])
+    a2 = float(elem2[0])
+    
+    # If both orbits are closed, choose the smaller to compute orbit period
+    if (a1 > 0.) and (a2 > 0.):
+        amin = min(a1, a2)
+        period = 2.*np.pi*(amin**3./GM)
+        
+    # If one orbit is closed and the other is an escape trajectory, choose the
+    # closed orbit to compute orbit period
+    elif a1 > 0.:
+        period = 2.*np.pi*(a1**3./GM)
+    
+    elif a2 > 0.:
+        period = 2.*np.pi*(a2**3./GM)
+        
+    # If both orbits are escape trajectories, choose an arbitrary period 
+    # corresponding to small orbit
+    else:
+        period = 3600.
+        
+    # Use 1/2 of the smaller orbit period 
+    subinterval = period/2.    
+    
+    return subinterval
 
 
 if __name__ == '__main__':
