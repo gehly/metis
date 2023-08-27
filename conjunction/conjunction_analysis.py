@@ -37,6 +37,86 @@ from utilities.constants import Re, GME
 ###############################################################################
 
 
+def compute_TCA(X1, X2, trange, gvec_fcn, params, rho_min_crit=0., N=16,
+                subinterval_factor=0.5):
+    '''
+    This function computes the Time of Closest Approach using Chebyshev Proxy
+    Polynomials. Per Section 3 of Denenberg (Ref 1), the function subdivides
+    the full time interval specified by trange into units no more than half the 
+    orbit period of the smaller orbit, which should contain at most one local
+    minimum of the relative distance between orbits. The funtion will either
+    output the time and Euclidean distance at closest approach over the full
+    time interval, or a list of all close approaches under a user-specified
+    input rho_min_crit.
+    
+    Parameters
+    ------
+    X1 : 6x1 numpy array
+        cartesian state vector of object 1 in ECI [km, km/s]
+    X2 : 6x1 numpy array
+        cartesian state vector of object 2 in ECI [km, km/s]
+    trange : 2 element list or array [t0, tf]
+        initial and final time for the full interval [sec]
+    rho_min_crit : float, optional
+        critical value of minimum distance (default=0.)
+        if > 0, output will contain all close approaches under this distance
+    N : int, optional
+        order of the Chebyshev Proxy Polynomial approximation (default=16)
+        default corresponds to recommended value from Denenberg Section 3
+    subinterval_factor : float, optional
+        factor to multiply smaller orbit period by (default=0.5)
+        default corresponds to recommended value from Denenberg Section 3
+    GM : float, optional
+        gravitational parameter (default=GME) [km^3/s^2]
+        
+    Returns
+    ------
+    
+    '''
+       
+    # Retrieve input parameters
+    GM = params['GM']
+    
+    # Setup first time interval
+    subinterval = compute_subinterval(X1, X2, subinterval_factor, GM)
+    a = trange[0]
+    b = min(trange[-1], a + subinterval)
+    
+    # Compute interpolation matrix for Chebyshev Proxy Polynomials of order N
+    # Note that this can be reused for all polynomial approximations as it
+    # only depends on the order
+    interp_mat = compute_interpolation_matrix(N)
+    
+    # Loop over times in increments of subinterval until end of trange
+    T_list = []
+    rho_list = []
+    while b <= trange[1]:        
+    
+        # Determine Chebyshev-Gauss-Lobato node locations
+        tvec = compute_CGL_nodes(a, b, N)
+        
+        # Evaluate function at node locations
+        gvec = gvec_fcn(tvec, X1, X2, params)
+        
+        
+    
+    
+    
+    
+    return
+
+
+def gvec_twobody_analytic(tvec, X1, X2, params):
+    '''
+    
+    '''
+    
+    
+    
+    return
+
+
+
 def compute_CGL_nodes(a, b, N):
     '''
     This function computes the location of the Chebyshev-Gauss-Lobatto nodes
@@ -107,7 +187,7 @@ def compute_interpolation_matrix(N):
     return interp_mat
 
 
-def compute_subinterval(X1, X2, GM=GME):
+def compute_subinterval(X1, X2, subinterval_factor=0.5, GM=GME):
     '''
     This function computes an appropriate length subinterval of the specified
     (finite) total interval on which to find the closest approach. Per the
@@ -122,6 +202,8 @@ def compute_subinterval(X1, X2, GM=GME):
         cartesian state vector of object 1 in ECI [km, km/s]
     X2 : 6x1 numpy array
         cartesian state vector of object 2 in ECI [km, km/s]
+    subinterval_factor : float, optional
+        factor to multiply smaller orbit period by (default=0.5)
     GM : float, optional
         gravitational parameter (default=GME) [km^3/s^2]
         
@@ -154,8 +236,8 @@ def compute_subinterval(X1, X2, GM=GME):
     else:
         period = 3600.
         
-    # Use 1/2 of the smaller orbit period 
-    subinterval = period/2.    
+    # Scale the smaller orbit period by user input
+    subinterval = period*subinterval_factor
     
     return subinterval
 
