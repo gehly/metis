@@ -87,33 +87,136 @@ def compute_TCA(X1, X2, trange, gvec_fcn, params, rho_min_crit=0., N=16,
     # only depends on the order
     interp_mat = compute_interpolation_matrix(N)
     
+    # Initialize the minimum range and TCA using the endpoints of the interval
+    dum, rvec, ivec, cvec = gvec_fcn(trange, X1, X2, params)
+    rho0 = np.sqrt(rvec[0]**2 + ivec[0]**2 + cvec[0]**2)
+    rhof = np.sqrt(rvec[-1]**2 + ivec[-1]**2 + cvec[-1]**2)
+    
+    if ((rho0 < rho_min_crit) and (rhof < rho_min_crit)) or (rho0 == rhof):
+        T_list = [trange[0], trange[-1]]
+        rho_list = [rho0, rhof]
+    elif rho0 < rhof:
+        T_list = [trange[0]]
+        rho_list = [rho0]
+    elif rhof < rho0:
+        T_list = [trange[-1]]
+        rho_list = [rhof]        
+    
     # Loop over times in increments of subinterval until end of trange
-    T_list = []
-    rho_list = []
+    rho_min = min(rho_list)
+    tmin = T_list[rho_list.index(rho_min)]
     while b <= trange[1]:        
     
         # Determine Chebyshev-Gauss-Lobato node locations
         tvec = compute_CGL_nodes(a, b, N)
         
         # Evaluate function at node locations
-        gvec = gvec_fcn(tvec, X1, X2, params)
+        gvec, dum1, dum2, dum3 = gvec_fcn(tvec, X1, X2, params)
         
+        # Find the roots of the relative range rate g(t)
+        troots = compute_gt_roots(gvec, interp_mat, a, b)
+        if len(troots) == 0:
+            continue
         
+        # Check if roots constitute a global minimum and/or are below the
+        # critical threshold
+        dum, rvec, ivec, cvec = gvec_fcn(troots, X1, X2, params)
+        for ii in range(len(troots)):
+            rho = np.sqrt(rvec[ii]**2 + ivec[ii]**2 + cvec[ii]**2)
+            
+            # Store if below critical threshold
+            if rho < rho_min_crit:
+                rho_list.append(rho)
+                T_list.append(troots[ii])
+            
+            # Update global minimum
+            if rho < rho_min:
+                rho_min = rho
+                tmin = troots[ii]
+            
+        # Increment time interval
+        if b == trange[-1]:
+            break
+        
+        a = float(b)
+        if b + subinterval <= trange[-1]:
+            b += subinterval
+        else:
+            b = trange[-1]            
+        
+    # Store global minimum
+    if tmin not in T_list:
+        T_list.append(tmin)
+        rho_list.append(rho_min)
+        
+    # Sort output
+    if len(T_list) > 1:
+        sorted_inds = np.argsort(T_list)
+        T_list = [T_list[ii] for ii in sorted_inds]
+        rho_list = [rho_list[ii] for ii in sorted_inds]
     
-    
-    
-    
-    return
+    return T_list, rho_list
 
 
 def gvec_twobody_analytic(tvec, X1, X2, params):
     '''
+    This function evaluates a twobody orbit propagation analytically (using 
+    Newton-Raphson iteration to solve Kepler's Equation) at the times 
+    specified in tvec. It then computes the relative distance and associated
+    derivative between the two given orbits.
+    
+    Parameters
+    ------
+    tvec: 1D numpy array
+        times for function evaluation [sec]
+    X1 : 6x1 numpy array
+        cartesian state vector of object 1 in ECI [km, km/s]
+    X2 : 6x1 numpy array
+        cartesian state vector of object 2 in ECI [km, km/s]
+    params : dictionary
+        physical data related to orbit propagation, such as GM, J2, ...
+        
+    Returns
+    ------
+    gvec: 1D numpy array
+        evaluation of function to find roots of, in this case g(t) is the
+        relative range rate between the two orbits, roots correspond to extrema
+        of the relative range
     
     '''
     
+    # Retrieve input data
+    GM = params['GM']    
     
+    # Compute function values to find roots of
+    # In order to minimize rho, we seek zeros of first derivative
+    # f(t) = dot(rho_vect, rho_vect)
+    # g(t) = df/dt = 2*dot(drho_vect, rho_vect)
+    gvec = np.zeros(tvec.shape)
+    rvec = np.zeros(tvec.shape)
+    ivec = np.zeros(tvec.shape)
+    cvec = np.zeros(tvec.shape)
+    jj = 0
+    for t in tvec:
+        X1_t = astro.element_conversion(X1, 1, 1, GM, t)
+        X2_t = astro.element_conversion(X2, 1, 1, GM, t)
+        rc_vect = X1_t[0:3].reshape(3,1)
+        vc_vect = X1_t[3:6].reshape(3,1)
+        rd_vect = X2_t[0:3].reshape(3,1)
+        vd_vect = X2_t[3:6].reshape(3,1)
+        
+        rho_eci = rd_vect - rc_vect
+        drho_eci = vd_vect - vc_vect
+        rho_ric = coord.eci2ric(rc_vect, vc_vect, rho_eci)
+        drho_ric = coord.eci2ric_vel(rc_vect, vc_vect, rho_ric, drho_eci)
+        
+        gvec[jj] = float(2*np.dot(rho_ric.T, drho_ric))
+        rvec[jj] = float(rho_ric[0])
+        ivec[jj] = float(rho_ric[1])
+        cvec[jj] = float(rho_ric[2])
+        jj += 1    
     
-    return
+    return gvec, rvec, ivec, cvec
 
 
 
@@ -185,6 +288,34 @@ def compute_interpolation_matrix(N):
     interp_mat = np.multiply(pjk_mat, Cmat)
     
     return interp_mat
+
+
+def compute_gt_roots(gvec, interp_mat, a, b):
+    
+    # Order of approximation
+    N = len(gvec) - 1
+    
+    # Compute aj coefficients (Denenberg Eq 14)
+    aj_vec = np.dot(interp_mat, gvec.reshape(N+1,1))
+    
+    # Compute the companion matrix (Denenberg Eq 18)
+    Amat = np.zeros((N,N))
+    Amat[0,1] = 1.
+    Amat[-1,:] = -aj_vec[0:N].flatten()/(2*aj_vec[N])
+    Amat[-1,-2] += 0.5
+    for jj in range(1,N-1):
+        Amat[jj,jj-1] = 0.5
+        Amat[jj,jj+1] = 0.5
+        
+    # Compute eigenvalues
+    # TODO paper indicates some eigenvalues may have small imaginary component
+    # but testing seems to show this is much more significant issue, needs
+    # further analysis
+    eig, dum = np.linalg.eig(Amat)
+    eig_real = np.asarray([np.real(ee) for ee in eig if (np.isreal(ee) and ee >= -1. and ee <= 1.)])
+    roots = (b+a)/2. + eig_real*(b-a)/2.
+
+    return roots
 
 
 def compute_subinterval(X1, X2, subinterval_factor=0.5, GM=GME):
