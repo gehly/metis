@@ -5,6 +5,7 @@ import os
 import sys
 import inspect
 import pickle
+import time
 
 
 filename = inspect.getframeinfo(inspect.currentframe()).filename
@@ -14,6 +15,7 @@ ind = current_dir.find('metis')
 metis_dir = current_dir[0:ind+5]
 sys.path.append(metis_dir)
 
+from conjunction import conjunction_analysis as ca
 from utilities import astrodynamics as astro
 from utilities import coordinate_systems as coord
 from utilities.constants import Re, GME
@@ -163,7 +165,38 @@ def setup_leo_case1():
     return
 
 
-def run_tca_test(fname):
+def run_tca_test(setup_file):
+    
+    pklFile = open(setup_file, 'rb' )
+    data = pickle.load( pklFile )
+    X1_0 = data[0]
+    X2_0 = data[1]
+    tout = data[2]
+    tmin = data[3]
+    rho_min = data[4]
+    elem_chief = data[5]
+    rho_ric = data[6]
+    drho_ric = data[7]
+    pklFile.close()
+    
+    trange = [tout[0], tout[-1]]
+    gvec_fcn = ca.gvec_twobody_analytic
+    params = {}
+    params['GM'] = GME
+    
+    start = time.time()
+    T_list, rho_list = ca.compute_TCA(X1_0, X2_0, trange, gvec_fcn, params)
+    runtime = time.time() - start
+    
+    print('Results from Setup')
+    print('tmin', tmin)
+    print('rho_min', rho_min)
+    
+    print('\nResults from compute_TCA')
+    print('T_list', T_list)
+    print('rho_list', rho_list)
+    
+    print('\nruntime', runtime)
     
     
     return
@@ -175,5 +208,6 @@ if __name__ == '__main__':
     
     # setup_leo_case1()
 
-
+    fname = os.path.join('unit_test', 'tca_twobody_leo_case1.pkl')
+    run_tca_test(fname)
 

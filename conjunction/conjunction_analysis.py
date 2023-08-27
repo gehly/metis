@@ -87,24 +87,11 @@ def compute_TCA(X1, X2, trange, gvec_fcn, params, rho_min_crit=0., N=16,
     # only depends on the order
     interp_mat = compute_interpolation_matrix(N)
     
-    # Initialize the minimum range and TCA using the endpoints of the interval
-    dum, rvec, ivec, cvec = gvec_fcn(trange, X1, X2, params)
-    rho0 = np.sqrt(rvec[0]**2 + ivec[0]**2 + cvec[0]**2)
-    rhof = np.sqrt(rvec[-1]**2 + ivec[-1]**2 + cvec[-1]**2)
-    
-    if ((rho0 < rho_min_crit) and (rhof < rho_min_crit)) or (rho0 == rhof):
-        T_list = [trange[0], trange[-1]]
-        rho_list = [rho0, rhof]
-    elif rho0 < rhof:
-        T_list = [trange[0]]
-        rho_list = [rho0]
-    elif rhof < rho0:
-        T_list = [trange[-1]]
-        rho_list = [rhof]        
-    
     # Loop over times in increments of subinterval until end of trange
-    rho_min = min(rho_list)
-    tmin = T_list[rho_list.index(rho_min)]
+    T_list = []
+    rho_list = []
+    rho_min = np.inf
+    tmin = 0.
     while b <= trange[1]:        
     
         # Determine Chebyshev-Gauss-Lobato node locations
@@ -115,6 +102,11 @@ def compute_TCA(X1, X2, trange, gvec_fcn, params, rho_min_crit=0., N=16,
         
         # Find the roots of the relative range rate g(t)
         troots = compute_gt_roots(gvec, interp_mat, a, b)
+        
+        # If this is first pass, include the interval endpoints for evaluation
+        if np.isinf(rho_min):
+            troots = np.concatenate((troots, np.array([trange[0], trange[-1]])))
+                
         if len(troots) == 0:
             continue
         
@@ -142,12 +134,41 @@ def compute_TCA(X1, X2, trange, gvec_fcn, params, rho_min_crit=0., N=16,
         if b + subinterval <= trange[-1]:
             b += subinterval
         else:
-            b = trange[-1]            
+            b = trange[-1]      
+            
+    # # Evaluate the relative range at the endpoints of the interval to ensure
+    # # these are not overlooked
+    # dum, rvec, ivec, cvec = gvec_fcn(trange, X1, X2, params)
+    # rho0 = np.sqrt(rvec[0]**2 + ivec[0]**2 + cvec[0]**2)
+    # rhof = np.sqrt(rvec[-1]**2 + ivec[-1]**2 + cvec[-1]**2)
+    
+    # # Store the global minimum and append to lists if others are below 
+    # # critical threshold
+    # rho_candidates = [rho_min, rho0, rhof]
+    # global_min = min(rho_candidates)
+    # global_tmin = [tmin, trange[0], trange[-1]][rho_candidates.index(global_min)]
+    
+    
+    
+    # if ((rho0 < rho_min_crit) and (rhof < rho_min_crit)) or (rho0 == rhof):
+    #     T_list = [trange[0], trange[-1]]
+    #     rho_list = [rho0, rhof]
+    # elif rho0 < rhof:
+    #     T_list = [trange[0]]
+    #     rho_list = [rho0]
+    # elif rhof < rho0:
+    #     T_list = [trange[-1]]
+    #     rho_list = [rhof]   
         
-    # Store global minimum
-    if tmin not in T_list:
+    # If a global minimum has been found, store output
+    if rho_min < np.inf and tmin not in T_list:
         T_list.append(tmin)
         rho_list.append(rho_min)
+    
+    # # Otherwise, compute and store the minimum range and TCA using the 
+    # # endpoints of the interval
+    # else:
+           
         
     # Sort output
     if len(T_list) > 1:
@@ -192,10 +213,10 @@ def gvec_twobody_analytic(tvec, X1, X2, params):
     # In order to minimize rho, we seek zeros of first derivative
     # f(t) = dot(rho_vect, rho_vect)
     # g(t) = df/dt = 2*dot(drho_vect, rho_vect)
-    gvec = np.zeros(tvec.shape)
-    rvec = np.zeros(tvec.shape)
-    ivec = np.zeros(tvec.shape)
-    cvec = np.zeros(tvec.shape)
+    gvec = np.zeros(len(tvec),)
+    rvec = np.zeros(len(tvec),)
+    ivec = np.zeros(len(tvec),)
+    cvec = np.zeros(len(tvec),)
     jj = 0
     for t in tvec:
         X1_t = astro.element_conversion(X1, 1, 1, GM, t)
