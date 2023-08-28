@@ -40,7 +40,7 @@ from utilities import numerical_methods as num
 ###############################################################################
 
 
-def general_dynamics(Xo, tvec, state_params, int_params):
+def general_dynamics(Xo, tvec, state_params, int_params, bodies=None):
     '''
     This function provides a general interface to numerical integration 
     routines.
@@ -336,14 +336,18 @@ def general_dynamics(Xo, tvec, state_params, int_params):
             
         if time_format == 'JD':
             simulation_start_epoch = (t0 - 2451545.0) * 86400.
+            
+        if time_format == 'seconds':
+            simulation_start_epoch = t0
         
         simulation_end_epoch = simulation_start_epoch + tvec[-1]
-
-        # Retrive state and propagator settings
-        bodies_to_create = state_params['bodies_to_create']
-        global_frame_origin = state_params['global_frame_origin']
-        global_frame_orientation = state_params['global_frame_orientation']
+        
+        # Initialize bodies if needed and retrieve state parameter data
+        if bodies is None:
+            bodies = initialize_tudat(state_params)
+            
         central_bodies = state_params['central_bodies']
+        bodies_to_create = state_params['bodies_to_create']
         mass = state_params['mass']
         Cd = state_params['Cd']
         Cr = state_params['Cr']
@@ -352,10 +356,6 @@ def general_dynamics(Xo, tvec, state_params, int_params):
         sph_deg = state_params['sph_deg']
         sph_ord = state_params['sph_ord']
         
-        # Create bodies
-        body_settings = environment_setup.get_default_body_settings(
-            bodies_to_create, global_frame_origin, global_frame_orientation)
-        bodies = environment_setup.create_system_of_bodies(body_settings)
         
         # Create the bodies to propagate
         # TUDAT always uses 6 element state vector
@@ -478,9 +478,20 @@ def general_dynamics(Xo, tvec, state_params, int_params):
         return tout, Xout
     
     
+def initialize_tudat(state_params):
+    
+    # Retrive state and propagator settings
+    bodies_to_create = state_params['bodies_to_create']
+    global_frame_origin = state_params['global_frame_origin']
+    global_frame_orientation = state_params['global_frame_orientation']
     
     
-
+    # Create bodies
+    body_settings = environment_setup.get_default_body_settings(
+        bodies_to_create, global_frame_origin, global_frame_orientation)
+    bodies = environment_setup.create_system_of_bodies(body_settings)
+    
+    return bodies
 
 
 ###############################################################################

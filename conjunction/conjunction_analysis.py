@@ -1,5 +1,6 @@
 import numpy as np
 import math
+from datetime import datetime
 import matplotlib.pyplot as plt
 import os
 import sys
@@ -21,6 +22,7 @@ ind = current_dir.find('metis')
 metis_dir = current_dir[0:ind+5]
 sys.path.append(metis_dir)
 
+from dynamics import dynamics_functions as dyn
 from utilities import astrodynamics as astro
 from utilities import coordinate_systems as coord
 from utilities.constants import Re, GME
@@ -85,40 +87,14 @@ def compute_TCA(X1, X2, trange, gvec_fcn, params, tudat_flag=False,
     
     # Setup Tudat propagation if needed
     if tudat_flag:
+        params['bodies'] = dyn.initialize_tudat(params)
         
-        # Create default body settings for "Earth"
-        bodies_to_create = ["Earth"]
+        # Convert time to seconds since J2000
+        if params['int_params']['time_format'] == 'datetime':
+            trange = [(trange[ii] - datetime(2000, 1, 1, 12, 0, 0)).total_seconds() for ii in range(len(trange))]
 
-        # Create default body settings for bodies_to_create, with "Earth"/"J2000" as the global frame origin and orientation
-        global_frame_origin = "Earth"
-        global_frame_orientation = "J2000"
-        body_settings = environment_setup.get_default_body_settings(
-            bodies_to_create, global_frame_origin, global_frame_orientation)
-
-        # Create system of bodies (in this case only Earth)
-        bodies = environment_setup.create_system_of_bodies(body_settings)
-        
-        earth_gravitational_parameter = bodies.get("Earth").gravitational_parameter
-        
-        # Convert initial state vector from km to meters for TUDAT propagator
-        X1_m = X1.flatten()*1000.
-        X2_m = X2.flatten()*1000.
-        
-        # initial_state = element_conversion.keplerian_to_cartesian_elementwise(
-        #     gravitational_parameter=earth_gravitational_parameter,
-        #     semi_major_axis=7500.0e3,
-        #     eccentricity=0.1,
-        #     inclination=np.deg2rad(85.3),
-        #     argument_of_periapsis=np.deg2rad(235.7),
-        #     longitude_of_ascending_node=np.deg2rad(23.4),
-        #     true_anomaly=np.deg2rad(139.87),
-        # )
-       
-    # Retrieve input parameters
-    GM = params['GM']
-    
     # Setup first time interval
-    subinterval = compute_subinterval(X1, X2, subinterval_factor, GM)
+    subinterval = compute_subinterval(X1, X2, subinterval_factor, GME)
     a = trange[0]
     b = min(trange[-1], a + subinterval)
         
@@ -141,7 +117,7 @@ def compute_TCA(X1, X2, trange, gvec_fcn, params, tudat_flag=False,
         tvec = compute_CGL_nodes(a, b, N)
         
         # Evaluate function at node locations
-        gvec, dum1, dum2, dum3 = gvec_fcn(tvec, X1, X2, params)
+        gvec, dum1, dum2, dum3 = gvec_fcn(t0, tvec, X1, X2, params)
         
         # Find the roots of the relative range rate g(t)
         troots = compute_gt_roots(gvec, interp_mat, a, b)
@@ -225,7 +201,7 @@ def compute_TCA(X1, X2, trange, gvec_fcn, params, tudat_flag=False,
     return T_list, rho_list
 
 
-def gvec_twobody_analytic(tvec, X1, X2, params):
+def gvec_twobody_analytic(t0, tvec, X1, X2, params):
     '''
     This function evaluates a twobody orbit propagation analytically (using 
     Newton-Raphson iteration to solve Kepler's Equation) at the times 
@@ -286,10 +262,55 @@ def gvec_twobody_analytic(tvec, X1, X2, params):
     return gvec, rvec, ivec, cvec
 
 
-def gvec_tudat(tvec, X1, X2, params):
+def gvec_tudat(t0, tvec, X1, X2, params):
     
+    # Retrieve input data
+    bodies = params['bodies']
+    state_params = params['state_params']
+    int_params = params['int_params']
     
-    return
+    # Initial state
+    Xo = np.concatenate((X1, X2), axis=0)
+    
+    # Compute function values to find roots of
+    # In order to minimize rho, we seek zeros of first derivative
+    # f(t) = dot(rho_vect, rho_vect)
+    # g(t) = df/dt = 2*dot(drho_vect, rho_vect)
+    gvec = np.zeros(len(tvec),)
+    rvec = np.zeros(len(tvec),)
+    ivec = np.zeros(len(tvec),)
+    cvec = np.zeros(len(tvec),)
+    jj = 0
+    for ti in tvec:
+        
+        if ti == t0:
+            X1_t = X1
+            X2_t = X2
+            
+        else:
+            tin = [t0, ti]
+            tout, Xout = dyn.general_dynamics(Xo, tin, state_params, int_params, bodies)
+            X1_t = Xout[-1,0:6]
+            X2_t = Xout[-1,6:12]
+        
+        
+        rc_vect = X1_t[0:3].reshape(3,1)
+        vc_vect = X1_t[3:6].reshape(3,1)
+        rd_vect = X2_t[0:3].reshape(3,1)
+        vd_vect = X2_t[3:6].reshape(3,1)
+        
+        rho_eci = rd_vect - rc_vect
+        drho_eci = vd_vect - vc_vect
+        rho_ric = coord.eci2ric(rc_vect, vc_vect, rho_eci)
+        drho_ric = coord.eci2ric_vel(rc_vect, vc_vect, rho_ric, drho_eci)
+        
+        gvec[jj] = float(2*np.dot(rho_ric.T, drho_ric))
+        rvec[jj] = float(rho_ric[0])
+        ivec[jj] = float(rho_ric[1])
+        cvec[jj] = float(rho_ric[2])
+        jj += 1    
+    
+    return gvec, rvec, ivec, cvec
 
 
 

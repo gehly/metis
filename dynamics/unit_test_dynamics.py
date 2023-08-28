@@ -834,6 +834,9 @@ def test_tudat_prop():
     state_params['drag_area_m2'] = 4.
     state_params['srp_area_m2'] = 4.
     
+    # Initialize Tudat bodies once to avoid excess memory allocation
+    bodies = dyn.initialize_tudat(state_params)
+    
 
     int_params = {}
     int_params['integrator'] = 'tudat'
@@ -860,7 +863,7 @@ def test_tudat_prop():
         
         if kk > 0:
             tin = [tk_list[kk-1], tk_list[kk]]
-            tout2, Xout2 = dyn.general_dynamics(X, tin, state_params, int_params)
+            tout2, Xout2 = dyn.general_dynamics(X, tin, state_params, int_params, bodies)
             X = Xout2[-1,:].reshape(6, 1)
         
             tout[kk] = tout2[-1] + tout[kk-1]
