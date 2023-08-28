@@ -6,6 +6,7 @@ import sys
 import inspect
 import pickle
 import time
+from datetime import datetime, timedelta
 
 
 filename = inspect.getframeinfo(inspect.currentframe()).filename
@@ -156,8 +157,12 @@ def setup_leo_case1():
     X1_0, X2_0, tout, tmin, rho_min = \
         compute_initial_conditions_twobody(elem_chief, rho_ric, drho_ric,
                                            dt_vect, GM)
+        
+    # Convert tout to UTC for use with tudat
+    UTC0 = datetime(2000, 1, 1, 12, 0, 0)
+    tout = [UTC0 + timedelta(seconds=ti) for ti in tout]
     
-    setup_file = os.path.join('unit_test', 'tca_twobody_leo_case1b.pkl')
+    setup_file = os.path.join('unit_test', 'tca_twobody_leo_case1c.pkl')
     pklFile = open( setup_file, 'wb' )
     pickle.dump([X1_0, X2_0, tout, tmin, rho_min, elem_chief, rho_ric, drho_ric],
                 pklFile, -1 )
@@ -302,9 +307,37 @@ def run_tca_test(setup_file):
     params = {}
     params['GM'] = GME
     
+    
+    state_params = {}
+    state_params['bodies_to_create'] = ['Earth']
+    state_params['global_frame_origin'] = 'Earth'
+    state_params['global_frame_orientation'] = 'J2000'
+    state_params['central_bodies'] = ['Earth']
+    state_params['sph_deg'] = 0
+    state_params['sph_ord'] = 0
+    state_params['mass'] = 400.
+    state_params['Cd'] = 0.
+    state_params['Cr'] = 0.
+    state_params['drag_area_m2'] = 4.
+    state_params['srp_area_m2'] = 4.
+
+    int_params = {}
+    int_params['integrator'] = 'tudat'
+    int_params['tudat_integrator'] = 'rkf78'
+    int_params['step'] = 10.
+    int_params['max_step'] = 100.
+    int_params['min_step'] = 1.
+    int_params['rtol'] = 1e-12
+    int_params['atol'] = 1e-12
+    int_params['time_format'] = 'datetime'
+    
+    params['state_params'] = state_params
+    params['int_params'] = int_params
+    
+    
     start = time.time()
     T_list, rho_list = ca.compute_TCA(X1_0, X2_0, trange, gvec_fcn, params,
-                                      rho_min_crit=0., N=32)
+                                      rho_min_crit=0., N=32, tudat_flag=True)
     runtime = time.time() - start
     
     print('\n')
@@ -326,8 +359,8 @@ if __name__ == '__main__':
     
     # plt.close('all')
     
-    # setup_leo_case2()
+    # setup_leo_case1()
 
-    fname = os.path.join('unit_test', 'tca_twobody_leo_case1b.pkl')
+    fname = os.path.join('unit_test', 'tca_twobody_leo_case1c.pkl')
     run_tca_test(fname)
 

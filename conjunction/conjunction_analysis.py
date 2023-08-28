@@ -87,7 +87,8 @@ def compute_TCA(X1, X2, trange, gvec_fcn, params, tudat_flag=False,
     
     # Setup Tudat propagation if needed
     if tudat_flag:
-        params['bodies'] = dyn.initialize_tudat(params)
+        state_params = params['state_params']
+        params['bodies'] = dyn.initialize_tudat(state_params)
         
         # Convert time to seconds since J2000
         if params['int_params']['time_format'] == 'datetime':
@@ -95,6 +96,7 @@ def compute_TCA(X1, X2, trange, gvec_fcn, params, tudat_flag=False,
 
     # Setup first time interval
     subinterval = compute_subinterval(X1, X2, subinterval_factor, GME)
+    t0 = trange[0]
     a = trange[0]
     b = min(trange[-1], a + subinterval)
         
@@ -131,7 +133,7 @@ def compute_TCA(X1, X2, trange, gvec_fcn, params, tudat_flag=False,
         # critical threshold
         if len(troots) > 0:
             
-            dum, rvec, ivec, cvec = gvec_fcn(troots, X1, X2, params)
+            dum, rvec, ivec, cvec = gvec_fcn(t0, troots, X1, X2, params)
             for ii in range(len(troots)):
                 rho = np.sqrt(rvec[ii]**2 + ivec[ii]**2 + cvec[ii]**2)
                 
@@ -291,8 +293,7 @@ def gvec_tudat(t0, tvec, X1, X2, params):
             tin = [t0, ti]
             tout, Xout = dyn.general_dynamics(Xo, tin, state_params, int_params, bodies)
             X1_t = Xout[-1,0:6]
-            X2_t = Xout[-1,6:12]
-        
+            X2_t = Xout[-1,6:12]        
         
         rc_vect = X1_t[0:3].reshape(3,1)
         vc_vect = X1_t[3:6].reshape(3,1)
@@ -309,6 +310,7 @@ def gvec_tudat(t0, tvec, X1, X2, params):
         ivec[jj] = float(rho_ric[1])
         cvec[jj] = float(rho_ric[2])
         jj += 1    
+    
     
     return gvec, rvec, ivec, cvec
 
