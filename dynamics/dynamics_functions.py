@@ -449,6 +449,21 @@ def general_dynamics(Xo, tvec, state_params, int_params, bodies=None):
                 maximum_step_size,
                 rtol,
                 atol)
+        
+        # elif int_params['tudat_integrator'] == 'rkf78':
+        #     initial_step_size = int_params['step']
+        #     maximum_step_size = int_params['max_step']
+        #     minimum_step_size = int_params['min_step']
+        #     rtol = int_params['rtol']
+        #     atol = int_params['atol']
+        #     control_settings = propagation_setup.integrator.step_size_control_elementwise_scalar_tolerance( rtol, atol )
+        #     validation_settings = propagation_setup.integrator.step_size_validation( 0.001, 1000.0 )
+        #     integrator_settings = propagation_setup.integrator.runge_kutta_variable_step(
+        #         initial_step_size,
+        #         propagation_setup.integrator.CoefficientSets.rkf_78,
+        #         step_size_control_settings = control_settings,
+        #         step_size_validation_settings = validation_settings)
+            
             
         # Create propagation settings
         propagator_settings = propagation_setup.propagator.translational(
