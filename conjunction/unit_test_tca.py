@@ -18,6 +18,7 @@ sys.path.append(metis_dir)
 from conjunction import conjunction_analysis as ca
 from utilities import astrodynamics as astro
 from utilities import coordinate_systems as coord
+from utilities import tle_functions as tle
 from utilities.constants import Re, GME
 
 
@@ -125,7 +126,7 @@ def setup_leo_case1():
     elem_chief = np.array([Re+550., 1e-4, 98.6, 30., 40., 50.])
     
     # Time vector
-    dt_vect = np.arange(-100., 100.1, 1.)
+    dt_vect = np.arange(-72*3600., 72*3600., 10.)
     dt_vect2 = np.arange(-1., 1., 1e-4)
     dt_vect3 = np.concatenate((dt_vect, dt_vect2))
     dt_vect = np.asarray(sorted(list(set(dt_vect3))))
@@ -156,7 +157,124 @@ def setup_leo_case1():
         compute_initial_conditions_twobody(elem_chief, rho_ric, drho_ric,
                                            dt_vect, GM)
     
-    setup_file = os.path.join('unit_test', 'tca_twobody_leo_case1.pkl')
+    setup_file = os.path.join('unit_test', 'tca_twobody_leo_case1b.pkl')
+    pklFile = open( setup_file, 'wb' )
+    pickle.dump([X1_0, X2_0, tout, tmin, rho_min, elem_chief, rho_ric, drho_ric],
+                pklFile, -1 )
+    pklFile.close()
+    
+    return
+
+
+def setup_leo_case2():
+    
+    
+    # This test case is based on Denenberg (2020) COSMOS 1607 - Fenyung 1C DEB
+    line1 = '1 15378U 84112A   15194.50416942 -.00000089  00000-0 -28818-6 0  9993'
+    line2 = '2 15378  64.9934 313.9757 0056000 236.4761 194.3519 13.83536818552983'
+    UTC = tle.tletime2datetime(line1)
+    t0 = UTC
+    
+    tle_dict = {}    
+    tle_dict[15378] = {}
+    tle_dict[15378]['UTC_list'] = [UTC]
+    tle_dict[15378]['line1_list'] = [line1]
+    tle_dict[15378]['line2_list'] = [line2]
+    
+            
+    line1 = '1 31570U 99025BZM 15193.80658714  .00004278  00000-0  28637-2 0  9998'
+    line2 = '2 31570 102.6018 188.9155 0192610  30.1541  89.8377 13.93148752415999'
+    UTC = tle.tletime2datetime(line1)
+  
+    tle_dict[31570] = {}
+    tle_dict[31570]['UTC_list'] = [UTC]
+    tle_dict[31570]['line1_list'] = [line1]
+    tle_dict[31570]['line2_list'] = [line2]
+    
+    # Convert object states to ECI
+    obj_id_list = [15378, 31570]
+    UTC_list = [t0]
+    output_state = tle.propagate_TLE(obj_id_list, UTC_list, tle_dict)
+    
+    obj_id = obj_id_list[0]
+    r_GCRF = output_state[obj_id]['r_GCRF'][0]
+    v_GCRF = output_state[obj_id]['v_GCRF'][0]
+    X1_0 = np.concatenate((r_GCRF, v_GCRF), axis=0)
+    
+    obj_id = obj_id_list[1]
+    r_GCRF = output_state[obj_id]['r_GCRF'][0]
+    v_GCRF = output_state[obj_id]['v_GCRF'][0]
+    X2_0 = np.concatenate((r_GCRF, v_GCRF), axis=0)
+    
+    # Time vector
+    dt_vect = np.arange(0., 5*86400., 10.)
+    # dt_vect2 = np.arange(-1., 1., 1e-4)
+    # dt_vect3 = np.concatenate((dt_vect, dt_vect2))
+    # dt_vect = np.asarray(sorted(list(set(dt_vect3))))
+    tout = dt_vect
+    
+    rho_plot = np.zeros(dt_vect.shape)
+    r_plot = np.zeros(dt_vect.shape)
+    i_plot = np.zeros(dt_vect.shape)
+    c_plot = np.zeros(dt_vect.shape)
+    ii = 0
+    for dt in dt_vect:
+        Xt_chief = astro.element_conversion(X1_0, 1, 1, GME, dt)
+        Xt_deputy = astro.element_conversion(X2_0, 1, 1, GME, dt)
+        
+        rc_t = Xt_chief[0:3].reshape(3,1)
+        vc_t = Xt_chief[3:6].reshape(3,1)
+        rd_t = Xt_deputy[0:3].reshape(3,1)
+        
+        rho_eci = rd_t - rc_t
+        rho_ric = coord.eci2ric(rc_t, vc_t, rho_eci)
+        
+        rho_plot[ii] = np.linalg.norm(rho_eci)
+        r_plot[ii] = float(rho_ric[0])
+        i_plot[ii] = float(rho_ric[1])
+        c_plot[ii] = float(rho_ric[2])
+        
+        ii += 1
+        
+    rho_min = min(rho_plot)
+    ind = list(rho_plot).index(rho_min)
+    
+    # Adjust to correspond to Xc_output and Xd_output
+    tmin = dt_vect[ind]
+    
+    print(rho_min)
+    print(tmin)
+    print(rho_plot[ind-3:ind+4])
+        
+        
+    plt.figure()
+    plt.subplot(4,1,1)
+    plt.plot(tout, rho_plot, 'k.')
+    plt.plot(tmin, rho_min, 'ro')
+    plt.ylabel('rho [km]')
+    plt.subplot(4,1,2)
+    plt.plot(tout, r_plot, 'k.')
+    plt.ylabel('r [km]')
+    plt.subplot(4,1,3)
+    plt.plot(tout, i_plot, 'k.')
+    plt.ylabel('i [km]')
+    plt.subplot(4,1,4)
+    plt.plot(tout, c_plot, 'k.')
+    plt.ylabel('c [km]')
+    plt.xlabel('Seconds since epoch')
+    
+    plt.show()
+    
+    
+
+    
+    elem_chief = 0.
+    rho_ric = 0.
+    drho_ric = 0.
+    
+    
+    
+    setup_file = os.path.join('unit_test', 'tca_twobody_leo_case2.pkl')
     pklFile = open( setup_file, 'wb' )
     pickle.dump([X1_0, X2_0, tout, tmin, rho_min, elem_chief, rho_ric, drho_ric],
                 pklFile, -1 )
@@ -185,9 +303,11 @@ def run_tca_test(setup_file):
     params['GM'] = GME
     
     start = time.time()
-    T_list, rho_list = ca.compute_TCA(X1_0, X2_0, trange, gvec_fcn, params)
+    T_list, rho_list = ca.compute_TCA(X1_0, X2_0, trange, gvec_fcn, params,
+                                      rho_min_crit=0., N=32)
     runtime = time.time() - start
     
+    print('\n')
     print('Results from Setup')
     print('tmin', tmin)
     print('rho_min', rho_min)
@@ -204,10 +324,10 @@ def run_tca_test(setup_file):
 
 if __name__ == '__main__':
     
-    plt.close('all')
+    # plt.close('all')
     
-    # setup_leo_case1()
+    # setup_leo_case2()
 
-    fname = os.path.join('unit_test', 'tca_twobody_leo_case1.pkl')
+    fname = os.path.join('unit_test', 'tca_twobody_leo_case1b.pkl')
     run_tca_test(fname)
 

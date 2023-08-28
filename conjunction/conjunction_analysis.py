@@ -5,6 +5,15 @@ import os
 import sys
 import inspect
 
+# Load tudatpy modules  
+from tudatpy.kernel.interface import spice
+from tudatpy.kernel import numerical_simulation
+from tudatpy.kernel.numerical_simulation import environment_setup
+from tudatpy.kernel.numerical_simulation import propagation_setup
+from tudatpy.kernel.astro import element_conversion
+from tudatpy.kernel import constants
+from tudatpy.util import result2array
+
 filename = inspect.getframeinfo(inspect.currentframe()).filename
 current_dir = os.path.dirname(os.path.abspath(filename))
 
@@ -37,8 +46,8 @@ from utilities.constants import Re, GME
 ###############################################################################
 
 
-def compute_TCA(X1, X2, trange, gvec_fcn, params, rho_min_crit=0., N=16,
-                subinterval_factor=0.5):
+def compute_TCA(X1, X2, trange, gvec_fcn, params, tudat_flag=False, 
+                rho_min_crit=0., N=16, subinterval_factor=0.5):
     '''
     This function computes the Time of Closest Approach using Chebyshev Proxy
     Polynomials. Per Section 3 of Denenberg (Ref 1), the function subdivides
@@ -73,6 +82,37 @@ def compute_TCA(X1, X2, trange, gvec_fcn, params, rho_min_crit=0., N=16,
     ------
     
     '''
+    
+    # Setup Tudat propagation if needed
+    if tudat_flag:
+        
+        # Create default body settings for "Earth"
+        bodies_to_create = ["Earth"]
+
+        # Create default body settings for bodies_to_create, with "Earth"/"J2000" as the global frame origin and orientation
+        global_frame_origin = "Earth"
+        global_frame_orientation = "J2000"
+        body_settings = environment_setup.get_default_body_settings(
+            bodies_to_create, global_frame_origin, global_frame_orientation)
+
+        # Create system of bodies (in this case only Earth)
+        bodies = environment_setup.create_system_of_bodies(body_settings)
+        
+        earth_gravitational_parameter = bodies.get("Earth").gravitational_parameter
+        
+        # Convert initial state vector from km to meters for TUDAT propagator
+        X1_m = X1.flatten()*1000.
+        X2_m = X2.flatten()*1000.
+        
+        # initial_state = element_conversion.keplerian_to_cartesian_elementwise(
+        #     gravitational_parameter=earth_gravitational_parameter,
+        #     semi_major_axis=7500.0e3,
+        #     eccentricity=0.1,
+        #     inclination=np.deg2rad(85.3),
+        #     argument_of_periapsis=np.deg2rad(235.7),
+        #     longitude_of_ascending_node=np.deg2rad(23.4),
+        #     true_anomaly=np.deg2rad(139.87),
+        # )
        
     # Retrieve input parameters
     GM = params['GM']
@@ -81,7 +121,7 @@ def compute_TCA(X1, X2, trange, gvec_fcn, params, rho_min_crit=0., N=16,
     subinterval = compute_subinterval(X1, X2, subinterval_factor, GM)
     a = trange[0]
     b = min(trange[-1], a + subinterval)
-    
+        
     # Compute interpolation matrix for Chebyshev Proxy Polynomials of order N
     # Note that this can be reused for all polynomial approximations as it
     # only depends on the order
@@ -92,7 +132,10 @@ def compute_TCA(X1, X2, trange, gvec_fcn, params, rho_min_crit=0., N=16,
     rho_list = []
     rho_min = np.inf
     tmin = 0.
-    while b <= trange[1]:        
+    while b <= trange[1]:
+        
+        # print('')
+        # print('a,b', a, b)
     
         # Determine Chebyshev-Gauss-Lobato node locations
         tvec = compute_CGL_nodes(a, b, N)
@@ -106,25 +149,28 @@ def compute_TCA(X1, X2, trange, gvec_fcn, params, rho_min_crit=0., N=16,
         # If this is first pass, include the interval endpoints for evaluation
         if np.isinf(rho_min):
             troots = np.concatenate((troots, np.array([trange[0], trange[-1]])))
+            
                 
-        if len(troots) == 0:
-            continue
-        
         # Check if roots constitute a global minimum and/or are below the
         # critical threshold
-        dum, rvec, ivec, cvec = gvec_fcn(troots, X1, X2, params)
-        for ii in range(len(troots)):
-            rho = np.sqrt(rvec[ii]**2 + ivec[ii]**2 + cvec[ii]**2)
+        if len(troots) > 0:
             
-            # Store if below critical threshold
-            if rho < rho_min_crit:
-                rho_list.append(rho)
-                T_list.append(troots[ii])
-            
-            # Update global minimum
-            if rho < rho_min:
-                rho_min = rho
-                tmin = troots[ii]
+            dum, rvec, ivec, cvec = gvec_fcn(troots, X1, X2, params)
+            for ii in range(len(troots)):
+                rho = np.sqrt(rvec[ii]**2 + ivec[ii]**2 + cvec[ii]**2)
+                
+                # print('ti', troots[ii])
+                # print('rho', rho)
+                
+                # Store if below critical threshold
+                if rho < rho_min_crit:
+                    rho_list.append(rho)
+                    T_list.append(troots[ii])
+                
+                # Update global minimum
+                if rho < rho_min:
+                    rho_min = rho
+                    tmin = troots[ii]
             
         # Increment time interval
         if b == trange[-1]:
@@ -238,6 +284,12 @@ def gvec_twobody_analytic(tvec, X1, X2, params):
         jj += 1    
     
     return gvec, rvec, ivec, cvec
+
+
+def gvec_tudat(tvec, X1, X2, params):
+    
+    
+    return
 
 
 
@@ -373,15 +425,15 @@ def compute_subinterval(X1, X2, subinterval_factor=0.5, GM=GME):
     # If both orbits are closed, choose the smaller to compute orbit period
     if (a1 > 0.) and (a2 > 0.):
         amin = min(a1, a2)
-        period = 2.*np.pi*(amin**3./GM)
+        period = 2.*np.pi*np.sqrt(amin**3./GM)
         
     # If one orbit is closed and the other is an escape trajectory, choose the
     # closed orbit to compute orbit period
     elif a1 > 0.:
-        period = 2.*np.pi*(a1**3./GM)
+        period = 2.*np.pi*np.sqrt(a1**3./GM)
     
     elif a2 > 0.:
-        period = 2.*np.pi*(a2**3./GM)
+        period = 2.*np.pi*np.sqrt(a2**3./GM)
         
     # If both orbits are escape trajectories, choose an arbitrary period 
     # corresponding to small orbit
