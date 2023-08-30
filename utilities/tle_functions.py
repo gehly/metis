@@ -70,7 +70,7 @@ def get_spacetrack_tle_data(obj_id_list = [], UTC_list = [], username='',
     tle_df : pandas dataframe
         norad, tle line1, tle line2
     '''
-    
+        
     tle_dict = {}
     tle_df = []
     UTC_list = copy.copy(UTC_list)
@@ -83,7 +83,7 @@ def get_spacetrack_tle_data(obj_id_list = [], UTC_list = [], username='',
     if len(obj_id_list) >= 1:
         myString = ",".join(map(str, obj_id_list))
 
-        # If only one time is given, add/subtract 2 day increment to produce window
+        # If only one time is given, add second to produce window
         if len(UTC_list) ==  1:
             UTC_list.append(UTC_list[0] + timedelta(days=2.))
             UTC_list[0] = UTC_list[0] - timedelta(days=2.)
@@ -95,8 +95,8 @@ def get_spacetrack_tle_data(obj_id_list = [], UTC_list = [], username='',
 #                UTC_list[-1] = UTC_list[0] + timedelta(days=2.)
             
             # Create expanded window
-            UTC_list[0] = UTC_list[0] - timedelta(days=2.)
-            UTC_list[-1] = UTC_list[-1] + timedelta(days=2.)
+            UTC_list[0] = UTC_list[0] # - timedelta(days=2.)
+            UTC_list[-1] = UTC_list[-1] # + timedelta(days=2.)
             
             UTC0 = UTC_list[0].strftime('%Y-%m-%d')
             UTC1 = UTC_list[-1].strftime('%Y-%m-%d')
@@ -113,13 +113,30 @@ def get_spacetrack_tle_data(obj_id_list = [], UTC_list = [], username='',
                         'NORAD_CAT_ID/' + myString +
                         '/orderby/NORAD_CAT_ID/format/tle')
     
-    # If no objects specified, retrieve latest for full catalog
-    # Note this query will only return data for TLEs with epochs in the last
-    # 30 days
+    # If no objects specified, retrieve data for full catalog    
     else:
-        pageData = ('//www.space-track.org/basicspacedata/query/class/gp/'
-                    '/EPOCH/>now-30/orderby/NORAD_CAT_ID/format/tle')
-#        print('Error: No Objects Specified!')
+        
+        # If one or more UTC times are given, retrieve data for the window
+        if len(UTC_list) == 1:
+            UTC_list.append(UTC_list[0] + timedelta(days=2.))
+            UTC_list[0] = UTC_list[0] - timedelta(days=2.)
+            
+        if len(UTC_list) >= 2:
+            UTC0 = UTC_list[0].strftime('%Y-%m-%d')
+            UTC1 = UTC_list[-1].strftime('%Y-%m-%d')
+            
+            pageData = ('//www.space-track.org/basicspacedata/query/class/gp/' +
+                        'EPOCH/' + UTC0 + '--' + UTC1 + 
+                        '/orderby/NORAD_CAT_ID/format/tle')
+            
+            
+
+        
+        # Otherwise return data for all TLEs with epochs in the last 30 days
+        else:
+            pageData = ('//www.space-track.org/basicspacedata/query/class/gp/'
+                        '/EPOCH/>now-30/orderby/NORAD_CAT_ID/format/tle')
+    #        print('Error: No Objects Specified!')
 
     ST_URL='https://www.space-track.org'
 
