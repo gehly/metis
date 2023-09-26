@@ -525,9 +525,9 @@ def Pc2D_Foster(X1, P1, X2, P2, HBR, rtol=1e-8):
     v = v1 - v2
     h = np.cross(r, v, axis=0)
     
-    print(r)
-    print(v)
-    print(h)
+    # print(r)
+    # print(v)
+    # print(h)
     
     # Unit vectors of relative encounter frame
     yhat = v/np.linalg.norm(v)
@@ -537,12 +537,12 @@ def Pc2D_Foster(X1, P1, X2, P2, HBR, rtol=1e-8):
     # Transformation matrix
     eci2xyz = np.concatenate((xhat.T, yhat.T, zhat.T))
     
-    print('')
+    # print('')
     
-    print(xhat)
-    print(yhat)
-    print(zhat)
-    print(eci2xyz)
+    # print(xhat)
+    # print(yhat)
+    # print(zhat)
+    # print(eci2xyz)
     
     # Transform combined covariance to relative encounter frame (xyz)
     Pxyz = np.dot(eci2xyz, np.dot(Peci, eci2xyz.T))
@@ -551,24 +551,24 @@ def Pc2D_Foster(X1, P1, X2, P2, HBR, rtol=1e-8):
     red = np.array([[1., 0., 0.], [0., 0., 1.]])
     Pxz = np.dot(red, np.dot(Pxyz, red.T))
     
-    print('')
-    print(Pxyz)
-    print(Pxz)
+    # print('')
+    # print(Pxyz)
+    # print(Pxz)
     
     # Calculate Double Integral
     x0 = np.linalg.norm(r)
     z0 = 0.
     
-    print('x0', x0)
+    # print('x0', x0)
     
     # Inverse of the Pxz matrix
     cholPxz_inv = np.linalg.inv(np.linalg.cholesky(Pxz))
     Pxz_inv = np.dot(cholPxz_inv.T, cholPxz_inv)
     Pxz_det = np.linalg.det(Pxz)
     
-    print('')
-    print('Pxz det', Pxz_det)
-    print('Pxz inv', Pxz_inv)
+    # print('')
+    # print('Pxz det', Pxz_det)
+    # print('Pxz inv', Pxz_inv)
     
     # Set up quadrature
     lower_semicircle = lambda x: -np.sqrt(HBR**2. - (x-x0)**2.)*(abs(x-x0)<=HBR)
@@ -578,9 +578,9 @@ def Pc2D_Foster(X1, P1, X2, P2, HBR, rtol=1e-8):
     atol = 1e-13
     Pc = (1./(2.*math.pi))*(1./np.sqrt(Pxz_det))*float(dblquad(Integrand, x0-HBR, x0+HBR, lower_semicircle, upper_semicircle, epsabs=atol, epsrel=rtol)[0])
     
-    print(Pc)
+    # print(Pc)
     
-    return 
+    return Pc
 
 
 
@@ -618,7 +618,9 @@ if __name__ == '__main__':
     HBR = 0.020
     tol = 1e-9
     
-    Pc2D_Foster(X1, P1, X2, P2, HBR, rtol=tol)
+    Pc = Pc2D_Foster(X1, P1, X2, P2, HBR, rtol=tol)
+    
+    print(Pc)
     
     # f = lambda y, x, a: a*x*y
     # print(dblquad(f, 0, 1, lambda x: x, lambda x: 2-x, args=(1,)))
