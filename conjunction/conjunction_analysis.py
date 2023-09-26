@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import os
 import sys
 import inspect
+from scipy.integrate import dblquad
 
 # Load tudatpy modules  
 from tudatpy.kernel.interface import spice
@@ -502,14 +503,130 @@ def compute_SMA(cart, GM=GME):
     return a
 
 
+###############################################################################
+# 2D Probability of Collision (Pc) Functions
+###############################################################################
+
+def Pc2D_Foster(X1, P1, X2, P2, HBR, rtol=1e-8):
+    '''
+    
+    
+    '''
+    
+    # Retrieve and combine the position covariance
+    Peci = P1[0:3,0:3] + P2[0:3,0:3]
+    
+    # Construct the relative encounter frame
+    r1 = np.reshape(X1[0:3], (3,1))
+    v1 = np.reshape(X1[3:6], (3,1))
+    r2 = np.reshape(X2[0:3], (3,1))
+    v2 = np.reshape(X2[3:6], (3,1))
+    r = r1 - r2
+    v = v1 - v2
+    h = np.cross(r, v, axis=0)
+    
+    print(r)
+    print(v)
+    print(h)
+    
+    # Unit vectors of relative encounter frame
+    yhat = v/np.linalg.norm(v)
+    zhat = h/np.linalg.norm(h)
+    xhat = np.cross(yhat, zhat, axis=0)
+    
+    # Transformation matrix
+    eci2xyz = np.concatenate((xhat.T, yhat.T, zhat.T))
+    
+    print('')
+    
+    print(xhat)
+    print(yhat)
+    print(zhat)
+    print(eci2xyz)
+    
+    # Transform combined covariance to relative encounter frame (xyz)
+    Pxyz = np.dot(eci2xyz, np.dot(Peci, eci2xyz.T))
+    
+    # 2D Projected covariance on the x-z plane of the relative encounter frame
+    red = np.array([[1., 0., 0.], [0., 0., 1.]])
+    Pxz = np.dot(red, np.dot(Pxyz, red.T))
+    
+    print('')
+    print(Pxyz)
+    print(Pxz)
+    
+    # Calculate Double Integral
+    x0 = np.linalg.norm(r)
+    z0 = 0.
+    
+    # Inverse of the Pxz matrix
+    cholPxz_inv = np.linalg.inv(np.linalg.cholesky(Pxz))
+    Pxz_inv = np.dot(cholPxz_inv.T, cholPxz_inv)
+    Pxz_det = np.linalg.det(Pxz)
+    
+    # Set up quadrature
+    lower_semicircle = lambda x: -np.sqrt(HBR**2. - (x-x0)**2.)*(abs(x-x0)<=HBR)
+    upper_semicircle = lambda x:  np.sqrt(HBR**2. - (x-x0)**2.)*(abs(x-x0)<=HBR)
+    
+    
+    atol = 1e-13
+        
+    
+    
+    Pc = (1./(2.*math.pi))*(1./np.sqrt(Pxz_det))*float(dblquad(int_circle, x0-HBR, x0+HBR, lower_semicircle, upper_semicircle, args=(Pxz,), epsabs=atol, epsrel=rtol)[0])
+    
+    print(Pc)
+    
+    return 
+
+
+
+
+def int_circle(x, z, P):
+    
+    I = math.exp(-1./2.*(P[0,0]*x**2. + P[0,1]*x*z + P[1,0]*x*z + P[1,1]*z**2.))
+    
+    return I
+
+
+
+
+
+
+
+
+
+
+
 if __name__ == '__main__':
     
     a = 0.
-    b = 200.
-    N = 16
-    xvec = compute_CGL_nodes(a,b,N)
-    interp_mat = compute_interpolation_matrix(N)
+    # b = 200.
+    # N = 16
+    # xvec = compute_CGL_nodes(a,b,N)
+    # interp_mat = compute_interpolation_matrix(N)
     
-    print(xvec)
-    print(interp_mat)
+    # print(xvec)
+    # print(interp_mat)
+    
+    X1 = np.reshape([378.39559, 4305.721887, 5752.767554, 2.360800244, 5.580331936, -4.322349039], (6,1))
+    X2 = np.reshape([374.5180598, 4307.560983, 5751.130418, -5.388125081, -3.946827739, 3.322820358], (6,1))
+    P1 = np.zeros((6,6))
+    P2 = np.zeros((6,6))
+    P1[0:3,0:3] = np.array([[44.5757544811362,  81.6751751052616,  -67.8687662707124],
+                            [81.6751751052616,  158.453402956163,  -128.616921644857],
+                            [-67.8687662707124, -128.616921644858, 105.490542562701]])
+    
+    P2[0:3,0:3] = np.array([[2.31067077720423,  1.69905293875632,  -1.4170164577661],
+                            [1.69905293875632,  1.24957388457206,  -1.04174164279599],
+                            [-1.4170164577661,  -1.04174164279599, 0.869260558223714]])
+    
+    HBR = 0.20
+    tol = 1e-9
+    
+    Pc2D_Foster(X1, P1, X2, P2, HBR, rtol=tol)
+    
+    
+    
+    
     
