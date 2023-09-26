@@ -559,34 +559,28 @@ def Pc2D_Foster(X1, P1, X2, P2, HBR, rtol=1e-8):
     x0 = np.linalg.norm(r)
     z0 = 0.
     
+    print('x0', x0)
+    
     # Inverse of the Pxz matrix
     cholPxz_inv = np.linalg.inv(np.linalg.cholesky(Pxz))
     Pxz_inv = np.dot(cholPxz_inv.T, cholPxz_inv)
     Pxz_det = np.linalg.det(Pxz)
     
+    print('')
+    print('Pxz det', Pxz_det)
+    print('Pxz inv', Pxz_inv)
+    
     # Set up quadrature
     lower_semicircle = lambda x: -np.sqrt(HBR**2. - (x-x0)**2.)*(abs(x-x0)<=HBR)
     upper_semicircle = lambda x:  np.sqrt(HBR**2. - (x-x0)**2.)*(abs(x-x0)<=HBR)
-    
+    Integrand = lambda z, x: math.exp(-0.5*(Pxz_inv[0,0]*x**2. + Pxz_inv[0,1]*x*z + Pxz_inv[1,0]*x*z + Pxz_inv[1,1]*z**2.))
     
     atol = 1e-13
-        
-    
-    
-    Pc = (1./(2.*math.pi))*(1./np.sqrt(Pxz_det))*float(dblquad(int_circle, x0-HBR, x0+HBR, lower_semicircle, upper_semicircle, args=(Pxz,), epsabs=atol, epsrel=rtol)[0])
+    Pc = (1./(2.*math.pi))*(1./np.sqrt(Pxz_det))*float(dblquad(Integrand, x0-HBR, x0+HBR, lower_semicircle, upper_semicircle, epsabs=atol, epsrel=rtol)[0])
     
     print(Pc)
     
     return 
-
-
-
-
-def int_circle(x, z, P):
-    
-    I = math.exp(-1./2.*(P[0,0]*x**2. + P[0,1]*x*z + P[1,0]*x*z + P[1,1]*z**2.))
-    
-    return I
 
 
 
@@ -621,12 +615,13 @@ if __name__ == '__main__':
                             [1.69905293875632,  1.24957388457206,  -1.04174164279599],
                             [-1.4170164577661,  -1.04174164279599, 0.869260558223714]])
     
-    HBR = 0.20
+    HBR = 0.020
     tol = 1e-9
     
     Pc2D_Foster(X1, P1, X2, P2, HBR, rtol=tol)
     
-    
+    # f = lambda y, x, a: a*x*y
+    # print(dblquad(f, 0, 1, lambda x: x, lambda x: 2-x, args=(1,)))
     
     
     
