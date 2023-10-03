@@ -44,6 +44,9 @@ from utilities.constants import Re, GME
 #
 #  [3] https://github.com/nasa/CARA_Analysis_Tools
 #
+#  [4] CCSDS Recommendation for Space Data System Standards: Conjunction Data
+#      Message (Recommended Standard 508.0-B-1), 2013.
+#
 #
 ###############################################################################
 
@@ -700,40 +703,51 @@ def remediate_covariance(Praw, Lclip, Lraw=[], Vraw=[]):
 
 
 
+###############################################################################
+# Utility Functions
+###############################################################################
 
+def read_cdm_file(cdm_file):
+    '''
+    This function reads a CCSDS Conjunction Data Message (CDM) to retrieve
+    object state and uncertainty information, collision risk metrics, and 
+    metadata related to the generation of the CDM.
+    
+    
+    '''
+    
+    # test = open(cdm_file).read().split()
+    # print(test)
+    
+    
+    field_name_list = []
+    data_list = []
+    with open(cdm_file) as file:
+        for line in file:
+            field_name = str(line[0:35]).strip()
+            data = str(line[37:]).split()[0]
+            
+            field_name_list.append(field_name)
+            data_list.append(data)
+            
+            
+    print(field_name_list)
+    print(data_list)
+    
+    
+    # Retrieve pertinent data
+    
+    
+    return
 
 
 
 if __name__ == '__main__':
     
-    a = 0.
-    # b = 200.
-    # N = 16
-    # xvec = compute_CGL_nodes(a,b,N)
-    # interp_mat = compute_interpolation_matrix(N)
     
-    # print(xvec)
-    # print(interp_mat)
+    cdm_file = os.path.join('unit_test/AlfanoTestCase01.cdm')
     
-    
-    print('\n')
-    
-    
-    # Praw = P1[0:3,0:3]
-    # cholPraw_inv = np.linalg.inv(np.linalg.cholesky(Praw))
-    # Praw_inv = np.dot(cholPraw_inv.T, cholPraw_inv)
-    
-    # Prem, Pdet, Pinv, posdef_status, clip_status = remediate_covariance(Praw, 0.)
-    
-    # print(Prem)
-    # print(Pdet, np.linalg.det(Prem), np.linalg.det(Praw))
-    # print(Pinv - np.linalg.inv(Prem))
-    # print(Pinv - np.linalg.inv(Praw))
-    # print(np.linalg.inv(Prem) - np.linalg.inv(Praw))
-    # print(np.linalg.inv(Praw) - Praw_inv)
-    # print(np.linalg.inv(Prem) - Praw_inv)
-    # print(Pinv - Praw_inv)
-    
+    read_cdm_file(cdm_file)
     
     
     

@@ -118,10 +118,6 @@ def unit_test_Pc2D_Foster_basic():
     return
 
 
-def read_cdm_data():
-    
-    
-    return
 
 
 
