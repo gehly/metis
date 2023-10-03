@@ -37,9 +37,14 @@ from utilities.constants import Re, GME
 # References:
 #
 #  [1] Denenberg, E., "Satellite Closest Approach Calculation Through 
-#         Chebyshev Proxy Polynomials," Acta Astronautica, 2020.
+#      Chebyshev Proxy Polynomials," Acta Astronautica, 2020.
 #
-#  [2] 
+#  [2] Hall, D.T., Hejduk, M.D., and Johnson, L.C., "Remedidting Non-Positive
+#      Definite State Covariances for Collision Probability Estimation," 2017.
+#
+#  [3] https://github.com/nasa/CARA_Analysis_Tools
+#
+#
 ###############################################################################
 
 
@@ -509,7 +514,30 @@ def compute_SMA(cart, GM=GME):
 
 def Pc2D_Foster(X1, P1, X2, P2, HBR, rtol=1e-8):
     '''
+    This function computes the probability of collision (Pc) in the 2D 
+    encounter plane following the method of Foster. The code has been ported
+    from the MATLAB library developed by the NASA CARA team, listed in Ref 3.
     
+    
+    Parameters
+    ------
+    X1 : 6x1 numpy array
+        Estimated mean state vector
+        Cartesian position and velocity of Object 1 in ECI [km, km/s]
+    P1 : 6x6 numpy array
+        Estimated covariance of Object 1 in ECI [km^2, km^2/s^2]
+    X2 : 6x1 numpy array
+        Estimated mean state vector
+        Cartesian position and velocity of Object 2 in ECI [km, km/s]
+    P2 : 6x6 numpy array
+        Estimated covariance of Object 2 in ECI [km^2, km^2/s^2]
+    HBR : float
+        hard-body region (e.g. radius for spherical object) [km]
+    
+    Returns
+    ------
+    Pc : float
+        probability of collision
     
     '''
     
@@ -555,6 +583,11 @@ def Pc2D_Foster(X1, P1, X2, P2, HBR, rtol=1e-8):
     # print(Pxyz)
     # print(Pxz)
     
+    # Exception Handling
+    # Remediate non-positive definite covariances
+    Lclip = (1e-4*HBR)**2.
+    
+    
     # Calculate Double Integral
     x0 = np.linalg.norm(r)
     z0 = 0.
@@ -584,7 +617,46 @@ def Pc2D_Foster(X1, P1, X2, P2, HBR, rtol=1e-8):
 
 
 
-
+def remediate_covariance(Praw, Lclip, Lraw=[], Vraw=[]):
+    '''
+    This function provides a level of exception handling by detecting and 
+    remediating non-positive definite covariances in the collision probability
+    calculation, following the procedue in Hall et al. (Ref 2). This code has
+    been ported from the MATLAB library developed by the NASA CARA team, 
+    listed in Ref 3.
+    
+    The function employs an eigenvalue clipping method, such that eigenvalues
+    below the specified Lclip value are reset to Lclip. The covariance matrix,
+    determinant, and inverse are then recomputed using the original 
+    eigenvectors and reset eigenvalues to ensure the output is positive (semi)
+    definite. An input of Lclip = 0 will result in the output being positive
+    semi-definite.
+    
+    Parameters
+    ------
+    
+    
+    Returns
+    ------
+    
+    
+    '''
+    
+    # Ensure the covariance has all real elements
+    if not np.isreal(Praw):
+        print('Error: input Praw is not real!')
+        print(Praw)
+        return
+    
+    # Calculate eigenvectors and eigenvalues if not input
+    if len(Lraw) == 0 and len(Vraw) == 0:
+        Lraw, Vraw = np.linalg.norm(Praw)
+        
+    
+    
+    
+    
+    return
 
 
 
