@@ -586,18 +586,19 @@ def Pc2D_Foster(X1, P1, X2, P2, HBR, rtol=1e-8):
     # Exception Handling
     # Remediate non-positive definite covariances
     Lclip = (1e-4*HBR)**2.
+    Pxz_rem, Pxz_det, Pxz_inv, posdef_status, clip_status = remediate_covariance(Pxz, Lclip)
     
     
     # Calculate Double Integral
     x0 = np.linalg.norm(r)
-    z0 = 0.
+    # z0 = 0.
     
     # print('x0', x0)
     
     # Inverse of the Pxz matrix
-    cholPxz_inv = np.linalg.inv(np.linalg.cholesky(Pxz))
-    Pxz_inv = np.dot(cholPxz_inv.T, cholPxz_inv)
-    Pxz_det = np.linalg.det(Pxz)
+    # cholPxz_inv = np.linalg.inv(np.linalg.cholesky(Pxz))
+    # Pxz_inv = np.dot(cholPxz_inv.T, cholPxz_inv)
+    # Pxz_det = np.linalg.det(Pxz)
     
     # print('')
     # print('Pxz det', Pxz_det)
@@ -643,20 +644,40 @@ def remediate_covariance(Praw, Lclip, Lraw=[], Vraw=[]):
     '''
     
     # Ensure the covariance has all real elements
-    if not np.isreal(Praw):
+    if not np.all(np.isreal(Praw)):
         print('Error: input Praw is not real!')
         print(Praw)
         return
     
     # Calculate eigenvectors and eigenvalues if not input
     if len(Lraw) == 0 and len(Vraw) == 0:
-        Lraw, Vraw = np.linalg.norm(Praw)
+        Lraw, Vraw = np.linalg.eig(Praw)
         
+    # Define the positive definite status of Praw
+    posdef_status = np.sign(min(Lraw))
+    
+    # Clip eigenvalues if needed, and record clipping status
+    Lrem = Lraw.copy()
+    if min(Lraw) < Lclip:
+        clip_status = True
+        Lrem[Lraw < Lclip] = Lclip
+    else:
+        clip_status = False
+        
+    # Determinant of remediated covariance
+    Pdet = np.prod(Lrem)
+    
+    # Inverse of remediated covariance
+    Pinv = np.dot(Vraw, np.dot(np.diag(1./Lrem), Vraw.T))
+    
+    # Remediated covariance
+    if clip_status:
+        Prem = np.dot(Vraw, np.dot(np.diag(Lrem), Vraw.T))
+    else:
+        Prem = Praw.copy()
     
     
-    
-    
-    return
+    return Prem, Pdet, Pinv, posdef_status, clip_status
 
 
 
@@ -693,9 +714,28 @@ if __name__ == '__main__':
     Pc = Pc2D_Foster(X1, P1, X2, P2, HBR, rtol=tol)
     
     print(Pc)
+    print('\n')
     
-    # f = lambda y, x, a: a*x*y
-    # print(dblquad(f, 0, 1, lambda x: x, lambda x: 2-x, args=(1,)))
+    
+    # Praw = P1[0:3,0:3]
+    # cholPraw_inv = np.linalg.inv(np.linalg.cholesky(Praw))
+    # Praw_inv = np.dot(cholPraw_inv.T, cholPraw_inv)
+    
+    # Prem, Pdet, Pinv, posdef_status, clip_status = remediate_covariance(Praw, 0.)
+    
+    # print(Prem)
+    # print(Pdet, np.linalg.det(Prem), np.linalg.det(Praw))
+    # print(Pinv - np.linalg.inv(Prem))
+    # print(Pinv - np.linalg.inv(Praw))
+    # print(np.linalg.inv(Prem) - np.linalg.inv(Praw))
+    # print(np.linalg.inv(Praw) - Praw_inv)
+    # print(np.linalg.inv(Prem) - Praw_inv)
+    # print(Pinv - Praw_inv)
+    
+    
+    
+    
+    
     
     
     
