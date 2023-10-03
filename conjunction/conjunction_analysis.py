@@ -512,11 +512,15 @@ def compute_SMA(cart, GM=GME):
 # 2D Probability of Collision (Pc) Functions
 ###############################################################################
 
-def Pc2D_Foster(X1, P1, X2, P2, HBR, rtol=1e-8):
+def Pc2D_Foster(X1, P1, X2, P2, HBR, rtol=1e-8, HBR_type='circle'):
     '''
     This function computes the probability of collision (Pc) in the 2D 
     encounter plane following the method of Foster. The code has been ported
     from the MATLAB library developed by the NASA CARA team, listed in Ref 3.
+    The function supports 3 types of hard body regions: circle, square, and 
+    square equivalent to the area of the circle. The input covariance may be
+    either 3x3 or 6x6, but only the 3x3 position covariance will be used in
+    the calculation of Pc.
     
     
     Parameters
@@ -533,6 +537,11 @@ def Pc2D_Foster(X1, P1, X2, P2, HBR, rtol=1e-8):
         Estimated covariance of Object 2 in ECI [km^2, km^2/s^2]
     HBR : float
         hard-body region (e.g. radius for spherical object) [km]
+    rtol : float, optional
+        relative tolerance for numerical quadrature (default=1e-8)
+    HBR_type : string, optional
+        type of hard body region ('circle', 'square', or 'squareEqArea')
+        (default='circle')
     
     Returns
     ------
@@ -591,7 +600,7 @@ def Pc2D_Foster(X1, P1, X2, P2, HBR, rtol=1e-8):
     
     # Calculate Double Integral
     x0 = np.linalg.norm(r)
-    # z0 = 0.
+    z0 = 0.
     
     # print('x0', x0)
     
@@ -605,14 +614,24 @@ def Pc2D_Foster(X1, P1, X2, P2, HBR, rtol=1e-8):
     # print('Pxz inv', Pxz_inv)
     
     # Set up quadrature
-    lower_semicircle = lambda x: -np.sqrt(HBR**2. - (x-x0)**2.)*(abs(x-x0)<=HBR)
-    upper_semicircle = lambda x:  np.sqrt(HBR**2. - (x-x0)**2.)*(abs(x-x0)<=HBR)
-    Integrand = lambda z, x: math.exp(-0.5*(Pxz_inv[0,0]*x**2. + Pxz_inv[0,1]*x*z + Pxz_inv[1,0]*x*z + Pxz_inv[1,1]*z**2.))
-    
     atol = 1e-13
-    Pc = (1./(2.*math.pi))*(1./np.sqrt(Pxz_det))*float(dblquad(Integrand, x0-HBR, x0+HBR, lower_semicircle, upper_semicircle, epsabs=atol, epsrel=rtol)[0])
+    Integrand = lambda z, x: math.exp(-0.5*(Pxz_inv[0,0]*x**2. + Pxz_inv[0,1]*x*z + Pxz_inv[1,0]*x*z + Pxz_inv[1,1]*z**2.))
+
+    if HBR_type == 'circle':
+        lower_semicircle = lambda x: -np.sqrt(HBR**2. - (x-x0)**2.)*(abs(x-x0)<=HBR)
+        upper_semicircle = lambda x:  np.sqrt(HBR**2. - (x-x0)**2.)*(abs(x-x0)<=HBR)
+        Pc = (1./(2.*math.pi))*(1./np.sqrt(Pxz_det))*float(dblquad(Integrand, x0-HBR, x0+HBR, lower_semicircle, upper_semicircle, epsabs=atol, epsrel=rtol)[0])
+        
+    elif HBR_type == 'square':
+        Pc = (1./(2.*math.pi))*(1./np.sqrt(Pxz_det))*float(dblquad(Integrand, x0-HBR, x0+HBR, z0-HBR, z0+HBR, epsabs=atol, epsrel=rtol)[0])
+        
+    elif HBR_type == 'squareEqArea':
+        HBR_eq = HBR*np.sqrt(math.pi)/2.
+        Pc = (1./(2.*math.pi))*(1./np.sqrt(Pxz_det))*float(dblquad(Integrand, x0-HBR_eq, x0+HBR_eq, z0-HBR_eq, z0+HBR_eq, epsabs=atol, epsrel=rtol)[0])
     
-    # print(Pc)
+    else:
+        print('Error: HBR type is not supported! Must be circle, square, or squareEqArea')
+        print(HBR_type)
     
     return Pc
 
@@ -710,8 +729,9 @@ if __name__ == '__main__':
     
     HBR = 0.020
     tol = 1e-9
+    HBR_type = 'circle'
     
-    Pc = Pc2D_Foster(X1, P1, X2, P2, HBR, rtol=tol)
+    Pc = Pc2D_Foster(X1, P1, X2, P2, HBR, rtol=tol, HBR_type=HBR_type)
     
     print(Pc)
     print('\n')
