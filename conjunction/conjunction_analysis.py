@@ -737,6 +737,80 @@ def read_cdm_file(cdm_file):
     
     # Retrieve pertinent data
     
+    # Time of closest approach (TCA)
+    ind = field_name_list.index('TCA')
+    TCA_UTC = datetime.strptime(data_list[ind], '%Y-%m-%dT%H:%M:%S.%f')
+    
+    # Miss Distance
+    retrieve_list = ['MISS_DISTANCE', 'RELATIVE_SPEED', 'RELATIVE_POSITION_R',
+                     'RELATIVE_POSITION_T', 'RELATIVE_POSITION_N', 
+                     'RELATIVE_VELOCITY_R', 'RELATIVE_VELOCITY_T',
+                     'RELATIVE_VELOCITY_N']
+    
+    miss_params = {}
+    for item in retrieve_list:
+        ind = field_name_list.index(item)
+        data = float(data_list[ind])
+        miss_params[item] = data
+        
+        
+    # Object States, Covariances, and Parameters
+    ind = field_name_list.index('COMMENT HBR')
+    HBR = float(data_list[ind])
+    
+    for ii in range(len(field_name_list)):
+        if field_name_list[ii] == 'OBJECT':
+            if data_list[ii] == 'OBJECT1':
+                obj1_ind = ii
+            elif data_list[ii] == 'OBJECT2':
+                obj2_ind = ii
+                
+    obj_params = {}
+    obj_params[1] = {}
+    obj_params[1]['mean'] = np.zeros((6,1))
+    obj_params[1]['covar'] = np.zeros((6,6))
+    for ii in range(obj1_ind, obj2_ind):
+        field = field_name_list[ii]
+        data = data_list[ii]
+        if field[0:4] == 'TIME':
+            data = datetime.strptime(data, '%Y-%m-%dT%H:%M:%S.%f')
+        
+        elif field == 'X':
+            obj_params[1]['mean'][0] = float(data)
+        elif field == 'Y':
+            obj_params[1]['mean'][1] = float(data)
+        elif field == 'Z':
+            obj_params[1]['mean'][2] = float(data)
+        elif field == 'X_DOT':
+            obj_params[1]['mean'][3] = float(data)
+        elif field == 'Y_DOT':
+            obj_params[1]['mean'][4] = float(data)
+        elif field == 'Z_DOT':
+            obj_params[1]['mean'][5] = float(data)
+            
+        elif field == 'CR_R':
+            obj_params[1]['covar'][0,0] = float(data)
+        elif field == 'CT_R':
+            obj_params[1]['covar'][1,0] = float(data)
+            obj_params[1]['covar'][1,0] = float(data)
+        elif field == 'CT_T':
+            obj_params[1]['covar'][1,1] = float(data)
+        elif field == 'CN_R':
+            obj_params[1]['covar'][0,2] = float(data)
+            obj_params[1]['covar'][2,0] = float(data)
+        elif field == 'CN_T':
+            obj_params[1]['covar'][1,2] = float(data)
+            obj_params[1]['covar'][2,1] = float(data)
+        elif field == 'CN_N':
+            obj_params[1]['covar'][2,2] = float(data)
+            
+    
+    print(TCA_UTC)
+    print(miss_params)
+    
+    print(obj1_ind)
+    print(obj2_ind)
+    
     
     return
 
