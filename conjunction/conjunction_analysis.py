@@ -766,43 +766,147 @@ def read_cdm_file(cdm_file):
                 obj2_ind = ii
                 
     obj_params = {}
-    obj_params[1] = {}
-    obj_params[1]['mean'] = np.zeros((6,1))
-    obj_params[1]['covar'] = np.zeros((6,6))
-    for ii in range(obj1_ind, obj2_ind):
-        field = field_name_list[ii]
-        data = data_list[ii]
-        if field[0:4] == 'TIME':
-            data = datetime.strptime(data, '%Y-%m-%dT%H:%M:%S.%f')
+    for obj_id in [1,2]:
+        obj_params[obj_id] = {}
+        obj_params[obj_id]['mean'] = np.zeros((6,1))
+        obj_params[obj_id]['covar'] = np.zeros((8,8))
         
-        elif field == 'X':
-            obj_params[1]['mean'][0] = float(data)
-        elif field == 'Y':
-            obj_params[1]['mean'][1] = float(data)
-        elif field == 'Z':
-            obj_params[1]['mean'][2] = float(data)
-        elif field == 'X_DOT':
-            obj_params[1]['mean'][3] = float(data)
-        elif field == 'Y_DOT':
-            obj_params[1]['mean'][4] = float(data)
-        elif field == 'Z_DOT':
-            obj_params[1]['mean'][5] = float(data)
+        if obj_id == 1:
+            lower = obj1_ind
+            upper = obj2_ind
+        else:
+            lower = obj2_ind
+            upper = len(field_name_list)
+        
+        for ii in range(lower, upper):
+            field = field_name_list[ii]
+            data = data_list[ii]
+            if field[0:4] == 'TIME':
+                data = datetime.strptime(data, '%Y-%m-%dT%H:%M:%S.%f')
             
-        elif field == 'CR_R':
-            obj_params[1]['covar'][0,0] = float(data)
-        elif field == 'CT_R':
-            obj_params[1]['covar'][1,0] = float(data)
-            obj_params[1]['covar'][1,0] = float(data)
-        elif field == 'CT_T':
-            obj_params[1]['covar'][1,1] = float(data)
-        elif field == 'CN_R':
-            obj_params[1]['covar'][0,2] = float(data)
-            obj_params[1]['covar'][2,0] = float(data)
-        elif field == 'CN_T':
-            obj_params[1]['covar'][1,2] = float(data)
-            obj_params[1]['covar'][2,1] = float(data)
-        elif field == 'CN_N':
-            obj_params[1]['covar'][2,2] = float(data)
+            if field == 'X':
+                obj_params[obj_id]['mean'][0] = float(data)
+            elif field == 'Y':
+                obj_params[obj_id]['mean'][1] = float(data)
+            elif field == 'Z':
+                obj_params[obj_id]['mean'][2] = float(data)
+            elif field == 'X_DOT':
+                obj_params[obj_id]['mean'][3] = float(data)
+            elif field == 'Y_DOT':
+                obj_params[obj_id]['mean'][4] = float(data)
+            elif field == 'Z_DOT':
+                obj_params[obj_id]['mean'][5] = float(data)
+                
+            elif field == 'CR_R':
+                obj_params[obj_id]['covar'][0,0] = float(data)
+            elif field == 'CT_R':
+                obj_params[obj_id]['covar'][1,0] = float(data)
+                obj_params[obj_id]['covar'][1,0] = float(data)
+            elif field == 'CT_T':
+                obj_params[obj_id]['covar'][1,1] = float(data)
+            elif field == 'CN_R':
+                obj_params[obj_id]['covar'][0,2] = float(data)
+                obj_params[obj_id]['covar'][2,0] = float(data)
+            elif field == 'CN_T':
+                obj_params[obj_id]['covar'][1,2] = float(data)
+                obj_params[obj_id]['covar'][2,1] = float(data)
+            elif field == 'CN_N':
+                obj_params[obj_id]['covar'][2,2] = float(data)
+                
+            elif field == 'CRDOT_R':
+                obj_params[obj_id]['covar'][0,3] = float(data)
+                obj_params[obj_id]['covar'][3,0] = float(data)
+            elif field == 'CRDOT_T':
+                obj_params[obj_id]['covar'][1,3] = float(data)
+                obj_params[obj_id]['covar'][3,1] = float(data)
+            elif field == 'CRDOT_N':
+                obj_params[obj_id]['covar'][2,3] = float(data)
+                obj_params[obj_id]['covar'][3,2] = float(data)
+            elif field == 'CRDOT_RDOT':
+                obj_params[obj_id]['covar'][3,3] = float(data)
+                
+            elif field == 'CTDOT_R':
+                obj_params[obj_id]['covar'][0,4] = float(data)
+                obj_params[obj_id]['covar'][4,0] = float(data)
+            elif field == 'CTDOT_T':
+                obj_params[obj_id]['covar'][1,4] = float(data)
+                obj_params[obj_id]['covar'][4,1] = float(data)
+            elif field == 'CTDOT_N':
+                obj_params[obj_id]['covar'][2,4] = float(data)
+                obj_params[obj_id]['covar'][4,2] = float(data)
+            elif field == 'CTDOT_RDOT':
+                obj_params[obj_id]['covar'][3,4] = float(data)
+                obj_params[obj_id]['covar'][4,3] = float(data)            
+            elif field == 'CTDOT_TDOT':
+                obj_params[obj_id]['covar'][4,4] = float(data)
+                
+            elif field == 'CNDOT_R':
+                obj_params[obj_id]['covar'][0,5] = float(data)
+                obj_params[obj_id]['covar'][5,0] = float(data)
+            elif field == 'CNDOT_T':
+                obj_params[obj_id]['covar'][1,5] = float(data)
+                obj_params[obj_id]['covar'][5,1] = float(data)
+            elif field == 'CNDOT_N':
+                obj_params[obj_id]['covar'][2,5] = float(data)
+                obj_params[obj_id]['covar'][5,2] = float(data)
+            elif field == 'CNDOT_RDOT':
+                obj_params[obj_id]['covar'][3,5] = float(data)
+                obj_params[obj_id]['covar'][5,3] = float(data) 
+            elif field == 'CNDOT_TDOT':
+                obj_params[obj_id]['covar'][4,5] = float(data)
+                obj_params[obj_id]['covar'][5,4] = float(data)        
+            elif field == 'CNDOT_NDOT':
+                obj_params[obj_id]['covar'][5,5] = float(data)
+                
+            elif field == 'CDRG_R':
+                obj_params[obj_id]['covar'][0,6] = float(data)
+                obj_params[obj_id]['covar'][6,0] = float(data)
+            elif field == 'CDRG_T':
+                obj_params[obj_id]['covar'][1,6] = float(data)
+                obj_params[obj_id]['covar'][6,1] = float(data)
+            elif field == 'CDRG_N':
+                obj_params[obj_id]['covar'][2,6] = float(data)
+                obj_params[obj_id]['covar'][6,2] = float(data)
+            elif field == 'CDRG_RDOT':
+                obj_params[obj_id]['covar'][3,6] = float(data)
+                obj_params[obj_id]['covar'][6,3] = float(data) 
+            elif field == 'CDRG_TDOT':
+                obj_params[obj_id]['covar'][4,6] = float(data)
+                obj_params[obj_id]['covar'][6,4] = float(data) 
+            elif field == 'CDRG_NDOT':
+                obj_params[obj_id]['covar'][5,6] = float(data)
+                obj_params[obj_id]['covar'][6,5] = float(data)     
+            elif field == 'CDRG_DRG':
+                obj_params[obj_id]['covar'][6,6] = float(data)
+                
+            elif field == 'CSRP_R':
+                obj_params[obj_id]['covar'][0,7] = float(data)
+                obj_params[obj_id]['covar'][7,0] = float(data)
+            elif field == 'CSRP_T':
+                obj_params[obj_id]['covar'][1,7] = float(data)
+                obj_params[obj_id]['covar'][7,1] = float(data)
+            elif field == 'CSRP_N':
+                obj_params[obj_id]['covar'][2,7] = float(data)
+                obj_params[obj_id]['covar'][7,2] = float(data)
+            elif field == 'CSRP_RDOT':
+                obj_params[obj_id]['covar'][3,7] = float(data)
+                obj_params[obj_id]['covar'][7,3] = float(data) 
+            elif field == 'CSRP_TDOT':
+                obj_params[obj_id]['covar'][4,7] = float(data)
+                obj_params[obj_id]['covar'][7,4] = float(data) 
+            elif field == 'CSRP_NDOT':
+                obj_params[obj_id]['covar'][5,7] = float(data)
+                obj_params[obj_id]['covar'][7,5] = float(data)
+            elif field == 'CSRP_DRG':
+                obj_params[obj_id]['covar'][6,7] = float(data)
+                obj_params[obj_id]['covar'][7,6] = float(data)             
+            elif field == 'CSRP_SRP':
+                obj_params[obj_id]['covar'][7,7] = float(data)
+                
+            else:
+                obj_params[obj_id][field] = data
+        
+        
             
     
     print(TCA_UTC)
@@ -810,6 +914,8 @@ def read_cdm_file(cdm_file):
     
     print(obj1_ind)
     print(obj2_ind)
+    
+    print(obj_params)
     
     
     return
