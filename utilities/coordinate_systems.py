@@ -398,12 +398,6 @@ def ric2eci(rc_vect, vc_vect, Q_ric=[]):
     h = np.linalg.norm(h_vect)
     OH = h_vect/h
     OT = np.cross(OH, OR, axis=0)
-    
-    
-    print(rc_vect)
-    print(vc_vect)
-    print(h_vect)
-    print(h)
 
     ON = np.concatenate((OR.T, OT.T, OH.T))
     NO = ON.T

@@ -121,12 +121,19 @@ def unit_test_Pc2D_Foster_basic():
 
 def unit_test_Pc2D_Foster_full():
     
-    fname = os.path.join('unit_test', 'AlfanoTestCase01.cdm')
-    accuracy = 1e-3
-    Pc_true = 0.146749549
-    test = run_unit_test(fname, accuracy, Pc_true)
+    Pc_true_list = [0.146749549, 0.006222267, 0.100351176, 0.049323406, 
+                    0.044487386, 0.004335455, 0.000158147, 0.036948008,
+                    0.290146291, 0.290146291, 0.002672026]
     
-    print(test)
+    accuracy = 1e-3
+    for ii in range(1, len(Pc_true_list)+1):
+        Pc_true = Pc_true_list[ii-1]
+        fname = 'AlfanoTestCase' + str(ii).zfill(2) + '.cdm'
+        cdm_file = os.path.join('unit_test', fname)
+        test = run_unit_test(cdm_file, accuracy, Pc_true)
+        print(fname, test)
+    
+    
     
     return
 
@@ -164,16 +171,16 @@ def run_unit_test(cdm_file, accuracy, Pc_true, tol=1e-8, HBR_type='circle'):
         print(obj1_frame)
         return
     
-    print('obj1')
-    print('r1_eci', r1_eci)
-    print('v1_eci', v1_eci)
+    # print('obj1')
+    # print('r1_eci', r1_eci)
+    # print('v1_eci', v1_eci)
     
     X1_eci = np.concatenate((r1_eci, v1_eci), axis=0)
     P1_ric = obj1_covar[0:3,0:3]
     P1_eci = coord.ric2eci(r1_eci, v1_eci, P1_ric)
     
-    print('P1_ric', P1_ric)
-    print('P1_eci', P1_eci)
+    # print('P1_ric', P1_ric)
+    # print('P1_eci', P1_eci)
     
     if obj2_frame == 'EME2000':
         r2_eci = obj2_state[0:3].reshape(3,1)
@@ -195,23 +202,23 @@ def run_unit_test(cdm_file, accuracy, Pc_true, tol=1e-8, HBR_type='circle'):
     P2_ric = obj2_covar[0:3,0:3]
     P2_eci = coord.ric2eci(r2_eci, v2_eci, P2_ric)
     
-    print('obj2')
-    print('r2_eci', r2_eci)
-    print('v2_eci', v2_eci)
-    print('P2_ric', P2_ric)
-    print('P2_eci', P2_eci)
+    # print('obj2')
+    # print('r2_eci', r2_eci)
+    # print('v2_eci', v2_eci)
+    # print('P2_ric', P2_ric)
+    # print('P2_eci', P2_eci)
     
     # Calculate 2D Pc
     Pc = ca.Pc2D_Foster(X1_eci, P1_eci, X2_eci, P2_eci, HBR, tol, HBR_type)  
     
-    print('Pc', Pc)
-    print('Pc_true', Pc_true)
+    # print('Pc', Pc)
+    # print('Pc_true', Pc_true)
     
     
     # Error check
     error = abs(Pc - Pc_true)/Pc_true
     
-    print('rel error', error)
+    # print('rel error', error)
     
     return (error < accuracy)
 
