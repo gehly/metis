@@ -730,11 +730,7 @@ def read_cdm_file(cdm_file):
             field_name_list.append(field_name)
             data_list.append(data)
             
-            
-    print(field_name_list)
-    print(data_list)
-    
-    
+
     # Retrieve pertinent data
     
     # Time of closest approach (TCA)
@@ -745,7 +741,7 @@ def read_cdm_file(cdm_file):
     retrieve_list = ['MISS_DISTANCE', 'RELATIVE_SPEED', 'RELATIVE_POSITION_R',
                      'RELATIVE_POSITION_T', 'RELATIVE_POSITION_N', 
                      'RELATIVE_VELOCITY_R', 'RELATIVE_VELOCITY_T',
-                     'RELATIVE_VELOCITY_N']
+                     'RELATIVE_VELOCITY_N', 'COMMENT HBR']
     
     miss_params = {}
     for item in retrieve_list:
@@ -755,8 +751,8 @@ def read_cdm_file(cdm_file):
         
         
     # Object States, Covariances, and Parameters
-    ind = field_name_list.index('COMMENT HBR')
-    HBR = float(data_list[ind])
+    # ind = field_name_list.index('COMMENT HBR')
+    # HBR = float(data_list[ind])
     
     for ii in range(len(field_name_list)):
         if field_name_list[ii] == 'OBJECT':
@@ -800,7 +796,7 @@ def read_cdm_file(cdm_file):
             elif field == 'CR_R':
                 obj_params[obj_id]['covar'][0,0] = float(data)
             elif field == 'CT_R':
-                obj_params[obj_id]['covar'][1,0] = float(data)
+                obj_params[obj_id]['covar'][0,1] = float(data)
                 obj_params[obj_id]['covar'][1,0] = float(data)
             elif field == 'CT_T':
                 obj_params[obj_id]['covar'][1,1] = float(data)
@@ -905,20 +901,10 @@ def read_cdm_file(cdm_file):
                 
             else:
                 obj_params[obj_id][field] = data
-        
-        
-            
-    
-    print(TCA_UTC)
-    print(miss_params)
-    
-    print(obj1_ind)
-    print(obj2_ind)
-    
-    print(obj_params)
+
     
     
-    return
+    return TCA_UTC, miss_params, obj_params
 
 
 

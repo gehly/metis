@@ -19,8 +19,6 @@ sys.path.append(metis_dir)
 
 from utilities import numerical_methods as num
 from utilities import time_systems as timesys
-# from utilities.time_systems import dt2mjd, mjd2dt, utcdt2ut1jd, utcdt2ttjd, jd2cent
-# from utilities.numerical_methods import interp_lagrange
 
 ###############################################################################
 #

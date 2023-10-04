@@ -11,7 +11,8 @@ metis_dir = current_dir[0:ind+5]
 sys.path.append(metis_dir)
 
 from conjunction import conjunction_analysis as ca
-
+from utilities import coordinate_systems as coord
+from utilities import eop_functions as eop
 
 
 ###############################################################################
@@ -118,12 +119,112 @@ def unit_test_Pc2D_Foster_basic():
     return
 
 
+def unit_test_Pc2D_Foster_full():
+    
+    fname = os.path.join('unit_test', 'AlfanoTestCase01.cdm')
+    accuracy = 1e-3
+    Pc_true = 0.146749549
+    test = run_unit_test(fname, accuracy, Pc_true)
+    
+    print(test)
+    
+    return
+
+
+def run_unit_test(cdm_file, accuracy, Pc_true, tol=1e-8, HBR_type='circle'):
+    
+    # Load CDM data
+    TCA_UTC, miss_params, obj_params = ca.read_cdm_file(cdm_file)
+    
+    # Retrieve data
+    HBR = miss_params['COMMENT HBR']            # meters
+    
+    obj1_frame = obj_params[1]['REF_FRAME']
+    obj1_state = obj_params[1]['mean']*1000.    # convert to meters
+    obj1_covar = obj_params[1]['covar']         # m^2, m^2/s^2
+    
+    obj2_frame = obj_params[2]['REF_FRAME']
+    obj2_state = obj_params[2]['mean']*1000.    # convert to meters
+    obj2_covar = obj_params[2]['covar']         # m^2, m^2/s^2
+    
+    # Convert covariance matrices to inertial frame
+    if obj1_frame == 'EME2000':
+        r1_eci = obj1_state[0:3].reshape(3,1)
+        v1_eci = obj1_state[3:6].reshape(3,1)
+        
+    elif obj1_frame == 'ITRF':
+        r1_ecef = obj1_state[0:3].reshape(3,1)
+        v1_ecef = obj1_state[3:6].reshape(3,1)
+        eop_alldata = eop.get_celestrak_eop_alldata()
+        EOP_data = eop.get_eop_data(eop_alldata, TCA_UTC)
+        r1_eci, v1_eci = coord.itrf2gcrf(r1_ecef, v1_ecef, TCA_UTC, EOP_data)
+        
+    else:
+        print('Error: Object 1 coordinate frame is not known')
+        print(obj1_frame)
+        return
+    
+    print('obj1')
+    print('r1_eci', r1_eci)
+    print('v1_eci', v1_eci)
+    
+    X1_eci = np.concatenate((r1_eci, v1_eci), axis=0)
+    P1_ric = obj1_covar[0:3,0:3]
+    P1_eci = coord.ric2eci(r1_eci, v1_eci, P1_ric)
+    
+    print('P1_ric', P1_ric)
+    print('P1_eci', P1_eci)
+    
+    if obj2_frame == 'EME2000':
+        r2_eci = obj2_state[0:3].reshape(3,1)
+        v2_eci = obj2_state[3:6].reshape(3,1)
+        
+    elif obj2_frame == 'ITRF':
+        r2_ecef = obj2_state[0:3].reshape(3,1)
+        v2_ecef = obj2_state[3:6].reshape(3,1)
+        eop_alldata = eop.get_celestrak_eop_alldata()
+        EOP_data = eop.get_eop_data(eop_alldata, TCA_UTC)
+        r2_eci, v2_eci = coord.itrf2gcrf(r2_ecef, v2_ecef, TCA_UTC, EOP_data)
+        
+    else:
+        print('Error: Object 2 coordinate frame is not known')
+        print(obj2_frame)
+        return
+    
+    X2_eci = np.concatenate((r2_eci, v2_eci), axis=0)
+    P2_ric = obj2_covar[0:3,0:3]
+    P2_eci = coord.ric2eci(r2_eci, v2_eci, P2_ric)
+    
+    print('obj2')
+    print('r2_eci', r2_eci)
+    print('v2_eci', v2_eci)
+    print('P2_ric', P2_ric)
+    print('P2_eci', P2_eci)
+    
+    # Calculate 2D Pc
+    Pc = ca.Pc2D_Foster(X1_eci, P1_eci, X2_eci, P2_eci, HBR, tol, HBR_type)  
+    
+    print('Pc', Pc)
+    print('Pc_true', Pc_true)
+    
+    
+    # Error check
+    error = abs(Pc - Pc_true)/Pc_true
+    
+    print('rel error', error)
+    
+    return (error < accuracy)
+
+
 
 
 
 if __name__ == '__main__':
     
-    unit_test_Pc2D_Foster_basic()
+    # unit_test_Pc2D_Foster_basic()
+    
+    unit_test_Pc2D_Foster_full()
+    
 
 
 
