@@ -703,6 +703,82 @@ def remediate_covariance(Praw, Lclip, Lraw=[], Vraw=[]):
 
 
 
+
+###############################################################################
+# Monte Carlo Probability of Collision (Pc) Functions
+###############################################################################
+
+def Pc_MonteCarlo(X1, P1, X2, P2, HBR, N=1000, HBR_type='circle'):
+    '''
+    This function computes the probability of collision (Pc) using Monte Carlo
+    samples to approximate the distributions of primary and secondary objects
+    and then checking the number of sample pairs that fall within the combined
+    dimensions of the physical objects.
+    
+    The function supports 3 types of hard body regions: circle, square, and 
+    square equivalent to the area of the circle. The input covariance may be
+    either 3x3 or 6x6, but only the 3x3 position covariance will be used in
+    the calculation of Pc.
+    
+    
+    Parameters
+    ------
+    X1 : 6x1 numpy array
+        Estimated mean state vector
+        Cartesian position and velocity of Object 1 in ECI [km, km/s]
+    P1 : 6x6 numpy array
+        Estimated covariance of Object 1 in ECI [km^2, km^2/s^2]
+    X2 : 6x1 numpy array
+        Estimated mean state vector
+        Cartesian position and velocity of Object 2 in ECI [km, km/s]
+    P2 : 6x6 numpy array
+        Estimated covariance of Object 2 in ECI [km^2, km^2/s^2]
+    HBR : float
+        hard-body region (e.g. radius for spherical object) [km]
+    N : int, optional
+        number of MC samples for each PDF (default=1000)
+    HBR_type : string, optional
+        type of hard body region ('circle', 'square', or 'squareEqArea')
+        (default='circle')
+    
+    Returns
+    ------
+    Pc : float
+        probability of collision
+    
+    '''
+    
+    # Retrieve and sample the position covariance
+    r1 = X1[0:3].reshape(3,1)
+    r2 = X2[0:3].reshape(3,1)
+    P1 = P1[0:3,0:3] 
+    P2 = P2[0:3,0:3]
+    samples1 = np.random.multivariate_normal(r1.flatten(), P1, N)
+    samples2 = np.random.multivariate_normal(r2.flatten(), P2, N)
+    
+    # Loop and compute separation distance
+    count = 0
+    for ii in range(N):        
+        si = samples1[ii]
+        
+        for jj in range(N):            
+            sj = samples2[jj]
+            
+            dist = np.linalg.norm(si-sj)
+            
+            if HBR_type == 'circle':
+                if dist < HBR:
+                    count += 1
+                    
+                    
+    Pc = float(count)/(N**2.)
+            
+
+    return Pc   
+    
+    
+
+
 ###############################################################################
 # Utility Functions
 ###############################################################################
