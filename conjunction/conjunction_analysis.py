@@ -761,10 +761,15 @@ def Pc_MonteCarlo(X1, P1, X2, P2, HBR, N=1000, HBR_type='circle'):
     for ii in range(N):        
         si = samples1[ii]
         
+        # print('ii', ii)
+        
         for jj in range(N):            
             sj = samples2[jj]
             
             dist = np.linalg.norm(si-sj)
+            
+            print(ii, jj, dist)
+            dist = 0.01
             
             if HBR_type == 'circle':
                 if dist < HBR:

@@ -23,7 +23,7 @@ from utilities import eop_functions as eop
 
 
 # NASA CARA MATLAB Basic Examples/Validation Cases
-def unit_test_Pc2D_Foster_basic():
+def unit_test_Pc_basic():
     
 #   Examples/Validation Cases:
 #
@@ -112,7 +112,10 @@ def unit_test_Pc2D_Foster_basic():
     Pc = ca.Pc2D_Foster(X1, P1, X2, P2, HBR, rtol=tol, HBR_type=HBR_type)    
     print(HBR_type, Pc, 2.70601573490093e-05)
     
-    
+    # Monte Carlo approach
+    HBR_type = 'circle'
+    Pc = ca.Pc_MonteCarlo(X1, P1, X2, P2, HBR, N=10, HBR_type=HBR_type)
+    print(HBR_type, Pc, 2.7060234765697e-05)
     
     
     
@@ -228,9 +231,11 @@ def run_unit_test(cdm_file, accuracy, Pc_true, tol=1e-8, HBR_type='circle'):
 
 if __name__ == '__main__':
     
-    # unit_test_Pc2D_Foster_basic()
+    unit_test_Pc_basic()
     
-    unit_test_Pc2D_Foster_full()
+    # unit_test_Pc2D_Foster_full()
+    
+    
     
 
 
