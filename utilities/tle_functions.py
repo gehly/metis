@@ -74,6 +74,7 @@ def get_spacetrack_tle_data(obj_id_list = [], UTC_list = [], username='',
     tle_dict = {}
     tle_df = []
     UTC_list = copy.copy(UTC_list)
+    
 
     if len(username) == 0:
         username = input('space-track username: ')
@@ -116,6 +117,9 @@ def get_spacetrack_tle_data(obj_id_list = [], UTC_list = [], username='',
     # If no objects specified, retrieve data for full catalog    
     else:
         
+        # TODO: These requests don't work, need to figure out correct API
+        # request to retrieve full catalog for given date range
+        
         # If one or more UTC times are given, retrieve data for the window
         if len(UTC_list) == 1:
             UTC_list.append(UTC_list[0] + timedelta(days=2.))
@@ -124,10 +128,17 @@ def get_spacetrack_tle_data(obj_id_list = [], UTC_list = [], username='',
         if len(UTC_list) >= 2:
             UTC0 = UTC_list[0].strftime('%Y-%m-%d')
             UTC1 = UTC_list[-1].strftime('%Y-%m-%d')
-            
+
             pageData = ('//www.space-track.org/basicspacedata/query/class/gp/' +
                         'EPOCH/' + UTC0 + '--' + UTC1 + 
                         '/orderby/NORAD_CAT_ID/format/tle')
+            
+            
+            # pageData = ('//www.space-track.org/basicspacedata/query/class/' +
+            #             'gp_history/NORAD_CAT_ID/' + '00001--99999' + '/orderby/' +
+            #             'TLE_LINE1 ASC/EPOCH/' + UTC0 + '--' + UTC1 + 
+            #             '/format/tle')
+            
             
             
 

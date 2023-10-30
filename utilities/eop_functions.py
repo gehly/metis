@@ -83,17 +83,27 @@ def get_celestrak_eop_alldata(offline_flag=False):
         information
     '''
     
-    if offline_flag:
+    # Check modification date of EOP data file
+    fname = os.path.join(input_data_dir, 'eop_alldata.pkl')
+    try:
+        timestamp = os.path.getmtime(fname)
+        modtime = datetime.fromtimestamp(timestamp)
+        tdiff_hrs = (datetime.now() - modtime).total_seconds()/3600.
+
+    except:
+        tdiff_hrs = 1e6
+
+    
+    if offline_flag or (tdiff_hrs < 6.):
         
-        # Load data from file
-        fname = os.path.join('../input_data', 'eop_alldata.pkl')        
+        # Load data from file      
         pklFile = open(fname, 'rb')
         data = pickle.load(pklFile)
         data_text = data[0]
         pklFile.close() 
         
     else:
-        
+                
         # Retrieve data from internet
         pageData = 'https://celestrak.com/SpaceData/eop19620101.txt'
 #        pageData = 'http://www.celestrak.com/SpaceData/EOP-Last5Years.txt'
@@ -110,6 +120,11 @@ def get_celestrak_eop_alldata(offline_flag=False):
         # Reduce to data
         data_text = r.text[ind_BEGIN_OBSERVED+16:ind_END_OBSERVED] \
             + r.text[ind_BEGIN_PREDICTED+17:ind_END_PREDICTED]
+            
+        # Save data    
+        pklFile = open( fname, 'wb' )
+        pickle.dump( [data_text], pklFile, -1 )
+        pklFile.close()
 
     return data_text
 
@@ -1116,17 +1131,17 @@ if __name__ == '__main__':
     
 #    save_celestrak_eop_alldata()
     
-    UTC = datetime(2020, 8, 10, 0, 0, 0)
+    UTC = datetime(2023, 10, 14, 0, 0, 0)
     
     eop_alldata = get_celestrak_eop_alldata()
-    EOP_data = get_eop_data(eop_alldata, UTC)
+    # EOP_data = get_eop_data(eop_alldata, UTC)
     
 #    print(EOP_data)
     
-    UT1_JD = timesys.utcdt2ut1jd(UTC, EOP_data['UT1_UTC'])
+    # UT1_JD = timesys.utcdt2ut1jd(UTC, EOP_data['UT1_UTC'])
     
-    R = compute_ERA(UT1_JD)
+    # R = compute_ERA(UT1_JD)
     
-    print(R)
+    # print(R)
     
     
