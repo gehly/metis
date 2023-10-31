@@ -780,6 +780,63 @@ def Pc_MonteCarlo(X1, P1, X2, P2, HBR, N=1000, HBR_type='circle'):
             
 
     return Pc   
+
+
+
+
+def Pc_MC_Kep2body_parallel(conf_level=0.6827, Nsample_batch=1000):
+    
+    
+    
+    # Do at least 100 samples per batch
+    if Nsample_batch < 100:
+        Nsample_batch = 100
+        
+    
+    
+    
+    return
+
+
+def EstimateRequiredSamples(Pc, acc, conf, maxiter=100):
+    
+    
+    # Reduce range to reasonable confidence values
+    if conf < 0.01:
+        conf = 0.01
+    elif conf > 0.999:
+        conf = 0.999
+        
+    # Use linear interpolation to get value of Nsig
+    cn = np.array([[1.0000e-02, 1.2533e-02],
+                   [1.0000e-01,  1.2566e-01],
+                   [2.0000e-01,  2.5335e-01],
+                   [3.0000e-01,  3.8532e-01],
+                   [4.0000e-01,  5.2440e-01],
+                   [5.0000e-01,  6.7449e-01],
+                   [6.0000e-01,  8.4162e-01],
+                   [6.8269e-01,  1.0000e+00],
+                   [7.0000e-01,  1.0364e+00],
+                   [8.0000e-01,  1.2816e+00],
+                   [8.5000e-01,  1.4395e+00],
+                   [9.0000e-01,  1.6449e+00],
+                   [9.3000e-01,  1.8119e+00],
+                   [9.5000e-01,  1.9600e+00],
+                   [9.6000e-01,  2.0537e+00],
+                   [9.7000e-01,  2.1701e+00],
+                   [9.8000e-01,  2.3263e+00],
+                   [9.9000e-01,  2.5758e+00],
+                   [9.9500e-01,  2.8070e+00],
+                   [9.9900e-01,  3.2905e+00]])
+    
+    
+    Nsig = np.interp(conf, cn[:,0], cn[:,1])
+    
+    print(Nsig)
+    
+    
+    
+    return
     
     
 
@@ -992,11 +1049,15 @@ def read_cdm_file(cdm_file):
 if __name__ == '__main__':
     
     
-    cdm_file = os.path.join('unit_test/AlfanoTestCase01.cdm')
+    # cdm_file = os.path.join('unit_test/AlfanoTestCase01.cdm')
     
-    read_cdm_file(cdm_file)
+    # read_cdm_file(cdm_file)
     
     
+    Pc = 0.01
+    acc = 0.1
+    conf = 0.55
+    EstimateRequiredSamples(Pc, acc, conf, maxiter=100)
     
     
     
