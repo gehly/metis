@@ -6,6 +6,7 @@ import os
 import sys
 import inspect
 from scipy.integrate import dblquad
+from scipy.special import erfcinv
 
 # Load tudatpy modules  
 from tudatpy.kernel.interface import spice
@@ -39,7 +40,7 @@ from utilities.constants import Re, GME
 #  [1] Denenberg, E., "Satellite Closest Approach Calculation Through 
 #      Chebyshev Proxy Polynomials," Acta Astronautica, 2020.
 #
-#  [2] Hall, D.T., Hejduk, M.D., and Johnson, L.C., "Remedidting Non-Positive
+#  [2] Hall, D.T., Hejduk, M.D., and Johnson, L.C., "Remediating Non-Positive
 #      Definite State Covariances for Collision Probability Estimation," 2017.
 #
 #  [3] https://github.com/nasa/CARA_Analysis_Tools
@@ -49,6 +50,15 @@ from utilities.constants import Re, GME
 #
 #  [5] Alfano, S., "Satellite Conjuction Monte Carlo Analysis," AAS Spaceflight
 #      Mechanics Meeting (AAS-09-233), 2009.
+#
+#  [6] Coppola, V.T., "Including Velocity Uncertianty in the Probability of 
+#      Collision Between Space Objects," AAS 12-247.
+#
+#  [7] Coppola, V.T., "Evaluating the Short Encounter Assumption of the 
+#      Probability of Collision Formula," AAS 12-248.
+#
+#
+#
 #
 #
 ###############################################################################
@@ -811,7 +821,7 @@ def EstimateRequiredSamples(Pc, acc, conf):
         conf = 0.999
         
     # Use linear interpolation to get value of Nsig
-    cn = np.array([[1.0000e-02, 1.2533e-02],
+    cn = np.array([[1.0000e-02,  1.2533e-02],
                    [1.0000e-01,  1.2566e-01],
                    [2.0000e-01,  2.5335e-01],
                    [3.0000e-01,  3.8532e-01],
@@ -853,7 +863,86 @@ def EstimateRequiredSamples(Pc, acc, conf):
     
 
     return Ns
+
+
+def conj_bounds_Coppola(gamma, HBR, rci, vci, Pci):
     
+    
+    # Size of input gamma array
+    Sgamma = gamma.shape
+    Ngamma = np.prod(Sgamma)
+    
+    # Initialize output time bounds
+    tau0 = np.nan*np.ones(Sgamma)
+    tau1 = np.nan*np.ones(Sgamma)
+    
+    # Define the encounter reference frame such that the relative velocity at 
+    # TCA is parallel to the x-hat direction, as described in Coppola (Ref 7) 
+    # around Eqs 4-5
+    v0mag = np.linalg.norm(vci)
+    
+    if v0mag < 100*np.eps:
+        tau0[:] = -np.inf
+        tau1[:] = -np.inf
+        tau0_gam1 = -np.inf
+        tau1_gam1 = np.inf
+        
+        return tau0, tau1, tau0_gam1, tau1_gam1
+    
+    xhat = vci/v0mag
+    yhat = rci - xhat*np.dot(xhat.T, rci)
+    yhat = yhat/np.linalg.norm(yhat)
+    zhat = np.cross(xhat, yhat, axis=0)
+    
+    # Define the 3x3 rotation matrix from inertial to encounter reference frame
+    EI = np.concatenate((xhat.T, yhat.T, zhat.T))
+    
+    # Extract 3x3 relative inertial position covariance
+    Aci = Pci[0:3,0:3]
+    
+    # Rotate inputs to the encounter frame
+    rce = np.dot(EI, rci)
+    Ace = np.dot(EI, np.dot(Aci, EI.T))
+    
+    # Extract quantities from Coppola Eqs 5-6 [Ref 7]
+    eta2 = Ace[0,0]
+    w = Ace[1:3,0].reshape(2,1)
+    Pc = Ace[1:3,1:3]
+    b = (np.dot(w.T, np.linalg.inv(Pc))).T
+    sv2 = np.sqrt(max(0., 2*(eta2 - np.dot(b.T, w))))
+    
+    # Set up static quantities used to calculate the conjunction bounds. These 
+    # static quantities are independent of the specific value(s) of gamma
+    # being processed. See Coppola Eqs 15-16 [Ref 7]
+    q0 = np.dot(b.T, rce[1:3].reshape(2,1))
+    bTb = np.dot(b.T, b)
+    dmin = -HBR*np.sqrt(bTb)
+    dmax = HBR*np.sqrt(1. + bTb)
+    
+    q0_minus_dmax = q0 - dmax
+    q0_minus_dmin = q0 - dmin
+    
+    tau0_gam1 = q0_minus_dmax/v0mag
+    tau1_gam1 = q0_minus_dmin/v0mag
+    
+    # Define the conjunction bounds for all input gamma values. See Coppola 
+    # Eqs 15-16 [Ref 7]
+    for ii in range(int(Sgamma[0])):
+        for jj in range(int(Sgamma[1])):
+        
+            # Calculate alpha_c, Ref 7 Eqs 10-11
+            ac = erfcinv(gamma[ii,jj])
+            
+            # Calculate the conjunction time bounds, Ref 7 Eqs 12-13
+            temp = ac*sv2
+            
+            tau0[ii,jj] = (-temp + q0_minus_dmax)/v0mag
+            tau1[ii,jj] = ( temp + q0_minus_dmin)/v0mag
+    
+    
+    
+    return tau0, tau1, tau0_gam1, tau1_gam1
+
     
 
 
