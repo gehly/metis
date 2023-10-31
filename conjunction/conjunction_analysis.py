@@ -47,6 +47,9 @@ from utilities.constants import Re, GME
 #  [4] CCSDS Recommendation for Space Data System Standards: Conjunction Data
 #      Message (Recommended Standard 508.0-B-1), 2013.
 #
+#  [5] Alfano, S., "Satellite Conjuction Monte Carlo Analysis," AAS Spaceflight
+#      Mechanics Meeting (AAS-09-233), 2009.
+#
 #
 ###############################################################################
 
@@ -798,7 +801,7 @@ def Pc_MC_Kep2body_parallel(conf_level=0.6827, Nsample_batch=1000):
     return
 
 
-def EstimateRequiredSamples(Pc, acc, conf, maxiter=100):
+def EstimateRequiredSamples(Pc, acc, conf):
     
     
     # Reduce range to reasonable confidence values
@@ -832,11 +835,24 @@ def EstimateRequiredSamples(Pc, acc, conf, maxiter=100):
     
     Nsig = np.interp(conf, cn[:,0], cn[:,1])
     
-    print(Nsig)
+    # Calculate approximate number of samples to achieve accuracy at 1-sigma
+    # confidence level
+    Nc1sig = 1./acc**2.
+    Ns1sig = Nc1sig/Pc
     
+    # Adjust to calculate at specified confidence level
+    Ns0 = max(1, np.ceil(Nsig**2. * Ns1sig))
     
+    Ls = np.floor(np.log10(Ns0))
+    if Ls > 1:
+        Ls = Ls - 1.
+        
+    Ms = 10.**Ls
+    Ns1 = np.ceil(Ns0/Ms)
+    Ns = Ns1*Ms
     
-    return
+
+    return Ns
     
     
 
@@ -1054,10 +1070,12 @@ if __name__ == '__main__':
     # read_cdm_file(cdm_file)
     
     
-    Pc = 0.01
-    acc = 0.1
-    conf = 0.55
-    EstimateRequiredSamples(Pc, acc, conf, maxiter=100)
+    Pc = 0.0001
+    acc = 0.3
+    conf = 0.9
+    Nsamples = EstimateRequiredSamples(Pc, acc, conf)
+    
+    print(Nsamples)
     
     
     
