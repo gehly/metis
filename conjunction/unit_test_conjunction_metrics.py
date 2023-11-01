@@ -11,6 +11,7 @@ metis_dir = current_dir[0:ind+5]
 sys.path.append(metis_dir)
 
 from conjunction import conjunction_analysis as ca
+from estimation import estimation_functions as est
 from utilities import coordinate_systems as coord
 from utilities import eop_functions as eop
 
@@ -141,7 +142,22 @@ def unit_test_Pc2D_Foster_full():
     return
 
 
-def run_unit_test(cdm_file, accuracy, Pc_true, tol=1e-8, HBR_type='circle'):
+def unit_test_Pc_MC_Kep2body_basic():
+    
+    # fname = 'OmitronTestCase_Test01_HighPc.cdm'
+    fname = 'AlfanoTestCase01.cdm'
+    accuracy = 1e-3
+    Pc_true = 4.20e-1
+    cdm_file = os.path.join('unit_test', fname)
+    test = run_unit_test(cdm_file, accuracy, Pc_true, MC_test=True)
+    
+    print(fname, test)
+    
+    return
+
+
+def run_unit_test(cdm_file, accuracy, Pc_true, tol=1e-8, HBR_type='circle',
+                  MC_test=False):
     
     # Load CDM data
     TCA_UTC, miss_params, obj_params = ca.read_cdm_file(cdm_file)
@@ -220,10 +236,83 @@ def run_unit_test(cdm_file, accuracy, Pc_true, tol=1e-8, HBR_type='circle'):
     
     # Error check
     error = abs(Pc - Pc_true)/Pc_true
+    Foster_2D_pass = error < accuracy
     
     # print('rel error', error)
     
-    return (error < accuracy)
+    # (Optional) Run Monte-Carlo Pc test
+    if MC_test:
+        
+        
+        # Convert 6x6 covariance to ECI
+        transform_fcn = est.unscented_ric2eci
+        
+        P1_ric = obj1_covar[0:6,0:6] 
+        inputs = {}
+        inputs['rc_vect'] = r1_eci
+        inputs['vc_vect'] = v1_eci
+        
+        print(P1_ric)
+        print(np.linalg.eig(P1_ric))
+        
+        
+        dum1, P1_eci_ut, dum2 = est.unscented_transform(np.zeros((6,1)), P1_ric, transform_fcn, inputs)
+        
+        print(P1_ric)
+        print(P1_eci_ut)
+        
+        
+        # Try Monte Carlo samples for comparison
+        N = 100000
+        mean = np.zeros((6,1))
+        Xout = np.zeros((6,N))
+        samples = np.random.multivariate_normal(mean.flatten(),P1_ric,int(N))
+        for ii in range(N):
+            X_ii = samples[ii].flatten()
+            rho_ric = X_ii[0:3].reshape(3,1)
+            drho_ric = X_ii[3:6].reshape(3,1)
+            
+            rho_eci = coord.ric2eci(r1_eci, v1_eci, rho_ric)
+            drho_eci = coord.ric2eci_vel(r1_eci, v1_eci, rho_ric, drho_ric)
+            
+            Xout[:,ii] = np.concatenate((rho_eci, drho_eci), axis=0).flatten()
+            
+        mean_eci = (1./N)*np.sum(Xout, axis=1).reshape(6,1)
+        diff = Xout - mean_eci
+        P1_eci_mc = (1./N)*np.dot(diff, diff.T)
+        
+        print(P1_eci_mc)
+        
+        
+        print('')
+        print(P1_eci)
+        print('')
+        print(P1_eci_ut[0:3,0:3])
+        print('')
+        print(P1_eci_mc[0:3,0:3])
+        
+        print('')
+        print(P1_eci_ut[3:6,3:6])
+        print('')
+        print(P1_eci_mc[3:6,3:6])
+        
+        print('')
+        print(P1_eci_ut[0:3,3:6])
+        print('')
+        print(P1_eci_mc[0:3,3:6])
+        
+        
+        
+        # Test number of samples
+        # Pc = ca.Pc_MonteCarlo(X1_eci, P1_eci, X2_eci, P2_eci, HBR, HBR_type)
+        
+        
+        
+        # Test time intervals
+        
+    
+    
+    return Foster_2D_pass
 
 
 
@@ -231,7 +320,9 @@ def run_unit_test(cdm_file, accuracy, Pc_true, tol=1e-8, HBR_type='circle'):
 
 if __name__ == '__main__':
     
-    unit_test_Pc_basic()
+    # unit_test_Pc_basic()
+    
+    unit_test_Pc_MC_Kep2body_basic()
     
     # unit_test_Pc2D_Foster_full()
     

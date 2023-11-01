@@ -721,7 +721,7 @@ def remediate_covariance(Praw, Lclip, Lraw=[], Vraw=[]):
 # Monte Carlo Probability of Collision (Pc) Functions
 ###############################################################################
 
-def Pc_MonteCarlo(X1, P1, X2, P2, HBR, N=1000, HBR_type='circle'):
+def Pc_MonteCarlo(X1, P1, X2, P2, HBR, HBR_type='circle'):
     '''
     This function computes the probability of collision (Pc) using Monte Carlo
     samples to approximate the distributions of primary and secondary objects
@@ -766,27 +766,32 @@ def Pc_MonteCarlo(X1, P1, X2, P2, HBR, N=1000, HBR_type='circle'):
     r2 = X2[0:3].reshape(3,1)
     P1 = P1[0:3,0:3] 
     P2 = P2[0:3,0:3]
-    samples1 = np.random.multivariate_normal(r1.flatten(), P1, N)
-    samples2 = np.random.multivariate_normal(r2.flatten(), P2, N)
+    # samples1 = np.random.multivariate_normal(r1.flatten(), P1, N)
+    # samples2 = np.random.multivariate_normal(r2.flatten(), P2, N)
     
-    # Loop and compute separation distance
-    count = 0
-    for ii in range(N):        
-        si = samples1[ii]
+    # # Loop and compute separation distance
+    # count = 0
+    # for ii in range(N):        
+    #     si = samples1[ii]
         
-        # print('ii', ii)
+    #     # print('ii', ii)
         
-        for jj in range(N):            
-            sj = samples2[jj]
+    #     for jj in range(N):            
+    #         sj = samples2[jj]
             
-            dist = np.linalg.norm(si-sj)
+    #         dist = np.linalg.norm(si-sj)
             
-            print(ii, jj, dist)
-            dist = 0.01
+    #         print(ii, jj, dist)
+    #         dist = 0.01
             
-            if HBR_type == 'circle':
-                if dist < HBR:
-                    count += 1
+    #         if HBR_type == 'circle':
+    #             if dist < HBR:
+    #                 count += 1
+    
+    
+    
+    
+    
                     
                     
     Pc = float(count)/(N**2.)
