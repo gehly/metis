@@ -243,6 +243,16 @@ def run_unit_test(cdm_file, accuracy, Pc_true, tol=1e-8, HBR_type='circle',
     # (Optional) Run Monte-Carlo Pc test
     if MC_test:
         
+        # TODO: Some discrepancies exist in how to transform 6x6 covariance beteen
+        # RIC and ECI, in particular the velocity components. The NASA CARA code
+        # matches a description in Tapley, Schutz, Born Section 4.16.1, which uses
+        # a simple linear transform and zeros for the pos-vel cross-correlations.
+        # This seems like an oversimplification. Schaub and Junkins Section 14.3
+        # and Example 14.1 include a cross(omega, r) term in the transformation
+        # of velocity between ECI and RIC, and use of an unscented transform or
+        # Monte Carlo samples to transform the 6x6 covariance will naturally turn
+        # out different from the TSB formulation.
+        
         
         # Convert 6x6 covariance to ECI
         transform_fcn = est.unscented_ric2eci

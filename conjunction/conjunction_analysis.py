@@ -794,7 +794,7 @@ def Pc_MonteCarlo(X1, P1, X2, P2, HBR, HBR_type='circle'):
     
                     
                     
-    Pc = float(count)/(N**2.)
+    # Pc = float(count)/(N**2.)
             
 
     return Pc   
