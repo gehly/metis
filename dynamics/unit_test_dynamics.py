@@ -834,6 +834,9 @@ def test_tudat_prop():
     state_params['drag_area_m2'] = 4.
     state_params['srp_area_m2'] = 4.
     
+    # Initialize Tudat bodies once to avoid excess memory allocation
+    bodies = dyn.initialize_tudat(state_params)
+    
 
     int_params = {}
     int_params['integrator'] = 'tudat'
@@ -860,7 +863,7 @@ def test_tudat_prop():
         
         if kk > 0:
             tin = [tk_list[kk-1], tk_list[kk]]
-            tout2, Xout2 = dyn.general_dynamics(X, tin, state_params, int_params)
+            tout2, Xout2 = dyn.general_dynamics(X, tin, state_params, int_params, bodies)
             X = Xout2[-1,:].reshape(6, 1)
         
             tout[kk] = tout2[-1] + tout[kk-1]
@@ -873,6 +876,152 @@ def test_tudat_prop():
     print(Xout)
     
     print(Xout[-1])
+    
+    
+    # Compute and plot errors
+    Xerr = np.zeros(Xout[:,0:6].shape)
+    for ii in range(len(tout)):
+        X_true = astro.element_conversion(Xo[0:6], 1, 1, dt=tout[ii])
+        Xerr[ii,:] = (Xout[ii,0:6].reshape(6,1) - X_true).flatten()
+        
+    plt.figure()
+    plt.subplot(3,1,1)
+    plt.plot(tout/3600., Xerr[:,0], 'k.')
+    plt.ylabel('X Err [km]')
+    plt.title('Position Errors')
+    plt.subplot(3,1,2)
+    plt.plot(tout/3600., Xerr[:,1], 'k.')
+    plt.ylabel('Y Err [km]')
+    plt.subplot(3,1,3)
+    plt.plot(tout/3600., Xerr[:,2], 'k.')
+    plt.ylabel('Z Err [km]')
+    plt.xlabel('Time [hours]')
+    
+    
+    
+    plt.show()
+    
+    
+    return
+
+
+def test_tudat_backprop():
+    
+    
+    # UTC0 = datetime(2000, 1, 1, 12, 0, 0)
+    # UTC1 = datetime(2000, 1, 2, 12, 0, 0)
+    # tvec = [UTC0, UTC1]
+    
+    # Xo = np.reshape([ 7.03748400133e+06,  3.23805901792e+06,  2.1507241875e+06, -1.46565763e+03,
+    #                  -4.09583949e+01,  6.62279761e+03], (6,1)) * 1e-3
+    
+    # print(Xo)
+    
+    # Create default body settings for "Earth"
+    bodies_to_create = ["Earth"]
+
+    # Create default body settings for bodies_to_create, with "Earth"/"J2000" as the global frame origin and orientation
+    global_frame_origin = "Earth"
+    global_frame_orientation = "J2000"
+    body_settings = environment_setup.get_default_body_settings(
+        bodies_to_create, global_frame_origin, global_frame_orientation)
+
+    # Create system of bodies (in this case only Earth)
+    bodies = environment_setup.create_system_of_bodies(body_settings)
+    
+    earth_gravitational_parameter = bodies.get("Earth").gravitational_parameter
+    initial_state = element_conversion.keplerian_to_cartesian_elementwise(
+        gravitational_parameter=earth_gravitational_parameter,
+        semi_major_axis=7500.0e3,
+        eccentricity=0.1,
+        inclination=np.deg2rad(85.3),
+        argument_of_periapsis=np.deg2rad(235.7),
+        longitude_of_ascending_node=np.deg2rad(23.4),
+        true_anomaly=np.deg2rad(139.87),
+    )
+    
+    # print(initial_state)
+    # print(earth_gravitational_parameter)
+
+    # initial_states = np.concatenate((initial_state, initial_state))
+    
+    # print(initial_states)
+    
+    # print(initial_states.shape)
+    
+
+    
+    # Xo = np.reshape(initial_state, (6,1))*1e-3
+    
+    # print(Xo)
+    
+    # Xo = np.reshape(initial_states, (12,1))*1e-3
+    
+    # GEO orbit
+    elem = [42164.1, 0.001, 0.1, 90., 0., 0.]
+    Xo = np.reshape(astro.kep2cart(elem), (6,1))
+    
+    
+    
+    
+    # Setup dynamics and coordinate frame models    
+    state_params = {}
+    state_params['bodies_to_create'] = ['Earth']
+    state_params['global_frame_origin'] = 'Earth'
+    state_params['global_frame_orientation'] = 'J2000'
+    state_params['central_bodies'] = ['Earth']
+    state_params['sph_deg'] = 0
+    state_params['sph_ord'] = 0
+    state_params['mass'] = 400.
+    state_params['Cd'] = 0.
+    state_params['Cr'] = 0.
+    state_params['drag_area_m2'] = 4.
+    state_params['srp_area_m2'] = 4.
+    
+    # Initialize Tudat bodies once to avoid excess memory allocation
+    bodies = dyn.initialize_tudat(state_params)
+    
+
+    int_params = {}
+    int_params['integrator'] = 'tudat'
+    int_params['tudat_integrator'] = 'rkf78'
+    int_params['step'] = -10.
+    int_params['max_step'] = -100.
+    int_params['min_step'] = -100.
+    int_params['rtol'] = 1e-12
+    int_params['atol'] = 1e-12
+    int_params['time_format'] = 'datetime'
+    
+    # Time vector
+    tk_list = []
+    # for hr in range(24):
+    #     UTC = datetime(2021, 6, 21, hr, 0, 0)
+    #     tvec = np.arange(0., 601., 60.)
+    #     tk_list.extend([UTC + timedelta(seconds=ti) for ti in tvec])
+    
+    tk_list = [datetime(2021, 6, 21, 0, 0, 0), datetime(2021, 6, 20, 0, 0, 0)]
+    
+    X = Xo
+    tout = np.zeros(len(tk_list),)
+    Xout = np.zeros((len(tk_list), 6))
+    for kk in range(len(tk_list)):
+
+        
+        if kk > 0:
+            tin = [tk_list[kk-1], tk_list[kk]]
+            tout2, Xout2 = dyn.general_dynamics(X, tin, state_params, int_params, bodies)
+            X = Xout2[-1,:].reshape(6, 1)
+        
+            tout[kk] = tout2[-1] + tout[kk-1]
+        
+        Xout[kk,:] = X.flatten()
+    
+    # tout, Xout = dyn.general_dynamics(Xo, tvec, state_params, int_params)
+    
+    print(tout)
+    print(Xout)
+    
+    # print(Xout[-1])
     
     
     # Compute and plot errors
@@ -1000,6 +1149,8 @@ if __name__ == '__main__':
     # test_jit_twobody()
     
     test_tudat_prop()
+    
+    # test_tudat_backprop()
     
     # test_coord_turn()
     

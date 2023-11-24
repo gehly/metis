@@ -295,6 +295,26 @@ def plot_sensor_map(sensor_id_list):
     return
 
 
+def plot_gaussian():
+    
+    x = np.arange(0, 10, 0.01)
+    y = ss.norm(5,1).pdf(x)
+    
+    plt.figure()
+    plt.plot(x, y, 'b-')
+    plt.plot([-1, 11], [0,0], 'k-')
+    plt.plot([0,0], [-0.1, 0.5], 'k-')
+    plt.plot([5,5], [-0.02, 0.02], 'k')
+    plt.plot([2,2], [-0.02, 0.02], 'k')
+    plt.plot([6,6], [-0.02, 0.02], 'k')
+    plt.axis('off')
+    
+    plt.show()
+    
+    
+    return
+
+
 
 def plot_multitarget_gaussian():
     
@@ -377,8 +397,9 @@ if __name__ == '__main__':
     
     # multiple_model_plot_measurements(measdir)
     
+    plot_gaussian()
     
-    plot_multitarget_gaussian()
+    # plot_multitarget_gaussian()
     
     
     

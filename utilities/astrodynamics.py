@@ -1746,24 +1746,25 @@ if __name__ == '__main__':
 #    print(LTAN)
     
     
-#    cart = np.array([710.87, 5151.26, 5075.69, 0.9039, -5.222, 5.1735])
-#    kep = cart2kep(cart)
-#    print(kep)
+    cart = np.array([710.87, 5151.26, 5075.69, 0.9039, -5.222, 5.1735])
+    cart = np.array([-27100, -32300, -100, 2.36, -1.98, 0])
+    kep = cart2kep(cart)
+    print(kep)
     
-    kep = np.array([42164.1, 0., 0., 20., 30., 0.])
-    cart = kep2cart(kep)
-    eqn = kep2eqn(kep)
-    modeqn = kep2modeqn(kep)
+    # kep = np.array([42164.1, 0., 0., 20., 30., 0.])
+    # cart = kep2cart(kep)
+    # eqn = kep2eqn(kep)
+    # modeqn = kep2modeqn(kep)
     
-    cart2 = modeqn2cart(modeqn)
-    err = np.linalg.norm(cart - cart2)
+    # cart2 = modeqn2cart(modeqn)
+    # err = np.linalg.norm(cart - cart2)
     
-    print('kep', kep)
-    print('cart', cart)
-    print('eqn', eqn)
-    print('modeqn', modeqn)
-    print('cart2', cart2)
-    print('err', err)
+    # print('kep', kep)
+    # print('cart', cart)
+    # print('eqn', eqn)
+    # print('modeqn', modeqn)
+    # print('cart2', cart2)
+    # print('err', err)
     
     
     

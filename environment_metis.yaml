@@ -3,7 +3,7 @@ channels:
   - conda-forge
   - tudat-team
 dependencies:
-  - numba=0.56.3
+  - numba
   - spyder
   - tudatpy
   - matplotlib
