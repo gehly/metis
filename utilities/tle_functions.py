@@ -27,21 +27,7 @@ from sensors import measurement_functions as mfunc
 from utilities import astrodynamics as astro
 from utilities import coordinate_systems as coord
 from utilities import eop_functions as eop
-
-
-# from utilities.eop_functions import get_celestrak_eop_alldata
-# from utilities.eop_functions import get_nutation_data
-# from utilities.eop_functions import get_eop_data
-# from utilities.eop_functions import get_XYs2006_alldata
-# from utilities.coordinate_systems import teme2gcrf
-# from utilities.coordinate_systems import gcrf2teme
-# from utilities.coordinate_systems import gcrf2itrf
-# from utilities.coordinate_systems import itrf2gcrf
-# from utilities.coordinate_systems import latlonht2ecef
-# from utilities.astrodynamics import element_conversion
-# from utilities.astrodynamics import meanmot2sma
 from utilities.constants import GME, Re, wE
-#from utilities.time_systems import gpsdt2utcdt
 
 
 
@@ -84,10 +70,11 @@ def get_spacetrack_tle_data(obj_id_list = [], UTC_list = [], username='',
     tle_df : pandas dataframe
         norad, tle line1, tle line2
     '''
-    
+        
     tle_dict = {}
     tle_df = []
     UTC_list = copy.copy(UTC_list)
+    
 
     if len(username) == 0:
         username = input('space-track username: ')
@@ -97,7 +84,7 @@ def get_spacetrack_tle_data(obj_id_list = [], UTC_list = [], username='',
     if len(obj_id_list) >= 1:
         myString = ",".join(map(str, obj_id_list))
 
-        # If only one time is given, add/subtract 2 day increment to produce window
+        # If only one time is given, add second to produce window
         if len(UTC_list) ==  1:
             UTC_list.append(UTC_list[0] + timedelta(days=2.))
             UTC_list[0] = UTC_list[0] - timedelta(days=2.)
@@ -109,8 +96,8 @@ def get_spacetrack_tle_data(obj_id_list = [], UTC_list = [], username='',
 #                UTC_list[-1] = UTC_list[0] + timedelta(days=2.)
             
             # Create expanded window
-            UTC_list[0] = UTC_list[0] - timedelta(days=2.)
-            UTC_list[-1] = UTC_list[-1] + timedelta(days=2.)
+            UTC_list[0] = UTC_list[0] # - timedelta(days=2.)
+            UTC_list[-1] = UTC_list[-1] # + timedelta(days=2.)
             
             UTC0 = UTC_list[0].strftime('%Y-%m-%d')
             UTC1 = UTC_list[-1].strftime('%Y-%m-%d')
@@ -127,13 +114,40 @@ def get_spacetrack_tle_data(obj_id_list = [], UTC_list = [], username='',
                         'NORAD_CAT_ID/' + myString +
                         '/orderby/NORAD_CAT_ID/format/tle')
     
-    # If no objects specified, retrieve latest for full catalog
-    # Note this query will only return data for TLEs with epochs in the last
-    # 30 days
+    # If no objects specified, retrieve data for full catalog    
     else:
-        pageData = ('//www.space-track.org/basicspacedata/query/class/gp/'
-                    '/EPOCH/>now-30/orderby/NORAD_CAT_ID/format/tle')
-#        print('Error: No Objects Specified!')
+        
+        # TODO: These requests don't work, need to figure out correct API
+        # request to retrieve full catalog for given date range
+        
+        # If one or more UTC times are given, retrieve data for the window
+        if len(UTC_list) == 1:
+            UTC_list.append(UTC_list[0] + timedelta(days=2.))
+            UTC_list[0] = UTC_list[0] - timedelta(days=2.)
+            
+        if len(UTC_list) >= 2:
+            UTC0 = UTC_list[0].strftime('%Y-%m-%d')
+            UTC1 = UTC_list[-1].strftime('%Y-%m-%d')
+
+            pageData = ('//www.space-track.org/basicspacedata/query/class/gp/' +
+                        'EPOCH/' + UTC0 + '--' + UTC1 + 
+                        '/orderby/NORAD_CAT_ID/format/tle')
+            
+            
+            # pageData = ('//www.space-track.org/basicspacedata/query/class/' +
+            #             'gp_history/NORAD_CAT_ID/' + '00001--99999' + '/orderby/' +
+            #             'TLE_LINE1 ASC/EPOCH/' + UTC0 + '--' + UTC1 + 
+            #             '/format/tle')
+            
+            
+            
+
+        
+        # Otherwise return data for all TLEs with epochs in the last 30 days
+        else:
+            pageData = ('//www.space-track.org/basicspacedata/query/class/gp/'
+                        '/EPOCH/>now-30/orderby/NORAD_CAT_ID/format/tle')
+    #        print('Error: No Objects Specified!')
 
     ST_URL='https://www.space-track.org'
 
@@ -1946,6 +1960,24 @@ if __name__ == '__main__' :
     
     plt.close('all')
     
+    # Envisat
+    obj_id = 27386
+    UTC = datetime(2023, 5, 19, 0, 0, 0)
+    output_state = propagate_TLE([obj_id], [UTC])
+    
+    r_GCRF = output_state[obj_id]['r_GCRF'][0]
+    v_GCRF = output_state[obj_id]['v_GCRF'][0]
+    
+    cart = np.concatenate((r_GCRF, v_GCRF), axis=0)
+    
+    print(cart)
+    
+    elem = astro.cart2kep(cart)
+    
+    print(elem)
+    
+    
+    
     
 #    obj_id_list = [43164, 43166, 43691, 43692, 43851, 43863, 44074, 44075,
 #                   44227, 44228, 44372, 44496]
@@ -1958,31 +1990,31 @@ if __name__ == '__main__' :
 #    
 #    plot_sma_rp_ra(obj_id_list, UTC_list)
     
-    # Landsat-8 Data
-    landsat8_norad = 39084
+    # # Landsat-8 Data
+    # landsat8_norad = 39084
     
-    # Sentinel 2 Data
-    sentinel_2a_norad = 40697
-    sentinel_2b_norad = 42063
+    # # Sentinel 2 Data
+    # sentinel_2a_norad = 40697
+    # sentinel_2b_norad = 42063
     
-    # Retrieve TLE and print state vectors
-    obj_id_list = [landsat8_norad, sentinel_2a_norad, sentinel_2b_norad]
-    UTC_start = datetime(2020, 6, 29, 0, 0, 0)
-    UTC_stop = datetime(2020, 7, 1, 0, 0, 0)
-    dt = 10.
+    # # Retrieve TLE and print state vectors
+    # obj_id_list = [landsat8_norad, sentinel_2a_norad, sentinel_2b_norad]
+    # UTC_start = datetime(2020, 6, 29, 0, 0, 0)
+    # UTC_stop = datetime(2020, 7, 1, 0, 0, 0)
+    # dt = 10.
     
-    delta_t = (UTC_stop - UTC_start).total_seconds()
-    UTC_list = [UTC_start + timedelta(seconds=ti) for ti in list(np.arange(0, delta_t, dt))]
+    # delta_t = (UTC_stop - UTC_start).total_seconds()
+    # UTC_list = [UTC_start + timedelta(seconds=ti) for ti in list(np.arange(0, delta_t, dt))]
     
-    print(UTC_list[0], UTC_list[-1])
+    # print(UTC_list[0], UTC_list[-1])
     
-    # Retrieve TLE 
-    retrieve_list = [UTC_list[0] - timedelta(days=1), UTC_list[-1] + timedelta(days=1)]
-    tle_dict, dum = get_spacetrack_tle_data(obj_id_list, retrieve_list)
+    # # Retrieve TLE 
+    # retrieve_list = [UTC_list[0] - timedelta(days=1), UTC_list[-1] + timedelta(days=1)]
+    # tle_dict, dum = get_spacetrack_tle_data(obj_id_list, retrieve_list)
     
-    print(tle_dict)
+    # print(tle_dict)
     
-    output_state = propagate_TLE(obj_id_list, UTC_list, tle_dict, prev_flag=True)
+    # output_state = propagate_TLE(obj_id_list, UTC_list, tle_dict, prev_flag=True)
     
     # # Save output
     # fname = os.path.join(r'D:\documents\research\cubesats\GeoscienceAustralia\data\check_tle_propagation.pkl')

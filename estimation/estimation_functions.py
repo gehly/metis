@@ -18,6 +18,7 @@ sys.path.append(metis_dir)
 from dynamics import dynamics_functions as dyn
 from sensors import measurement_functions as mfunc
 from utilities import astrodynamics as astro
+from utilities import coordinate_systems as coord
 from utilities.constants import arcsec2rad
 
 
@@ -2301,6 +2302,60 @@ def unscented_kep2cart(chi, inputs):
         Xeci = astro.kep2cart(elem)
         Y[:,jj] = Xeci.flatten()
 
+    return Y
+
+
+def unscented_ric2eci(chi, inputs):
+    '''
+    Function for use with unscented_transform.
+    Converts sigma point matrix from RIC coordinates to ECI.
+
+    Parameters
+    ------
+    chi : L x (2L+1) numpy array
+      sigma point matrix
+    inputs : dictionary
+      input parameters
+
+    Returns
+    ------
+    Y : m x (2L+1) numpy array
+      transformed sigma point matrix
+    '''
+    
+    # TODO: Some discrepancies exist in how to transform 6x6 covariance beteen
+    # RIC and ECI, in particular the velocity components. The NASA CARA code
+    # matches a description in Tapley, Schutz, Born Section 4.16.1, which uses
+    # a simple linear transform and zeros for the pos-vel cross-correlations.
+    # This seems like an oversimplification. Schaub and Junkins Section 14.3
+    # and Example 14.1 include a cross(omega, r) term in the transformation
+    # of velocity between ECI and RIC, and use of an unscented transform or
+    # Monte Carlo samples to transform the 6x6 covariance will naturally turn
+    # out different from the TSB formulation.
+
+    # Size of input/output
+    L = int(chi.shape[1])
+    Y = np.zeros((6, L))
+    
+    # Input parameters
+    rc_vect = inputs['rc_vect']
+    vc_vect = inputs['vc_vect']
+
+    for jj in range(L):
+
+        # Pull out column of chi
+        Xrel_ric = chi[:,jj]
+        rho_ric = Xrel_ric[0:3].reshape(3,1)
+        drho_ric = Xrel_ric[3:6].reshape(3,1)
+
+        # Convert to ECI
+        rho_eci = coord.ric2eci(rc_vect, vc_vect, rho_ric)
+        drho_eci = coord.ric2eci_vel(rc_vect, vc_vect, rho_ric, drho_ric)        
+        Xrel_eci = np.concatenate((rho_eci, drho_eci), axis=0)
+        
+        Y[:,jj] = Xrel_eci.flatten()
+    
+    
     return Y
 
 
