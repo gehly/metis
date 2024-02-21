@@ -55,7 +55,7 @@ def get_spacetrack_tle_data(obj_id_list = [], UTC_list = [], username='',
     UTC_list : list, optional
         UTC datetime objects to specify desired times for TLEs to retrieve
         - if empty code will retrieve latest available
-        - if 1 entry, code will retrieve all TLEs in the following 1 day window
+        - if 1 entry, code will retrieve all TLEs in the +/- 2 day window
         - if 2 entries, code will retrieve all TLEs between first and second time
           (default = empty)
     username : string, optional
@@ -86,8 +86,8 @@ def get_spacetrack_tle_data(obj_id_list = [], UTC_list = [], username='',
 
         # If only one time is given, add second to produce window
         if len(UTC_list) ==  1:
-            UTC_list.append(UTC_list[0] + timedelta(days=2.))
-            UTC_list[0] = UTC_list[0] - timedelta(days=2.)
+            UTC_list.append(UTC_list[0] + timedelta(days=3.))
+            UTC_list[0] = UTC_list[0] - timedelta(days=3.)
 
         # If times are specified, retrieve from window
         if len(UTC_list) >= 2:
