@@ -1027,8 +1027,9 @@ def cart2kep(cart, GM=GME):
 
     # Calculate RAAN and inclination
     ih_vect = h_vect/h
-    RAAN = math.atan2(ih_vect[0], -ih_vect[1])   # rad
-    i = math.acos(ih_vect[2])   # rad
+
+    RAAN = math.atan2(ih_vect[0,0], -ih_vect[1,0])   # rad
+    i = math.acos(ih_vect[2,0])   # rad
     if RAAN < 0.:
         RAAN += 2.*math.pi
 
@@ -1052,8 +1053,8 @@ def cart2kep(cart, GM=GME):
 
     # Calculate true anomaly
     cross1 = np.cross(ie_vect, ir_vect, axis=0)
-    tan1 = np.dot(cross1.T, ih_vect)
-    tan2 = np.dot(ie_vect.T, ir_vect)
+    tan1 = np.dot(cross1.T, ih_vect).flatten()[0]
+    tan2 = np.dot(ie_vect.T, ir_vect).flatten()[0]
     theta = math.atan2(tan1, tan2)    # rad
     
     # Update range of true anomaly for elliptical orbits
@@ -1541,6 +1542,8 @@ def element_conversion(x_in, iflag, oflag, GM=GME, dt=0.):
       Velocity in z               [km/s]
 
     '''
+    
+    x_in = list(x_in.flatten())
 
     # Get initial orbit elements
     if iflag == 0:
@@ -1750,6 +1753,13 @@ if __name__ == '__main__':
     cart = np.array([-27100, -32300, -100, 2.36, -1.98, 0])
     kep = cart2kep(cart)
     print(kep)
+    
+    kep = np.array([7500., 0.1, 85.3, 23.4, 235.7, 139.87])
+    cart = kep2cart(kep)
+    print(cart)
+    
+    cart2 = element_conversion(kep, 0, 1)
+    print(cart2)
     
     # kep = np.array([42164.1, 0., 0., 20., 30., 0.])
     # cart = kep2cart(kep)
