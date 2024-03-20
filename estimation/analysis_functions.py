@@ -599,9 +599,9 @@ def compute_orbit_errors(filter_output, full_state_output, truth_dict):
         resids[0,:] *= 1000.
     if p == 2:
         resids *= (1./arcsec2rad)
-    if p == 3:
-        resids[0,:] *= 1000.
-        resids[1:3,:] *= (1./arcsec2rad)
+    # if p == 3:
+    #     resids[0,:] *= 1000.
+    #     resids[1:3,:] *= (1./arcsec2rad)
     
     
 

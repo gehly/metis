@@ -1133,7 +1133,8 @@ if __name__ == '__main__':
     
     UTC = datetime(2023, 10, 14, 0, 0, 0)
     
-    eop_alldata = get_celestrak_eop_alldata()
+    # eop_alldata = get_celestrak_eop_alldata()
+
     # EOP_data = get_eop_data(eop_alldata, UTC)
     
 #    print(EOP_data)

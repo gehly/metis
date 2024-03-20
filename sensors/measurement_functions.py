@@ -43,7 +43,7 @@ def compute_measurement(X, state_params, sensor_params, sensor_id, UTC,
     # Compute station location in GCRF
     sensor_itrf = sensor['site_ecef']
     sensor_gcrf, dum = coord.itrf2gcrf(sensor_itrf, np.zeros((3,1)), UTC, EOP_data,
-                                 XYs_df)
+                                       XYs_df)
     
 #    print('sensor_gcrf', sensor_gcrf)
     
@@ -85,6 +85,9 @@ def compute_measurement(X, state_params, sensor_params, sensor_id, UTC,
             
             Y[ii] = 1.
             
+        
+            
+            
 #            sat2sun = sun_gcrf - r_gcrf
 #            sat2obs = stat_gcrf - r_gcrf
 #            if spacecraftConfig['type'] == '3DoF':
@@ -96,6 +99,16 @@ def compute_measurement(X, state_params, sensor_params, sensor_id, UTC,
 #                q_BI = X[6:10].reshape(4,1)                
 #                mapp = compute_mapp(sat2sun, sat2obs, spacecraftConfig, surfaces, q_BI)                
 #                Y[ii] = mapp
+
+
+        elif mtype == 'x':
+            Y[ii] = float(X[0])
+            
+        elif mtype == 'y':
+            Y[ii] = float(X[1])
+            
+        elif mtype == 'z':
+            Y[ii] = float(X[2])
                 
         else:
             print('Invalid Measurement Type! Entered: ', mtype)
@@ -751,6 +764,35 @@ def unscented_rg(tk, chi, state_params, sensor_params, sensor_id):
 
 
     return gamma_til, Rk
+
+
+def H_inertial_xyz(tk, Xref, state_params, sensor_params, sensor_id):
+    
+    # Number of states
+    n = len(Xref)    
+
+    # Measurement noise
+    sensor_kk = sensor_params[sensor_id]
+    meas_types = sensor_kk['meas_types']
+    sigma_dict = sensor_kk['sigma_dict']
+    p = len(meas_types)
+    Rk = np.zeros((p, p))
+    for ii in range(p):
+        mtype = meas_types[ii]
+        sig = sigma_dict[mtype]
+        Rk[ii,ii] = sig**2.   
+    
+  
+    # Hk_til and Gi
+    Gk = Xref[0:3].reshape(3,1)
+    
+    Hk_til = np.zeros((3,n))
+    Hk_til[0,0] = 1.
+    Hk_til[1,1] = 1.
+    Hk_til[2,2] = 1.
+    
+    
+    return Hk_til, Gk, Rk
 
 
 def H_cwrho(tk, Xref, state_params, sensor_params, sensor_id):

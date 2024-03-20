@@ -1,35 +1,12 @@
-import numpy as np
-import math
-from datetime import datetime
-import matplotlib.pyplot as plt
-import os
-import sys
-import inspect
-from scipy.integrate import dblquad
-from scipy.special import erfcinv
-
-# Load tudatpy modules  
-from tudatpy.kernel.interface import spice
-from tudatpy.kernel import numerical_simulation
-from tudatpy.kernel.numerical_simulation import environment_setup
-from tudatpy.kernel.numerical_simulation import propagation_setup
-from tudatpy.kernel.astro import element_conversion
-from tudatpy.kernel import constants
-from tudatpy.util import result2array
-
-filename = inspect.getframeinfo(inspect.currentframe()).filename
-current_dir = os.path.dirname(os.path.abspath(filename))
-
-ind = current_dir.find('metis')
-metis_dir = current_dir[0:ind+5]
-sys.path.append(metis_dir)
-
-from dynamics import dynamics_functions as dyn
-from utilities import astrodynamics as astro
-from utilities import coordinate_systems as coord
-from utilities.constants import Re, GME
-
 ###############################################################################
+# This file contains code developed from the open source NASA CARA Analysis 
+# Tools, provided under the NASA Open Source Software Agreement.
+#
+# Copyright © 2020 United States Government as represented by the Administrator 
+# of the National Aeronautics and Space Administration. All Rights Reserved.
+#
+# Modified (port to python) by Steve Gehly Feb 27, 2024
+#
 #
 # This script contains functions to analyze collision risk, including 
 # calculation of Time of Closest Approach (TCA), Euclidean miss distance,
@@ -62,6 +39,40 @@ from utilities.constants import Re, GME
 #
 #
 ###############################################################################
+
+
+import numpy as np
+import math
+from datetime import datetime
+import matplotlib.pyplot as plt
+import os
+import sys
+import inspect
+from scipy.integrate import dblquad
+from scipy.special import erfcinv
+
+# Load tudatpy modules  
+from tudatpy.kernel.interface import spice
+from tudatpy.kernel import numerical_simulation
+from tudatpy.kernel.numerical_simulation import environment_setup
+from tudatpy.kernel.numerical_simulation import propagation_setup
+from tudatpy.kernel.astro import element_conversion
+from tudatpy.kernel import constants
+from tudatpy.util import result2array
+
+filename = inspect.getframeinfo(inspect.currentframe()).filename
+current_dir = os.path.dirname(os.path.abspath(filename))
+
+ind = current_dir.find('metis')
+metis_dir = current_dir[0:ind+5]
+sys.path.append(metis_dir)
+
+from dynamics import dynamics_functions as dyn
+from utilities import astrodynamics as astro
+from utilities import coordinate_systems as coord
+from utilities.constants import Re, GME
+
+
 
 
 
