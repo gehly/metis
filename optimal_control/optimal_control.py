@@ -3,13 +3,19 @@ import math
 import sys
 from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
+import inspect
+import os
 
-metis_dir = r'C:\Users\Steve\Documents\code\metis'
+filename = inspect.getframeinfo(inspect.currentframe()).filename
+current_dir = os.path.dirname(os.path.abspath(filename))
+
+ind = current_dir.find('metis')
+metis_dir = current_dir[0:ind+5]
 sys.path.append(metis_dir)
 
-import dynamics.dynamics_functions as dyn
-import utilities.astrodynamics as astro
-import utilities.numerical_methods as nummeth
+from dynamics import dynamics_functions as dyn
+from utilities import astrodynamics as astro
+from utilities import numerical_methods as nummeth
 
 
 from utilities.constants import GME
@@ -530,10 +536,10 @@ def single_shooting_cannon2():
         nummeth.single_shooting(Xo_init, bc_vect, tin, boundary_fcn, state_params, int_params)
         
         
-    x0 = float(Xo[0])
-    y0 = float(Xo[1])
-    vx0 = float(Xo[2])
-    vy0 = float(Xo[3])
+    x0 = float(Xo[0,0])
+    y0 = float(Xo[1,0])
+    vx0 = float(Xo[2,0])
+    vy0 = float(Xo[3,0])
     
     
     print('\nFinal Values')
@@ -619,10 +625,10 @@ def multiple_shooting_cannon():
         nummeth.multiple_shooting(Xo_init, bc_vect, tin, cvect_fcn, state_params, int_params)
         
         
-    x0 = float(Xo[0])
-    y0 = float(Xo[1])
-    vx0 = float(Xo[2])
-    vy0 = float(Xo[3])
+    x0 = float(Xo[0,0])
+    y0 = float(Xo[1,0])
+    vx0 = float(Xo[2,0])
+    vy0 = float(Xo[3,0])
     
     
     print('\nFinal Values')
@@ -1074,13 +1080,13 @@ if __name__ == '__main__':
     
 #    ocp_twobody()
     
-#    single_shooting_cannon2()
+    # single_shooting_cannon2()
     
-#    multiple_shooting_cannon()
+    multiple_shooting_cannon()
     
 #    multiple_shooting_yt()
     
-    multiple_shooting_hohmann_transfer()
+    # multiple_shooting_hohmann_transfer()
     
     
     
