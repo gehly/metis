@@ -196,7 +196,7 @@ def salt_setup():
 def run_salt_propagator(Xo, params):
     
     # Setup RK4 integrator
-    tin = np.array([0, 5*365.25*86400])
+    tin = np.array([0, 0.25*365.25*86400])
     Xo[2] = Xo[2]*pi/180
     Xo[3] = Xo[3]*pi/180
     Xo[4] = Xo[4]*pi/180
@@ -206,7 +206,7 @@ def run_salt_propagator(Xo, params):
     P = 2.*pi*np.sqrt(a**3./params['GM'])
     params['step'] = P
     
-    tout, yout = rk4(intfcn, tin, Xo, params)
+    tout, yout, fcalls = rk4(intfcn, tin, Xo, params)
     
 #    # Analytic result on Omega
 #    omega0 = Xo[3]
@@ -373,10 +373,9 @@ if __name__ == '__main__':
 #    x_vect, w_vect = lgwt(N,a,b)
     
     Xo, params = salt_setup()
-    
+        
     tout, yout = run_salt_propagator(Xo, params)
-    
-    
+        
     plot_salt_propagator(tout, yout)
     
     
