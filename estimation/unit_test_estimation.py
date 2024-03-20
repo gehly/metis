@@ -84,7 +84,7 @@ def linear_motion_setup():
     meas_dict['sensor_id_list'] = []
     sensor_params = {}
     sensor_params[1] = {}
-    sig_rg = 0.5
+    sig_rg = 1.
     sensor_params[1]['sigma_dict'] = {}
     sensor_params[1]['sigma_dict']['rg'] = sig_rg
     sensor_params[1]['meas_types'] = ['rg']
@@ -134,8 +134,8 @@ def execute_linear1d_test():
     
     
     # Batch Test
-    filter_output, full_state_output = est.ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, params_dict)
-    analysis.compute_linear1d_errors(filter_output, truth_dict)
+    batch_output, full_state_output = est.ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, params_dict)
+    analysis.compute_linear1d_errors(batch_output, truth_dict)
     
     # Lp-norm Batch Test
     filter_output, full_state_output = est.lp_batch(state_dict, truth_dict, meas_dict, meas_fcn, params_dict)
@@ -143,6 +143,7 @@ def execute_linear1d_test():
     
     
     # EKF Test
+    # params_dict['filter_params']['gap_seconds'] = 0.
     ekf_output, full_state_output = est.ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, params_dict)
     analysis.compute_linear1d_errors(ekf_output, truth_dict)
         
@@ -158,7 +159,20 @@ def execute_linear1d_test():
     analysis.compute_linear1d_errors(ukf_output, truth_dict)
     
     
-        
+    print('Batch output')
+    tf = sorted(batch_output.keys())[-1]
+    Xf_batch = batch_output[tf]['X']
+    Pf_batch = batch_output[tf]['P']
+    
+    print('Xf_batch', Xf_batch)
+    print('Pf_batch', Pf_batch)
+    
+    print('KF output')
+    Xf_kf = ekf_output[tf]['X']
+    Pf_kf = ekf_output[tf]['P']
+    
+    print('Xf_ekf', Xf_kf)
+    print('Pf_ekf', Pf_kf)
     
     return
 
@@ -898,7 +912,7 @@ if __name__ == '__main__':
     
     plt.close('all')
     
-    # execute_linear1d_test()
+    execute_linear1d_test()
     
     # execute_balldrop_test()
     
@@ -907,7 +921,7 @@ if __name__ == '__main__':
     # twobody_born_setup()
 
     
-    execute_twobody_test()
+    # execute_twobody_test()
     
 
 
