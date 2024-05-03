@@ -1960,23 +1960,34 @@ if __name__ == '__main__' :
     
     plt.close('all')
     
-    # Envisat
-    obj_id = 27386
-    UTC = datetime(2023, 5, 19, 0, 0, 0)
-    output_state = propagate_TLE([obj_id], [UTC])
+    # # Envisat
+    # obj_id = 27386
     
-    r_GCRF = output_state[obj_id]['r_GCRF'][0]
-    v_GCRF = output_state[obj_id]['v_GCRF'][0]
+    # # GEO - Optus 10
+    # obj_id = 40146
+    # UTC = datetime(2023, 5, 19, 0, 0, 0)
+    # output_state = propagate_TLE([obj_id], [UTC])
     
-    cart = np.concatenate((r_GCRF, v_GCRF), axis=0)
+    # r_GCRF = output_state[obj_id]['r_GCRF'][0]
+    # v_GCRF = output_state[obj_id]['v_GCRF'][0]
     
-    print(cart)
+    # cart = np.concatenate((r_GCRF, v_GCRF), axis=0)
     
-    elem = astro.cart2kep(cart)
+    # print(cart)
     
-    print(elem)
+    # elem = astro.cart2kep(cart)
     
+    # print(elem)
     
+    tle_dict, tle_df = get_spacetrack_tle_data(username='steve.gehly@gmail.com', password='SpaceTrackPword!')
+    
+    for obj_id in tle_dict:
+        line2 = tle_dict[obj_id]['line2_list'][0]
+        a, e, i, RAAN, w, theta = parse_tle_line2(line2)
+        
+        if a < 10000 and e > 0.1:
+            print(tle_dict[obj_id])
+        
     
     
 #    obj_id_list = [43164, 43166, 43691, 43692, 43851, 43863, 44074, 44075,
