@@ -1979,7 +1979,6 @@ if __name__ == '__main__' :
     
     # print(elem)
     
-    tle_dict, tle_df = get_spacetrack_tle_data(username='steve.gehly@gmail.com', password='SpaceTrackPword!')
     
     for obj_id in tle_dict:
         line2 = tle_dict[obj_id]['line2_list'][0]
