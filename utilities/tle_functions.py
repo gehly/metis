@@ -1960,23 +1960,24 @@ if __name__ == '__main__' :
     
     plt.close('all')
     
-    # Envisat
-    obj_id = 27386
-    UTC = datetime(2023, 5, 19, 0, 0, 0)
-    output_state = propagate_TLE([obj_id], [UTC])
+    # # Envisat
+    # obj_id = 27386
     
-    r_GCRF = output_state[obj_id]['r_GCRF'][0]
-    v_GCRF = output_state[obj_id]['v_GCRF'][0]
+    # # GEO - Optus 10
+    # obj_id = 40146
+    # UTC = datetime(2023, 5, 19, 0, 0, 0)
+    # output_state = propagate_TLE([obj_id], [UTC])
     
-    cart = np.concatenate((r_GCRF, v_GCRF), axis=0)
+    # r_GCRF = output_state[obj_id]['r_GCRF'][0]
+    # v_GCRF = output_state[obj_id]['v_GCRF'][0]
     
-    print(cart)
+    # cart = np.concatenate((r_GCRF, v_GCRF), axis=0)
     
-    elem = astro.cart2kep(cart)
+    # print(cart)
     
-    print(elem)
+    # elem = astro.cart2kep(cart)
     
-    
+    # print(elem)
     
     
 #    obj_id_list = [43164, 43166, 43691, 43692, 43851, 43863, 44074, 44075,
