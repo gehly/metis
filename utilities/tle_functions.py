@@ -1980,15 +1980,6 @@ if __name__ == '__main__' :
     # print(elem)
     
     
-    for obj_id in tle_dict:
-        line2 = tle_dict[obj_id]['line2_list'][0]
-        a, e, i, RAAN, w, theta = parse_tle_line2(line2)
-        
-        if a < 10000 and e > 0.1:
-            print(tle_dict[obj_id])
-        
-    
-    
 #    obj_id_list = [43164, 43166, 43691, 43692, 43851, 43863, 44074, 44075,
 #                   44227, 44228, 44372, 44496]
 #    
