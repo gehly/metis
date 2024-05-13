@@ -49,7 +49,7 @@ def interp_lagrange(X, Y, xx, p):
         # adjust row0 in case near data set endpoints
         if (N == len(X)) or (row0 < nn-1):
             row0 = nn-1
-        elif (row0 > (len(X)-nn)):  # (row0 == length(X))            
+        elif (row0 >= (len(X)-nn)):            
             row0 = len(X) - nn - 1        
     
         # Trim to relevant data points
