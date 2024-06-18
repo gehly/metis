@@ -18,3 +18,5 @@ execution/transits.csv
 doc/~$Coordinate_Frames_and_Time_Systems.pptx
 
 iod/unit_test/
+
+*.pyc
