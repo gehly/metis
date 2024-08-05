@@ -348,8 +348,15 @@ def compute_visible_passes(UTC_list, obj_id_list, sensor_dict, tle_dict={},
             common1 = common_el.intersection(common_az)
             common_pos = common1.intersection(common_rg)
             
-#            print(sensor_id)
-#            print(common_pos)
+            # print(sensor_id)
+            # print(common_pos)
+            
+            for el_ind in sorted(list(common_el)):
+                print('El Mask Passed', UTC_list[el_ind])
+                
+            print('len common el', len(common_el))
+            print('len common pos', len(common_pos))
+
             
             # Sunlit/station dark constraint
             if 'sun_elmask' in sensor:
@@ -364,9 +371,17 @@ def compute_visible_passes(UTC_list, obj_id_list, sensor_dict, tle_dict={},
                 sun_el_inds = np.where(np.asarray(sun_el_list) < sun_elmask)[0]                
                 common_inds = list(common_pos.intersection(set(sun_el_inds)))
                 
-#                print(sensor_id)
-#                print('sun_elmask', sun_elmask)
-#                print(common_inds)
+                # print(sensor_id)
+                # print('sun_elmask', sun_elmask)
+                # print(common_inds)
+                
+                for el_ind in sorted(list(common_inds)):
+                    print('Station Dark Passed', UTC_list[el_ind])
+                    
+                print('len common inds', len(common_inds))
+                print('len common el', len(common_el))
+                
+                
                 
             # Laser constraints
             if 'laser_output' in sensor and rso['laser_lim'] > 0.:
@@ -443,6 +458,8 @@ def compute_visible_passes(UTC_list, obj_id_list, sensor_dict, tle_dict={},
                         if sun_angle < half_cone:
                             vis_array[ii] = False
                             ecclipse_inds.append(ii)
+                            
+                            print('Eclipse', obj_id, UTC_list[ii])
     
                     # Check too close to moon
                     if 'moon_angle_lim' in sensor:
@@ -450,6 +467,8 @@ def compute_visible_passes(UTC_list, obj_id_list, sensor_dict, tle_dict={},
                         if moon_angle < moon_angle_lim:
                             vis_array[ii] = False
                             moon_inds.append(ii)
+                            
+                            print('Moon Limit', obj_id, UTC_list[ii])
                                     
                     # Check apparent magnitude
                     # Optional input for albedo could be retrieved for each object
@@ -460,6 +479,8 @@ def compute_visible_passes(UTC_list, obj_id_list, sensor_dict, tle_dict={},
                         if mapp > mapp_lim:
                             vis_array[ii] = False
                             mapp_inds.append(ii)
+                            
+                            print('Mapp Limit', obj_id, UTC_list[ii])
             
             vis_inds = np.where(vis_array)[0]
 #            UTC_vis = UTC_array[vis_inds]

@@ -24,6 +24,7 @@ import dynamics.dynamics_functions as dyn
 import sensors.measurement_functions as mfunc
 import sensors.sensors as sens
 import sensors.visibility_functions as visfunc
+from utilities import attitude as att
 import utilities.astrodynamics as astro
 import utilities.coordinate_systems as coord
 import utilities.eop_functions as eop
@@ -993,6 +994,86 @@ def pdf_contours():
     return
 
 
+def test_covariance_transform():
+    
+    # Create a random rotation matrix
+    ehat = np.random.rand(3,1)
+    ehat = ehat/np.linalg.norm(ehat)
+    phi = np.random.rand()
+
+    DCM = att.ehatphi2dcm(ehat, phi)
+    print(DCM)
+    
+    print(np.linalg.norm(DCM[:,0]))
+    print(np.linalg.norm(DCM[:,1]))
+    print(np.linalg.norm(DCM[:,2]))
+    
+    
+    
+    # Covariance matrix to rotate
+    P = np.random.rand(6,6)
+    P = np.dot(P, P.T)
+    # P[0:3,0:3] *= 1e6
+    
+    print(P)
+    print(P - P.T)
+    print(np.linalg.eig(P))
+    
+    
+    # Simple linear rotation
+    R = np.zeros((6,6))
+    R[0:3,0:3] = DCM
+    R[3:6,3:6] = DCM
+    
+    print(R)
+    
+    P2 = np.dot(R, np.dot(P, R.T))
+    
+    print(P2)
+    
+    
+    # Generate samples and recompute
+    mean = np.zeros(6,)
+    N = 1000000
+    mc_init = np.random.multivariate_normal(mean,P,int(N))
+    mc_final = np.zeros(mc_init.shape)
+    print(mc_init.shape)
+    
+    for ii in range(N):
+        pos = mc_init[ii][0:3].reshape(3,1)
+        vel = mc_init[ii][3:6].reshape(3,1)
+        
+        # print(pos)
+        # print(vel)
+        
+        p3 = np.dot(DCM, pos)
+        v3 = np.dot(DCM, vel)
+        vec = np.zeros(6,)
+        vec[0:3] = p3.flatten()
+        vec[3:6] = v3.flatten()
+        
+        # print(vec)
+        
+        mc_final[ii,:] = vec
+        
+    # Compute mean and covar
+    m3 = np.mean(mc_final, axis=0)
+    print(m3)
+    
+    P3 = np.zeros((6,6))
+    for ii in range(N):
+        mci = mc_final[ii,:].reshape(6,1)
+        diff = mci - m3.reshape(6,1)
+        
+        P3 += (1./N)*np.dot(diff, diff.T)
+        
+    print(P2)
+    print(P3)
+    print(P2-P3)
+    
+    return
+
+
 if __name__ == '__main__':
     
     
@@ -1002,12 +1083,13 @@ if __name__ == '__main__':
     
 #    twobody_heo_aegis_prop()
     
-    demars_high_orbit()
+    # demars_high_orbit()
     
 #    aegis_ukf_setup()
     
 #    execute_aegis_test()
     
+    test_covariance_transform()
     
     
 #    pdf_contours()

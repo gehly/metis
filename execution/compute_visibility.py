@@ -51,16 +51,22 @@ if __name__ == '__main__':
     
     
 #    obj_id_list = [45727, 47967, 29648, 46113, 24846, 23528, 26624, 35491]
-    obj_id_list = [47967]
+    # obj_id_list = [47967]
+    # obj_id_list = [37379, 41240, 45551, 20580, 36585, 40697]
+    obj_id_list = [41240, 37379]
     sensor_id_list = ['UNSW Falcon', 'CMU Falcon']
     
-    UTC0 = datetime(2021, 9, 13, 0, 0, 0)
-    delta_t = 7.*86400.
-    dt = 10.
+    # sensor_id_list = ['CMU Falcon']
+    # obj_id_list = [37379]
+    
+    UTC0 = datetime(2024, 5, 8, 12, 0, 0)
+    delta_t = 1.*86400.
+    dt = 12.
     UTC_list = [UTC0 + timedelta(seconds=ti) for ti in list(np.arange(0, delta_t, dt))]
     
     sensor_dict = define_sensors(sensor_id_list)
-    vis_dict = compute_visible_passes(UTC_list, obj_id_list, sensor_dict)
+    vis_dict, rso_dict = compute_visible_passes(UTC_list, obj_id_list, sensor_dict)
+                                                
     
     
 #    print(vis_dict)
@@ -70,8 +76,12 @@ if __name__ == '__main__':
     vis_file_min_el = 10.
 #    outdir = os.path.join(metis_dir, 'skyfield_data')
 #    vis_file = os.path.join(outdir, 'test_visible_passes.csv')
-    vis_file = 'M2_visible_passes_2021_09_13.csv'
-    generate_visibility_file(vis_dict, vis_file, vis_file_min_el)
+
+    outdir = r'C:\Users\sgehly\Documents\students\masters\bas_andriessen\data'
+    vis_file = os.path.join(outdir, 'bas_test_case_visible_passes_2024_05_08.csv')
+    #generate_visibility_file(vis_dict, vis_file, vis_file_min_el)
+    generate_visibility_file(vis_dict, rso_dict, UTC_list, outdir, vis_file, 
+                             vis_file_min_el)
     
     
     
