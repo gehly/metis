@@ -61,7 +61,7 @@ if __name__ == '__main__':
     
     UTC0 = datetime(2024, 5, 8, 12, 0, 0)
     delta_t = 1.*86400.
-    dt = 12.
+    dt = 1.
     UTC_list = [UTC0 + timedelta(seconds=ti) for ti in list(np.arange(0, delta_t, dt))]
     
     sensor_dict = define_sensors(sensor_id_list)
@@ -78,7 +78,7 @@ if __name__ == '__main__':
 #    vis_file = os.path.join(outdir, 'test_visible_passes.csv')
 
     outdir = r'C:\Users\sgehly\Documents\students\masters\bas_andriessen\data'
-    vis_file = os.path.join(outdir, 'bas_test_case_visible_passes_2024_05_08.csv')
+    vis_file = os.path.join(outdir, 'bas_test_case_visible_passes_2024_05_08_1sec.csv')
     #generate_visibility_file(vis_dict, vis_file, vis_file_min_el)
     generate_visibility_file(vis_dict, rso_dict, UTC_list, outdir, vis_file, 
                              vis_file_min_el)

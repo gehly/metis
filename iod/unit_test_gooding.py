@@ -37,6 +37,171 @@ from utilities.constants import GME, Re, arcsec2rad
 
 
 
+
+def linh_test_case():
+    
+    # Generic GEO Orbit
+    # elem = [42164.1, 0.01, 0.1, 90., 1., 1.]
+    # Xo = np.reshape(astro.kep2cart(elem), (6,1))
+    Xo = np.reshape([-4.016332655807315E4, -1.2814784554277074E4, 
+                     120.47359695689153, 0.9342751231187755, 
+                     -2.9297861717915916, -0.004559887207651069], (6,1))
+    print('Xo true', Xo)
+    
+    UTC0 = datetime(2024, 8, 1, 20, 48, 6, 526944)
+    
+    #2024-08-02T04:58:39.00000000001125Z"; "2024-08-02T04:58:54.00000000001125Z"; "2024-08-02T04:59:09.00000000001125Z
+    
+    # Time vector
+    UTC1 = datetime(2024, 8, 2, 4, 58, 39)
+    UTC2 = datetime(2024, 8, 2, 4, 58, 54)
+    UTC3 = datetime(2024, 8, 2, 4, 59, 9)
+    UTC_list = [UTC1, UTC2, UTC3]
+    tk_list = UTC_list
+    
+    # Sensor data
+    sensor_id = 'Linh Optical'
+    sensor_params = sens.define_sensors([sensor_id])
+    sensor_params[sensor_id]['meas_types'] = ['ra', 'dec']
+    sensor = sensor_params[sensor_id]
+    
+    # Retrieve latest EOP data from celestrak.com
+    eop_alldata = eop.get_celestrak_eop_alldata()
+        
+    # Retrieve polar motion data from file
+    XYs_df = eop.get_XYs2006_alldata()
+    
+    # Compute measurements
+    Yk_list = []
+    sensor_id_list = []
+    rho_list = []
+    for UTC in UTC_list:
+        
+        dt_sec = (UTC - UTC0).total_seconds()
+        EOP_data = eop.get_eop_data(eop_alldata, UTC)
+        Xk = astro.element_conversion(Xo, 1, 1, dt=dt_sec)
+        all_meas = mfunc.compute_measurement(Xk, {}, sensor_params, sensor_id, UTC, EOP_data,
+                                             XYs_df, meas_types=['ra', 'dec', 'rg', 'az', 'el'])
+        
+        
+        print(all_meas)
+        
+        Yk = all_meas[0:2].reshape(2,1)
+        Yk_list.append(Yk)
+        sensor_id_list.append(sensor_id)
+        rho_list.append(float(all_meas[2]))
+        
+    
+    
+    print(Yk_list)
+    print(sensor_id_list)
+    print(rho_list)
+    
+
+    # Execute function
+    X_list, M_list = iod.gooding_angles_iod(UTC_list, Yk_list, sensor_id_list,
+                                            sensor_params, orbit_regime='GEO',
+                                            search_mode='middle_out',
+                                            periapsis_check=True,
+                                            rootfind='zeros')
+    
+    
+    print('Final Answers')
+    print('X_list', X_list)
+    print('M_list', M_list)
+    
+    for ii in range(len(M_list)):
+        
+        X_err = X_list[ii] - Xo
+        print('')
+        print('ii', ii)
+        print('M', M_list[ii])
+        print('X err', np.linalg.norm(X_err))
+        
+        
+    
+    
+    ii = 0
+    while ii < len(X_list):
+        
+        Xi = X_list[ii]
+        
+        print('')
+        print('ii', ii)
+        
+        del_list = []
+        for jj in range(len(X_list)):
+            
+            if jj == ii:
+                continue
+            
+            Xj = X_list[jj]
+            if np.linalg.norm(Xi - Xj) < 1e-3:
+                del_list.append(jj)
+                
+        print('del_list', del_list)
+        del_list = sorted(del_list, reverse=True)
+        for ind in del_list:
+            del X_list[ind]
+        
+        ii += 1
+    
+    print(X_list)
+    
+    # Check final output states and angles
+    sensor_id_time_list = sensor_id_list
+    tof_2 = (tk_list[1] - tk_list[0]).total_seconds()
+    tof_f = (tk_list[2] - tk_list[0]).total_seconds()
+    sensor0 = sensor_id_time_list[0]
+    sensor2 = sensor_id_time_list[1]
+    sensorf = sensor_id_time_list[2]
+    EOP_data0 = eop.get_eop_data(eop_alldata, tk_list[0])
+    EOP_data2 = eop.get_eop_data(eop_alldata, tk_list[1])
+    EOP_dataf = eop.get_eop_data(eop_alldata, tk_list[2])
+    for ii in range(len(X_list)):
+        
+        Xi_0 = X_list[ii]
+        Xi_2 = astro.element_conversion(Xi_0, 1, 1, dt=tof_2)
+        Xi_f = astro.element_conversion(Xi_0, 1, 1, dt=tof_f)
+        
+        meas0 = mfunc.compute_measurement(Xi_0, {}, sensor_params, sensor0, tk_list[0], EOP_data0,
+                                          XYs_df, meas_types=['ra', 'dec'])
+        
+        meas2 = mfunc.compute_measurement(Xi_2, {}, sensor_params, sensor2, tk_list[1], EOP_data2,
+                                          XYs_df, meas_types=['ra', 'dec'])
+        measf = mfunc.compute_measurement(Xi_f, {}, sensor_params, sensorf, tk_list[2], EOP_dataf,
+                                          XYs_df, meas_types=['ra', 'dec'])
+        
+        resids0 = (meas0 - Yk_list[0])*(1./arcsec2rad)
+        resids2 = (meas2 - Yk_list[1])*(1./arcsec2rad)
+        residsf = (measf - Yk_list[2])*(1./arcsec2rad)
+        
+        # unit vectors
+        uhat_meas2 = np.array([[math.cos(meas2[1])*math.cos(meas2[0])],
+                               [math.cos(meas2[1])*math.sin(meas2[0])],
+                               [math.sin(meas2[1])]])
+    
+        uhat_yk2 = np.array([[math.cos(Yk_list[1][1])*math.cos(Yk_list[1][0])],
+                             [math.cos(Yk_list[1][1])*math.sin(Yk_list[1][0])],
+                             [math.sin(Yk_list[1][1])]])
+        
+        
+        print('')
+        print('Xi', Xi)
+        print('elem_i', astro.cart2kep(X_list[ii]))
+        print('resids0', resids0)
+        print('resids2', resids2)
+        print('residsf', residsf)
+        
+        print(uhat_meas2)
+        print(uhat_yk2)
+        
+        print(float(np.dot(uhat_meas2.T, uhat_yk2)))
+    
+    
+    return
+
+
 def single_rev_geo():
     
     # Generic GEO Orbit
@@ -1760,7 +1925,9 @@ if __name__ == '__main__':
     
     # multi_rev_geo2()
     
-    multi_rev_geo3()
+    # multi_rev_geo3()
+    
+    linh_test_case()
     
     
     
