@@ -802,6 +802,62 @@ def ode_spring_mass_damper_stm(t, X, params):
     return dX
 
 
+def ode_spring_mass_damper_ocbe(t, X, params):
+    
+    # Number of states
+    n = 2
+    nz = 4
+    
+    # Control matrix
+    B = np.array([[0.],
+                  [1.]])
+    
+    # Input params
+    k = params['k']
+    m = params['m']
+    c = params['c']
+    Q = params['Q']
+    
+    x = float(X[0])
+    dx = float(X[1])
+    pr = float(X[2])
+    pv = float(X[3])
+    
+    # Generate A matrix
+    A = np.zeros((nz, nz))
+    Axx = np.array([[  0.,   1.]
+                    [-k/m, -c/m]])
+                    
+    Axp = -np.dot(B, np.dot(Q, B.T))
+    Apx = np.zeros((n, n))
+    App = -Axx.T
+    
+    A[0:2,0:2] = Axx
+    A[0:2,2:4] = Axp
+    A[2:4,0:2] = Apx
+    A[2:4,2:4] = App
+    
+    
+
+    # Compute STM components dphi = A*phi
+    phi_mat = np.reshape(X[nz:], (nz, nz))
+    dphi_mat = np.dot(A, phi_mat)
+    dphi_v = np.reshape(dphi_mat, (nz**2, 1))
+
+    # Derivative vector
+    dX = np.zeros(nz+nz**2,)
+
+    # Note that it should be equivalent to compute dX[0:3] = A*X[0:3]
+    dX[0] = dx
+    dX[1] = -(k/m)*x - (c/m)*dx
+    dX[2] = (k/m)*pv
+    dX[3] = -pr + (c/m)*pv
+    
+    dX[nz:] = dphi_v.flatten()
+    
+    return dX
+
+
 ###############################################################################
 # Orbit Propagation Routines
 ###############################################################################
