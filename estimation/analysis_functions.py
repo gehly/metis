@@ -68,7 +68,7 @@ def compute_linear1d_errors(filter_output, truth_dict):
     
     plt.subplot(3,1,3)
     plt.plot(tk_list, resids[0,:], 'k.')
-    plt.ylim([-resids_max, resids_max])
+    # plt.ylim([-resids_max, resids_max])
     plt.ylabel('Range Resids [m]')
     plt.xlabel('Time [sec]')
     

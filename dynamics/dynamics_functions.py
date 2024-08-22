@@ -751,6 +751,57 @@ def ode_coordturn_ukf(t, X, params):
     return dX
 
 
+def ode_spring_mass_damper(t, X, params):
+    
+    
+    k = params['k']
+    m = params['m']
+    c = params['c']
+    
+    x = float(X[0])
+    dx = float(X[1])
+    
+    dX = np.zeros(2,)
+    dX[0] = dx
+    dX[1] = -(k/m)*x - (c/m)*dx
+    
+    
+    return dX
+
+
+def ode_spring_mass_damper_stm(t, X, params):
+    
+    # number of states
+    n = 2
+    
+    k = params['k']
+    m = params['m']
+    c = params['c']
+    
+    x = float(X[0])
+    dx = float(X[1])
+    
+    # Generate A matrix
+    A = np.zeros((n, n))
+    A[0,1] = 1.
+    A[1,0] = -(k/m)
+    A[1,1] = -(c/m)
+
+    # Compute STM components dphi = A*phi
+    phi_mat = np.reshape(X[n:], (n, n))
+    dphi_mat = np.dot(A, phi_mat)
+    dphi_v = np.reshape(dphi_mat, (n**2, 1))
+
+    # Derivative vector
+    dX = np.zeros(n+n**2,)
+
+    dX[0] = dx
+    dX[1] = -(k/m)*x - (c/m)*dx
+    dX[n:] = dphi_v.flatten()
+    
+    return dX
+
+
 ###############################################################################
 # Orbit Propagation Routines
 ###############################################################################
