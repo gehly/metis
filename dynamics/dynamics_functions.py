@@ -825,7 +825,7 @@ def ode_spring_mass_damper_ocbe(t, X, params):
     
     # Generate A matrix
     A = np.zeros((nz, nz))
-    Axx = np.array([[  0.,   1.]
+    Axx = np.array([[  0.,   1.],
                     [-k/m, -c/m]])
                     
     Axp = -np.dot(B, np.dot(Q, B.T))

@@ -60,11 +60,16 @@ def bl_ocbe(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):
         
     '''
     
+    # Note from Lubey dissertation P39
+    # xbar_km1_km1 = xhat_km1_km1
+    # Pbar_km1_km1 = Phat_km1_km1
+    
     # Break out params
     state_params = params_dict['state_params']
     int_params = params_dict['int_params']
     sensor_params = params_dict['sensor_params']
     filter_params = params_dict['filter_params']
+    state_params['Q'] = filter_params['Q']
     
     # State information
     state_tk = sorted(state_dict.keys())[-1]
@@ -166,7 +171,14 @@ def bl_ocbe(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):
         xbar_k_km1 = np.dot(phi_xx, xhat_km1)
         Pbar_k_km1 = np.dot(phi_xx, np.dot(Phat_km1, phi_xx.T)) - np.dot(phi_xp, phi_xx.T)
         
+        print('')
+        print(tk)
+        print(Xref_k)
+        print(phi)
+        print(xbar_k_km1)
+        print(Pbar_k_km1)
         
+
         # Measurement Update           
         # Retrieve measurement data
         Yk = Yk_list[kk]
@@ -209,14 +221,14 @@ def bl_ocbe(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):
         filter_output[tk]['P'] = Phat_k
         filter_output[tk]['resids'] = resids
         
-        # Overwrite previous time step
-        if tk > tk_prior:
-            filter_output[tk_prior]['X'] = filter_output[tk_prior]['Xref'] + xhat_km1_k
-            filter_output[tk_prior]['P'] = Phat_km1_k
+        # # Overwrite previous time step
+        # if tk > tk_prior:
+        #     filter_output[tk_prior]['X'] = filter_output[tk_prior]['Xref'] + xhat_km1_k
+        #     filter_output[tk_prior]['P'] = Phat_km1_k
         
     
     
-    return filter_output
+    return filter_output, 0
 
 
 def cholesky_inv(P):
