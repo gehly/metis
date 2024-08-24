@@ -48,6 +48,16 @@ def bl_ocbe(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):
     full_state_output : dictionary
         output state and covariance at all truth times
         
+        
+    References
+    ------
+    [1] Lubey, "Maneuver Detection and Reconstruction in Data Sparse Systems 
+        with an Optimal Control Based Estimator," PhD Dissertation, 2015.
+    
+    [2] Lubey and Scheeres, "Automated State and Dynamics Estimation in
+        Dynamically Mismodeled Systems with Information from Optimal Control 
+        Policies," FUSION 2015.
+        
     '''
     
     # Break out params
@@ -81,10 +91,10 @@ def bl_ocbe(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):
 
     # Initialize
     adjoint0 = np.zeros((n, 1))
-    P = Po_bar
-    Zref = np.concatenate((Xo_ref, adjoint0), axis=0)
-    nz = len(Zref)
-    xhat = np.zeros((nz, 1))
+    Phat_k = Po_bar
+    Zref_k = np.concatenate((Xo_ref, adjoint0), axis=0)
+    nz = len(Zref_k)
+    xhat_k = np.zeros((n, 1))
     phi = np.identity(nz)
     phi0_v = np.reshape(phi, (nz**2, 1))
     
@@ -109,10 +119,10 @@ def bl_ocbe(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):
             
         # Propagate to next time
         # Initial Conditions for Integration Routine
-        Zref_prior = Zref
-        xhat_prior = xhat
-        P_prior = P
-        int0 = np.concatenate((Zref_prior, phi0_v))
+        Zref_km1 = Zref_k
+        xhat_km1 = xhat_k
+        Phat_km1 = Phat_k
+        int0 = np.concatenate((Zref_km1, phi0_v))
         
         # Integrate Zref and STM
         if tk_prior == tk:
@@ -124,7 +134,8 @@ def bl_ocbe(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):
 
         # Extract values for later calculations
         xout = intout[-1,:]
-        Zref = xout[0:nz].reshape(nz, 1)
+        Zref_k = xout[0:nz].reshape(nz, 1)
+        Xref_k = Zref_k[0:n].reshape(n, 1)
         phi_v = xout[nz:].reshape(nz**2, 1)
         phi = np.reshape(phi_v, (nz, nz))
         
@@ -151,20 +162,66 @@ def bl_ocbe(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):
         
         
         # Time Update: a priori state and covar at tk
-        # Lubey Dissertation Eq 3.63
-        xbar = np.dot(phi_xx, xhat_prior)
-        Pbar = np.dot(phi_xx, np.dot(P_prior, phi_xx.T)) - np.dot(phi_xp, phi_xx.T)
+        # Lubey FUSION Eq 7-8
+        xbar_k_km1 = np.dot(phi_xx, xhat_km1)
+        Pbar_k_km1 = np.dot(phi_xx, np.dot(Phat_km1, phi_xx.T)) - np.dot(phi_xp, phi_xx.T)
         
         
-        # Measurement Update: posterior state and covar at tk            
+        # Measurement Update           
         # Retrieve measurement data
         Yk = Yk_list[kk]
         sensor_id = sensor_id_list[kk]
 
-        # Compute prefit residuals and  Kalman gain
-        Hk_til, Gk, Rk = meas_fcn(tk, Zref, state_params, sensor_params, sensor_id)
+        # Compute prefit residuals and measurement mapping matrix
+        # Lubey FUSION Eq 9-10
+        Hk_til, Gk, Rk = meas_fcn(tk, Zref_k, state_params, sensor_params, sensor_id)
         yk = Yk - Gk
+        
+        # Predicted residuals (innovations) and covariance
+        Bk = yk - np.dot(Hk_til, xbar_k_km1)
+        P_Bk = np.dot(Hk_til, np.dot(Pbar_k_km1, Hk_til.T)) + Rk 
+        inv_Pbk = cholesky_inv(P_Bk)
+        
+        # Compute prior and posterior gain matrices
+        # Lubey FUSION Eq 14-15
+        L_km1 = Phat_km1 @ phi_xx.T @ Hk_til.T @ inv_Pbk
+        L_k = Pbar_k_km1 @ Hk_til.T @ inv_Pbk
+        
+        # Updated state deviation vectors, covariances, adjoint deviation
+        # Lubey FUSION Eq 11-13, 16-17
+        xhat_km1_k = xhat_km1 + L_km1 @ Bk
+        xhat_k = xbar_k_km1 + L_k @ Bk
+        phat_km1_k = -cholesky_inv(Phat_km1) @ L_km1 @ Bk
+        
+        Phat_km1_k = Phat_km1 - L_km1 @ P_Bk @ L_km1.T
+        P1 = np.eye(n) - L_k @ Hk_til
+        P2 = L_k @ Rk @ L_k.T
+        Phat_k = P1 @ Pbar_k_km1 @ P1.T + P2
+        
+        # Post-fit residuals and updated state
+        resids = yk - np.dot(Hk_til, xhat_k)
+        Xk = Xref_k + xhat_k
+        
+        # Store output
+        filter_output[tk] = {}
+        filter_output[tk]['Xref'] = Xref_k
+        filter_output[tk]['X'] = Xk
+        filter_output[tk]['P'] = Phat_k
+        filter_output[tk]['resids'] = resids
+        
+        # Overwrite previous time step
+        if tk > tk_prior:
+            filter_output[tk_prior]['X'] = filter_output[tk_prior]['Xref'] + xhat_km1_k
+            filter_output[tk_prior]['P'] = Phat_km1_k
         
     
     
-    return
+    return filter_output
+
+
+def cholesky_inv(P):
+    
+    cholP_inv = np.linalg.inv(np.linalg.cholesky(P))
+    Pinv = np.dot(cholP_inv.T, cholP_inv)
+    
+    return Pinv
