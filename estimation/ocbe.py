@@ -87,6 +87,7 @@ def bl_ocbe(state_dict, truth_dict, meas_dict, meas_fcn, params_dict,
 
     # Initialize output
     filter_output = {}
+    smoother_data = {}
 
     # Measurement times
     tk_list = meas_dict['tk_list']
@@ -223,6 +224,14 @@ def bl_ocbe(state_dict, truth_dict, meas_dict, meas_fcn, params_dict,
         filter_output[tk]['P'] = Phat_k
         filter_output[tk]['resids'] = resids
         
+        smoother_data[tk] = {}
+        smoother_data[tk]['Xref'] = Xref_k
+        smoother_data[tk]['xhat'] = xhat_k
+        smoother_data[tk]['phi_xx'] = phi_xx
+        #smoother_data[tk]['phi_pp'] = phi_pp
+        smoother_data[tk]['Pbar'] = Pbar_k_km1
+        smoother_data[tk]['P'] = Phat_k
+        
         # Overwrite previous time step
         if tk > tk_prior:
             filter_output[tk_prior]['X'] = filter_output[tk_prior]['Xref'] + xhat_km1_k
@@ -231,7 +240,47 @@ def bl_ocbe(state_dict, truth_dict, meas_dict, meas_fcn, params_dict,
     
     if smoothing:
         
-        x = 1
+        # Initialize
+        xhat_kp1_l = smoother_data[tk_list[-1]]['xhat']
+        Phat_kp1_l = smoother_data[tk_list[-1]]['P']
+        filter_output[tk_list[-1]]['X_kl'] = filter_output[tk_list[-1]]['X']
+        filter_output[tk_list[-1]]['P_kl'] = filter_output[tk_list[-1]]['P']
+        filter_output[tk_list[-1]]['resids_kl'] = filter_output[tk_list[-1]]['resids']
+        
+        # Loop backwards through time        
+        for kk in range(N-2,-1,-1):
+            
+            # Retrieve data for this iteration
+            t_k = tk_list[kk]
+            t_kp1 = tk_list[kk+1]
+            
+            Xref_k = smoother_data[t_k]['Xref']
+            xhat_k_k = smoother_data[t_k]['xhat']
+            Phat_k_k = smoother_data[t_k]['P']
+            phi_xx = smoother_data[t_kp1]['phi_xx']
+            Pbar_kp1_k = smoother_data[t_kp1]['Pbar']
+            
+            # Retrieve measurement data
+            Yk = Yk_list[kk]
+            sensor_id = sensor_id_list[kk]
+    
+            # Compute prefit residuals and  Kalman gain
+            Hk_til, Gk, Rk = meas_fcn(tk, Xref_k, state_params, sensor_params, sensor_id)
+            yk = Yk - Gk
+            
+            # Compute smoothed state estimate and covariance
+            Sk = Phat_k_k @ phi_xx.T @ est.cholesky_inv(Pbar_kp1_k)
+            xhat_k_l = xhat_k_k + Sk @ (xhat_kp1_l - np.dot(phi_xx, xhat_k_k))
+            Phat_k_l = Phat_k_k + Sk @ (Phat_kp1_l - Pbar_kp1_k) @ Sk.T
+            
+            # Store output
+            filter_output[t_k]['X_kl'] = Xref_k + xhat_k_l
+            filter_output[t_k]['P_kl'] = Phat_k_l
+            filter_output[t_k]['resids_kl'] = yk - np.dot(Hk_til, xhat_k_l)            
+            
+            # Reset for next iteration
+            xhat_kp1_l = xhat_k_l.copy()
+            Phat_kp1_l = Phat_k_l.copy()
     
     
     

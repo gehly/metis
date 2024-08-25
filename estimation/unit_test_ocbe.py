@@ -181,10 +181,10 @@ def execute_spring_mass_damper_test():
     analysis.compute_linear1d_errors(ekf_output, truth_dict, smoothing)
         
     
-    # # OCBE Test
-    # params_dict['int_params']['intfcn'] = dyn.ode_spring_mass_damper_ocbe
-    # ocbe_output, full_state_output = ocbe.bl_ocbe(state_dict, truth_dict, meas_dict, meas_fcn, params_dict, smoothing)
-    # analysis.compute_linear1d_errors(ocbe_output, truth_dict, smoothing)
+    # OCBE Test
+    params_dict['int_params']['intfcn'] = dyn.ode_spring_mass_damper_ocbe
+    ocbe_output, full_state_output = ocbe.bl_ocbe(state_dict, truth_dict, meas_dict, meas_fcn, params_dict, smoothing)
+    analysis.compute_linear1d_errors(ocbe_output, truth_dict, smoothing)
     
     
     return
