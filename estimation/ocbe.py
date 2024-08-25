@@ -16,6 +16,7 @@ metis_dir = current_dir[0:ind+5]
 sys.path.append(metis_dir)
 
 from dynamics import dynamics_functions as dyn
+from estimation import estimation_functions as est
 from sensors import measurement_functions as mfunc
 from utilities import astrodynamics as astro
 from utilities import coordinate_systems as coord
@@ -23,7 +24,8 @@ from utilities.constants import arcsec2rad
 
 
 
-def bl_ocbe(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):
+def bl_ocbe(state_dict, truth_dict, meas_dict, meas_fcn, params_dict,
+            smoothing=False):
     '''
     This function implements the Ballistic Linear Optimal Control Based 
     Estimator (BL-OCBE).
@@ -192,7 +194,7 @@ def bl_ocbe(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):
         # Predicted residuals (innovations) and covariance
         Bk = yk - np.dot(Hk_til, xbar_k_km1)
         P_Bk = np.dot(Hk_til, np.dot(Pbar_k_km1, Hk_til.T)) + Rk 
-        inv_Pbk = cholesky_inv(P_Bk)
+        inv_Pbk = est.cholesky_inv(P_Bk)
         
         # Compute prior and posterior gain matrices
         # Lubey FUSION Eq 14-15
@@ -203,7 +205,7 @@ def bl_ocbe(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):
         # Lubey FUSION Eq 11-13, 16-17
         xhat_km1_k = xhat_km1 + L_km1 @ Bk
         xhat_k = xbar_k_km1 + L_k @ Bk
-        phat_km1_k = -cholesky_inv(Phat_km1) @ L_km1 @ Bk
+        phat_km1_k = -est.cholesky_inv(Phat_km1) @ L_km1 @ Bk
         
         Phat_km1_k = Phat_km1 - L_km1 @ P_Bk @ L_km1.T
         P1 = np.eye(n) - L_k @ Hk_til
@@ -221,19 +223,18 @@ def bl_ocbe(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):
         filter_output[tk]['P'] = Phat_k
         filter_output[tk]['resids'] = resids
         
-        # # Overwrite previous time step
-        # if tk > tk_prior:
-        #     filter_output[tk_prior]['X'] = filter_output[tk_prior]['Xref'] + xhat_km1_k
-        #     filter_output[tk_prior]['P'] = Phat_km1_k
+        # Overwrite previous time step
+        if tk > tk_prior:
+            filter_output[tk_prior]['X'] = filter_output[tk_prior]['Xref'] + xhat_km1_k
+            filter_output[tk_prior]['P'] = Phat_km1_k
         
+    
+    if smoothing:
+        
+        x = 1
+    
     
     
     return filter_output, 0
 
 
-def cholesky_inv(P):
-    
-    cholP_inv = np.linalg.inv(np.linalg.cholesky(P))
-    Pinv = np.dot(cholP_inv.T, cholP_inv)
-    
-    return Pinv

@@ -166,6 +166,8 @@ def execute_spring_mass_damper_test():
         
     params_dict['int_params']['intfcn'] = dyn.ode_spring_mass_damper_stm
     
+    smoothing = True
+    
     
     # Batch Test
     batch_output, full_state_output = est.ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, params_dict)
@@ -175,14 +177,14 @@ def execute_spring_mass_damper_test():
     
     # EKF Test
     # params_dict['filter_params']['gap_seconds'] = 0.
-    ekf_output, full_state_output = est.ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, params_dict)
-    analysis.compute_linear1d_errors(ekf_output, truth_dict)
+    ekf_output, full_state_output = est.ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, params_dict, smoothing)
+    analysis.compute_linear1d_errors(ekf_output, truth_dict, smoothing)
         
     
-    # OCBE Test
-    params_dict['int_params']['intfcn'] = dyn.ode_spring_mass_damper_ocbe
-    ocbe_output, full_state_output = ocbe.bl_ocbe(state_dict, truth_dict, meas_dict, meas_fcn, params_dict)
-    analysis.compute_linear1d_errors(ocbe_output, truth_dict)
+    # # OCBE Test
+    # params_dict['int_params']['intfcn'] = dyn.ode_spring_mass_damper_ocbe
+    # ocbe_output, full_state_output = ocbe.bl_ocbe(state_dict, truth_dict, meas_dict, meas_fcn, params_dict, smoothing)
+    # analysis.compute_linear1d_errors(ocbe_output, truth_dict, smoothing)
     
     
     return
