@@ -757,13 +757,16 @@ def ode_spring_mass_damper(t, X, params):
     k = params['k']
     m = params['m']
     c = params['c']
+    aoff = params['aoff']
+    amag = params['amag']
+    w = params['w']
     
     x = float(X[0])
     dx = float(X[1])
     
     dX = np.zeros(2,)
     dX[0] = dx
-    dX[1] = -(k/m)*x - (c/m)*dx
+    dX[1] = -(k/m)*x - (c/m)*dx + aoff + amag*np.sin(w*t)
     
     
     return dX
@@ -777,6 +780,9 @@ def ode_spring_mass_damper_stm(t, X, params):
     k = params['k']
     m = params['m']
     c = params['c']
+    aoff = params['aoff']
+    amag = params['amag']
+    w = params['w']
     
     x = float(X[0])
     dx = float(X[1])
@@ -796,7 +802,7 @@ def ode_spring_mass_damper_stm(t, X, params):
     dX = np.zeros(n+n**2,)
 
     dX[0] = dx
-    dX[1] = -(k/m)*x - (c/m)*dx
+    dX[1] = -(k/m)*x - (c/m)*dx # + aoff + amag*np.sin(w*t)
     dX[n:] = dphi_v.flatten()
     
     return dX
@@ -817,6 +823,9 @@ def ode_spring_mass_damper_ocbe(t, X, params):
     m = params['m']
     c = params['c']
     Q = params['Q']
+    aoff = params['aoff']
+    amag = params['amag']
+    w = params['w']
     
     x = float(X[0])
     dx = float(X[1])
@@ -847,9 +856,10 @@ def ode_spring_mass_damper_ocbe(t, X, params):
     # Derivative vector
     dX = np.zeros(nz+nz**2,)
 
-    # Note that it should be equivalent to compute dX[0:3] = A*X[0:3]
+    # Note that with no unmodeled acceleration it should be equivalent to 
+    # compute dX[0:3] = A*X[0:3]
     dX[0] = dx
-    dX[1] = -(k/m)*x - (c/m)*dx
+    dX[1] = -(k/m)*x - (c/m)*dx # + aoff + amag*np.sin(w*t)
     dX[2] = (k/m)*pv
     dX[3] = -pr + (c/m)*pv
     

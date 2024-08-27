@@ -40,10 +40,13 @@ def spring_mass_setup():
     state_params['m'] = 100.
     state_params['k'] = 10.
     state_params['c'] = 1.
+    state_params['aoff'] = 0.5
+    state_params['amag'] = 0.1
+    state_params['w'] = 2.*np.pi/5.
     state_params['B'] = np.array([[0.], [1.]])
     
     filter_params = {}
-    filter_params['Q'] = np.diag([1e-8])
+    filter_params['Q'] = np.diag([0.5])
     filter_params['gap_seconds'] = 100.
     filter_params['alpha'] = 1e-4
     filter_params['pnorm'] = 1.2
@@ -168,6 +171,7 @@ def execute_spring_mass_damper_test():
     params_dict['int_params']['intfcn'] = dyn.ode_spring_mass_damper_stm
     
     smoothing = True
+    fname = 'unit_test/ocbe_spring_mass_results_Q0_5.pkl'
     
     
     # Batch Test
@@ -185,7 +189,8 @@ def execute_spring_mass_damper_test():
     # OCBE Test
     params_dict['int_params']['intfcn'] = dyn.ode_spring_mass_damper_ocbe
     ocbe_output, full_state_output = ocbe.bl_ocbe(state_dict, truth_dict, meas_dict, meas_fcn, params_dict, smoothing)
-    analysis.compute_linear1d_errors(ocbe_output, truth_dict, smoothing)
+    # analysis.compute_linear1d_errors(ocbe_output, truth_dict, smoothing)
+    analysis.compute_ocbe_errors_springmass(ocbe_output, truth_dict, params_dict, fname, smoothing)
     
     
     return

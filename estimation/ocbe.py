@@ -254,6 +254,11 @@ def bl_ocbe(state_dict, truth_dict, meas_dict, meas_fcn, params_dict,
         filter_output[tk_list[-1]]['P_kl'] = filter_output[tk_list[-1]]['P']
         filter_output[tk_list[-1]]['resids_kl'] = filter_output[tk_list[-1]]['resids']
         
+        # Note that I set u(t0) = 0 and solve for u(t_k+1) throughout smoother
+        # Lubey dissertation Fig 4.3-4.4 seem to suggest he does otherwise, set
+        # final time to zero and solve backwards so nonzero value at t0.
+        filter_output[tk_list[0]]['u_kl'] = 0
+        
         # Loop backwards through time        
         for kk in range(N-2,-1,-1):
             
@@ -287,7 +292,7 @@ def bl_ocbe(state_dict, truth_dict, meas_dict, meas_fcn, params_dict,
             # Store output
             filter_output[t_k]['X_kl'] = Xref_k + xhat_k_l
             filter_output[t_k]['P_kl'] = Phat_k_l
-            filter_output[t_k]['u_kl'] = u
+            filter_output[t_kp1]['u_kl'] = u
             filter_output[t_k]['resids_kl'] = yk - np.dot(Hk_til, xhat_k_l)
             
             
