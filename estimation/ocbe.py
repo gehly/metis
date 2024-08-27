@@ -78,6 +78,7 @@ def bl_ocbe(state_dict, truth_dict, meas_dict, meas_fcn, params_dict,
     Xo_ref = state_dict[state_tk]['X']
     Po_bar = state_dict[state_tk]['P']
     Q = filter_params['Q']
+    B = state_params['B']
     gap_seconds = filter_params['gap_seconds']
     time_format = int_params['time_format']
     
@@ -228,15 +229,21 @@ def bl_ocbe(state_dict, truth_dict, meas_dict, meas_fcn, params_dict,
         smoother_data[tk]['Xref'] = Xref_k
         smoother_data[tk]['xhat'] = xhat_k
         smoother_data[tk]['phi_xx'] = phi_xx
-        #smoother_data[tk]['phi_pp'] = phi_pp
+        smoother_data[tk]['phi_pp'] = phi_pp
         smoother_data[tk]['Pbar'] = Pbar_k_km1
         smoother_data[tk]['P'] = Phat_k
         
         # Overwrite previous time step
-        if tk > tk_prior:
+        # Note this is equivalent to a one step smoothing 
+        # if smoothing the entire trajectory, not much point keeping this
+        if tk > tk_prior and not smoothing:
             filter_output[tk_prior]['X'] = filter_output[tk_prior]['Xref'] + xhat_km1_k
             filter_output[tk_prior]['P'] = Phat_km1_k
         
+    
+    # Compute control inputs
+    
+    
     
     if smoothing:
         
@@ -258,6 +265,7 @@ def bl_ocbe(state_dict, truth_dict, meas_dict, meas_fcn, params_dict,
             xhat_k_k = smoother_data[t_k]['xhat']
             Phat_k_k = smoother_data[t_k]['P']
             phi_xx = smoother_data[t_kp1]['phi_xx']
+            phi_pp = smoother_data[t_kp1]['phi_pp']
             Pbar_kp1_k = smoother_data[t_kp1]['Pbar']
             
             # Retrieve measurement data
@@ -273,10 +281,15 @@ def bl_ocbe(state_dict, truth_dict, meas_dict, meas_fcn, params_dict,
             xhat_k_l = xhat_k_k + Sk @ (xhat_kp1_l - np.dot(phi_xx, xhat_k_k))
             Phat_k_l = Phat_k_k + Sk @ (Phat_kp1_l - Pbar_kp1_k) @ Sk.T
             
+            # Compute control inputs
+            u = -Q @ B.T @ phi_pp @ est.cholesky_inv(Phat_k_k) @ (xhat_k_k - xhat_k_l)
+            
             # Store output
             filter_output[t_k]['X_kl'] = Xref_k + xhat_k_l
             filter_output[t_k]['P_kl'] = Phat_k_l
-            filter_output[t_k]['resids_kl'] = yk - np.dot(Hk_til, xhat_k_l)            
+            filter_output[t_k]['u_kl'] = u
+            filter_output[t_k]['resids_kl'] = yk - np.dot(Hk_til, xhat_k_l)
+            
             
             # Reset for next iteration
             xhat_kp1_l = xhat_k_l.copy()

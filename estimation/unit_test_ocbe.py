@@ -40,6 +40,7 @@ def spring_mass_setup():
     state_params['m'] = 100.
     state_params['k'] = 10.
     state_params['c'] = 1.
+    state_params['B'] = np.array([[0.], [1.]])
     
     filter_params = {}
     filter_params['Q'] = np.diag([1e-8])
@@ -196,6 +197,6 @@ if __name__ == '__main__':
     
     plt.close('all')
     
-    # spring_mass_setup()
+    spring_mass_setup()
     
     execute_spring_mass_damper_test()
