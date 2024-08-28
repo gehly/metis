@@ -27,7 +27,7 @@ from utilities.constants import arcsec2rad
 # Linear Motion Analysis
 ###############################################################################
 
-def compute_linear1d_errors(filter_output, truth_dict):
+def compute_linear1d_errors(filter_output, truth_dict, smoothing=False):
     
     # Compute errors
     n = 2
@@ -57,6 +57,7 @@ def compute_linear1d_errors(filter_output, truth_dict):
     plt.plot(tk_list, -3*sig_x, 'k--')
 #    plt.ylim([-1, 1])
     plt.ylabel('Pos Err [m]')
+    plt.title('Filter Results')
     
     plt.subplot(3,1,2)
     plt.plot(tk_list, X_err[1,:], 'k.')
@@ -68,21 +69,214 @@ def compute_linear1d_errors(filter_output, truth_dict):
     
     plt.subplot(3,1,3)
     plt.plot(tk_list, resids[0,:], 'k.')
-    plt.ylim([-resids_max, resids_max])
+    # plt.ylim([-resids_max, resids_max])
     plt.ylabel('Range Resids [m]')
     plt.xlabel('Time [sec]')
     
     plt.show()
     
    
-    print('\nError Statistics')
+    print('\n Filter Error Statistics')
     print('Pos mean and std [m]: ' + '{:.3f}'.format(np.mean(X_err[0,:])) + ', {:.3f}'.format(np.std(X_err[0,:])))
     print('Vel mean and std [m/s]: ' + '{:.3f}'.format(np.mean(X_err[1,:])) + ', {:.3f}'.format(np.std(X_err[1,:])))
     print('Rg Resids mean and std [m]: ' + '{:.3f}'.format(np.mean(resids[0,:])) + ', {:.3f}'.format(np.std(resids[0,:])))
     
     
+    if smoothing:
+        # Compute errors
+        n = 2
+        p = 1
+        X_err = np.zeros((n, len(filter_output)))
+        resids = np.zeros((p, len(filter_output)))
+        sig_x = np.zeros(len(filter_output),)
+        sig_dx = np.zeros(len(filter_output),)
+        tk_list = list(filter_output.keys())
+        for kk in range(len(filter_output)):
+            tk = tk_list[kk]
+            X = filter_output[tk]['X_kl']
+            P = filter_output[tk]['P_kl']
+            resids[:,kk] = filter_output[tk]['resids_kl'].flatten()
+            
+            X_true = truth_dict[tk]
+            X_err[:,kk] = (X - X_true).flatten()
+            sig_x[kk] = np.sqrt(P[0,0])
+            sig_dx[kk] = np.sqrt(P[1,1])
+            
+        resids_max = np.ceil(np.max(np.abs(resids))) 
+            
+        plt.figure()
+        plt.subplot(3,1,1)
+        plt.plot(tk_list, X_err[0,:], 'k.')
+        plt.plot(tk_list, 3*sig_x, 'k--')
+        plt.plot(tk_list, -3*sig_x, 'k--')
+    #    plt.ylim([-1, 1])
+        plt.ylabel('Pos Err [m]')
+        plt.title('Smoother Results')
+        
+        plt.subplot(3,1,2)
+        plt.plot(tk_list, X_err[1,:], 'k.')
+        plt.plot(tk_list, 3*sig_dx, 'k--')
+        plt.plot(tk_list, -3*sig_dx, 'k--')
+    #    plt.ylim([-0.05, 0.05])
+        plt.ylabel('Vel Err [m/s]')
+        
+        
+        plt.subplot(3,1,3)
+        plt.plot(tk_list, resids[0,:], 'k.')
+        # plt.ylim([-resids_max, resids_max])
+        plt.ylabel('Range Resids [m]')
+        plt.xlabel('Time [sec]')
+        
+        plt.show()
+        
+       
+        print('\n Filter Error Statistics')
+        print('Pos mean and std [m]: ' + '{:.3f}'.format(np.mean(X_err[0,:])) + ', {:.3f}'.format(np.std(X_err[0,:])))
+        print('Vel mean and std [m/s]: ' + '{:.3f}'.format(np.mean(X_err[1,:])) + ', {:.3f}'.format(np.std(X_err[1,:])))
+        print('Rg Resids mean and std [m]: ' + '{:.3f}'.format(np.mean(resids[0,:])) + ', {:.3f}'.format(np.std(resids[0,:])))
+    
+    
     
     return
+
+
+
+###############################################################################
+# Spring-Mass-Damper
+###############################################################################
+
+def compute_ocbe_errors_springmass(filter_output, truth_dict, params_dict, fname, smoothing=False):
+    
+    
+    # accleration model
+    state_params = params_dict['state_params']
+    aoff = state_params['aoff']
+    amag = state_params['amag']
+    w = state_params['w']
+    
+    # Compute errors
+    n = 2
+    p = 1
+    X_err = np.zeros((n, len(filter_output)))
+    resids = np.zeros((p, len(filter_output)))
+    sig_x = np.zeros(len(filter_output),)
+    sig_dx = np.zeros(len(filter_output),)
+    tk_list = list(filter_output.keys())
+    for kk in range(len(filter_output)):
+        tk = tk_list[kk]
+        X = filter_output[tk]['X']
+        P = filter_output[tk]['P']
+        resids[:,kk] = filter_output[tk]['resids'].flatten()
+        
+        X_true = truth_dict[tk]
+        X_err[:,kk] = (X - X_true).flatten()
+        sig_x[kk] = np.sqrt(P[0,0])
+        sig_dx[kk] = np.sqrt(P[1,1])
+        
+    resids_max = np.ceil(np.max(np.abs(resids))) 
+        
+    plt.figure()
+    plt.subplot(3,1,1)
+    plt.plot(tk_list, X_err[0,:], 'k.')
+    plt.plot(tk_list, 3*sig_x, 'k--')
+    plt.plot(tk_list, -3*sig_x, 'k--')
+#    plt.ylim([-1, 1])
+    plt.ylabel('Pos Err [m]')
+    plt.title('Filter Results')
+    
+    plt.subplot(3,1,2)
+    plt.plot(tk_list, X_err[1,:], 'k.')
+    plt.plot(tk_list, 3*sig_dx, 'k--')
+    plt.plot(tk_list, -3*sig_dx, 'k--')
+#    plt.ylim([-0.05, 0.05])
+    plt.ylabel('Vel Err [m/s]')
+    
+    
+    plt.subplot(3,1,3)
+    plt.plot(tk_list, resids[0,:], 'k.')
+    # plt.ylim([-resids_max, resids_max])
+    plt.ylabel('Range Resids [m]')
+    plt.xlabel('Time [sec]')
+    
+    plt.show()
+    
+   
+    print('\n Filter Error Statistics')
+    print('Pos mean and std [m]: ' + '{:.3f}'.format(np.mean(X_err[0,:])) + ', {:.3f}'.format(np.std(X_err[0,:])))
+    print('Vel mean and std [m/s]: ' + '{:.3f}'.format(np.mean(X_err[1,:])) + ', {:.3f}'.format(np.std(X_err[1,:])))
+    print('Rg Resids mean and std [m]: ' + '{:.3f}'.format(np.mean(resids[0,:])) + ', {:.3f}'.format(np.std(resids[0,:])))
+    
+    
+    if smoothing:
+        # Compute errors
+        n = 2
+        p = 1
+        X_err = np.zeros((n, len(filter_output)))
+        resids = np.zeros((p, len(filter_output)))
+        sig_x = np.zeros(len(filter_output),)
+        sig_dx = np.zeros(len(filter_output),)
+        uvec = np.zeros(len(filter_output),)
+        uerr = np.zeros(len(filter_output),)
+        tk_list = list(filter_output.keys())
+        for kk in range(len(filter_output)):
+            tk = tk_list[kk]
+                        
+            X = filter_output[tk]['X_kl']
+            P = filter_output[tk]['P_kl']
+            u = filter_output[tk]['u_kl']
+            resids[:,kk] = filter_output[tk]['resids_kl'].flatten()
+            
+            X_true = truth_dict[tk]
+            X_err[:,kk] = (X - X_true).flatten()
+            uvec[kk] = u
+            u_true = aoff + amag*np.sin(w*tk)
+            uerr[kk] = u - u_true
+            sig_x[kk] = np.sqrt(P[0,0])
+            sig_dx[kk] = np.sqrt(P[1,1])
+            
+        resids_max = np.ceil(np.max(np.abs(resids))) 
+            
+        plt.figure()
+        plt.subplot(3,1,1)
+        plt.plot(tk_list, X_err[0,:], 'k.')
+        plt.plot(tk_list, 3*sig_x, 'k--')
+        plt.plot(tk_list, -3*sig_x, 'k--')
+    #    plt.ylim([-1, 1])
+        plt.ylabel('Pos Err [m]')
+        plt.title('Smoother Results')
+        
+        plt.subplot(3,1,2)
+        plt.plot(tk_list, X_err[1,:], 'k.')
+        plt.plot(tk_list, 3*sig_dx, 'k--')
+        plt.plot(tk_list, -3*sig_dx, 'k--')
+    #    plt.ylim([-0.05, 0.05])
+        plt.ylabel('Vel Err [m/s]')
+        
+        
+        plt.subplot(3,1,3)
+        plt.plot(tk_list, resids[0,:], 'k.')
+        # plt.ylim([-resids_max, resids_max])
+        plt.ylabel('Range Resids [m]')
+        plt.xlabel('Time [sec]')
+        
+        plt.show()
+        
+       
+        print('\n Smoother Error Statistics')
+        print('Pos mean and std [m]: ' + '{:.3f}'.format(np.mean(X_err[0,:])) + ', {:.3f}'.format(np.std(X_err[0,:])))
+        print('Vel mean and std [m/s]: ' + '{:.3f}'.format(np.mean(X_err[1,:])) + ', {:.3f}'.format(np.std(X_err[1,:])))
+        print('Rg Resids mean and std [m]: ' + '{:.3f}'.format(np.mean(resids[0,:])) + ', {:.3f}'.format(np.std(resids[0,:])))
+    
+    
+    
+    
+    
+    
+    pklFile = open( fname, 'wb' )
+    pickle.dump( [tk_list, X_err, sig_x, sig_dx, uvec, uerr], pklFile, -1 )
+    pklFile.close()
+    
+    return 
 
 
 

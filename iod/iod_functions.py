@@ -2622,7 +2622,7 @@ def gibbs_iod(r1_vect, r2_vect, r3_vect, GM=GME):
     return v2_vect, exit_flag
 
 
-def herrick_gibbs_iod(r1_vect, r2_vect, r3_vect,UTC_list, GM=GME):
+def herrick_gibbs_iod(r1_vect, r2_vect, r3_vect, UTC_list, GM=GME):
     '''
     This function solves Gibbs Problem for small angles to finds a Keplerian 
     orbit solution to fit three, time-sequential (t1 < t2 < t3), co-planar 

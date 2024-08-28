@@ -348,6 +348,10 @@ def twobody_geo_setup():
         UTC = datetime(2021, 6, 21, hr, 0, 0)
         tvec = np.arange(0., 601., 60.)
         tk_list.extend([UTC + timedelta(seconds=ti) for ti in tvec])
+        
+    # tvec = np.arange(0., 86401., 1800.)
+    # UTC = datetime(2021, 6, 21, 0, 0, 0)
+    # tk_list.extend([UTC + timedelta(seconds=ti) for ti in tvec])
 
     # Inital State
     elem = [42164.1, 0.001, 0., 90., 0., 0.]
@@ -912,16 +916,16 @@ if __name__ == '__main__':
     
     plt.close('all')
     
-    execute_linear1d_test()
+    # execute_linear1d_test()
     
     # execute_balldrop_test()
     
-    # twobody_geo_setup()
+    twobody_geo_setup()
     
     # twobody_born_setup()
 
     
-    # execute_twobody_test()
+    execute_twobody_test()
     
 
 

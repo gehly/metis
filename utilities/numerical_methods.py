@@ -40,7 +40,7 @@ def interp_lagrange(X, Y, xx, p):
     nn  = int(math.floor(No2))
     
     # Find index such that X[row0] < xx < X[row0+1]
-    row0 = list(np.where(X < xx)[0])[-1]
+    row0 = list(np.where(X <= xx)[0])[-1]
     
     # Trim data set
     # N is even (p is odd)    

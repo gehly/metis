@@ -358,6 +358,29 @@ def unscented_linear1d_rg(tk, chi, state_params, sensor_params, sensor_id):
     return gamma_til, Rk
 
 
+def H_linear1d_pos(tk, Xref, state_params, sensor_params, sensor_id):
+    
+    # Break out state
+    x = float(Xref[0,0])
+    
+    # Measurement information
+    sensor_kk = sensor_params[sensor_id]
+    meas_types = sensor_kk['meas_types']
+    sigma_dict = sensor_kk['sigma_dict']
+    p = len(meas_types)
+    Rk = np.zeros((p, p))
+    for ii in range(p):
+        mtype = meas_types[ii]
+        sig = sigma_dict[mtype]
+        Rk[ii,ii] = sig**2.   
+    
+    # Hk_til and Gi
+    Hk_til = np.array([[1., 0.]])
+    Gk = np.array([[x]])
+    
+    return Hk_til, Gk, Rk
+
+
 def H_balldrop(tk, Xref, state_params, sensor_params, sensor_id):
     
     # Break out state

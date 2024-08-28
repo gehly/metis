@@ -862,6 +862,8 @@ def skew_matrix(w):
 
     '''
     
+    w = w.flatten()
+    
     wskew = np.array(([[   0, -w[2], w[1]],
                        [ w[2],   0, -w[0]],
                        [-w[1], w[0],   0]]))
@@ -1174,7 +1176,7 @@ def quat2dcm(q):
     B. Wie, "Space Vehicle Dynamics and Control," 2nd ed., 2008. Eq. 5.38
     '''
     
-    qvec = q[0:3]
+    qvec = q[0:3].reshape(3,1)
     q4 = float(q[3])
     qskew = skew_matrix(qvec)
 
@@ -1830,108 +1832,108 @@ def ehatphi2dcm(ehat, phi):
 #
 #test_bug()
 
-#def test_parameter_conversions():
-#    '''
-#    Schaub and Junkins Example 3.2, 3.3
-#    '''    
-#    
-#    
-#    eulerB = [30., -45., 60.]
-#    eulerF = [10., 25., -15.]
-#    
-#    sequence = [3,2,1]
-#    
-#    DCM_BN = euler_angles(sequence, eulerB[0]*pi/180., eulerB[1]*pi/180.,
-#                          eulerB[2]*pi/180.)
-#    
-#    DCM_FN = euler_angles(sequence, eulerF[0]*pi/180., eulerF[1]*pi/180.,
-#                          eulerF[2]*pi/180.)
-#                          
-#    DCM_BF = dcm_composition(DCM_BN, DCM_FN.T)
-#    
-#    yaw, pitch, roll = dcm2euler321(DCM_BF)
-#    
-#    ehat_FN, phi_FN = dcm2ehatphi(DCM_FN)
-#    
-#    DCM_FN = ehatphi2dcm(ehat_FN, phi_FN)
-#    
-##    print 'BN', DCM_BN
-##    print
-##    print 'FN', DCM_FN
-##    print
-##    print 'BF', DCM_BF
-##    print
-##    print 'yaw', yaw*180./pi
-##    print 'pitch', pitch*180./pi
-##    print 'roll', roll*180./pi
-##    print
-##    print 'ehat', ehat_FN
-##    print 'phi', phi_FN*180./pi
-#    
-#    
-#    quat_FN = dcm2quat(DCM_FN)
-#    DCM_FN = quat2dcm(quat_FN)
-#    ehat_FN, phi_FN = quat2ehatphi(quat_FN)
-#    quat_FN2 = ehatphi2quat(ehat_FN, phi_FN)
-#    
-#    print
-#    print 'FN', DCM_FN
-#    print
-#    print 'quat', quat_FN
-#    print 'quat2', quat_FN2
-#    print 'ehat', ehat_FN
-#    print 'phi', phi_FN*180./pi
-#    
-#    gibbs_FN = quat2gibbs(quat_FN)
-#    quat_FN = gibbs2quat(gibbs_FN)
-#    ehat_FN, phi_FN = gibbs2ehatphi(gibbs_FN)
-#    gibbs_FN2 = ehatphi2gibbs(ehat_FN, phi_FN)
-#    
-#    print
-#    print 'gibbs_FN', gibbs_FN
-#    print 'quat_FN', quat_FN
-#    print 'ehat', ehat_FN
-#    print 'phi', phi_FN*180./pi
-#    print 'gibbs_FN2', gibbs_FN2
-#    
-#    DCM_FN = gibbs2dcm(gibbs_FN)
-#    gibbs_FN = dcm2gibbs(DCM_FN)
-#    
-#    print
-#    print 'gibbs_FN', gibbs_FN
-#    print 'DCM_FN', DCM_FN
-#    
-#    print
-#    print 'MRPs'
-#    
-#    p_FN = quat2mrp(quat_FN)
-#    quat_FN = mrp2quat(p_FN)
-#    
-#    print 'p_FN', p_FN
-#    print 'q_FN', quat_FN
-#    
-#    p_FN = ehatphi2mrp(ehat_FN, phi_FN)
-#    ehat_FN, phi_FN = mrp2ehatphi(p_FN)
-#    
-#    print 'p_FN', p_FN
-#    print 'ehat', ehat_FN
-#    print 'phi', phi_FN*180./pi
-#    
-#    p_FN = gibbs2mrp(gibbs_FN)
-#    gibbs_FN = mrp2gibbs(p_FN)
-#    
-#    print 'p_FN', p_FN
-#    print 'gibbs_FN', gibbs_FN
-#    
-#    p_FN = dcm2mrp(DCM_FN)
-#    print p_FN
-#    DCM_FN = mrp2dcm(p_FN)
-#    
-#    print 'p_FN', p_FN
-#    print 'DCM_FN', DCM_FN
-#    
-#    
-#    return
+# def test_parameter_conversions():
+#     '''
+#     Schaub and Junkins Example 3.2, 3.3
+#     '''    
+    
+    
+#     eulerB = [30., -45., 60.]
+#     eulerF = [10., 25., -15.]
+    
+#     sequence = [3,2,1]
+    
+#     DCM_BN = euler_angles(sequence, eulerB[0]*pi/180., eulerB[1]*pi/180.,
+#                           eulerB[2]*pi/180.)
+    
+#     DCM_FN = euler_angles(sequence, eulerF[0]*pi/180., eulerF[1]*pi/180.,
+#                           eulerF[2]*pi/180.)
+                          
+#     DCM_BF = dcm_composition(DCM_BN, DCM_FN.T)
+    
+#     yaw, pitch, roll = dcm2euler321(DCM_BF)
+    
+#     ehat_FN, phi_FN = dcm2ehatphi(DCM_FN)
+    
+#     DCM_FN = ehatphi2dcm(ehat_FN, phi_FN)
+    
+# #    print 'BN', DCM_BN
+# #    print
+# #    print 'FN', DCM_FN
+# #    print
+# #    print 'BF', DCM_BF
+# #    print
+# #    print 'yaw', yaw*180./pi
+# #    print 'pitch', pitch*180./pi
+# #    print 'roll', roll*180./pi
+# #    print
+# #    print 'ehat', ehat_FN
+# #    print 'phi', phi_FN*180./pi
+    
+    
+#     quat_FN = dcm2quat(DCM_FN)
+#     DCM_FN = quat2dcm(quat_FN)
+#     ehat_FN, phi_FN = quat2ehatphi(quat_FN)
+#     quat_FN2 = ehatphi2quat(ehat_FN, phi_FN)
+    
+#     print
+#     print 'FN', DCM_FN
+#     print
+#     print 'quat', quat_FN
+#     print 'quat2', quat_FN2
+#     print 'ehat', ehat_FN
+#     print 'phi', phi_FN*180./pi
+    
+#     gibbs_FN = quat2gibbs(quat_FN)
+#     quat_FN = gibbs2quat(gibbs_FN)
+#     ehat_FN, phi_FN = gibbs2ehatphi(gibbs_FN)
+#     gibbs_FN2 = ehatphi2gibbs(ehat_FN, phi_FN)
+    
+#     print
+#     print 'gibbs_FN', gibbs_FN
+#     print 'quat_FN', quat_FN
+#     print 'ehat', ehat_FN
+#     print 'phi', phi_FN*180./pi
+#     print 'gibbs_FN2', gibbs_FN2
+    
+#     DCM_FN = gibbs2dcm(gibbs_FN)
+#     gibbs_FN = dcm2gibbs(DCM_FN)
+    
+#     print
+#     print 'gibbs_FN', gibbs_FN
+#     print 'DCM_FN', DCM_FN
+    
+#     print
+#     print 'MRPs'
+    
+#     p_FN = quat2mrp(quat_FN)
+#     quat_FN = mrp2quat(p_FN)
+    
+#     print 'p_FN', p_FN
+#     print 'q_FN', quat_FN
+    
+#     p_FN = ehatphi2mrp(ehat_FN, phi_FN)
+#     ehat_FN, phi_FN = mrp2ehatphi(p_FN)
+    
+#     print 'p_FN', p_FN
+#     print 'ehat', ehat_FN
+#     print 'phi', phi_FN*180./pi
+    
+#     p_FN = gibbs2mrp(gibbs_FN)
+#     gibbs_FN = mrp2gibbs(p_FN)
+    
+#     print 'p_FN', p_FN
+#     print 'gibbs_FN', gibbs_FN
+    
+#     p_FN = dcm2mrp(DCM_FN)
+#     print p_FN
+#     DCM_FN = mrp2dcm(p_FN)
+    
+#     print 'p_FN', p_FN
+#     print 'DCM_FN', DCM_FN
+    
+    
+#     return
 #
 #
 #def test_compositions():

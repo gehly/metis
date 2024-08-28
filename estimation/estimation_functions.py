@@ -1033,7 +1033,8 @@ def unscented_batch(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):
 # Sequential Estimation
 ###############################################################################
 
-def ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):    
+def ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, params_dict,
+           smoothing=False):    
     '''
     This function implements the linearized Extended Kalman Filter for the 
     least squares cost function.
@@ -1084,6 +1085,7 @@ def ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):
 
     # Initialize output
     filter_output = {}
+    smoother_data = {}
 
     # Measurement times
     tk_list = meas_dict['tk_list']
@@ -1197,6 +1199,15 @@ def ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):
         filter_output[tk]['P'] = P
         filter_output[tk]['resids'] = resids
         
+        smoother_data[tk] = {}
+        smoother_data[tk]['Xref'] = Xref
+        smoother_data[tk]['xhat'] = xhat
+        smoother_data[tk]['phi'] = phi
+        smoother_data[tk]['Pbar'] = Pbar
+        smoother_data[tk]['P'] = P
+        
+        
+        
 #        print('\n')
 #        print('tk', tk)
 #        print('xbar', xbar)
@@ -1238,6 +1249,10 @@ def ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):
             
         count += 1
         
+        # Don't use EKF for smoothing cases
+        if smoothing:
+            conv_flag = False
+        
 
         # After filter convergence, update reference trajectory
         if conv_flag:
@@ -1245,6 +1260,54 @@ def ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):
             xhat = np.zeros((n, 1))
             
             
+    
+    
+    # Smoothing
+    if smoothing:
+        
+        # Initialize
+        xhat_kp1_l = smoother_data[tk_list[-1]]['xhat']
+        Phat_kp1_l = smoother_data[tk_list[-1]]['P']
+        filter_output[tk_list[-1]]['X_kl'] = filter_output[tk_list[-1]]['X']
+        filter_output[tk_list[-1]]['P_kl'] = filter_output[tk_list[-1]]['P']
+        filter_output[tk_list[-1]]['resids_kl'] = filter_output[tk_list[-1]]['resids']
+        
+        # Loop backwards through time        
+        for kk in range(N-2,-1,-1):
+            
+            # Retrieve data for this iteration
+            t_k = tk_list[kk]
+            t_kp1 = tk_list[kk+1]
+            
+            Xref_k = smoother_data[t_k]['Xref']
+            xhat_k_k = smoother_data[t_k]['xhat']
+            Phat_k_k = smoother_data[t_k]['P']
+            phi = smoother_data[t_kp1]['phi']
+            Pbar_kp1_k = smoother_data[t_kp1]['Pbar']
+            
+            # Retrieve measurement data
+            Yk = Yk_list[kk]
+            sensor_id = sensor_id_list[kk]
+    
+            # Compute prefit residuals and  Kalman gain
+            Hk_til, Gk, Rk = meas_fcn(tk, Xref_k, state_params, sensor_params, sensor_id)
+            yk = Yk - Gk
+            
+            # Compute smoothed state estimate and covariance
+            Sk = Phat_k_k @ phi.T @ cholesky_inv(Pbar_kp1_k)
+            xhat_k_l = xhat_k_k + Sk @ (xhat_kp1_l - np.dot(phi, xhat_k_k))
+            Phat_k_l = Phat_k_k + Sk @ (Phat_kp1_l - Pbar_kp1_k) @ Sk.T
+            
+            # Store output
+            filter_output[t_k]['X_kl'] = Xref_k + xhat_k_l
+            filter_output[t_k]['P_kl'] = Phat_k_l
+            filter_output[t_k]['resids_kl'] = yk - np.dot(Hk_til, xhat_k_l)            
+            
+            # Reset for next iteration
+            xhat_kp1_l = xhat_k_l.copy()
+            Phat_kp1_l = Phat_k_l.copy()
+        
+        
     
             
     # TODO Generation of full_state_output not working correctly
@@ -2147,6 +2210,19 @@ def gaussian_entropy(P) :
     entropy = H
 
     return entropy
+
+
+###############################################################################
+# General Utilities
+###############################################################################
+
+
+def cholesky_inv(P):
+    
+    cholP_inv = np.linalg.inv(np.linalg.cholesky(P))
+    Pinv = np.dot(cholP_inv.T, cholP_inv)
+    
+    return Pinv
 
 
 def gaussian_likelihood(x, m, P):
