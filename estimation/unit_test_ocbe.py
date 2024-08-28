@@ -46,7 +46,7 @@ def spring_mass_setup():
     state_params['B'] = np.array([[0.], [1.]])
     
     filter_params = {}
-    filter_params['Q'] = np.diag([0.5])
+    filter_params['Q'] = np.diag([0.25])
     filter_params['gap_seconds'] = 100.
     filter_params['alpha'] = 1e-4
     filter_params['pnorm'] = 1.2
