@@ -156,6 +156,8 @@ def get_spacetrack_tle_data(obj_id_list = [], UTC_list = [], username='',
         r = s.get('https:' + pageData)
         if r.status_code == requests.codes.ok:
             
+            print(r.text)
+            
             # Parse response and form output
             tle_list = []
             nchar = 69
@@ -195,6 +197,48 @@ def get_spacetrack_tle_data(obj_id_list = [], UTC_list = [], username='',
         else:
             print("Error: Page data request failed.")
 
+    return tle_dict, tle_df
+
+
+def read_tle(text):
+    
+    tle_dict = {}
+    
+    # Parse response and form output
+    tle_list = []
+    nchar = 69
+    nskip = 2
+    ntle = int(round(len(text)/142.))
+    for ii in range(ntle):
+
+        line1_start = ii*2*(nchar+nskip)
+        line1_stop = ii*2*(nchar+nskip) + nchar
+        line2_start = ii*2*(nchar+nskip) + nchar + nskip
+        line2_stop = ii*2*(nchar+nskip) + 2*nchar + nskip
+        line1 = text[line1_start:line1_stop]
+        line2 = text[line2_start:line2_stop]
+        UTC = tletime2datetime(line1)
+
+        try:
+            obj_id = int(line1[2:7])
+        except:
+            continue
+
+        if obj_id not in tle_dict:
+            tle_dict[obj_id] = {}
+            tle_dict[obj_id]['UTC_list'] = []
+            tle_dict[obj_id]['line1_list'] = []
+            tle_dict[obj_id]['line2_list'] = []
+
+        tle_dict[obj_id]['UTC_list'].append(UTC)
+        tle_dict[obj_id]['line1_list'].append(line1)
+        tle_dict[obj_id]['line2_list'].append(line2)
+
+        linelist = [obj_id,line1,line2,UTC]
+        tle_list.append(linelist)
+
+    tle_df = pd.DataFrame(tle_list, columns=['norad','line1','line2','utc'])
+    
     return tle_dict, tle_df
 
 
@@ -1960,8 +2004,34 @@ if __name__ == '__main__' :
     
     plt.close('all')
     
-    # # Envisat
-    # obj_id = 27386
+
+    obj_id = 32789
+    # tle_dict, dum = get_spacetrack_tle_data(obj_id_list = [obj_id])
+    
+    # print(tle_dict)
+    
+    tle_text = ("1 32789U 07021G   08119.60740078 -.00000054  00000-0  00000+0 0  9999 \n"
+                "2 32789 098.0082 179.6267 0015321 307.2977 051.0656 14.81417433    68")
+    
+    print(tle_text)
+    
+
+    
+    tle_dict, dum = read_tle(tle_text)
+    
+    
+    
+    UTC = tletime2datetime(tle_dict[obj_id]['line1_list'][0])
+    
+    output_state = propagate_TLE([obj_id], [UTC], tle_dict=tle_dict)
+    
+    print(UTC)
+    # print(output_state)
+    
+    r_GCRF = output_state[obj_id]['r_GCRF'][0]
+    v_GCRF = output_state[obj_id]['v_GCRF'][0]
+    X = np.concatenate((r_GCRF, v_GCRF), axis=0)*1000
+    print(X.flatten())
     
     # # GEO - Optus 10
     # obj_id = 40146
