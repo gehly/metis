@@ -1149,6 +1149,8 @@ def run_multitarget_filter(setup_file, results_file):
     truth_dict = data[4]
     pklFile.close()
     
+    lmb_filter(state_dict, truth_dict, meas_dict, birth_time_dict, meas_fcn, params_dict)
+    
     # Update to use UKF propagator function
     # params_dict['int_params']['intfcn'] = dyn.ode_coordturn_ukf
     
@@ -1193,20 +1195,20 @@ if __name__ == '__main__':
     
     plt.close('all')
     
-    fdir = r'D:\documents\research_projects\multitarget\data\sim\test\2022_12_14_lmb_geo_2obj'
+    # fdir = r'D:\documents\research_projects\multitarget\data\sim\test\2022_12_14_lmb_geo_2obj'
     
     
-    setup_file = os.path.join(fdir, 'tudat_geo_twobody_2obj_pd099_lam5_fov05_setup.pkl')
-    results_file = os.path.join(fdir, 'tudat_geo_twobody_2obj_pd099_lam5_fov05_lmb_results.pkl')
+    # setup_file = os.path.join(fdir, 'tudat_geo_twobody_2obj_pd099_lam5_fov05_setup.pkl')
+    # results_file = os.path.join(fdir, 'tudat_geo_twobody_2obj_pd099_lam5_fov05_lmb_results.pkl')
     
     
     # tudat_geo_2obj_setup(setup_file)    
     
     
-    
-    # setup_file = os.path.join(fdir, 'vo_coordturn_10obj_setup.pkl')
-    # setup_file_mat = os.path.join(fdir, 'vo_coordturn_10obj_setup.mat')
-    # results_file = os.path.join(fdir, 'vo_coordturn_10boj_lmb_results.pkl')
+    fdir = 'multitarget_test'
+    setup_file = os.path.join(fdir, 'vo_coordturn_10obj_setup.pkl')
+    setup_file_mat = os.path.join(fdir, 'vo_coordturn_10obj_setup.mat')
+    results_file = os.path.join(fdir, 'vo_coordturn_10boj_lmb_results.pkl')
     
     
     # vo_2d_motion_setup(setup_file)
@@ -1214,7 +1216,7 @@ if __name__ == '__main__':
     # gen_mat_file(setup_file, setup_file_mat)
     
     
-    # run_multitarget_filter(setup_file, results_file)
+    run_multitarget_filter(setup_file, results_file)
     
     # multitarget_analysis(results_file)
     
