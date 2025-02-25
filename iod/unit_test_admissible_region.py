@@ -16,22 +16,54 @@ import admissible_region as ar
 
 
 def unit_test_optical_car_gmm_demars():
+    '''
+    Test case from DeMars and Jah Section II [1].
     
-    # True orbit (DeMars Section V.E.)
-    a = 43000.
-    e = 0.03
-    i = np.radians(3.)
-    RAAN = 0.
-    w = 0.
-    theta = 0.
+    '''
     
+    # Physical constants
+    GM = 398600.4415*1e9            # m^3/s^2
+    Re = 6378.1370*1000.            # m
+    wE = 7.2921158553e-5            # rad/s
+       
+    # Measurement vector
+    ra = np.radians(10.)
+    dec = np.radians(-2.)
+    dra = np.radians(15.)/3600.
+    ddec = np.radians(3.)/3600.
+    
+    Zk = np.reshape([ra, dec, dra, ddec], (4,1))
+    
+    # Ground station
+    q_vect = Re*np.array([[np.cos(np.radians(30.))],
+                          [                     0.],
+                          [np.sin(np.radians(30.))]])
+    
+    w_vect = np.array([[0.], [0.], [wE]])
+    dq_vect = np.cross(w_vect, q_vect, axis=0)
+        
     # Vector of range values
     rho_vect = np.arange(0., 50000., 5.)
+    
+    # CAR limits
+    a_max = 50000.
+    a_min = 0.
+    e_max = 0.4
     
     
     
     # Set up parameters for CAR GMM function
     params = {}
+    params['GM'] = GM
+    params['Re'] = Re
+    params['rho_vect'] = rho_vect
+    params['a_max'] = a_max
+    params['a_min'] = a_min
+    params['e_max'] = e_max
+    
+    
+    
+    
     params['rho_vect'] = rho_vect
     
     
@@ -41,5 +73,5 @@ def unit_test_optical_car_gmm_demars():
 
 if __name__ == '__main__':
     
-    
+    unit_test_optical_car_gmm_demars()
     
