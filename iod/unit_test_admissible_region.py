@@ -43,12 +43,18 @@ def unit_test_optical_car_gmm_demars():
     dq_vect = np.cross(w_vect, q_vect, axis=0)
         
     # Vector of range values
-    rho_vect = np.arange(0., 50000., 5.)
+    rho_vect = np.arange(0., 50000., 5.)*1000.      # m
     
     # CAR limits
-    a_max = 50000.
-    a_min = 0.
+    a_max = 50000.*1000.            # m
+    a_min = 0.                      # m
     e_max = 0.4
+    
+    # Desired maximum standard deviation in range 
+    # These are not from DeMars and produce CAR with many fewer components
+    # than shown in the paper
+    sigma_rho_desired = 5000.       # m
+    sigma_drho_desired = 80.        # m/s
     
     
     
@@ -60,6 +66,8 @@ def unit_test_optical_car_gmm_demars():
     params['a_max'] = a_max
     params['a_min'] = a_min
     params['e_max'] = e_max
+    params['sigma_rho_desired'] = sigma_rho_desired
+    params['sigma_drho_desired'] = sigma_drho_desired
     
     
     

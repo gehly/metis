@@ -51,6 +51,18 @@ def optical_car_gmm(Zk, q_vect, dq_vect, params):
     # Compute CAR boundaries
     rho_lim, drho_lim, drho_dict, rho_a_all, rho_e_all, drho_a_all, drho_e_all = \
             car_drho_limits(Zk, q_vect, dq_vect, params)
+            
+    # Compute range marginal PDF quantities
+    a_rho = np.min(rho_lim)
+    b_rho = np.max(rho_lim)    
+    sigma_rho, L_rho = car_sigma_library(a_rho, b_rho, params['sigma_rho_desired'])
+    
+    # Compute means and covariances for GMM components
+    m_rho = []
+    for i in range(L_rho):
+        m_rho.append(a_rho + (b_rho-a_rho)/(L_rho+1.)*(i+1.))
+    
+    P_rho = [sigma_rho**2.]*L_rho
     
     
     return
@@ -87,10 +99,12 @@ def car_drho_limits(Zk, q_vect, dq_vect, params):
     # Break out inputs
     GM = params['GM']
     Re = params['Re']
+    rho_vect = params['rho_vect']
     a_max = params['a_max']
     a_min = params['a_min']
     e_max = params['e_max']
-    
+    e_min = 0.                      # only apply upper limit on ecc for now
+        
     # Retrieve measurement data
     Zk = Zk.flatten()
     ra = float(Zk[0])
@@ -118,13 +132,11 @@ def car_drho_limits(Zk, q_vect, dq_vect, params):
     
     # Compute energy limits (DeMars Eq 5)
     E_max = -GM/(2.*a_max)
-    if a_min == 0. :
+    if a_min == 0.:
         a_min = 1e-10
     E_min = -GM/(2.*a_min)
     
     # Eccentricity Constraint
-    e_min = 0.
-
     # Angular Momentum Components (DeMars Eq 6 setup)
     h1 = np.cross(q_vect, u_rho)
     h2 = np.cross(u_rho, (dra*u_ra + ddec*u_dec))
@@ -141,13 +153,154 @@ def car_drho_limits(Zk, q_vect, dq_vect, params):
     c6 = 2.*np.dot(h2, h4) + np.dot(h3, h3)
     c7 = 2.*np.dot(h3, h4)
     c8 = np.dot(h4, h4)
-    
-    
-    
-    
-    
-    return
 
+    # Loop over range values  
+    rho_output = np.array([])
+    drho_output = np.array([])
+    rho_a_all = np.array([])
+    rho_e_all = np.array([])
+    drho_a_all = np.array([])
+    drho_e_all = np.array([])
+    drho_dict = {}
+    for ii in range(len(rho_vect)):
+
+        # Current range value
+        rho = rho_vect[ii]
+
+        # Compute F for current range (DeMars Eq 3 setup)
+        F = w2*rho**2. + w3*rho + w4 - 2.*GM/np.sqrt(rho**2. + w5*rho + w0)
+
+        # Compute values of drho for SMA limits (DeMars Eq 4)
+        # Max/Min values of the radical in DeMars Eq 4
+        rad_max = (w1/2.)**2. - F + 2.*E_max
+        rad_min = (w1/2.)**2. - F + 2.*E_min
+
+        drho_a = np.array([])
+        if rad_max >= 0.:
+            rad_max = np.sqrt(rad_max)
+            drho_a = np.append(drho_a, np.array([-w1/2. + rad_max, -w1/2. - rad_max]))
+        if rad_min >= 0.:
+            rad_min = np.sqrt(rad_min)
+            drho_a = np.append(drho_a, np.array([-w1/2. + rad_min, -w1/2. - rad_min]))
+
+        # Eccentricity Constraints
+        # Compute P and U for current range (DeMars Eq 6)
+        P = c1*rho**2. + c2*rho + c3
+        U = c4*rho**4. + c5*rho**3. + c6*rho**2. + c7*rho + c8
+
+        # Compute coefficients (DeMars Eq 8)
+        a0_max = F*U + GM**2.*(1.-e_max**2.)
+        a0_min = F*U + GM**2.*(1.-e_min**2.)
+        a1 = F*P + w1*U
+        a2 = U + c0*F + w1*P
+        a3 = P + c0*w1
+        a4 = c0
+
+        # Solve the quartic equation (DeMars Eq 8)
+        r = np.roots(np.array([a4, a3, a2, a1, a0_max]))
+        drho_ecc =  np.array([])
+        for i in range(len(r)):
+            if np.isreal(r[i]):
+                drho_ecc = np.append(drho_ecc, float(r[i]))
+
+        # Set up output
+        # Build arrays of rho values corresponding to limits in SMA and ECC
+        drho_a_all = np.append(drho_a_all, drho_a)
+        drho_e_all = np.append(drho_e_all, drho_ecc)
+        for ii in range(len(drho_a)):
+            rho_a_all = np.append(rho_a_all, rho)
+        for ii in range(len(drho_ecc)):
+            rho_e_all = np.append(rho_e_all, rho)
+                
+        # If the eccentricity and semi-major axis limits have returned values
+        # for drho, determine which form the boundaries of the CAR
+        if len(drho_ecc) and len(drho_a):            
+
+            if len(drho_ecc) == 2:
+                
+                if len(drho_a) == 2:
+                    rho_output = np.append(rho_output, np.array([rho, rho]))
+                    drho_vect = np.append(drho_ecc, drho_a)
+                    drho_vect = np.sort(drho_vect)
+                    drho_output = np.append(drho_output, drho_vect[1:3])
+                    drho_dict[rho] = drho_vect[1:3]
+
+                if len(drho_a) == 4:
+                    drho_a = np.sort(drho_a)
+                    drho_ecc = np.sort(drho_ecc)
+
+                    # Positive side
+                    drho_vect1 = np.array([])
+                    if drho_a[2] < np.max(drho_ecc):
+                        rho_output = np.append(rho_output, np.array([rho, rho]))
+                        
+                        if drho_a[3] < np.max(drho_ecc):
+                            drho_vect1 = drho_a[2:4]
+                            drho_output = np.append(drho_output, drho_vect1)
+                        else:
+                            drho_vect1 = np.array([drho_a[2], np.max(drho_ecc)])
+                            drho_output = np.append(drho_output, drho_vect1)
+                            
+                        #drho_dict[rho] = drho_vect1
+
+                    # Negative Side
+                    drho_vect2 = np.array([])
+                    if drho_a[1] > np.min(drho_ecc):
+                        rho_output = np.append(rho_output, np.array([rho, rho]))
+
+                        if drho_a[0] > np.min(drho_ecc):
+                            drho_vect2 = drho_a[0:2]
+                            drho_output = np.append(drho_output, drho_vect2)
+                        else :
+                            drho_vect2 = np.array([drho_a[1], np.min(drho_ecc)])
+                            drho_output = np.append(drho_output, drho_vect2)
+                            
+                    drho_dict[rho] = np.append(drho_vect1, drho_vect2)                                           
+
+            if len(drho_ecc) == 4:
+
+                if len(drho_a) == 2:
+                    rho_output = np.append(rho_output, np.array([rho, rho, rho, rho]))
+                    drho_vect = np.append(drho_a, drho_ecc)
+                    drho_vect = np.sort(drho_vect)
+                    drho_output = np.append(drho_output, drho_vect[1:5])
+                    drho_dict[rho] = drho_vect[1:5]
+
+                if len(drho_a) == 4:
+                    drho_a = np.sort(drho_a)
+                    drho_ecc = np.sort(drho_ecc)
+
+                    # Positive Side
+                    drho_vect1 = np.array([])
+                    if drho_a[2] < np.max(drho_ecc):
+                        rho_output = np.append(rho_output, np.array([rho, rho]))
+
+                        if drho_a[3] < np.max(drho_ecc):
+                            drho_vect1 = drho_a[2:4]
+                            drho_output = np.append(drho_output, drho_vect1)
+                        else :
+                            drho_vect1 = np.array([drho_a[2], np.max(drho_ecc)])
+                            drho_output = np.append(drho_output, drho_vect1)
+
+                        #drho_dict[rho] = drho_vect1
+
+                    # Negative Side
+                    drho_vect2 = np.array([])
+                    if drho_a[1] > np.min(drho_ecc):
+                        rho_output = np.append(rho_output, np.array([rho,rho]))
+
+                        if drho_a[0] > np.min(drho_ecc):
+                            drho_vect2 = drho_a[0:2]
+                            drho_output = np.append(drho_output, drho_vect2)
+                        else :
+                            drho_vect2 = np.array([drho_a[1], np.min(drho_ecc)])
+                            drho_output = np.append(drho_output, drho_vect2)
+
+                    drho_dict[rho] = np.append(drho_vect1, drho_vect2)    
+    
+    
+    
+    return rho_output, drho_output, drho_dict, rho_a_all, rho_e_all, drho_a_all, drho_e_all
 
 
 def car_sigma_library(a, b, sigma_in) :
