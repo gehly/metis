@@ -135,7 +135,7 @@ def optical_car_gmm(rho_vect, Zk, q_vect, dq_vect, params, plot_flag=False):
 
         # Get values from Range-Rate PDF
         drho_vect = drho_dict2[mi]
-        for k in range(len(drho_vect)/2):
+        for k in range(int(len(drho_vect)/2)):
             drho_k = drho_vect[2*k:2*k+2]
             a_drho = np.min(drho_k)
             b_drho = np.max(drho_k)
@@ -167,9 +167,9 @@ def optical_car_gmm(rho_vect, Zk, q_vect, dq_vect, params, plot_flag=False):
         print('sig_drho_max = ',sig_drho_max)
 
         mrho_RE = [mi[0]/params['Re'] for mi in m]
-        mdrho = [mi[1] for mi in m]
+        mdrho = [mi[1]/1000. for mi in m]
 
-        #Range Marginal PDF
+        # Range Marginal PDF
         plt.figure()
         plt.plot(rho_unique/params['Re'],p_vect,'b--',lw=2)
         plt.plot(rho_unique/params['Re'],g_approx,'r--',lw=2)
@@ -178,41 +178,28 @@ def optical_car_gmm(rho_vect, Zk, q_vect, dq_vect, params, plot_flag=False):
         plt.xlabel('Range [ER]')
         
 
-        #CAR with GM mean locations
+        # CAR with GM mean locations
         plt.figure()
-        plt.plot(rho_lim/params['Re'],drho_lim,'k.')
+        plt.plot(rho_lim/params['Re'],drho_lim/1000.,'k.')
         plt.plot(mrho_RE,mdrho,'k+')
         #plt.title('Constrained Admissible Region')
         plt.xlabel('Range [ER]')
         plt.ylabel('Range-Rate [km/s]')
-        plt.legend(['CAR','GMM Means'],numpoints=1)
+        plt.legend(['CAR','GMM Means'],numpoints=1,loc='upper left')
         
 
-        #CAR PDF
-        #plt.figure()
-        
 
-        #Full AR with all limits
+        # Full AR with all limits
         plt.figure()
-        plt.plot(rho_a_all/params['Re'],drho_a_all,'ro',markeredgecolor='r',markersize=2)
-        plt.plot(rho_e_all/params['Re'],drho_e_all,'bo',markeredgecolor='b',markersize=2)
-        plt.plot(rho_lim/params['Re'],drho_lim,'ko',markersize=2)
+        plt.plot(rho_a_all/params['Re'],drho_a_all/1000.,'ro',markeredgecolor='r',markersize=2)
+        plt.plot(rho_e_all/params['Re'],drho_e_all/1000.,'bo',markeredgecolor='b',markersize=2)
+        plt.plot(rho_lim/params['Re'],drho_lim/1000.,'ko',markersize=2)
         plt.xlabel('Range [ER]')
         plt.ylabel('Range-Rate [km/s]')
         plt.legend(['SMA Limits','Ecc Limits','CAR'],numpoints=1)
-        plt.xlim([5.6,6.3])
-        plt.ylim([-2.,2.])
-        
-        plt.figure()
-        plt.plot(rho_a_all/params['Re'],drho_a_all,'ko',markeredgecolor='k',markersize=2)
-        plt.plot(rho_e_all/params['Re'],drho_e_all,'k_',markeredgecolor='k',markersize=4)
-        plt.plot(rho_lim/params['Re'],drho_lim,'ko',markersize=4)
-        plt.xlabel('Range [ER]')
-        plt.ylabel('Range-Rate [km/s]')
-        plt.legend(['SMA Limits','Ecc Limits','CAR'],numpoints=1)
-        plt.xlim([5.6,6.3])
-        plt.ylim([-2.,2.])
-                
+        # plt.xlim([5.6,6.3])
+        # plt.ylim([-2.,2.])
+
         
         plt.show()
     
