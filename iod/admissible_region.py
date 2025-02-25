@@ -11,7 +11,7 @@
 
 
 import numpy as np
-
+import matplotlib.pyplot as plt
 
 
 
@@ -20,7 +20,7 @@ import numpy as np
 # Constrained Admissible Region (CAR)
 ###############################################################################
 
-def optical_car_gmm(Zk, q_vect, dq_vect, params):
+def optical_car_gmm(rho_vect, Zk, q_vect, dq_vect, params, plot_flag=False):
     '''
     This function computes a Gaussian Mixture Model (GMM) to approximate a 
     uniform distribution representing the Constrained Admissible Region (CAR)
@@ -50,25 +50,183 @@ def optical_car_gmm(Zk, q_vect, dq_vect, params):
       
     # Compute CAR boundaries
     rho_lim, drho_lim, drho_dict, rho_a_all, rho_e_all, drho_a_all, drho_e_all = \
-            car_drho_limits(Zk, q_vect, dq_vect, params)
+            car_drho_limits(rho_vect, Zk, q_vect, dq_vect, params)
             
     # Compute range marginal PDF quantities
     a_rho = np.min(rho_lim)
     b_rho = np.max(rho_lim)    
     sigma_rho, L_rho = car_sigma_library(a_rho, b_rho, params['sigma_rho_desired'])
     
-    # Compute means and covariances for GMM components
+    # Compute means and covariances for GMM components (DeMars Eq 22)
     m_rho = []
     for i in range(L_rho):
         m_rho.append(a_rho + (b_rho-a_rho)/(L_rho+1.)*(i+1.))
     
     P_rho = [sigma_rho**2.]*L_rho
+        
+    # Compute weights of GMM components (DeMars Eq 23)
+    # Evaluate range marginal PDF at each range value
+    p_vect = []
+    psum = 0.
+    rho_unique = np.unique(rho_lim)
+    delta_rho = rho_unique[1] - rho_unique[0]
+    for rho in rho_unique:
+        drho_vect = drho_dict[rho]
+        a_drho = np.min(drho_vect)
+        b_drho = np.max(drho_vect)
+        p_vect.append((b_drho-a_drho)*delta_rho)
+        #p_vect.append((b_drho-a_drho)/(b_rho-a_rho))
+
+    #p_vect = np.asarray(p_vect)/(sum(p_vect)*delta_rho)
+    norm_fact = np.trapz(p_vect, rho_unique)
+    p_vect = p_vect/norm_fact
+
+    #check = np.dot(p_vect,[delta_rho]*len(p_vect))
+    #print check
+
+    #Compute H matrix
+    M = len(p_vect)
+    H = np.zeros((M, L_rho))
+    for i in range(M):
+        for j in range(L_rho):
+            rhoi = rho_unique[i]
+            mj = m_rho[j]
+            sigj = np.sqrt(P_rho[j])
+            H[i,j] = (1/(np.sqrt(2.*np.pi)*sigj))*np.exp(-0.5*((rhoi-mj)/sigj)**2.)
+
+    #Compute weights (least squares fit)
+    w_rho = np.dot(np.linalg.inv(np.dot(H.T, H)), np.dot(H.T, p_vect))
+
+    if abs(sum(w_rho) - 1.) > 0.1:
+        print('Error: iod.car_gmm range weights not normalized!!')
+        print(w_rho)
+        print(sum(w_rho))
+
+    # Compute PDF sum
+    g_approx = []
+    for i in range(M):
+        gi = 0.
+        rhoi = rho_unique[i]
+        for j in range(L_rho):            
+            wj = w_rho[j]
+            mj = m_rho[j]
+            sigj = np.sqrt(P_rho[j])
+            gi += wj*(1/(np.sqrt(2.*np.pi)*sigj))*np.exp(-0.5*((rhoi-mj)/sigj)**2.)
+        g_approx.append(gi)  
+        
+        
+    # Compute range-rate marginal PDF quantities and store in GMM
+    # Get drho limits for m_rho
+    rho_lim2, drho_lim2, drho_dict2 = car_drho_limits(m_rho, Zk, q_vect, dq_vect, params)[0:3]
+    
+    w = []
+    m = []
+    P = []
+    sig_drho_max = 0.
+    xx = []
+    yy = []
+    zz = []    
+    for i in range(L_rho):
+        
+        # Get values from Range PDF
+        wi = w_rho[i]
+        mi = m_rho[i]
+        Pi = P_rho[i]
+
+        # Get values from Range-Rate PDF
+        drho_vect = drho_dict2[mi]
+        for k in range(len(drho_vect)/2):
+            drho_k = drho_vect[2*k:2*k+2]
+            a_drho = np.min(drho_k)
+            b_drho = np.max(drho_k)
+            sig_drho, L_drho = car_sigma_library(a_drho, b_drho, params['sigma_drho_desired'])
+            if sig_drho > sig_drho_max :
+                sig_drho_max = sig_drho.copy()
+
+
+            #Weights, means, covar for this rho
+            wj = 1./L_drho
+            Pj = sig_drho**2.
+            for j in range(L_drho):
+                mj = a_drho + (b_drho-a_drho)/(L_drho + 1.)*(j+1.)
+                w.append(wi*wj)
+                m.append(np.array([[mi],[mj]]))
+                P.append(np.array([[Pi,0.],[0.,Pj]]))
+
+    
+
+    GMM = [w,m,P]
+
+
+    #Plot checks
+    if plot_flag:
+
+        print('L_rho = ',L_rho)
+        print('sig_rho = ',sigma_rho)
+        print('L_tot = ',len(w))
+        print('sig_drho_max = ',sig_drho_max)
+
+        mrho_RE = [mi[0]/params['Re'] for mi in m]
+        mdrho = [mi[1] for mi in m]
+
+        #Range Marginal PDF
+        plt.figure()
+        plt.plot(rho_unique/params['Re'],p_vect,'b--',lw=2)
+        plt.plot(rho_unique/params['Re'],g_approx,'r--',lw=2)
+        #plt.title('Range Marginal PDF')
+        plt.legend(['PDF','GM Approx'])
+        plt.xlabel('Range [ER]')
+        
+
+        #CAR with GM mean locations
+        plt.figure()
+        plt.plot(rho_lim/params['Re'],drho_lim,'k.')
+        plt.plot(mrho_RE,mdrho,'k+')
+        #plt.title('Constrained Admissible Region')
+        plt.xlabel('Range [ER]')
+        plt.ylabel('Range-Rate [km/s]')
+        plt.legend(['CAR','GMM Means'],numpoints=1)
+        
+
+        #CAR PDF
+        #plt.figure()
+        
+
+        #Full AR with all limits
+        plt.figure()
+        plt.plot(rho_a_all/params['Re'],drho_a_all,'ro',markeredgecolor='r',markersize=2)
+        plt.plot(rho_e_all/params['Re'],drho_e_all,'bo',markeredgecolor='b',markersize=2)
+        plt.plot(rho_lim/params['Re'],drho_lim,'ko',markersize=2)
+        plt.xlabel('Range [ER]')
+        plt.ylabel('Range-Rate [km/s]')
+        plt.legend(['SMA Limits','Ecc Limits','CAR'],numpoints=1)
+        plt.xlim([5.6,6.3])
+        plt.ylim([-2.,2.])
+        
+        plt.figure()
+        plt.plot(rho_a_all/params['Re'],drho_a_all,'ko',markeredgecolor='k',markersize=2)
+        plt.plot(rho_e_all/params['Re'],drho_e_all,'k_',markeredgecolor='k',markersize=4)
+        plt.plot(rho_lim/params['Re'],drho_lim,'ko',markersize=4)
+        plt.xlabel('Range [ER]')
+        plt.ylabel('Range-Rate [km/s]')
+        plt.legend(['SMA Limits','Ecc Limits','CAR'],numpoints=1)
+        plt.xlim([5.6,6.3])
+        plt.ylim([-2.,2.])
+                
+        
+        plt.show()
     
     
     return
 
 
-def car_drho_limits(Zk, q_vect, dq_vect, params):
+def car_gmm_to_eci():
+    
+    
+    return
+
+
+def car_drho_limits(rho_vect, Zk, q_vect, dq_vect, params):
     '''
     This function computes a Gaussian Mixture Model (GMM) to approximate a 
     uniform distribution representing the Constrained Admissible Region (CAR)
@@ -80,6 +238,8 @@ def car_drho_limits(Zk, q_vect, dq_vect, params):
 
     Parameters
     ----------
+    rho_vect : list
+        range values where range-rate bounds are needed
     Zk : 4x1 numpy array
         measurement vector containing topocentric RA/DEC and rates [rad, rad/s]
     q_vect : 3x1 numpy array
@@ -99,7 +259,6 @@ def car_drho_limits(Zk, q_vect, dq_vect, params):
     # Break out inputs
     GM = params['GM']
     Re = params['Re']
-    rho_vect = params['rho_vect']
     a_max = params['a_max']
     a_min = params['a_min']
     e_max = params['e_max']
