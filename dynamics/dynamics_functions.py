@@ -328,6 +328,9 @@ def general_dynamics(Xo, tvec, state_params, int_params, bodies=None):
     if integrator == 'tudat':
         
         # Convert initial state vector from km to meters for TUDAT propagator
+        # if state_params['unit'] == 'km':
+        #     initial_state = Xo.flatten()*1000.
+        
         initial_state = Xo.flatten()*1000.
         
         # Set simulation start and end epochs
@@ -487,6 +490,10 @@ def general_dynamics(Xo, tvec, state_params, int_params, bodies=None):
         
         tout = states_array[:,0] - simulation_start_epoch
         Xout = states_array[:,1:6*N+1]*1e-3
+        
+        # # Convert units to km if needed
+        # if state_params['unit'] == 'km':
+        #     Xout *= 1e-3
         
 
         

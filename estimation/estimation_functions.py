@@ -18,6 +18,7 @@ sys.path.append(metis_dir)
 from dynamics import dynamics_functions as dyn
 from sensors import measurement_functions as mfunc
 from utilities import astrodynamics as astro
+from utilities import attitude as att
 from utilities import coordinate_systems as coord
 from utilities.constants import arcsec2rad
 
@@ -1581,6 +1582,446 @@ def ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):
 
     
     return filter_output, full_state_output
+
+
+def ls_ukf_attitude(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):    
+    '''
+    This function implements the Unscented Kalman Filter for the least
+    squares cost function incorporate attitude state estimation.
+
+    Parameters
+    ------
+    state_dict : dictionary
+        initial state and covariance for filter execution
+    truth_dict : dictionary
+        true state at all times
+    meas_dict : dictionary
+        measurement data over time for the filter and parameters (noise, etc)
+    meas_fcn : function handle
+        function for measurements
+    state_params : dictionary
+        physical parameters and constants
+    sensor_params : dictionary
+        location, constraint, noise parameters of sensors
+    int_params : dictionary
+        numerical integration parameters
+
+    Returns
+    ------
+    filter_output : dictionary
+        output state, covariance, and post-fit residuals at measurement times
+    full_state_output : dictionary
+        output state and covariance at all truth times
+        
+    '''
+    
+    # Break out params
+    state_params = params_dict['state_params']
+    int_params = params_dict['int_params']
+    sensor_params = params_dict['sensor_params']
+    filter_params = params_dict['filter_params']
+    
+    # State information
+    state_tk = sorted(state_dict.keys())[-1]
+    Xk = state_dict[state_tk]['X']
+    P = state_dict[state_tk]['P']
+    Q = filter_params['Q']
+    gap_seconds = filter_params['gap_seconds']
+    time_format = int_params['time_format']
+
+    n = len(Xk)
+    q = int(Q.shape[0])
+    
+    # Prior information about the distribution
+    pnorm = 2.
+    kurt = math.gamma(5./pnorm)*math.gamma(1./pnorm)/(math.gamma(3./pnorm)**2.)
+    beta = kurt - 1.
+    kappa = kurt - float(n)
+    
+    # Compute sigma point weights
+    alpha = filter_params['alpha']
+    lam = alpha**2.*(n + kappa) - n
+    gam = np.sqrt(n + lam)
+    Wm = 1./(2.*(n + lam)) * np.ones(2*n,)
+    Wc = Wm.copy()
+    Wm = np.insert(Wm, 0, lam/(n + lam))
+    Wc = np.insert(Wc, 0, lam/(n + lam) + (1 - alpha**2 + beta))
+    diagWc = np.diag(Wc)
+
+    # Initialize output
+    filter_output = {}
+
+    # Measurement times
+    tk_list = meas_dict['tk_list']
+    Yk_list = meas_dict['Yk_list']
+    sensor_id_list = meas_dict['sensor_id_list']
+    
+    # Number of epochs
+    N = len(tk_list)
+  
+    # Loop over times
+    for kk in range(N):
+    
+        # Current and previous time
+        if kk == 0:
+            tk_prior = state_tk
+        else:
+            tk_prior = tk_list[kk-1]
+
+        tk = tk_list[kk]
+        
+        if time_format == 'seconds':
+            delta_t = tk - tk_prior
+        elif time_format == 'JD':
+            delta_t = (tk - tk_prior)*86400.
+        elif time_format == 'datetime':
+            delta_t = (tk - tk_prior).total_seconds()
+
+        # Compute sigma points matrix
+        sqP = np.linalg.cholesky(P)
+        Xrep = np.tile(Xk, (1, n))
+        chi = np.concatenate((Xk, Xrep+(gam*sqP), Xrep-(gam*sqP)), axis=1)
+        chi_v = np.reshape(chi, (n*(2*n+1), 1), order='F')
+        
+        # Propagate to next time
+        if tk_prior == tk:
+            intout = chi_v.T
+        else:
+            int0 = chi_v.flatten()
+            tin = [tk_prior, tk]
+            
+            tout, intout = dyn.general_dynamics(int0, tin, state_params, int_params)
+
+        # Extract values for later calculations
+        chi_v = intout[-1,:]
+        chi = np.reshape(chi_v, (n, 2*n+1), order='F')
+       
+        # State Noise Compensation
+        # Zero out SNC for long time gaps
+        if delta_t > gap_seconds:        
+            Gamma = np.zeros((n,q))
+        else:
+            Gamma = np.zeros((n,q))
+            Gamma[0:q,:] = (delta_t**2./2) * np.eye(q)
+            Gamma[q:2*q,:] = delta_t * np.eye(q)
+#            Gamma = delta_t * np.concatenate((np.eye(q)*delta_t/2., np.eye(q)))
+
+        Xbar = np.dot(chi, Wm.T)
+        Xbar = np.reshape(Xbar, (n, 1))
+        chi_diff = chi - np.dot(Xbar, np.ones((1, (2*n+1))))
+        Pbar = np.dot(chi_diff, np.dot(diagWc, chi_diff.T)) + np.dot(Gamma, np.dot(Q, Gamma.T))
+        
+        print('')
+        print('kk', kk)
+        print('Pbar', Pbar)
+        print('eig', np.linalg.eig(Pbar))
+        print('det', np.linalg.det(Pbar))
+
+        # Recompute sigma points to incorporate process noise
+        sqP = np.linalg.cholesky(Pbar)
+        Xrep = np.tile(Xbar, (1, n))
+        chi_bar = np.concatenate((Xbar, Xrep+(gam*sqP), Xrep-(gam*sqP)), axis=1) 
+        chi_diff = chi_bar - np.dot(Xbar, np.ones((1, (2*n+1))))
+        
+        # Measurement Update: posterior state and covar at tk            
+        # Retrieve measurement data
+        Yk = Yk_list[kk]
+        sensor_id = sensor_id_list[kk]
+        
+        # Computed measurements and covariance
+        gamma_til_k, Rk = meas_fcn(tk, chi_bar, state_params, sensor_params, sensor_id)
+        ybar = np.dot(gamma_til_k, Wm.T)
+        ybar = np.reshape(ybar, (len(ybar), 1))
+        Y_diff = gamma_til_k - np.dot(ybar, np.ones((1, (2*n+1))))
+        Pyy = np.dot(Y_diff, np.dot(diagWc, Y_diff.T)) + Rk
+        Pxy = np.dot(chi_diff,  np.dot(diagWc, Y_diff.T))
+        
+        print('Yk', Yk)
+        print('ybar', ybar)
+        
+        # Kalman gain and measurement update
+        Kk = np.dot(Pxy, np.linalg.inv(Pyy))
+        Xk = Xbar + np.dot(Kk, Yk-ybar)
+        
+        # Basic covariance update
+#        P = Pbar - np.dot(K, np.dot(Pyy, K.T))
+        
+        # Re-symmetric covariance     
+#        P = 0.5 * (P + P.T)
+        
+        # Joseph form
+        cholPbar = np.linalg.inv(np.linalg.cholesky(Pbar))
+        invPbar = np.dot(cholPbar.T, cholPbar)
+        P1 = (np.eye(n) - np.dot(np.dot(Kk, np.dot(Pyy, Kk.T)), invPbar))
+        P2 = np.dot(Kk, np.dot(Rk, Kk.T))
+        P = np.dot(P1, np.dot(Pbar, P1.T)) + P2
+
+        # Recompute measurments using final state to get resids
+        sqP = np.linalg.cholesky(P)
+        Xrep = np.tile(Xk, (1, n))
+        chi_k = np.concatenate((Xk, Xrep+(gam*sqP), Xrep-(gam*sqP)), axis=1)
+        gamma_til_post, dum = meas_fcn(tk, chi_k, state_params, sensor_params, sensor_id)
+        ybar_post = np.dot(gamma_til_post, Wm.T)
+        ybar_post = np.reshape(ybar_post, (len(ybar), 1))
+        
+        # Post-fit residuals and updated state
+        resids = Yk - ybar_post
+        
+        # Store output
+        filter_output[tk] = {}
+        filter_output[tk]['X'] = Xk
+        filter_output[tk]['P'] = P
+        filter_output[tk]['resids'] = resids
+        
+#        print('\n')
+#        print('tk', tk)
+#        print('Xbar', Xbar)
+#        print('Xk', Xk)
+#        print('Yk', Yk)
+#        print('ybar', ybar)
+#        print('ybar_post', ybar_post)
+#        print('Kk', Kk)
+#        print('resids', resids)
+#        print('Pbar', Pbar)
+#        print('P', P)
+#        
+#        if kk > 2:
+#             mistake
+
+            
+    # TODO Generation of full_state_output not working correctly
+    # Use filter_output for error analysis
+    
+    full_state_output = {}
+            
+
+    
+    return filter_output, full_state_output
+
+
+def ukf_6dof_predictor(tin, X, P, int_params, state_params, filter_params):
+    
+    # Retrieve parameters
+    Q = filter_params['Q']
+    sig_u = filter_params['sig_u']
+    sig_v = filter_params['sig_v']
+    Wm = filter_params['Wm']
+    diagWc = filter_params['diagWc']
+    gam = filter_params['gam']
+    gap_seconds = filter_params['gap_seconds']
+    time_format = int_params['time_format']
+    
+    # Initialize the GRP error sigma points
+    sqP = np.linalg.cholesky(P)
+    Xgrp = np.zeros((12,1))
+    Xgrp[0:6] = X[0:6]
+    Xgrp[9:12] = X[10:13]
+    Xrep = np.tile(Xgrp, (1, 12))
+    chi_grp = np.concatenate((Xgrp, Xrep+(gam*sqP), Xrep-(gam*sqP)), axis=1)
+
+    # Form sigma point matrix for quaternions
+    chi_quat = np.zeros((13, 25))
+    chi_quat[:, 0] = X.flatten()
+    chi_quat[0:6, 1:25] = chi_grp[0:6, 1:25]
+    chi_quat[10:13, 1:25] = chi_grp[9:12, 1:25]
+    
+    # Compute the delta quaternion sigma points
+    qmean = X[6:10].reshape(4,1)
+    for jj in range(24):
+        dp = chi_grp[6:9, jj+1].reshape(3,1)
+        dq = att.grp2quat(dp, 1)
+        qj = att.quat_composition(dq, qmean)
+        chi_quat[6:10, jj+1] = qj.flatten()   
+    
+    # Vector for integration function
+    chi_v = np.reshape(chi_quat, (13*25, 1), order='F')
+
+    # Retrieve integration times
+    tk_prior = tin[0]
+    tk = tin[-1]
+    if time_format == 'seconds':
+        delta_t = tk - tk_prior
+    elif time_format == 'JD':
+        delta_t = (tk - tk_prior)*86400.
+    elif time_format == 'datetime':
+        delta_t = (tk - tk_prior).total_seconds()
+    
+    # Integrate chi
+    if tk_prior == tk:
+        intout = chi_v.T
+    else:
+        int0 = chi_v.flatten()        
+        tout, intout = dyn.general_dynamics(int0, tin, state_params, int_params)
+
+    # Extract values for later calculations
+    chi_v = intout[-1,:]
+    chi_bar = np.reshape(chi_v, (13, 25), order='F')
+    
+    # Form sigma point matrix for GRPs
+    chi_grp = np.zeros((12, 25))
+    chi_grp[0:6, :] = chi_bar[0:6, :]
+    chi_grp[9:12, :] = chi_bar[9:12, :]
+    
+    # Compute the delta quaternion sigma points
+    qmean = chi_bar[6:10, 0].reshape(4,1)
+    qinv = att.quat_inverse(qmean)    
+    for jj in range(1, 25):
+        qj = chi_bar[6:10, jj].reshape(4,1)
+        dq = att.quat_composition(qj, qinv)
+        dp = att.quat2grp(dq, 1)
+        chi_grp[6:9, jj] = dp.flatten()
+    
+
+    Xgrp = np.dot(chi_grp, Wm.T)
+    Xgrp = np.reshape(Xgrp, (12, 1))
+    chi_diff = chi_grp - np.dot(Xgrp, np.ones((1, 25)))
+    
+    if delta_t > 100.:
+        Pbar = np.dot(chi_diff, np.dot(diagWc, chi_diff.T))
+    else:
+        print('\n Process Noise')
+        Gamma1 = np.eye(3) * 0.5*delta_t**2.
+        Gamma2 = np.eye(3) * delta_t
+        Gamma = np.concatenate((Gamma1, Gamma2), axis=0)  
+        
+        Qatt1 = np.eye(3) * (sig_v**2 - (1./6.)*sig_u**2.*delta_t**2.)
+        Qatt2 = np.eye(3) * sig_u**2.
+        Qatt = np.zeros((6,6))
+        Qatt[0:3, 0:3] = Qatt1
+        Qatt[3:6, 3:6] = Qatt2
+        Qatt *= delta_t/2.
+        
+        Pbar = np.dot(chi_diff, np.dot(diagWc, chi_diff.T))
+        Pbar[0:6, 0:6] += np.dot(Gamma, np.dot(Q, Gamma.T))
+        Pbar[6:12, 6:12] += Qatt
+
+    # Re-symmetric pos def
+    # Pbar = 0.5 * (Pbar + Pbar.T)
+    
+#    print(Pbar)
+#    print(np.linalg.eig(Pbar))
+#    
+#    print(Xgrp)
+#    print(qmean)
+#    mistake
+    
+    
+    return Xgrp, Pbar, qmean
+
+
+def ukf_6dof_corrector(Xgrp, Pbar, qmean, Yi, ti, n, alpha, sun_gcrf,
+                       sensor, EOP_data, XYs_df, spacecraftConfig, surfaces):
+    
+    
+    #Compute Weights
+    beta = 2.
+    kappa = 3. - 12.
+    lam = alpha**2 * (12. + kappa) - 12.
+    gam = np.sqrt(12. + lam)
+
+    Wm = 1./(2.*(12. + lam)) * np.ones((1,2*12))
+    Wm = list(Wm.flatten())
+    Wc = copy.copy(Wm)
+    Wm.insert(0,lam/(12. + lam))
+    Wc.insert(0,lam/(12. + lam) + (1 - alpha**2 + beta))
+    Wm = np.asarray(Wm)
+    diagWc = np.diag(Wc)  
+    
+    # Sensor parameters
+    meas_types = sensor['meas_types']
+    sigma_dict = sensor['sigma_dict']
+    p = len(meas_types)
+    
+    # Measurement noise
+    var = []
+    for mt in meas_types:
+        var.append(sigma_dict[mt]**2.)
+    Rk = np.diag(var)
+    
+    
+    # Recompute sigma points to incorporate process noise
+    sqP = np.linalg.cholesky(Pbar)
+    Xrep = np.tile(Xgrp, (1, 12))
+    chi_grp = np.concatenate((Xgrp, Xrep+(gam*sqP), Xrep-(gam*sqP)), axis=1) 
+    chi_diff = chi_grp - np.dot(Xgrp, np.ones((1, 25)))
+    
+    # Compute sigma points with quaternions
+    chi_quat = np.zeros((13, 25))
+    chi_quat[0:6, :] = chi_grp[0:6, :]
+    chi_quat[10:13, :] = chi_grp[9:12, :]
+    chi_quat[6:10, 0] = qmean.flatten()
+    for jj in range(24):
+        dp = chi_grp[6:9, jj+1].reshape(3,1)
+        dq = att.grp2quat(dp, 1)
+        qj = att.quat_composition(dq, qmean)
+        chi_quat[6:10, jj+1] = qj.flatten() 
+    
+    # Computed measurements    
+    meas_bar = np.zeros((p, 25))
+    for jj in range(chi_quat.shape[1]):
+        Xj = chi_quat[:,jj]
+        Yj = compute_measurement(Xj, sun_gcrf, sensor, spacecraftConfig,
+                                 surfaces, ti, EOP_data,
+                                 sensor['meas_types'], XYs_df)
+        meas_bar[:,jj] = Yj.flatten()
+        
+#        print(jj)
+#        print(Yj)
+    
+#    print(Wm)
+    Ybar = np.dot(meas_bar, Wm.T)
+    Ybar = np.reshape(Ybar, (p, 1))
+    Y_diff = meas_bar - np.dot(Ybar, np.ones((1, 25)))
+    Pyy = np.dot(Y_diff, np.dot(diagWc, Y_diff.T))
+    Pxy = np.dot(chi_diff,  np.dot(diagWc, Y_diff.T))
+
+    Pyy += Rk
+    
+#    print(meas_bar)
+#    print(Yi)
+#    print(Ybar)
+#    print(Pyy)
+
+    # Measurement Update
+    K = np.dot(Pxy, np.linalg.inv(Pyy))
+    Xgrp = Xgrp + np.dot(K, Yi-Ybar)
+    
+    # Compute updated quaternion and full state vector
+    dp = Xgrp[6:9].reshape(3,1)
+    dq = att.grp2quat(dp, 1)
+    q = att.quat_composition(dq, qmean)
+    X = np.zeros((13, 1))
+    X[0:6] = Xgrp[0:6]
+    X[6:10] = q
+    X[10:13] = Xgrp[9:12]
+    
+#        # Regular update
+#        P = Pbar - np.dot(K, np.dot(Pyy, K.T))
+#
+#        # Re-symmetric pos def
+#        P = 0.5 * (P + P.T)
+    
+    # Joseph Form
+    cholPbar = np.linalg.inv(np.linalg.cholesky(Pbar))
+    invPbar = np.dot(cholPbar.T, cholPbar)
+    P1 = (np.identity(12) - np.dot(np.dot(K, np.dot(Pyy, K.T)), invPbar))
+    P = np.dot(P1, np.dot(Pbar, P1.T)) + np.dot(K, np.dot(Rk, K.T))
+    
+#    print('posterior')
+#    print(X)
+#    print(P)
+#    print(Ybar)
+#    print(Yi - Ybar)
+#        print(Pyy)
+#        print(Rk)
+#        print(Pxy)
+    
+
+#    # Gaussian Likelihood
+    beta = compute_gaussian(Yi, Ybar, Pyy)
+#    beta_list.append(beta)
+    
+    return X, P, beta
 
 
 ###############################################################################
