@@ -11,6 +11,7 @@
 
 
 import numpy as np
+import math
 import matplotlib.pyplot as plt
 
 
@@ -43,7 +44,11 @@ def optical_car_gmm(rho_vect, Zk, q_vect, dq_vect, params, plot_flag=False):
 
     Returns
     -------
-    car_gmm : dictionary
+    GMM : list of GM component weights, means, covariance matrices [rho, drho]
+          [w,m,P]
+            w = list of weights
+            m = list of means (numpy px1 arrays)
+            P = list of covars (numpy pxp arrays)
         
 
     '''
@@ -204,13 +209,7 @@ def optical_car_gmm(rho_vect, Zk, q_vect, dq_vect, params, plot_flag=False):
         plt.show()
     
     
-    return
-
-
-def car_gmm_to_eci():
-    
-    
-    return
+    return GMM
 
 
 def car_drho_limits(rho_vect, Zk, q_vect, dq_vect, params):
@@ -504,5 +503,203 @@ def car_sigma_library(a, b, sigma_in) :
             break
 
     return sigma_out, L
+
+
+def car_gmm_to_eci(GMM0, Zk, q_vect, dq_vect, params):
+    '''
+    This function coverts the CAR GMM in range/range-rate space to ECI
+    cartesian coordinates using an unscented transform.
+
+    Parameters
+    ------
+    GMM0 : list of GM component weights, means, covariance matrices [rho, drho]
+            [w,m,P]
+            w = list of weights
+            m = list of means (numpy px1 arrays)
+            P = list of covars (numpy pxp arrays)
+    Zk : 4x1 numpy array
+        measurement vector containing topocentric RA/DEC and rates [rad, rad/s]
+    q_vect : 3x1 numpy array
+        sensor position vector in ECI [m]
+    dq_vect : 3x1 numpy array
+        sensor velocity vector in ECI [m/s]
+    params : dictionary
+        additional parameters (CAR limits)
+
+    Returns
+    ------
+    GMM = list of GM component weights, means, covariance matrices [ECI]
+            [w,m,P]
+            w = list of weights
+            m = list of means (numpy nx1 arrays)
+            P = list of covars (numpy nxn arrays)
+    
+    '''
+    
+    #Break out GMM
+    w = GMM0[0]
+    m0 = GMM0[1]
+    P0 = GMM0[2]
+    
+    # Retrieve inputs
+    sigma_dict = params['sigma_dict']
+    
+    # Setup for unscented transform
+    params['q_vect'] = q_vect
+    params['dq_vect'] = dq_vect
+
+    #Get sigmas for meas_types
+    meas_types = ['ra', 'dec', 'dra', 'ddec']
+    var_vect = []
+    for meas in meas_types:
+        var_vect.append((sigma_dict[meas])**2.)
+    
+    #For each GM component use unscented transform to put in ECI
+    L = len(w)
+    m_list = []
+    P_list = []
+    for j in range(L):
+        mj = m0[j]        
+        mj = np.append(mj, Zk)
+        mj = np.reshape(mj, (6,1))
+        Pj = np.diag(P0[j])
+        Pj = np.append(Pj, var_vect)
+        Pj = np.diag(Pj)
+
+        #Execute UT function
+        m, P, dum = unscented_transform(mj, Pj, ut_car_to_eci, params)
+        m_list.append(m)
+        P_list.append(P)
+
+    GMM = [w,m_list,P_list]
+    
+    
+    
+    return GMM
+
+
+def unscented_transform(m1, P1, transform_fcn, params, alpha=1., pnorm=2.):
+    '''
+    This function computes the unscented transform for a p-norm
+    distribution and user defined transform function.
+
+    Parameters
+    ------
+    m1 : nx1 numpy array
+      mean state vector
+    P1 : nxn numpy array
+      covariance matrix
+    transform_fcn : function handle
+      name of transform function
+    params : dictionary
+      input parameters for transform function
+    alpha : float, optional
+      sigma point distribution parameter (default=1)
+    pnorm : float, optional
+      value of p-norm distribution (default=2)
+
+    Returns
+    ------
+    m2 : mx1 numpy array
+      transformed mean state vector
+    P2 : mxm numpy array
+      transformed covariance matrix
+    Pcross : nxm numpy array
+      cross correlation covariance matrix
+    '''
+
+    # Number of States
+    L = int(m1.shape[0])
+
+    # Prior information about the distribution
+    kurt = math.gamma(5./pnorm)*math.gamma(1./pnorm)/(math.gamma(3./pnorm)**2.)
+    beta = kurt - 1.
+    kappa = kurt - float(L)
+
+    # Compute sigma point weights
+    lam = alpha**2.*(L + kappa) - L
+    gam = np.sqrt(L + lam)
+    Wm = 1./(2.*(L + lam)) * np.ones((1, 2*L))
+    Wm = list(Wm.flatten())
+    Wc = Wm.copy()
+    Wm.insert(0, lam/(L + lam))
+    Wc.insert(0, lam/(L + lam) + (1 - alpha**2 + beta))
+    Wm = np.asarray(Wm)
+    diagWc = np.diag(Wc)
+
+    # Compute chi - baseline sigma points
+    sqP = np.linalg.cholesky(P1)
+    Xrep = np.tile(m1, (1, L))
+    chi = np.concatenate((m1, Xrep+(gam*sqP), Xrep-(gam*sqP)), axis=1)
+    chi_diff = chi - np.dot(m1, np.ones((1, (2*L+1))))
+
+    # Compute transformed sigma points
+    Y = transform_fcn(chi, params)
+    row2 = int(Y.shape[0])
+    col2 = int(Y.shape[1])
+
+    # Compute mean and covar
+    m2 = np.dot(Y, Wm.T)
+    m2 = np.reshape(m2, (row2, 1))
+    Y_diff = Y - np.dot(m2, np.ones((1, col2)))
+    P2 = np.dot(Y_diff, np.dot(diagWc, Y_diff.T))
+    Pcross = np.dot(chi_diff,  np.dot(diagWc, Y_diff.T))
+
+    return m2, P2, Pcross
+
+
+def ut_car_to_eci(chi, params):
+    '''
+    Function for use with unscented_transform.
+    Converts sigma point matrix from inertial cartesian coordinates to
+    keplerian elements.
+
+    Parameters
+    ------
+    chi : L x (2L+1) numpy array
+      sigma point matrix
+    params : dictionary
+      input parameters
+
+    Returns
+    ------
+    Y : m x (2L+1) numpy array
+      transformed sigma point matrix
+    '''
+
+    #Station pos/vel in ECI
+    q_vect = params['q_vect'].flatten()
+    dq_vect = params['dq_vect'].flatten()
+
+    #Initialize output
+    Y = np.zeros(chi.shape)
+    L = int(chi.shape[1])
+
+    for ind in range(L):
+
+        #Break out chi
+        rho = float(chi[0,ind])
+        drho = float(chi[1,ind])
+        ra = float(chi[2,ind])
+        dec = float(chi[3,ind])
+        dra = float(chi[4,ind])
+        ddec = float(chi[5,ind])
+
+        #Unit vectors
+        u_rho = np.array([ np.cos(ra)*np.cos(dec),  np.sin(ra)*np.cos(dec), np.sin(dec)])
+        u_ra =  np.array([-np.sin(ra)*np.cos(dec),  np.cos(ra)*np.cos(dec),          0.])
+        u_dec = np.array([-np.cos(ra)*np.sin(dec), -np.sin(ra)*np.sin(dec), np.cos(dec)])
+
+        #Range and Range-Rate vectors
+        rho_vect = rho*u_rho
+        drho_vect = drho*u_rho + rho*dra*u_ra + rho*ddec*u_dec
+
+        #Compute pos/vel in ECI and add to output
+        r_vect = q_vect + rho_vect
+        v_vect = dq_vect + drho_vect
+        Y[:,ind] = np.append(r_vect, v_vect)
+
+    return Y
+
 
 

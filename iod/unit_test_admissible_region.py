@@ -15,6 +15,9 @@ import matplotlib.pyplot as plt
 import admissible_region as ar
 
 
+arcsec2rad = np.pi/(3600.*180.)
+
+
 
 def unit_test_optical_car_gmm_demars():
     '''
@@ -57,7 +60,12 @@ def unit_test_optical_car_gmm_demars():
     sigma_rho_desired = 5000.       # m
     sigma_drho_desired = 80.        # m/s
     
-    
+    # Measurement noise (DeMars Section V.B.)
+    sigma_dict = {}
+    sigma_dict['ra'] = 0.4*arcsec2rad
+    sigma_dict['dec'] = 0.4*arcsec2rad
+    sigma_dict['dra'] = 0.07*arcsec2rad
+    sigma_dict['ddec'] = 0.07*arcsec2rad
     
     # Set up parameters for CAR GMM function
     params = {}
@@ -68,9 +76,16 @@ def unit_test_optical_car_gmm_demars():
     params['e_max'] = e_max
     params['sigma_rho_desired'] = sigma_rho_desired
     params['sigma_drho_desired'] = sigma_drho_desired
+    params['sigma_dict'] = sigma_dict
     
+    # Compute CAR GMM in range, range-rate space
+    GMM_rgrr = ar.optical_car_gmm(rho_vect, Zk, q_vect, dq_vect, params, plot_flag=True)
     
-    GMM = ar.optical_car_gmm(rho_vect, Zk, q_vect, dq_vect, params, plot_flag=True)
+    # Convert GMM to Cartesian ECI
+    GMM_eci = ar.car_gmm_to_eci(GMM_rgrr, Zk, q_vect, dq_vect, params)
+    
+    # Check weights
+    print('sum weights', sum(GMM_eci[0]))
     
     
     return
@@ -115,7 +130,12 @@ def unit_test_optical_car_gmm_gehly():
     sigma_rho_desired = 500.       # m
     sigma_drho_desired = 20.        # m/s
     
-    
+    # Measurement noise (DeMars Section V.B.)
+    sigma_dict = {}
+    sigma_dict['ra'] = 0.4*arcsec2rad
+    sigma_dict['dec'] = 0.4*arcsec2rad
+    sigma_dict['dra'] = 0.07*arcsec2rad
+    sigma_dict['ddec'] = 0.07*arcsec2rad
     
     # Set up parameters for CAR GMM function
     params = {}
@@ -126,10 +146,16 @@ def unit_test_optical_car_gmm_gehly():
     params['e_max'] = e_max
     params['sigma_rho_desired'] = sigma_rho_desired
     params['sigma_drho_desired'] = sigma_drho_desired
+    params['sigma_dict'] = sigma_dict
     
+    # Compute CAR GMM in range, range-rate space
+    GMM_rgrr = ar.optical_car_gmm(rho_vect, Zk, q_vect, dq_vect, params, plot_flag=True)
     
-    GMM = ar.optical_car_gmm(rho_vect, Zk, q_vect, dq_vect, params, plot_flag=True)
+    # Convert GMM to Cartesian ECI
+    GMM_eci = ar.car_gmm_to_eci(GMM_rgrr, Zk, q_vect, dq_vect, params)
     
+    # Check weights
+    print('sum weights', sum(GMM_eci[0]))
     
     return
 
