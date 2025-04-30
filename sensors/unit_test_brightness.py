@@ -25,10 +25,10 @@ def object_setup():
     
     # Initial state
     # LEO SSO
-    elem = np.array([7000e3, 0.001, np.radians(98.), 0., 0., 0.])
+    # elem = np.array([7000e3, 0.001, np.radians(98.), 0., 0., 0.])
     
     # GEO
-    # elem = np.array([42164e3, 0.001, 0.001, 0., 0., 0])
+    elem = np.array([42164e3, 0.001, 0.001, 0., 0., 0])
     
     Xo = element_conversion.keplerian_to_cartesian(elem, 3.986e14)
         
@@ -102,7 +102,7 @@ def plot_measurements(check_elevation=True, check_station_dark=True, check_eclip
     bodies_sun_state = environment_setup.create_system_of_bodies(body_settings)
     
     # Propagate orbit
-    tf = t0 + 3600.
+    tf = t0 + 86400.
     tvec = np.array([t0, tf])
     tout, Xout = propagate_orbit(Xo, tvec, rso_params, int_params, bodies)
     
@@ -818,4 +818,5 @@ def latlonht2ecef(lat, lon, ht):
 if __name__ == '__main__':
     
     
-    plot_measurements()
+    # Set flags to all true to do visibility checks, or false to turn off
+    plot_measurements(True, True, True)
