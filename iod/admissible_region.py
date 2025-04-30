@@ -345,6 +345,9 @@ def car_drho_limits(rho_vect, Zk, q_vect, dq_vect, params):
         r = np.roots(np.array([a4, a3, a2, a1, a0_max]))
         drho_ecc =  np.array([])
         for i in range(len(r)):
+            
+            # Note this check will pass for r = number + 0j which then produces
+            # a warning when cast to float
             if np.isreal(r[i]):
                 drho_ecc = np.append(drho_ecc, float(r[i]))
 
