@@ -48,7 +48,7 @@ def linear_motion_setup():
     
     filter_params = {}
     filter_params['Q'] = np.diag([1e-8])
-    filter_params['gap_seconds'] = 100.
+    filter_params['gap_seconds'] = 1e-12
     filter_params['alpha'] = 1e-4
     filter_params['pnorm'] = 1.2
     
@@ -137,26 +137,9 @@ def execute_linear1d_test():
     batch_output, full_state_output = est.ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, params_dict)
     analysis.compute_linear1d_errors(batch_output, truth_dict)
     
-    # Lp-norm Batch Test
-    filter_output, full_state_output = est.lp_batch(state_dict, truth_dict, meas_dict, meas_fcn, params_dict)
-    analysis.compute_linear1d_errors(filter_output, truth_dict)
-    
-    
-    # EKF Test
-    # params_dict['filter_params']['gap_seconds'] = 0.
-    ekf_output, full_state_output = est.ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, params_dict)
-    analysis.compute_linear1d_errors(ekf_output, truth_dict)
-        
-    
-    # Unscented Batch Test
-    params_dict['int_params']['intfcn'] = dyn.ode_linear1d_ukf
-    meas_fcn = mfunc.unscented_linear1d_rg
-    ubatch_output, full_state_output = est.unscented_batch(state_dict, truth_dict, meas_dict, meas_fcn, params_dict)
-    analysis.compute_linear1d_errors(ubatch_output, truth_dict)    
-    
-    # UKF Test
-    ukf_output, full_state_output = est.ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, params_dict)
-    analysis.compute_linear1d_errors(ukf_output, truth_dict)
+    # # Lp-norm Batch Test
+    # filter_output, full_state_output = est.lp_batch(state_dict, truth_dict, meas_dict, meas_fcn, params_dict)
+    # analysis.compute_linear1d_errors(filter_output, truth_dict)
     
     
     print('Batch output')
@@ -167,12 +150,45 @@ def execute_linear1d_test():
     print('Xf_batch', Xf_batch)
     print('Pf_batch', Pf_batch)
     
+    
+    # EKF Test
+    # params_dict['filter_params']['gap_seconds'] = 0.
+    ekf_output, full_state_output = est.ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, params_dict)
+    analysis.compute_linear1d_errors(ekf_output, truth_dict)
+    
     print('KF output')
     Xf_kf = ekf_output[tf]['X']
     Pf_kf = ekf_output[tf]['P']
     
     print('Xf_ekf', Xf_kf)
     print('Pf_ekf', Pf_kf)
+    
+    
+    # EKF Smoothing
+    # params_dict['filter_params']['gap_seconds'] = 0.
+    ekf_output, full_state_output = est.ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, params_dict, smoothing=True)
+    analysis.compute_linear1d_errors(ekf_output, truth_dict, smoothing=True)
+    
+    print('KF smoothing output')
+    Xf_kf = ekf_output[tf]['X']
+    Pf_kf = ekf_output[tf]['P']
+    
+    print('Xf_ekf', Xf_kf)
+    print('Pf_ekf', Pf_kf)
+        
+    
+    # # Unscented Batch Test
+    # params_dict['int_params']['intfcn'] = dyn.ode_linear1d_ukf
+    # meas_fcn = mfunc.unscented_linear1d_rg
+    # ubatch_output, full_state_output = est.unscented_batch(state_dict, truth_dict, meas_dict, meas_fcn, params_dict)
+    # analysis.compute_linear1d_errors(ubatch_output, truth_dict)    
+    
+    # # UKF Test
+    # ukf_output, full_state_output = est.ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, params_dict)
+    # analysis.compute_linear1d_errors(ukf_output, truth_dict)
+    
+    
+    
     
     return
 
@@ -916,16 +932,16 @@ if __name__ == '__main__':
     
     plt.close('all')
     
-    # execute_linear1d_test()
+    execute_linear1d_test()
     
     # execute_balldrop_test()
     
-    twobody_geo_setup()
+    # twobody_geo_setup()
     
     # twobody_born_setup()
 
     
-    execute_twobody_test()
+    # execute_twobody_test()
     
 
 
