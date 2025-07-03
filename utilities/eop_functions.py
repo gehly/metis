@@ -1131,7 +1131,7 @@ if __name__ == '__main__':
     
 #    save_celestrak_eop_alldata()
     
-    UTC = datetime(2023, 10, 14, 0, 0, 0)
+    # UTC = datetime(2023, 10, 14, 0, 0, 0)
     
     # eop_alldata = get_celestrak_eop_alldata()
 
@@ -1144,5 +1144,8 @@ if __name__ == '__main__':
     # R = compute_ERA(UT1_JD)
     
     # print(R)
+    
+    df = get_XYs2006_alldata()
+    print(df)
     
     

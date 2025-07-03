@@ -932,7 +932,7 @@ if __name__ == '__main__':
     
     plt.close('all')
     
-    execute_linear1d_test()
+    # execute_linear1d_test()
     
     # execute_balldrop_test()
     
@@ -941,7 +941,7 @@ if __name__ == '__main__':
     # twobody_born_setup()
 
     
-    # execute_twobody_test()
+    execute_twobody_test()
     
 
 
