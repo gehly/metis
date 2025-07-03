@@ -21,7 +21,7 @@ import dynamics.dynamics_functions as dyn
 import estimation.analysis_functions as analysis
 import estimation.estimation_functions as est
 import iod.iod_functions as iod
-import iod.iod_functions2 as iod2
+#import iod.iod_functions2 as iod2
 import sensors.measurement_functions as mfunc
 import sensors.sensors as sens
 import sensors.visibility_functions as visfunc
@@ -1573,7 +1573,7 @@ def unit_test_gooding_iod():
         dt_sec = (UTC - UTC0).total_seconds()
         EOP_data = eop.get_eop_data(eop_alldata, UTC)
         Xk = astro.element_conversion(Xo, 1, 1, dt=dt_sec)
-        all_meas = mfunc.compute_measurement(Xk, {}, sensor, UTC, EOP_data,
+        all_meas = mfunc.compute_measurement(Xk, {}, sensor_params, sensor_id, UTC, EOP_data,
                                              XYs_df, meas_types=['ra', 'dec', 'rg', 'az', 'el'])
         
         
@@ -1609,14 +1609,14 @@ if __name__ == '__main__':
     
 #    unit_test_herrick_gibbs_iod()
     
-#    unit_test_gauss_iod()
+    unit_test_gauss_iod()
     
-#    unit_test_gooding_iod()
+    unit_test_gooding_iod()
     
     
 #    lambert_test()
     
-    lambert_test_jit()
+    # lambert_test_jit()
     
 #    lambert_test_hyperbolic()
     
