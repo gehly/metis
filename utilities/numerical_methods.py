@@ -66,7 +66,7 @@ def interp_lagrange(X, Y, xx, p):
         elif (row0 > len(X)-nn):
             row0 = len(X) - nn - 1
         else:
-            if (xx-X(row0) > 0.5) and (row0+1+nn < len(X)):
+            if (xx-X[row0] > 0.5) and (row0+1+nn < len(X)):
                 row0 = row0 + 1
     
         # Trim to relevant data points

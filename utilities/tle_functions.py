@@ -30,6 +30,15 @@ from utilities import eop_functions as eop
 from utilities.constants import GME, Re, wE
 
 
+# Load tudatpy modules
+from tudatpy.kernel.interface import spice_interface
+from tudatpy.kernel import numerical_simulation
+from tudatpy.kernel.numerical_simulation import environment_setup, propagation_setup
+from tudatpy.kernel.astro import element_conversion
+from tudatpy.kernel import constants
+from tudatpy.util import result2array
+from tudatpy.astro import time_conversion
+from tudatpy.astro.time_conversion import DateTime
 
 
 ###############################################################################
@@ -2005,28 +2014,34 @@ if __name__ == '__main__' :
     plt.close('all')
     
 
-    obj_id = 32789
-    # tle_dict, dum = get_spacetrack_tle_data(obj_id_list = [obj_id])
+    # obj_id = 32789
+    # # tle_dict, dum = get_spacetrack_tle_data(obj_id_list = [obj_id])
     
-    # print(tle_dict)
+    # # print(tle_dict)
     
-    tle_text = ("1 32789U 07021G   08119.60740078 -.00000054  00000-0  00000+0 0  9999 \n"
-                "2 32789 098.0082 179.6267 0015321 307.2977 051.0656 14.81417433    68")
+    # tle_text = ("1 32789U 07021G   08119.60740078 -.00000054  00000-0  00000+0 0  9999 \n"
+    #             "2 32789 098.0082 179.6267 0015321 307.2977 051.0656 14.81417433    68")
     
-    print(tle_text)
+    # print(tle_text)
     
 
     
-    tle_dict, dum = read_tle(tle_text)
+    # tle_dict, dum = read_tle(tle_text)
     
     
     
-    UTC = tletime2datetime(tle_dict[obj_id]['line1_list'][0])
+    # UTC = tletime2datetime(tle_dict[obj_id]['line1_list'][0])
     
-    output_state = propagate_TLE([obj_id], [UTC], tle_dict=tle_dict)
+    
+    obj_id = 52373
+    UTC = datetime(2025, 7, 29, 11, 58, 50, 816644)
+    
+    
+    
+    output_state = propagate_TLE([obj_id], [UTC])
     
     print(UTC)
-    # print(output_state)
+    print(output_state)
     
     r_GCRF = output_state[obj_id]['r_GCRF'][0]
     v_GCRF = output_state[obj_id]['v_GCRF'][0]
@@ -2041,13 +2056,13 @@ if __name__ == '__main__' :
     # r_GCRF = output_state[obj_id]['r_GCRF'][0]
     # v_GCRF = output_state[obj_id]['v_GCRF'][0]
     
-    # cart = np.concatenate((r_GCRF, v_GCRF), axis=0)
+    cart = np.concatenate((r_GCRF, v_GCRF), axis=0)
     
-    # print(cart)
+    print(cart)
     
-    # elem = astro.cart2kep(cart)
+    elem = astro.cart2kep(cart)
     
-    # print(elem)
+    print(elem)
     
     
 #    obj_id_list = [43164, 43166, 43691, 43692, 43851, 43863, 44074, 44075,
