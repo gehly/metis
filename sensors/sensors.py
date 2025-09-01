@@ -1434,6 +1434,131 @@ def define_sensors(sensor_id_list=[]):
     sensor_dict['Born s394']['obs_gap'] = obs_gap
     sensor_dict['Born s394']['min_pass'] = min_pass
     sensor_dict['Born s394']['max_pass'] = max_pass
+    
+    
+    print('TIRA')
+    
+    # site_ecef = np.reshape([549.500, -1380.870, 6182.200], (3,1))
+    # lat, lon, ht = coord.ecef2latlonht(site_ecef)
+    lat = 50.6174
+    lon = 7.1308
+    ht = 0.2946
+    geodetic_latlonht = [lat, lon, ht]
+    site_ecef = coord.latlonht2ecef(lat, lon, ht)
+    
+    # Constraints/Limits
+    az_lim = [0., 2.*pi]  # rad
+    el_lim = [5.*pi/180., pi/2.]  # rad
+    rg_lim = [0., 5000.]   # km
+    
+    # FOV dimensions
+    LAM_dim = 0.45   # deg
+    PHI_dim = 0.45   # deg
+    
+    # Convert to radians
+    LAM_half = 0.5*LAM_dim*pi/180
+    PHI_half = 0.5*PHI_dim*pi/180
+    FOV_hlim = [-LAM_half, LAM_half]
+    FOV_vlim = [-PHI_half, PHI_half]
+   
+    # Measurement types and noise
+    meas_types = ['rg', 'ra', 'dec']
+    sigma_dict = {}
+    sigma_dict['rg'] = 0.001  # km
+    sigma_dict['ra'] = 5.*arcsec2rad   # rad
+    sigma_dict['dec'] = 5.*arcsec2rad  # rad
+    
+    # Pass parameters
+    max_pass = 6000.
+    min_pass = 60.
+    max_gap = 600.
+    obs_gap = 1.
+    
+    # Location and constraints
+    sensor_dict['TIRA'] = {}
+    sensor_dict['TIRA']['geodetic_latlonht'] = geodetic_latlonht
+    sensor_dict['TIRA']['site_ecef'] = site_ecef
+    sensor_dict['TIRA']['el_lim'] = el_lim
+    sensor_dict['TIRA']['az_lim'] = az_lim
+    sensor_dict['TIRA']['rg_lim'] = rg_lim
+    sensor_dict['TIRA']['FOV_hlim'] = FOV_hlim
+    sensor_dict['TIRA']['FOV_vlim'] = FOV_vlim
+    sensor_dict['TIRA']['passive_optical'] = False
+    
+    # Measurements and noise
+    sensor_dict['TIRA']['meas_types'] = meas_types
+    sensor_dict['TIRA']['sigma_dict'] = sigma_dict
+    
+    # Pass parameters
+    sensor_dict['TIRA']['max_gap'] = max_gap
+    sensor_dict['TIRA']['obs_gap'] = obs_gap
+    sensor_dict['TIRA']['min_pass'] = min_pass
+    sensor_dict['TIRA']['max_pass'] = max_pass
+
+
+    print('ALTAIR')
+    
+    # site_ecef = np.reshape([549.500, -1380.870, 6182.200], (3,1))
+    # lat, lon, ht = coord.ecef2latlonht(site_ecef)
+    lat = 9.39
+    lon = 167.48
+    ht = 0.0627
+    geodetic_latlonht = [lat, lon, ht]
+    site_ecef = coord.latlonht2ecef(lat, lon, ht)
+    
+    # Constraints/Limits
+    az_lim = [0., 2.*pi]  # rad
+    el_lim = [5.*pi/180., pi/2.]  # rad
+    rg_lim = [0., 5000.]   # km
+    
+    # FOV dimensions
+    LAM_dim = 1.1   # deg
+    PHI_dim = 1.1   # deg
+    
+    # Convert to radians
+    LAM_half = 0.5*LAM_dim*pi/180
+    PHI_half = 0.5*PHI_dim*pi/180
+    FOV_hlim = [-LAM_half, LAM_half]
+    FOV_vlim = [-PHI_half, PHI_half]
+   
+    # Measurement types and noise
+    meas_types = ['rg', 'ra', 'dec']
+    sigma_dict = {}
+    sigma_dict['rg'] = 0.001  # km
+    sigma_dict['ra'] = 5.*arcsec2rad   # rad
+    sigma_dict['dec'] = 5.*arcsec2rad  # rad
+    
+    # Pass parameters
+    max_pass = 6000.
+    min_pass = 60.
+    max_gap = 600.
+    obs_gap = 1.
+    
+    # Location and constraints
+    sensor_dict['ALTAIR'] = {}
+    sensor_dict['ALTAIR']['geodetic_latlonht'] = geodetic_latlonht
+    sensor_dict['ALTAIR']['site_ecef'] = site_ecef
+    sensor_dict['ALTAIR']['el_lim'] = el_lim
+    sensor_dict['ALTAIR']['az_lim'] = az_lim
+    sensor_dict['ALTAIR']['rg_lim'] = rg_lim
+    sensor_dict['ALTAIR']['FOV_hlim'] = FOV_hlim
+    sensor_dict['ALTAIR']['FOV_vlim'] = FOV_vlim
+    sensor_dict['ALTAIR']['passive_optical'] = False
+    
+    # Measurements and noise
+    sensor_dict['ALTAIR']['meas_types'] = meas_types
+    sensor_dict['ALTAIR']['sigma_dict'] = sigma_dict
+    
+    # Pass parameters
+    sensor_dict['ALTAIR']['max_gap'] = max_gap
+    sensor_dict['ALTAIR']['obs_gap'] = obs_gap
+    sensor_dict['ALTAIR']['min_pass'] = min_pass
+    sensor_dict['ALTAIR']['max_pass'] = max_pass
+
+
+
+
+
 
     # Remove sensors not in list
     if len(sensor_id_list) > 0:

@@ -2033,8 +2033,8 @@ if __name__ == '__main__' :
     # UTC = tletime2datetime(tle_dict[obj_id]['line1_list'][0])
     
     
-    obj_id = 52373
-    UTC = datetime(2025, 7, 29, 11, 58, 50, 816644)
+    obj_id = 39451
+    UTC = datetime(2023, 4, 13, 20, 32, 50)
     
     
     

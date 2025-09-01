@@ -1498,8 +1498,8 @@ def ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):
         
         print('')
         print('kk', kk)
-        print('Pbar', Pbar)
-        print('eig', np.linalg.eig(Pbar))
+        # print('Pbar', Pbar)
+        # print('eig', np.linalg.eig(Pbar))
         print('det', np.linalg.det(Pbar))
 
         # Recompute sigma points to incorporate process noise
@@ -1558,20 +1558,20 @@ def ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, params_dict):
         filter_output[tk]['P'] = P
         filter_output[tk]['resids'] = resids
         
-#        print('\n')
-#        print('tk', tk)
-#        print('Xbar', Xbar)
-#        print('Xk', Xk)
-#        print('Yk', Yk)
-#        print('ybar', ybar)
-#        print('ybar_post', ybar_post)
-#        print('Kk', Kk)
-#        print('resids', resids)
-#        print('Pbar', Pbar)
-#        print('P', P)
+        print('\n')
+        print('tk', tk)
+        print('Xbar', Xbar)
+        print('Xk', Xk)
+        print('Yk', Yk)
+        print('ybar', ybar)
+        print('ybar_post', ybar_post)
+        print('Kk', Kk)
+        print('resids', resids)
+        print('Pbar', Pbar)
+        print('P', P)
 #        
-#        if kk > 2:
-#             mistake
+        if kk > 2:
+             mistake
 
             
     # TODO Generation of full_state_output not working correctly
