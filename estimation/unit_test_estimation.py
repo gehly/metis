@@ -1034,8 +1034,8 @@ def execute_twobody_test():
 #    params_dict['filter_params']['Q'] = 1e-16 * np.diag([1, 1, 1])
         
     # Batch Test
-    filter_output, full_state_output = est.ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, params_dict)    
-    analysis.compute_orbit_errors(filter_output, full_state_output, truth_dict)
+    # filter_output, full_state_output = est.ls_batch(state_dict, truth_dict, meas_dict, meas_fcn, params_dict)    
+    # analysis.compute_orbit_errors(filter_output, full_state_output, truth_dict)
     
     # # Lp-Norm Batch Test
     # params_dict['filter_params']['pnorm'] = 1.2
@@ -1044,8 +1044,8 @@ def execute_twobody_test():
     
     
     # EKF Test
-    filter_output, full_state_output = est.ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, params_dict)
-    analysis.compute_orbit_errors(filter_output, filter_output, truth_dict)
+    # filter_output, full_state_output = est.ls_ekf(state_dict, truth_dict, meas_dict, meas_fcn, params_dict)
+    # analysis.compute_orbit_errors(filter_output, filter_output, truth_dict)
     
     
     # Unscented Batch Test
@@ -1085,8 +1085,8 @@ def execute_twobody_test():
 #    
     
     
-    filter_output, full_state_output = est.unscented_batch(state_dict, truth_dict, meas_dict, meas_fcn, params_dict)
-    analysis.compute_orbit_errors(filter_output, full_state_output, truth_dict)
+    # filter_output, full_state_output = est.unscented_batch(state_dict, truth_dict, meas_dict, meas_fcn, params_dict)
+    # analysis.compute_orbit_errors(filter_output, full_state_output, truth_dict)
     
     # UKF Test
     filter_output, full_state_output = est.ls_ukf(state_dict, truth_dict, meas_dict, meas_fcn, params_dict)
