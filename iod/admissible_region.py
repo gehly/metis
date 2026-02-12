@@ -77,13 +77,22 @@ def optical_car_gmm(rho_vect, Zk, q_vect, dq_vect, params, plot_flag=False):
     delta_rho = rho_unique[1] - rho_unique[0]
     for rho in rho_unique:
         drho_vect = drho_dict[rho]
-        a_drho = np.min(drho_vect)
-        b_drho = np.max(drho_vect)
-        p_vect.append((b_drho-a_drho)*delta_rho)
-        #p_vect.append((b_drho-a_drho)/(b_rho-a_rho))
+        
+        if len(drho_vect) == 2:
+            a_drho = np.min(drho_vect)
+            b_drho = np.max(drho_vect)
+            p_vect.append((b_drho-a_drho)*delta_rho)
+            #p_vect.append((b_drho-a_drho)/(b_rho-a_rho))
+            
+        elif len(drho_vect) == 4:
+            drho_vect = np.sort(drho_vect)
+            area1 = (drho_vect[1] - drho_vect[0])*delta_rho
+            area2 = (drho_vect[3] - drho_vect[2])*delta_rho
+            p_vect.append(area1 + area2)
 
     #p_vect = np.asarray(p_vect)/(sum(p_vect)*delta_rho)
     norm_fact = np.trapz(p_vect, rho_unique)
+
     p_vect = p_vect/norm_fact
 
     #check = np.dot(p_vect,[delta_rho]*len(p_vect))
@@ -138,22 +147,85 @@ def optical_car_gmm(rho_vect, Zk, q_vect, dq_vect, params, plot_flag=False):
         mi = m_rho[i]
         Pi = P_rho[i]
 
+        # # Get values from Range-Rate PDF
+        # drho_vect = drho_dict2[mi]
+        # for k in range(int(len(drho_vect)/2)):
+        #     drho_k = drho_vect[2*k:2*k+2]
+        #     a_drho = np.min(drho_k)
+        #     b_drho = np.max(drho_k)
+        #     sig_drho, L_drho = car_sigma_library(a_drho, b_drho, params['sigma_drho_desired'])
+        #     if sig_drho > sig_drho_max :
+        #         sig_drho_max = sig_drho.copy()
+
+
+        #     #Weights, means, covar for this rho
+        #     wj = 1./L_drho
+        #     Pj = sig_drho**2.
+        #     for j in range(L_drho):
+        #         mj = a_drho + (b_drho-a_drho)/(L_drho + 1.)*(j+1.)
+        #         w.append(wi*wj)
+        #         m.append(np.array([[mi],[mj]]))
+        #         P.append(np.array([[Pi,0.],[0.,Pj]]))
+                
         # Get values from Range-Rate PDF
         drho_vect = drho_dict2[mi]
-        for k in range(int(len(drho_vect)/2)):
-            drho_k = drho_vect[2*k:2*k+2]
+        if len(drho_vect) == 2:
+            drho_k = drho_vect
             a_drho = np.min(drho_k)
             b_drho = np.max(drho_k)
             sig_drho, L_drho = car_sigma_library(a_drho, b_drho, params['sigma_drho_desired'])
             if sig_drho > sig_drho_max :
                 sig_drho_max = sig_drho.copy()
 
-
             #Weights, means, covar for this rho
             wj = 1./L_drho
             Pj = sig_drho**2.
             for j in range(L_drho):
                 mj = a_drho + (b_drho-a_drho)/(L_drho + 1.)*(j+1.)
+                w.append(wi*wj)
+                m.append(np.array([[mi],[mj]]))
+                P.append(np.array([[Pi,0.],[0.,Pj]]))
+                
+        
+        # Note that this won't actually space components evenly across the full
+        # vertical space, but instead creates 2 separate vertical regions that
+        # are evenly spaced within themselves, which is maybe not ideal/intended
+        # but is simpler to ensure the correct number of components
+        elif len(drho_vect) == 4:
+            drho_k = drho_vect[0:2]
+            a_drho1 = np.min(drho_k)
+            b_drho1 = np.max(drho_k)
+            sig_drho1, L_drho1 = car_sigma_library(a_drho1, b_drho1, params['sigma_drho_desired'])
+            if sig_drho1 > sig_drho_max :
+                sig_drho_max = sig_drho1.copy()
+                
+            d1 = b_drho1 - a_drho1
+            
+            drho_k = drho_vect[2:4]
+            a_drho2 = np.min(drho_k)
+            b_drho2 = np.max(drho_k)
+            sig_drho2, L_drho2 = car_sigma_library(a_drho2, b_drho2, params['sigma_drho_desired'])
+            if sig_drho2 > sig_drho_max :
+                sig_drho_max = sig_drho2.copy()
+                
+            d2 = b_drho2 - a_drho2
+            
+            d_total = d1+d2
+            
+
+            #Weights, means, covar for this rho
+            wj = (1./L_drho1)*(d1/d_total)
+            Pj = sig_drho1**2.
+            for j in range(L_drho1):
+                mj = a_drho1 + (b_drho1-a_drho1)/(L_drho1 + 1.)*(j+1.)
+                w.append(wi*wj)
+                m.append(np.array([[mi],[mj]]))
+                P.append(np.array([[Pi,0.],[0.,Pj]]))
+                
+            wj = (1./L_drho2)*(d2/d_total)
+            Pj = sig_drho2**2.
+            for j in range(L_drho2):
+                mj = a_drho2 + (b_drho2-a_drho2)/(L_drho2 + 1.)*(j+1.)
                 w.append(wi*wj)
                 m.append(np.array([[mi],[mj]]))
                 P.append(np.array([[Pi,0.],[0.,Pj]]))

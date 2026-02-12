@@ -75,28 +75,28 @@ def luigi_test_case():
     Yk_list = []
     sensor_id_list = []
     rho_list = []
-    for UTC in UTC_list:
+    # for UTC in UTC_list:
         
-        dt_sec = (UTC - UTC0).total_seconds()
-        EOP_data = eop.get_eop_data(eop_alldata, UTC)
-        Xk = astro.element_conversion(Xo, 1, 1, dt=dt_sec)
-        all_meas = mfunc.compute_measurement(Xk, {}, sensor_params, sensor_id, UTC, EOP_data,
-                                             XYs_df, meas_types=['ra', 'dec', 'rg', 'az', 'el'])
+    #     dt_sec = (UTC - UTC0).total_seconds()
+    #     EOP_data = eop.get_eop_data(eop_alldata, UTC)
+    #     Xk = astro.element_conversion(Xo, 1, 1, dt=dt_sec)
+    #     all_meas = mfunc.compute_measurement(Xk, {}, sensor_params, sensor_id, UTC, EOP_data,
+    #                                          XYs_df, meas_types=['ra', 'dec', 'rg', 'az', 'el'])
         
         
-        print(all_meas)
+    #     print(all_meas)
         
-        Yk = all_meas[0:2].reshape(2,1)
-        Yk_list.append(Yk)
-        sensor_id_list.append(sensor_id)
-        rho_list.append(float(all_meas[2]))
+    #     Yk = all_meas[0:2].reshape(2,1)
+    #     Yk_list.append(Yk)
+    #     sensor_id_list.append(sensor_id)
+    #     rho_list.append(float(all_meas[2]))
         
     
-    # Yk_list = [np.array([[1.57576193], [0.75166425]]), 
-    #            np.array([[1.8472072], [0.47479596]]), 
-    #            np.array([[2.01012769], [0.22509851]])]
+    Yk_list = [np.array([[1.55033304], [0.76927364]]), 
+               np.array([[1.83064689], [0.49517466]]), 
+               np.array([[1.999036  ], [0.24286021]])]
     
-    # sensor_id_list = [sensor_id]*3
+    sensor_id_list = [sensor_id]*3
     
     print(Yk_list)
     print(sensor_id_list)
