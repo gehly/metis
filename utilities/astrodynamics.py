@@ -1752,17 +1752,50 @@ if __name__ == '__main__':
 #    print(LTAN)
     
     
-    cart = np.array([710.87, 5151.26, 5075.69, 0.9039, -5.222, 5.1735])
-    cart = np.array([-27100, -32300, -100, 2.36, -1.98, 0])
-    kep = cart2kep(cart)
-    print(kep)
+    # cart = np.array([710.87, 5151.26, 5075.69, 0.9039, -5.222, 5.1735])
+    # cart = np.array([-27100, -32300, -100, 2.36, -1.98, 0])
     
-    kep = np.array([7500., 0.1, 85.3, 23.4, 235.7, 139.87])
-    cart = kep2cart(kep)
-    print(cart)
+    sgp4_cart = np.array([-3319729.43632604,2232522.20111217,5584714.47472505,
+                          -5425.91087379,  3011.18527714, -4417.7380047])
+    sgp4_kep = cart2kep(sgp4_cart, GM=GME*1e9)
+    print(sgp4_kep)
     
-    cart2 = element_conversion(kep, 0, 1)
-    print(cart2)
+    sma = sgp4_kep[0,0]/1000.
+    sgp4_P = 2*np.pi*np.sqrt(sma**3/GME)
+    print(sgp4_P)
+    
+    iod_sma = 6.87440040e+03
+    iod_P = 2*np.pi*np.sqrt(iod_sma**3/GME)
+    print(iod_P)
+    
+    print(iod_P - sgp4_P)
+    
+    vc = np.sqrt(GME/sma)
+    print('vc', vc)
+    
+    orbit_frac = 3600./sgp4_P 
+    print('orbit_frac', orbit_frac)
+    
+    along_track_pos_err = orbit_frac*(iod_P - sgp4_P)*vc
+    print('along track pos error', orbit_frac*(iod_P - sgp4_P)*vc)
+    
+    along_track_angle_err1 = along_track_pos_err/(sma-6378)*180/np.pi
+    along_track_angle_err2 = along_track_pos_err/2000.*180/np.pi
+    
+    print(along_track_angle_err1)
+    print(along_track_angle_err2)
+    
+    
+    # iod_cart = []
+    
+    
+    
+    # kep = np.array([7500., 0.1, 85.3, 23.4, 235.7, 139.87])
+    # cart = kep2cart(kep)
+    # print(cart)
+    
+    # cart2 = element_conversion(kep, 0, 1)
+    # print(cart2)
     
     # kep = np.array([42164.1, 0., 0., 20., 30., 0.])
     # cart = kep2cart(kep)
