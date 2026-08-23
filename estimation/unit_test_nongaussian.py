@@ -562,7 +562,7 @@ def demars_high_orbit():
     filter_params['gap_seconds'] = 900.
     filter_params['alpha'] = 1e-4
     filter_params['delta_s_sec'] = 600.
-    filter_params['split_T'] = 0.1
+    filter_params['split_T'] = 0.01
     
     # Integration function and additional settings
     int_params = {}
@@ -1079,20 +1079,20 @@ if __name__ == '__main__':
     
     plt.close('all')
     
-#    twobody_geo_aegis_prop()
+    # twobody_geo_aegis_prop()
     
 #    twobody_heo_aegis_prop()
     
-    # demars_high_orbit()
+    demars_high_orbit()
     
 #    aegis_ukf_setup()
     
 #    execute_aegis_test()
     
-    test_covariance_transform()
+    # test_covariance_transform()
     
     
-#    pdf_contours()
+    pdf_contours()
 
 
 
